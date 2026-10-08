@@ -672,3 +672,43 @@ panic obligations. A possible pointer publication invalidates startup and existi
 histories.
 Address/order guard mutations fail symbolic and native tests; matching observed bits do not
 permit dereferencing a returned pointer. Numeric intrinsic destinations remain unsupported.
+
+## Incoming shared storage and platform calls
+
+Shared non-Freeze root references, including nested struct, tuple, array and enum fields, retain
+incoming read-only storage identity. Potentially aliased multiple interior/mutable root graphs
+remain UNKNOWN. Static stores validate Freeze snapshots against the exact compiler pointee shape;
+non-Freeze snapshots remain unsupported. Tracked stores retain lifetime and escape evidence without
+inventing static payload initialization or startup history. Guard, type, field, lifetime, alias
+and unknown-effect mutations are exercised on host and ARM with debug and optimized MIR.
+
+Metadata-only dependency retention preserves the actual compiler exported-symbol index. Foreign
+Rust ABI declarations can resolve to a unique, strong, explicitly exported, non-generic Rust body
+with a matching normalized signature. Native-library, dynamic, weak, ambiguous, missing and
+unsupported exports remain UNKNOWN. Declaration contracts are not a proof; callee contracts and
+retained bodies execute normally. Temporary copies of an existing third-party implementation test
+positive, panic/assertion mutation and UNKNOWN paths while the analyzed fixtures forbid unsafe code.
+
+Exact Cortex-M PRIMASK reads/writes and interrupt mask instructions support only validated compiler
+assembly templates, u32 register operands, options and fallthrough shapes on supported ARM targets.
+PRIMASK reads remain arbitrary, including reserved upper bits. Repeated reads need not agree;
+counterexamples depending on that abstraction are labeled. Mask writes establish no exclusion or
+startup history and invalidate published atomic history. Other assembly remains UNKNOWN. This does
+not establish scheduling, interrupt handler behavior or MMIO access conditions.
+
+Compiler-typed inhabited zero-sized structs, tuples and arrays share bounded input descriptions.
+They emit no scalar symbols and consume one ordinary input slot per completed argument shape.
+The 16-level depth, 256-element array and 2048-node descriptor limits remain explicit. Unions,
+uninhabited types and unsupported reference shapes do not become valid from size alone.
+
+Checked dependency construction can certify MaybeUninit's uninitialized unit field and exact
+core UnsafeCell/SyncUnsafeCell forwarding. The narrow bool-to-u8 construction encoding preserves
+portable atomic container origins. A certificate does not establish initialized payload bytes;
+shared payload reads remain UNKNOWN even after supported stores. Compiler fixtures cover stores,
+guard mutations, spoofed unions, initialized alternatives and stale certificate rejection.
+
+Whole compiler-backed mutable Rust bool statics admit fresh arbitrary valid values on each read.
+Their declared initializer and preceding writes establish no runtime history. Supported typed
+writes discard shared history. The model requires exact bool storage at offset zero and rejects
+numeric addresses, immutable storage and readonly writes. Counterexamples relying on arbitrary
+state or unstable reads carry an abstraction reason; they do not establish a boot-time panic.

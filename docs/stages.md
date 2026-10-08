@@ -1236,3 +1236,12 @@ atomic construction. This certifies container provenance without initializing pa
 Shared payload reads before or after stores remain UNKNOWN. Host/ARM compiler fixtures check
 stores, refuted mutations, spoofed/initialized unions and stale artifact rejection. The retained
 origin cache policy refreshes certificates for these construction rules.
+
+## Stage 77: arbitrary mutable Rust boolean static state
+
+Whole compiler-backed mutable Rust bool allocations at offset zero support valid boolean loads
+and typed writes. Each read has a fresh abstraction; neither initializer nor preceding write nor
+critical-section assembly establishes startup or exclusion history. Already-taken and stable-read
+claims refute with explicit abstraction labels. Numeric addresses, incorrect declared types,
+immutable storage and readonly writes remain UNKNOWN. Safe custom MIR fixtures cover host/ARM
+and debug/optimized compilation plus initializer mutations.

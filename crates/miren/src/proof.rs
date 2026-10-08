@@ -91,9 +91,9 @@ struct Return {
 struct Engine<'tcx> {
     tcx: TyCtxt<'tcx>,
     terms: Context,
-    next_symbol: u32,
+    next_symbol: std::cell::Cell<u32>,
     float_encodings: BTreeMap<u32, Term>,
-    abstraction_symbols: BTreeMap<u32, &'static str>,
+    abstraction_symbols: std::cell::RefCell<BTreeMap<u32, &'static str>>,
     static_views: std::cell::RefCell<Vec<static_views::StaticView<'tcx>>>,
     static_origins: std::cell::RefCell<
         std::collections::HashMap<
@@ -156,9 +156,9 @@ pub fn verify(
     let mut engine = Engine {
         tcx,
         terms: Context::default(),
-        next_symbol: 0,
+        next_symbol: std::cell::Cell::new(0),
         float_encodings: BTreeMap::new(),
-        abstraction_symbols: BTreeMap::new(),
+        abstraction_symbols: std::cell::RefCell::new(BTreeMap::new()),
         static_views: std::cell::RefCell::new(Vec::new()),
         static_origins: Default::default(),
         static_epoch: None,
@@ -499,18 +499,19 @@ impl<'tcx> Engine<'tcx> {
         .map_err(|reason| format!("contract `{text}`: {reason}"))
     }
 
-    fn fresh(&mut self, sort: Sort) -> Term {
+    fn fresh(&self, sort: Sort) -> Term {
         let symbol = self
             .terms
-            .symbol(self.next_symbol, sort)
+            .symbol(self.next_symbol.get(), sort)
             .expect("modeled MIR sort");
-        self.next_symbol += 1;
+        self.next_symbol.set(self.next_symbol.get() + 1);
         symbol
     }
 
-    fn fresh_abstraction(&mut self, sort: Sort, reason: &'static str) -> Term {
+    fn fresh_abstraction(&self, sort: Sort, reason: &'static str) -> Term {
         let term = self.fresh(sort);
         self.abstraction_symbols
+            .borrow_mut()
             .insert(term.symbol_index().expect("fresh symbol"), reason);
         term
     }
@@ -779,8 +780,7 @@ impl<'tcx> Engine<'tcx> {
                 query
                     .symbols()
                     .iter()
-                    .filter_map(|symbol| self.abstraction_symbols.get(symbol))
-                    .copied()
+                    .filter_map(|symbol| self.abstraction_symbols.borrow().get(symbol).copied())
                     .collect::<std::collections::BTreeSet<_>>()
                     .into_iter()
                     .map(str::to_owned)

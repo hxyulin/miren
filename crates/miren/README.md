@@ -79,6 +79,13 @@ origin evidence remains UNKNOWN. These records establish construction provenance
 values, synchronization or a verified callee summary. Ordinary atomic interference stays
 conservative; startup histories still require explicit assumptions.
 
+Whole mutable Rust `bool` statics support typed direct reads and writes through compiler-backed
+allocation provenance. Each read admits either valid boolean value, including after writes;
+initializers and critical sections establish no startup or shared-state history. Counterexamples
+that depend on this abstraction record its reason. Foreign storage, numeric addresses, different
+scalar types, interior offsets and mismatched storage origins remain UNKNOWN. Readonly pointers
+cannot authorize writes.
+
 Ordinary and async entry scopes differ: selecting an async constructor with `--entry` checks
 construction; `--async-entry` also polls its fresh future through Pending and Ready states.
 Executor scheduling, cancellation and unbounded suspension require additional models or proofs.
@@ -98,7 +105,8 @@ Tracked thin raw addresses support MIR `Offset` within a compiler-sized referenc
 one-past formation and reverse offsets. Compiler pointee layout supplies the stride; scaled signed
 displacement and allocation bounds produce explicit validity obligations. Array casts retain their
 known extent. Numeric pointer offsets, zero-sized strides, wrapping arithmetic and raw loads/stores
-remain UNKNOWN. Retained references still undergo liveness and frame-escape checks.
+outside the separately documented static-view domains remain UNKNOWN. Retained references still
+undergo liveness and frame-escape checks.
 
 Compiler-typed `u8` MIR repeats use one constant SMT array and a target-width length. Their byte
 count does not expand host storage, and the compiler checks the target array layout. Bounds checks
@@ -128,7 +136,8 @@ the live backing value using its recorded compiler type, field offsets and targe
 supported integers, arrays and padding-free structs occupy at most 128 bytes. Bounds, liveness and
 frame-escape checks apply. Shared prefixes and borrowed-array conversions retain that backing
 reference; owned copies retain their copied values. Numeric origins, mutable raw slices, padding
-and raw subobject formation remain UNKNOWN. Raw byte access does not enable arbitrary pointer loads or writes.
+and raw subobject formation remain UNKNOWN. Raw byte access does not enable arbitrary pointer loads
+or writes.
 
 Shared non-Freeze root references retain incoming read-only storage identity, including nested
 fields such as a task spawner's executor reference. One interior/mutable root storage graph is

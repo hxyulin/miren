@@ -134,7 +134,7 @@ impl<'tcx> Engine<'tcx> {
         if cost > MAX_INPUT_VALUES.saturating_sub(self.input_values) {
             return Err("lazy input descriptors exceed the 512-node budget".to_owned());
         }
-        let start = self.next_symbol;
+        let start = self.next_symbol.get();
         let next = start
             .checked_add(shape.slots)
             .ok_or("lazy input symbol range overflow")?;
@@ -142,7 +142,7 @@ impl<'tcx> Engine<'tcx> {
             return Err("lazy input exceeds the 262144 reserved-symbol-slot budget".to_owned());
         }
         let seed = self.terms.symbol(start, Sort::Bool)?;
-        self.next_symbol = next;
+        self.next_symbol.set(next);
         self.input_values += cost;
         self.input_shapes = cache;
         Ok(Some(Value::Input(symbolic::input::InputValue {

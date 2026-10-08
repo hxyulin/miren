@@ -4,6 +4,7 @@ use rustc_middle::mir::interpret::GlobalAlloc;
 
 mod atomics;
 mod initialization;
+mod scalars;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum ViewKind {
@@ -30,6 +31,9 @@ impl<'tcx> Engine<'tcx> {
         constant: rustc_middle::mir::Const<'tcx>,
         span: Span,
     ) -> Result<Option<Value>, String> {
+        if let Some(value) = self.mutable_bool_static_constant(constant, span)? {
+            return Ok(Some(value));
+        }
         let ty::Ref(_, pointee, mutability) = constant.ty().kind() else {
             return Ok(None);
         };
@@ -309,6 +313,9 @@ impl<'tcx> Engine<'tcx> {
                     return Err(
                         "uninitialized static payload reads need an initialization model".into(),
                     );
+                }
+                if let Some(value) = self.mutable_bool_static_read(view)? {
+                    return Ok(value);
                 }
                 if self.atomic_shape(view.ty).is_some() {
                     return Ok(value);
