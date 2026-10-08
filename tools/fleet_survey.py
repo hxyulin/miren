@@ -60,7 +60,11 @@ def revision(path):
 
 
 def digest(path):
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    result = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            result.update(chunk)
+    return result.hexdigest()
 
 
 def freeze_analyzer(analyzer, output):
@@ -91,6 +95,83 @@ def source_hashes(fleet, output):
             if path.is_file():
                 result[str(path.relative_to(fleet))] = digest(path)
     return result
+
+
+ARTIFACT_SUFFIXES = (".rmeta", ".rlib", ".so", ".dylib", ".dll", ".miren-origins.json")
+MAX_INPUT_FILES = 100000
+
+
+def artifact_inputs(report, cwd):
+    files, directories = set(), {}
+    arguments = iter(report["rustc_arguments"])
+    for argument in arguments:
+        option, value = None, None
+        if argument in ("--extern", "-L"):
+            option, value = argument, next(arguments, None)
+        elif argument.startswith("--extern="):
+            option, value = "--extern", argument[len("--extern="):]
+        elif argument.startswith("-L") and argument != "-L":
+            option, value = "-L", argument[2:].lstrip("=")
+        if not value:
+            continue
+        if option == "--extern" and "=" in value:
+            path = Path(os.path.abspath(cwd / value.split("=", 1)[1]))
+            files.add(str(path))
+            if path.suffix == ".rmeta":
+                files.add(str(path) + ".miren-origins.json")
+        elif option == "-L":
+            kind, path = value.split("=", 1) if "=" in value else ("all", value)
+            if kind in {"dependency", "all", "native"}:
+                directory = str(Path(os.path.abspath(cwd / path)))
+                mode = "artifacts" if kind == "dependency" else "build"
+                if directories.get(directory) != "build":
+                    directories[directory] = mode
+    out = (report.get("compiler_environment") or {}).get("OUT_DIR")
+    if out:
+        directories[str(Path(os.path.abspath(cwd / out)))] = "build"
+    return {"files": sorted(files), "directories": dict(sorted(directories.items()))}
+
+
+def artifact_hashes(inputs, cache=None):
+    result = {}
+    paths = set(inputs["files"])
+    visited_files = 0
+    for directory, mode in inputs["directories"].items():
+        root = Path(directory)
+        result["directory:" + directory] = root.is_dir()
+        if not root.is_dir():
+            continue
+        for parent, subdirs, files in os.walk(root):
+            subdirs[:] = sorted(set(subdirs) - SKIP)
+            for name in sorted(files):
+                visited_files += 1
+                if visited_files > MAX_INPUT_FILES:
+                    raise ValueError("dependency/build traversal exceeds file limit")
+                if mode == "build" or name.endswith(ARTIFACT_SUFFIXES):
+                    path = str(Path(parent) / name)
+                    paths.add(path)
+                    if name.endswith(".rmeta"):
+                        paths.add(path + ".miren-origins.json")
+                if len(paths) > MAX_INPUT_FILES:
+                    raise ValueError("dependency/build input inventory exceeds file limit")
+    if len(paths) > MAX_INPUT_FILES:
+        raise ValueError("dependency/build input inventory exceeds file limit")
+    for name in sorted(paths):
+        path = Path(name)
+        if cache is not None and name in cache:
+            result[name] = cache[name]
+        else:
+            result[name] = digest(path) if path.is_file() else None
+            if cache is not None:
+                cache[name] = result[name]
+    return result
+
+
+def invalidate_unit(summary, unit, reason):
+    unit.update(status="failed", error=reason)
+    for root in summary["roots"]:
+        if root["id"].startswith(unit["id"] + "::"):
+            root.update(status="unknown", failure=reason, first_blocker=reason)
 
 
 def reports(data):
@@ -143,6 +224,11 @@ def rustc_option(arguments, flag):
         if argument.startswith(flag + "="):
             return argument[len(flag) + 1:]
     return None
+
+
+def compiler_cwd(report, workspace):
+    directory = Path(report.get("working_directory") or workspace)
+    return directory if directory.is_absolute() else workspace / directory
 
 
 def unit_matches(unit, report, cwd):
@@ -318,21 +404,28 @@ def survey(args):
         item = {"id": name, "inventory": record, "errors": errors, "expected_units": len(units)}
         summary["workspaces"].append(item)
         for unit in units:
-            matched = [r for r in inventories if unit_matches(unit, r, workspace)]
+            matched = [r for r in inventories if unit_matches(unit, r, compiler_cwd(r, workspace))]
             summary["units"].append(unit)
             if len(matched) != 1 or errors:
                 unit["error"] = "missing, duplicate or malformed inventory"
                 continue
             unit["status"] = "inventoried"
+            inventory_cwd = compiler_cwd(matched[0], workspace)
+            unit["artifact_inputs"] = artifact_inputs(matched[0], inventory_cwd)
+            try:
+                unit["artifact_hashes"] = artifact_hashes(unit["artifact_inputs"])
+            except (OSError, ValueError) as error:
+                unit.update(status="failed", error="cannot fingerprint artifacts: " + str(error))
+                continue
             pending.append((unit, matched[0], workspace))
         excluded = [r for r in inventories
                     if r.get("target") != args.target
-                    and any(unit_matches(u, r, workspace) for u in build_scripts)]
+                    and any(unit_matches(u, r, compiler_cwd(r, workspace)) for u in build_scripts)]
         item["excluded_host_build_scripts"] = [
             {"crate_name": r["crate_name"], "arguments": r["rustc_arguments"]} for r in excluded]
         unmatched = [r.get("crate_name") for r in inventories
                      if r not in excluded
-                     and not any(unit_matches(u, r, workspace) for u in units)]
+                     and not any(unit_matches(u, r, compiler_cwd(r, workspace)) for u in units)]
         if any(r.get("target") != args.target for r in inventories if r not in excluded):
             item["errors"].append("inventory target differs from requested target")
         if unmatched:
@@ -343,7 +436,7 @@ def survey(args):
         unit, inventory, workspace = item
         prefix = output / ("verify-" + hashlib.sha256(unit["id"].encode()).hexdigest()[:16])
         jsonl = prefix.with_suffix(".jsonl")
-        cwd = Path(inventory.get("working_directory") or workspace)
+        cwd = compiler_cwd(inventory, workspace)
         recorded = inventory.get("compiler_environment")
         replay_env = {key: value for key, value in env.items()
                       if not key.startswith(("CARGO_", "DEP_")) and key != "OUT_DIR"}
@@ -358,9 +451,23 @@ def survey(args):
         for key in LIMITS:
             command += ["--" + key.replace("_", "-"), str(getattr(args, key))]
         command += ["--", *inventory["rustc_arguments"]]
+        integrity_error = None
+        try:
+            before = artifact_hashes(unit["artifact_inputs"])
+            if before != unit["artifact_hashes"]:
+                integrity_error = "dependency/build inputs changed before verification"
+        except (OSError, ValueError) as error:
+            integrity_error = "cannot fingerprint artifacts: " + str(error)
         record, _ = execute(command, cwd, replay_env, prefix, args.unit_timeout)
+        try:
+            after = artifact_hashes(unit["artifact_inputs"])
+            unit["artifact_hashes_after_verify"] = after
+            if after != unit["artifact_hashes"]:
+                integrity_error = "dependency/build inputs changed during verification"
+        except (OSError, ValueError) as error:
+            integrity_error = "cannot fingerprint artifacts: " + str(error)
         verified, errors = reports(jsonl.read_bytes() if jsonl.exists() else b"")
-        failure = None
+        failure = integrity_error
         if record.get("returncode") not in (0, 1) or record["status"] == "timeout":
             failure = "verification crashed, failed to launch or timed out"
         if errors or len(verified) != 1:
@@ -394,6 +501,17 @@ def survey(args):
             summary["roots"].extend(future.result())
             summary["roots"].sort(key=lambda root: root["id"])
             save(output / "summary.json", summary)
+    final_artifact_cache = {}
+    for unit in summary["units"]:
+        if "artifact_hashes" not in unit:
+            continue
+        try:
+            final_inputs = artifact_hashes(unit["artifact_inputs"], final_artifact_cache)
+            unit["artifact_hashes_at_completion"] = final_inputs
+            if final_inputs != unit["artifact_hashes"]:
+                invalidate_unit(summary, unit, "dependency/build inputs changed before completion")
+        except (OSError, ValueError) as error:
+            invalidate_unit(summary, unit, "cannot fingerprint artifacts: " + str(error))
     final_hashes = source_hashes(fleet, output)
     if final_hashes != summary["provenance"]["source_files"]:
         summary["errors"].append("fleet source/build contents changed during the survey")

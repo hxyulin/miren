@@ -38,8 +38,14 @@ Replay restores the report's captured compiler working directory and Cargo compi
 Older inventories without environment capture are rejected for proof counting. The compiler
 capture covers Cargo package/features/configuration variables, manifest and crate identity,
 `OUT_DIR` and `DEP_*`; arbitrary custom environment inputs outside that capture are not guaranteed
-reproducible. No application source is rewritten. Cargo may download dependencies and refresh its
-analysis cache.
+reproducible. The runner fingerprints explicit compiler dependencies, transitive metadata and
+proc-macro candidates in dependency search directories, adjacent `.rmeta.miren-origins.json`
+sidecars (including their absence), generated `OUT_DIR` files and native search-directory inputs.
+It checks these immediately before and after each unit's verification and again at completion.
+Changed, added or missing inputs invalidate that unit's proof counts and leave collection partial.
+Dependency/build traversal is limited to 100,000 files per unit. These are integrity checks on
+live Cargo artifacts; the artifacts are not copied into the survey output. No application source
+is rewritten. Cargo may download dependencies and refresh its analysis cache.
 
 Provenance includes source revisions and dirty paths, analyzer binary hash, compiler/solver
 versions, original/frozen binary hashes, source/build file hashes, target, profile, feature

@@ -1011,3 +1011,16 @@ overflow and bounds validity failures, and stride/bounds mutations. Native tests
 relationships and the incorrect-stride assertion. Numeric pointers, zero-sized strides, wrapping
 arithmetic, untracked snapshots and raw dereferences remain UNKNOWN. Validity failures are recorded
 separately from panic-safety failures.
+
+## Stage 59: survey dependency and generated-input integrity
+
+The survey fingerprints explicit dependency artifacts, transitive metadata and proc-macro
+candidates, adjacent origin sidecars including their absence, generated `OUT_DIR` files and native
+search-directory inputs. Captured compiler working directories resolve relative arguments;
+symlink-adjacent sidecars retain their original spelling. A bounded traversal records each unit's
+inputs after inventory, immediately before and after verification, and at completion.
+
+Changed, added or missing inputs invalidate affected results and leave collection partial.
+Twelve standalone tests cover complete nested-cwd surveys, transitive changes, new sidecars,
+artifact/generated-file mutations, symlinks and traversal limits. Artifacts remain live Cargo
+inputs; these integrity checks do not claim hermetic capture of arbitrary custom environment data.

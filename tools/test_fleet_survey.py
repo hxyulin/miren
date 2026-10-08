@@ -115,6 +115,65 @@ class SurveyTests(unittest.TestCase):
         self.assertEqual(diff["removed"], [])
         self.assertEqual(diff["changed"][0]["after"], "refuted")
 
+    def test_artifact_fingerprints_cover_transitive_absence_and_generated_inputs(self):
+        dependencies = self.directory / "target/deps"
+        generated = self.directory / "target/generated"
+        dependencies.mkdir(parents=True)
+        generated.mkdir()
+        dependencies = dependencies.resolve()
+        generated = generated.resolve()
+        artifact = dependencies / "libdep.rmeta"
+        artifact.write_bytes(b"metadata")
+        (dependencies / "macro.dylib").write_bytes(b"macro")
+        (generated / "included.rs").write_text("const GENERATED: u32 = 1;\n")
+        report = {**self.inventory, "rustc_arguments": [
+            "--extern=dep=" + str(artifact), "--extern", "other=" + str(artifact),
+            "-Ldependency=" + str(dependencies), "-L", "dependency=" + str(dependencies)],
+            "compiler_environment": {"OUT_DIR": str(generated)}}
+        inputs = survey.artifact_inputs(report, self.directory)
+        before = survey.artifact_hashes(inputs)
+        sidecar = Path(str(artifact) + ".miren-origins.json")
+        self.assertIsNone(before[str(sidecar)])
+        self.assertIn(str(dependencies / "macro.dylib"), before)
+        for path in [sidecar, dependencies / "transitive.rmeta", generated / "included.rs"]:
+            original = path.read_bytes() if path.exists() else None
+            path.write_bytes(b"changed")
+            self.assertNotEqual(before, survey.artifact_hashes(inputs))
+            if original is None:
+                path.unlink()
+            else:
+                path.write_bytes(original)
+            self.assertEqual(before, survey.artifact_hashes(inputs))
+        with patch.object(survey, "MAX_INPUT_FILES", 1):
+            with self.assertRaises(ValueError):
+                survey.artifact_hashes(inputs)
+
+    def test_captured_crate_cwd_and_symlink_sidecars_preserve_argument_paths(self):
+        workspace = self.directory.resolve()
+        crate = workspace / "nested/crate"
+        crate.mkdir(parents=True)
+        actual = workspace / "actual.rmeta"
+        actual.write_bytes(b"metadata")
+        link = crate / "linked.rmeta"
+        link.symlink_to(actual)
+        sidecar = Path(str(link) + ".miren-origins.json")
+        sidecar.write_text("{}")
+        (crate / "included.rs").write_text("const INPUT: u32 = 1;\n")
+        report = {**self.inventory, "working_directory": "nested/crate",
+                  "rustc_arguments": ["--extern", "dep=linked.rmeta", "-L", ".",
+                                      "-L", "dependency=."],
+                  "compiler_environment": {"OUT_DIR": "."}}
+        cwd = survey.compiler_cwd(report, workspace)
+        inputs = survey.artifact_inputs(report, cwd)
+        self.assertIn(str(link), inputs["files"])
+        self.assertNotIn(str(actual), inputs["files"])
+        self.assertEqual(inputs["directories"][str(crate)], "build")
+        fingerprints = survey.artifact_hashes(inputs)
+        self.assertEqual(fingerprints[str(sidecar)], survey.digest(sidecar))
+        self.assertIn(str(crate / "included.rs"), fingerprints)
+        sidecar.write_text('{"changed": true}')
+        self.assertNotEqual(fingerprints, survey.artifact_hashes(inputs))
+
     def test_analyzer_snapshot_survives_original_replacement(self):
         original = self.directory / "miren"
         sibling = self.directory / "miren-rustc"
@@ -138,12 +197,23 @@ class SurveyTests(unittest.TestCase):
         executable.chmod(0o755)
         for name in ("rustc", "z3"):
             (self.directory / name).symlink_to(executable)
-        for mode in ("normal", "host_build", "missing", "malformed", "crash", "mismatch",
+        for mode in ("normal", "host_build", "crate_cwd", "missing", "malformed", "crash",
+                     "mismatch",
                      "missing_proof", "configuration_mutation", "file_mutation", "missing_target",
-                     "missing_compiler", "unsupported_schema",
+                     "missing_compiler", "unsupported_schema", "artifact_mutation", "new_sidecar",
+                     "transitive_mutation", "generated_mutation",
                      "source_mutation", "inventory_fail"):
             with self.subTest(mode=mode):
                 self.source.write_text("pub fn checked() {}\n")
+                dependencies = self.directory / "target/deps"
+                generated = self.directory / "target/generated"
+                dependencies.mkdir(parents=True, exist_ok=True)
+                generated.mkdir(parents=True, exist_ok=True)
+                (dependencies / "libdep.rmeta").write_bytes(b"metadata")
+                sidecar = dependencies / "libdep.rmeta.miren-origins.json"
+                sidecar.unlink(missing_ok=True)
+                (dependencies / "transitive.rmeta").unlink(missing_ok=True)
+                (generated / "included.rs").write_text("const GENERATED: u32 = 1;\n")
                 output = self.directory / ("output-" + mode)
                 args = survey.argparse.Namespace(
                     fleet=self.directory, output=output, analyzer=executable,
@@ -156,7 +226,7 @@ class SurveyTests(unittest.TestCase):
                     "CARGO_REGISTRY_TOKEN": "secret-never-record"}):
                     code = survey.survey(args)
                 result = json.loads((output / "summary.json").read_text())
-                if mode in ("normal", "host_build"):
+                if mode in ("normal", "host_build", "crate_cwd"):
                     self.assertEqual(code, 0)
                     self.assertEqual(result["counts"]["proved"], 1)
                     self.assertEqual(result["counts"]["refuted"], 1)
@@ -193,10 +263,20 @@ if "metadata" in args:
 report = {"schema_version": 9, "crate_name": "sample", "target": "arm",
           "compiler": "fake version 1", "panic_strategy": "abort", "mir_phase": "runtime",
           "overflow_checks": True,
-          "working_directory": str(root), "compiler_environment": {},
-          "rustc_arguments": ["--crate-name", "sample", "--crate-type", "lib", source],
+          "working_directory": str(root),
+          "compiler_environment": {"OUT_DIR": str(root / "target/generated")},
+          "rustc_arguments": ["--crate-name", "sample", "--crate-type", "lib", source,
+                              "--extern", "dep=" + str(root / "target/deps/libdep.rmeta"),
+                              "-L", "dependency=" + str(root / "target/deps")],
           "functions": [{"name": name, "source": {"file": source, "line": 1, "column": 1}}
                         for name in ["checked", "negative", "unsupported"]]}
+if mode == "crate_cwd":
+    (root / "nested").mkdir(exist_ok=True)
+    report["working_directory"] = "nested"
+    report["compiler_environment"]["OUT_DIR"] = "../target/generated"
+    report["rustc_arguments"] = ["--crate-name", "sample", "--crate-type", "lib", "../lib.rs",
+                                 "--extern", "dep=../target/deps/libdep.rmeta",
+                                 "-L", "dependency=../target/deps"]
 path = Path(args[args.index("--jsonl") + 1])
 if "inventory" in args:
     if "--no-config" not in args:
@@ -217,6 +297,14 @@ else:
         report["crate_name"] = "other"
     if mode == "missing_proof":
         report["functions"][0]["proof"] = None
+    if mode == "artifact_mutation":
+        (root / "target/deps/libdep.rmeta").write_bytes(b"different metadata")
+    if mode == "new_sidecar":
+        (root / "target/deps/libdep.rmeta.miren-origins.json").write_text("{}")
+    if mode == "transitive_mutation":
+        (root / "target/deps/transitive.rmeta").write_bytes(b"new metadata")
+    if mode == "generated_mutation":
+        (root / "target/generated/included.rs").write_text("const GENERATED: u32 = 2;\n")
     if mode == "missing_target":
         del report["target"]
     if mode == "missing_compiler":
