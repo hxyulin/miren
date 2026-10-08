@@ -72,6 +72,11 @@ unchecked verified summaries. Explicit trusted boundaries and startup domains re
 assumptions. Replay executes supported native inputs only with `--replay`, reports its independent
 evidence, and never upgrades a passing execution to PROVED.
 
+Reference graph validation is shared by tracked-value checks, frame-escape checks and returns.
+It traverses nested aggregates, pointer backing storage, iterator sources and static epochs before
+accepting dependent operations. The implementation lives separately from memory projection and
+mutation; this separation does not change the supported reference domain.
+
 The [coverage guide](../../docs/coverage.md) is the maintained feature reference. The
 [proof guide](../../docs/proofs.md) explains the encoding and limitations, and the
 [development guide](../../docs/development.md) lists required checks.

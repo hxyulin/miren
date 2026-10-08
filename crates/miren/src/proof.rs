@@ -43,6 +43,7 @@ mod pointer_atomic_shapes;
 mod pointer_atomics;
 mod pointer_handles;
 mod pointer_validity;
+mod reference_graph;
 mod replay_inputs;
 mod slice_equality;
 mod startup;

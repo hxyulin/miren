@@ -974,3 +974,14 @@ Ten host runner tests include full fake surveys with positive, refuted and unkno
 units, compiler crashes, malformed reports, configuration/source mutations and frozen binaries.
 Compiler integration checks source environment capture without registry credentials. A completed
 survey establishes collection completeness, not a proof of every root or firmware safety.
+
+## Stage 56: isolate reference graph validation
+
+Tracked-value, frame-escape and recursive graph validation move from memory projection code into
+one reference graph module. Six existing unit tests move with their helpers. The traversal,
+initialization checks and escape rules are unchanged; sibling returns retain the same validator.
+
+Before/after host and ARM runs over reference lifetime, tracked pointer, coroutine and local atomic
+fixtures produce identical complete proof records and SMT queries for 173 root reports. The full
+compiler/runtime suite passes. This refactor creates a focused validation boundary without adding
+reference permissions or language coverage.
