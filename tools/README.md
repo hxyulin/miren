@@ -80,6 +80,12 @@ baseline counts, unit failures, outcome transitions, added/removed roots, previo
 regressions and incompatible configurations. The previous collection may be partial, with its
 status preserved in the comparison.
 
+Comparisons also split transitions by both previous and current source classification, so a
+changed source-span heuristic cannot appear as a proof gain. Changed first blockers on roots
+that remain UNKNOWN are counted separately: clearing one unsupported operation can reveal another
+without changing the root's outcome. Blocker text remains diagnostic evidence, not a stable
+semantic category or a claim that later paths are supported.
+
 Compact provenance stores source and artifact aggregate SHA256 fingerprints instead of all
 artifact paths. Artifact checkpoint coverage is explicit: older surveys have no artifact evidence
 and report null for its fingerprint/unchanged flag; surveys recorded before pre-verification maps

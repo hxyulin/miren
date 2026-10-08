@@ -1095,3 +1095,13 @@ Host/ARM debug and optimized fixtures cover whole/projected static values, retai
 static returns, shared inputs and mutation of actual local tracked storage. Initializer and field
 mutations refute. Dead and nested-dead references, escaping local pointers and snapshot address
 observation remain UNKNOWN with their original diagnostic boundaries.
+
+## Stage 65: classified outcome and blocker comparisons
+
+Survey publication separates transitions by both previous and current source classification.
+A changed source-span heuristic stays visible instead of appearing as a proof gain. UNKNOWN roots
+whose first blocker changes are counted separately even when their status stays unchanged. These
+diagnostic strings do not promise support for later paths or define stable semantic categories.
+
+Eighteen standalone host tool tests cover deterministic comparisons, classification shifts and
+previously unrecorded blockers alongside complete collection and artifact-integrity checks.

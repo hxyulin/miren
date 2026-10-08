@@ -118,6 +118,32 @@ class ExportTests(unittest.TestCase):
         self.assertEqual(result["removed_roots"], 0)
         self.assertEqual(sum(t["count"] for t in result["transitions"]), 2336)
 
+    def test_comparison_tracks_classification_and_hidden_blocker_progress(self):
+        previous = deepcopy(self.raw)
+        unknowns = [r for r in previous["roots"] if r["status"] == "unknown"]
+        unknowns[0]["first_blocker"] = None
+        unknowns[1]["first_blocker"] = "earlier unsupported operation"
+        changed = next(r for r in previous["roots"]
+                       if r["classification"] == "source_function_heuristic"
+                       and r["status"] == "proved")
+        changed["classification"] = "generated_or_other"
+        previous["classified_counts"] = {
+            category: exporter.tally([r for r in previous["roots"]
+                                     if r["classification"] == category])
+            for category in exporter.CATEGORIES}
+        result = exporter.export(self.raw, "2026-10-09", previous)["comparison"]
+        self.assertEqual(result["changed_roots"], 0)
+        self.assertEqual(sum(t["count"] for t in result["classified_transitions"]), 2336)
+        self.assertIn({"before_classification": "generated_or_other",
+                       "after_classification": "source_function_heuristic",
+                       "before": "proved", "after": "proved", "count": 1},
+                      result["classified_transitions"])
+        self.assertEqual(sum(t["count"] for t in result["unknown_blocker_transitions"]), 2)
+        self.assertEqual({t["before"] for t in result["unknown_blocker_transitions"]},
+                         {None, "earlier unsupported operation"})
+        self.raw["roots"].reverse()
+        self.assertEqual(result, exporter.export(self.raw, "2026-10-09", previous)["comparison"])
+
 
 if __name__ == "__main__":
     unittest.main()

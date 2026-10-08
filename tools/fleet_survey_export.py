@@ -151,6 +151,15 @@ def comparison(summary, previous):
     after = {r["id"]: r for r in summary["roots"]}
     transitions = Counter((before[key]["status"], after[key]["status"])
                           for key in before.keys() & after)
+    classified_transitions = Counter(
+        (before[key]["classification"], after[key]["classification"],
+         before[key]["status"], after[key]["status"])
+        for key in before.keys() & after)
+    blocker_transitions = Counter(
+        (before[key]["first_blocker"], after[key]["first_blocker"])
+        for key in before.keys() & after
+        if before[key]["status"] == after[key]["status"] == "unknown"
+        and before[key]["first_blocker"] != after[key]["first_blocker"])
     return {"baseline_collection_status": previous["status"],
             "baseline_failed_units": sum(u["status"] != "complete" for u in previous["units"]),
             "baseline_counts": counts,
@@ -161,6 +170,14 @@ def comparison(summary, previous):
             "previously_proved_regressions": sum(
                 before[key]["status"] == "proved" and after[key]["status"] != "proved"
                 for key in before.keys() & after),
+            "classified_transitions": [
+                {"before_classification": ca, "after_classification": cb,
+                 "before": a, "after": b, "count": count}
+                for (ca, cb, a, b), count in sorted(classified_transitions.items())],
+            "unknown_blocker_transitions": [
+                {"before": a, "after": b, "count": count}
+                for (a, b), count in sorted(blocker_transitions.items(),
+                                          key=lambda item: (item[0][0] or "", item[0][1] or ""))],
             "transitions": [{"before": a, "after": b, "count": count}
                             for (a, b), count in sorted(transitions.items())]}
 
