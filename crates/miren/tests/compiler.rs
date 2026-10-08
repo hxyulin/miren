@@ -64,6 +64,37 @@ fn has_site(report: &Report, name: &str, kind: SiteKind) -> bool {
 }
 
 #[test]
+fn inventories_retain_source_environment_without_credentials_or_proof_policy() {
+    let directory = Directory::new();
+    let source = directory.0.join("environment.rs");
+    std::fs::write(
+        &source,
+        "pub fn version() -> &'static str { env!(\"CARGO_PKG_VERSION\") }",
+    )
+    .unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_miren"))
+        .current_dir(&directory.0)
+        .env("CARGO_PKG_VERSION", "survey-input")
+        .env("CARGO_REGISTRY_TOKEN", "must-not-be-recorded")
+        .env_remove("MIREN_VERIFY")
+        .args(["--json", "--", "--crate-type=lib", "--edition=2024"])
+        .arg(&source)
+        .arg("--out-dir")
+        .arg(&directory.0)
+        .output()
+        .unwrap();
+    let report = report(output);
+    assert_eq!(
+        report.working_directory,
+        Some(directory.0.canonicalize().unwrap())
+    );
+    let environment = report.compiler_environment.unwrap();
+    assert_eq!(environment["CARGO_PKG_VERSION"], "survey-input");
+    assert!(!environment.contains_key("CARGO_REGISTRY_TOKEN"));
+    assert!(!environment.contains_key("MIREN_VERIFY"));
+}
+
+#[test]
 fn bounds_arithmetic_and_explicit_panics_remain_visible_with_aborting_panics() {
     let directory = Directory::new();
     let report = report(analyze(

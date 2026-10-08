@@ -139,6 +139,7 @@ experimental loop induction and trusted boundaries require explicit settings. Ra
 - [Contracts](docs/contracts.md): metadata and explicit trusted boundaries.
 - [Proofs](docs/proofs.md): symbolic execution, induction and counterexample interpretation.
 - [Examples](docs/examples.md): independently testable parser, frame and contract cases.
+- [Fleet survey runner](tools/README.md): repeatable inventories, independent proofs and comparisons.
 - [Development](docs/development.md): formatting, linting, tests, builds and documentation checks.
 - [Analyzer design](docs/analyzer-redesign.md): remaining storage, call and proof work.
 

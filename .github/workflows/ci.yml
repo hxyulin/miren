@@ -38,6 +38,7 @@ jobs:
           done
       - name: Run proofs and runtime tests
         run: |
+          python3 -m unittest discover -s tools -p 'test_*.py'
           cargo test --workspace --locked
           for example in contracts can-frame dr16; do
             cargo test --locked --manifest-path examples/$example/Cargo.toml

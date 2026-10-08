@@ -2,6 +2,7 @@
 
 pub mod cli;
 mod config;
+pub mod invocation;
 pub mod limits;
 pub mod project;
 pub mod replay;
@@ -23,6 +24,10 @@ pub struct Report {
     pub overflow_checks: bool,
     pub mir_phase: String,
     pub rustc_arguments: Vec<String>,
+    #[serde(default)]
+    pub working_directory: Option<std::path::PathBuf>,
+    #[serde(default)]
+    pub compiler_environment: Option<BTreeMap<String, String>>,
     pub functions: Vec<Function>,
     pub traces: Vec<Trace>,
     pub coverage: Coverage,

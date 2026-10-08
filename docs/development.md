@@ -16,6 +16,7 @@ cargo build --workspace --locked
 cargo fmt --all --check
 cargo lint
 cargo test --workspace --locked
+python3 -m unittest discover -s tools -p 'test_*.py'
 cargo build --workspace --release --locked
 cargo deny check
 prek run --all-files --stage manual

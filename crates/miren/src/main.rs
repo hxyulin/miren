@@ -345,6 +345,8 @@ fn collect(tcx: TyCtxt<'_>, arguments: &[String]) -> Report {
         overflow_checks: tcx.sess.overflow_checks(),
         mir_phase: "optimized_mir with mir-opt-level=0".to_owned(),
         rustc_arguments: arguments.to_vec(),
+        working_directory: std::env::current_dir().ok(),
+        compiler_environment: miren::invocation::source_environment(),
         functions,
         traces: Vec::new(),
         coverage: miren::Coverage::default(),

@@ -956,3 +956,21 @@ small cases. Arbitrary non-byte slices, slice views and general adapters remain 
 Model indentation is disabled without changing solver logic or response limits. The mixed-end
 fixture's complete model fell from 570,463 to 131,593 bytes, fitting the existing 256 KiB cap.
 Unsupported compiler-inlined pointer/formatting internals remain explicit UNKNOWN cases.
+
+## Stage 55: repeatable fleet surveys
+
+A standalone host runner discovers library/binary units through pinned Cargo metadata, finishes
+inventories before independently verifying units, and bounds parallel analysis. Every attempt uses
+a fresh directory with atomic partial/complete summaries. Expected missing units, malformed reports,
+compiler crashes and mismatched roots cannot disappear or count as proofs. Host build scripts and
+the host-only xtask are explicitly outside the embedded scope.
+
+Reports retain the compiler working directory and selected Cargo source environment. The runner
+freezes analyzer binaries, ignores project proof configuration, fingerprints source/build inputs,
+and records compiler, solver, target, profile, features and limits. Outcome diffs retain stable
+unit/root identities and distinguish configuration incompatibilities from changed evidence.
+
+Ten host runner tests include full fake surveys with positive, refuted and unknown roots, missing
+units, compiler crashes, malformed reports, configuration/source mutations and frozen binaries.
+Compiler integration checks source environment capture without registry credentials. A completed
+survey establishes collection completeness, not a proof of every root or firmware safety.

@@ -56,6 +56,12 @@ source/argument commands and `--from-report` remain supported. Direct mode retai
 requires the original dependencies and working directory. Project commands rebuild through Cargo
 instead of asking users to manage those artifacts.
 
+Fresh reports retain the compiler working directory and Cargo source environment (`CARGO_PKG_*`,
+features, target configuration, manifest/crate names, `OUT_DIR` and `DEP_*`). Independent survey
+replays restore those inputs without inheriting analysis policies or registry credentials.
+Non-Unicode source environment values make the environment capture unavailable. Custom environment
+inputs outside those Cargo variables are not captured; reports are not hermetic build artifacts.
+
 Ordinary and async entry scopes differ: selecting an async constructor with `--entry` checks
 construction; `--async-entry` also polls its fresh future through Pending and Ready states.
 Executor scheduling, cancellation and unbounded suspension require additional models or proofs.

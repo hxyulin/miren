@@ -218,6 +218,20 @@ hardware/async effects remain separate work.
 
 ## Measurement procedure and cost
 
+New measurements use the [repeatable survey runner](../tools/README.md). It discovers workspace
+library and binary units, completes inventories before verification, and checks units independently:
+
+```sh
+python3 tools/fleet_survey.py /path/to/fleet-2027 --output /tmp/fleet-survey-001 \
+  --solver "$PWD/.venv/bin/z3"
+```
+
+Use a fresh output directory and `--previous /tmp/fleet-survey-001/summary.json` for a later
+comparison. The runner freezes analyzer binaries, restores recorded Cargo source inputs, and retains
+missing units and compiler failures as partial collection. Exit zero means every unit's results
+were collected, including REFUTED and UNKNOWN; it does not establish whole-firmware safety.
+The measurements above are historical and are not automatically updated by this command.
+
 First inventory each complete workspace, because verification failures can prevent Cargo from
 building dependent crates. From the relevant workspace root:
 
