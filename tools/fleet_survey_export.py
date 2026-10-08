@@ -159,6 +159,13 @@ def comparison(summary, previous):
         (before[key]["first_blocker"], after[key]["first_blocker"])
         for key in before.keys() & after
         if before[key]["status"] == after[key]["status"] == "unknown"
+        and before[key]["first_blocker"] != after[key]["first_blocker"]
+        and "source_function_heuristic" in
+        {before[key]["classification"], after[key]["classification"]})
+    blocker_counts = Counter(
+        (before[key]["classification"], after[key]["classification"])
+        for key in before.keys() & after
+        if before[key]["status"] == after[key]["status"] == "unknown"
         and before[key]["first_blocker"] != after[key]["first_blocker"])
     return {"baseline_collection_status": previous["status"],
             "baseline_failed_units": sum(u["status"] != "complete" for u in previous["units"]),
@@ -174,10 +181,17 @@ def comparison(summary, previous):
                 {"before_classification": ca, "after_classification": cb,
                  "before": a, "after": b, "count": count}
                 for (ca, cb, a, b), count in sorted(classified_transitions.items())],
+            "unknown_blocker_transition_scope": "source_function_heuristic_in_either_collection",
+            "unknown_blocker_change_counts": [
+                {"before_classification": ca, "after_classification": cb, "count": count}
+                for (ca, cb), count in sorted(blocker_counts.items())],
             "unknown_blocker_transitions": [
                 {"before": a, "after": b, "count": count}
                 for (a, b), count in sorted(blocker_transitions.items(),
-                                          key=lambda item: (item[0][0] or "", item[0][1] or ""))],
+                                          key=lambda item: (item[0][0] is not None,
+                                                            item[0][0] or "",
+                                                            item[0][1] is not None,
+                                                            item[0][1] or ""))],
             "transitions": [{"before": a, "after": b, "count": count}
                             for (a, b), count in sorted(transitions.items())]}
 

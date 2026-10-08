@@ -120,7 +120,8 @@ class ExportTests(unittest.TestCase):
 
     def test_comparison_tracks_classification_and_hidden_blocker_progress(self):
         previous = deepcopy(self.raw)
-        unknowns = [r for r in previous["roots"] if r["status"] == "unknown"]
+        unknowns = [r for r in previous["roots"] if r["status"] == "unknown"
+                    and r["classification"] == "source_function_heuristic"]
         unknowns[0]["first_blocker"] = None
         unknowns[1]["first_blocker"] = "earlier unsupported operation"
         changed = next(r for r in previous["roots"]
@@ -143,6 +144,34 @@ class ExportTests(unittest.TestCase):
                          {None, "earlier unsupported operation"})
         self.raw["roots"].reverse()
         self.assertEqual(result, exporter.export(self.raw, "2026-10-09", previous)["comparison"])
+
+    def test_null_and_empty_blockers_have_distinct_deterministic_sort_positions(self):
+        previous = deepcopy(self.raw)
+        unknowns = [i for i, r in enumerate(self.raw["roots"]) if r["status"] == "unknown"
+                    and r["classification"] == "source_function_heuristic"]
+        for index, blocker in zip(unknowns[:2], [None, ""]):
+            previous["roots"][index]["first_blocker"] = blocker
+            self.raw["roots"][index]["first_blocker"] = "later unsupported operation"
+        result = exporter.export(self.raw, "2026-10-09", previous)["comparison"]
+        self.assertEqual(result["unknown_blocker_transitions"], [
+            {"before": None, "after": "later unsupported operation", "count": 1},
+            {"before": "", "after": "later unsupported operation", "count": 1}])
+        previous["roots"].reverse()
+        self.raw["roots"].reverse()
+        self.assertEqual(result, exporter.export(self.raw, "2026-10-09", previous)["comparison"])
+
+    def test_generated_blocker_changes_are_counted_without_expanding_diagnostic_text(self):
+        previous = deepcopy(self.raw)
+        generated = next(r for r in previous["roots"] if r["status"] == "unknown"
+                         and r["classification"] == "generated_or_other")
+        generated["first_blocker"] = "earlier generated blocker"
+        result = exporter.export(self.raw, "2026-10-09", previous)["comparison"]
+        self.assertEqual(result["unknown_blocker_change_counts"], [
+            {"before_classification": "generated_or_other",
+             "after_classification": "generated_or_other", "count": 1}])
+        self.assertEqual(result["unknown_blocker_transitions"], [])
+        self.assertEqual(result["unknown_blocker_transition_scope"],
+                         "source_function_heuristic_in_either_collection")
 
 
 if __name__ == "__main__":

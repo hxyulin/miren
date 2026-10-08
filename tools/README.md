@@ -86,6 +86,13 @@ that remain UNKNOWN are counted separately: clearing one unsupported operation c
 without changing the root's outcome. Blocker text remains diagnostic evidence, not a stable
 semantic category or a claim that later paths are supported.
 
+All UNKNOWN first-blocker text changes are counted by previous/current classification. Detailed
+text transitions cover roots classified as source functions in either collection, with that scope
+explicit in the output; generated closure diagnostics can be very large and remain in the raw
+reports. Compiler crate hashes and debug-type ordering can change without semantic progress, so
+text changes alone do not establish that an unsupported operation was resolved. Null and empty
+blockers retain distinct, deterministic ordering.
+
 Compact provenance stores source and artifact aggregate SHA256 fingerprints instead of all
 artifact paths. Artifact checkpoint coverage is explicit: older surveys have no artifact evidence
 and report null for its fingerprint/unchanged flag; surveys recorded before pre-verification maps

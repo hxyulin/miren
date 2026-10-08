@@ -1078,9 +1078,10 @@ initialized payload. Equal-sized initialized byte arrays decode into primitive i
 using the target endian order, preserving exact float storage bits.
 
 Host/ARM debug and optimized tests cover sized and slice queries, invalid zero guards, later panics,
-signed zero, signaling NaN payloads and a same-name guard that executes its own body. Value and guard
-mutations refute. Character, restricted integer, Boolean and reference byte casts remain UNKNOWN;
-return-type mutations confirm these boundaries. Native checks agree with supported layout/encoding
+signed zero, signaling NaN payloads and a same-name guard that executes its own body.
+Value and guard mutations refute. Character, restricted integer, Boolean and reference byte casts
+remain UNKNOWN; return-type mutations confirm these boundaries.
+Native checks agree with supported layout/encoding
 claims. Option/NonZero niche casts and arbitrary unsized pointer metadata remain unsupported.
 
 ## Stage 64: shared Freeze snapshot reborrows
@@ -1105,3 +1106,18 @@ diagnostic strings do not promise support for later paths or define stable seman
 
 Eighteen standalone host tool tests cover deterministic comparisons, classification shifts and
 previously unrecorded blockers alongside complete collection and artifact-integrity checks.
+
+## Stage 66: second complete fleet pass and bounded diagnostic publication
+
+The next complete 32-unit scan retains all 2,336 root identities and resolves five previous
+unknown source functions into proofs. Source outcomes are 490 PROVED, 226 REFUTED and 303 UNKNOWN;
+all earlier proofs and refutations retain their outcomes. Another 20 inspected source roots pass
+an earlier unsupported operation and stop at a newly exposed gap. Hardware MMIO stays unsupported.
+All source inputs and four dependency/generated-input checkpoint maps remain unchanged.
+
+Compact publication counts first-blocker text changes for every classification and retains detailed
+transitions for roots classified as source functions in either collection. Large generated closure
+diagnostics remain in raw reports; every current root remains in the compact data. Crate hashes
+and debug-type ordering can change without semantic progress, which the survey guide distinguishes
+from inspected blocker advances. Null and empty blocker text sort distinctly and deterministically.
+Twenty host tool tests verify these publication boundaries alongside the existing collection checks.
