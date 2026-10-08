@@ -1,5 +1,56 @@
 # Fleet workspace survey
 
+## Current repeatable measurement
+
+On 2026-10-08, the repeatable runner collected all 2,336 roots from all 32 ARM library/binary
+units in fleet-2027. There were 1,028 PROVED, 221 REFUTED and 1,087 UNKNOWN roots, with no
+PROVED_WITH_ASSUMPTIONS results. All units completed collection; no entire workspace passed
+verification. Counts describe selected root domains, not line coverage or firmware safety.
+
+The source-function heuristic below identifies 1,019 declarations: 457 PROVED, 197 REFUTED and
+365 UNKNOWN. Its denominator differs from the historical 976 because the firmware revision changed.
+Refutations concern arbitrary supported root inputs and remain runtime unconfirmed.
+
+The [current JSON summary](/data/fleet-survey-current.json) records every root's outcome, source,
+first blocker and compilation unit, using the documented `root_columns` indices. It also records
+the frozen binary hashes, build settings and source-input fingerprint. Raw inventories, solver
+reports and command logs remain local measurement artifacts.
+
+- Firmware revision: `26377371e38ed3234f972bcdf6b2f9f4d26a7f02`;
+  tracked application source unchanged.
+  The working tree contains an untracked `rust-project.json`; all source-input hashes stayed equal
+  throughout the scan.
+- Analyzer code: `defa81a`, JSON schema 9. Recorded analyzer working-tree differences are survey
+  documentation and runner whitespace; the binaries were frozen before analysis.
+- Compiler: nightly-2026-09-22; Z3 4.15.4.
+- Target: `thumbv7em-none-eabihf`; dev profile; Cargo default features and locked dependencies.
+- All 32 units use panic abort and enabled overflow checks;
+  root/dependency MIR optimization is zero.
+- Limits: 8,192 steps, call depth 16, 200,000 query bytes, 30 seconds per root and 5 seconds per
+  solver request; four verification workers, sequential Cargo inventories.
+- No project proof configuration, startup assumptions, trusted sidecars, induction or native replay.
+
+The pre-fix runner collected a partial baseline: 13 units crashed when rustc queried dependency
+static initializer MIR absent from metadata. The storage-origin guard recovers collection for those
+units while keeping unavailable origins UNKNOWN. The same 2,336 roots remain selected, and no
+previously proved root regressed. The recovered reports add 556 proofs and 171 refutations to the
+baseline's collected outcomes; these are recovered results, not newly supported initializer bodies.
+
+Among the 365 unknown source-function roots, mutually exclusive first-blocker groups are:
+
+- Dependency static origin MIR: 63.
+- Raw pointer offset operations: 45.
+- Trait-object input shapes: 22.
+- Solver unknown results: 46.
+- Execution limits: 28.
+- Input/constant shape budgets: 32.
+- Other unsupported inputs, operations and calls: 129.
+
+These first blockers guide the next stages; resolving one can expose further unsupported behavior.
+The old mutable-input counts below no longer describe the current implementation.
+
+## Historical 2026-10-06 survey
+
 On 2026-10-06, miren checked the unchanged fleet-2027 shared libraries, DM-MC02 board/robot
 workspace and RM-C board workspace for `thumbv7em-none-eabihf`. After adding floating point,
 symbolic enum inputs, dependency-defined inputs, array patterns, dependency MIR retention and
@@ -218,7 +269,9 @@ hardware/async effects remain separate work.
 
 ## Measurement procedure and cost
 
-New measurements use the [repeatable survey runner](../tools/README.md). It discovers workspace
+New measurements use the
+[repeatable survey runner](https://github.com/hxyulin/miren/blob/main/tools/README.md).
+It discovers workspace
 library and binary units, completes inventories before verification, and checks units independently:
 
 ```sh

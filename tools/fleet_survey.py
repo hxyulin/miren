@@ -299,7 +299,7 @@ def survey(args):
                 if not set(target["kind"]) & {"lib", "bin", "rlib", "staticlib", "cdylib"}:
                     continue
                 kind = ",".join(sorted(target["kind"]))
-                identifier = f'{name}/{package["name"]}/{kind}/{target["name"]}' 
+                identifier = f'{name}/{package["name"]}/{kind}/{target["name"]}'
                 units.append({"id": identifier, "crate_name": target["name"].replace("-", "_"),
                               "source": str(Path(target["src_path"]).resolve()),
                               "kinds": target["crate_types"], "status": "missing_inventory"})
