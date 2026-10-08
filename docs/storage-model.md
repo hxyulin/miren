@@ -12,6 +12,13 @@ actual tracked references keep their allocation, capability and liveness checks.
 graphs are validated before accepting the projection. These snapshots cannot supply a raw address
 identity. Local allocation retirement and frame-escape checks remain active.
 
+Tracked address descriptors now also retain the compiler pointee type established at address
+formation. A shared byte slice retains that source pointer and length, and encodes the live backing
+value on reads. Compiler field offsets and target-endian integer encodings certify each readable
+byte of supported padding-free storage. Bounds and reference graphs are checked before reads;
+numeric address equality creates no provenance. Unsupported padding, mutable raw slices and raw
+subobject formation remain UNKNOWN.
+
 ## First migration stage: footprints and subobject certificates
 
 The ordinary interpreter now checks static address extents through a common `StorageFootprint`.

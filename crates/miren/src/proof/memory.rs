@@ -95,6 +95,10 @@ impl<'tcx> Engine<'tcx> {
                 self.snapshot(source, memory, conditions, depth + 1)?;
                 Ok(value.clone())
             }
+            Value::RawSlice { source, .. } => {
+                self.snapshot(source, memory, conditions, depth + 1)?;
+                self.raw_slice_snapshot(value, memory, conditions)
+            }
             Value::TrackedPointer { reference, .. } => {
                 self.snapshot(reference, memory, conditions, depth + 1)?;
                 Ok(value.clone())
@@ -206,7 +210,7 @@ impl<'tcx> Engine<'tcx> {
         Ok(value)
     }
 
-    fn memory_projection(
+    pub(super) fn memory_projection(
         &self,
         value: Value,
         projection: &MemoryProjection,
@@ -827,7 +831,10 @@ impl<'tcx> Engine<'tcx> {
     ) -> Result<Value, String> {
         if matches!(
             value,
-            Value::Reference { .. } | Value::TrackedPointer { .. } | Value::DebugReference { .. }
+            Value::Reference { .. }
+                | Value::RawSlice { .. }
+                | Value::TrackedPointer { .. }
+                | Value::DebugReference { .. }
         ) {
             self.validate_static_initialization_graph(&value, state, &mut Vec::new())?;
         }
@@ -840,7 +847,9 @@ impl<'tcx> Engine<'tcx> {
             Value::DebugReference { place: true, .. } => {
                 Err("opaque Debug data cannot escape as an owned value".into())
             }
-            Value::DebugReference { place: false, .. } | Value::TrackedPointer { .. } => {
+            Value::RawSlice { .. }
+            | Value::DebugReference { place: false, .. }
+            | Value::TrackedPointer { .. } => {
                 Self::validate_reference_graph(&value, state, Some(incoming), &mut Vec::new())?;
                 Ok(value)
             }

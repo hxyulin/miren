@@ -123,6 +123,12 @@ direct-tag enums with a compiler zero discriminant. Byte arrays remain compact. 
 MaybeUninit, pointers, niche/payload enums and restricted integer reconstruction remain UNKNOWN.
 This models the checked core operation; it does not make uninitialized storage readable.
 
+Compiler-typed shared byte slices can retain a tracked source allocation and length. Reads encode
+the live backing value using its recorded compiler type, field offsets and target endian order;
+supported integers, arrays and padding-free structs occupy at most 128 bytes. Bounds, liveness and
+frame-escape checks apply. Numeric origins, mutable raw slices, padding and raw subobject formation
+remain UNKNOWN. Raw byte access does not enable arbitrary pointer loads or writes.
+
 The [coverage guide](../../docs/coverage.md) is the maintained feature reference. The
 [proof guide](../../docs/proofs.md) explains the encoding and limitations, and the
 [development guide](../../docs/development.md) lists required checks.

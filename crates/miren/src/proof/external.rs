@@ -229,7 +229,8 @@ impl<'tcx> Engine<'tcx> {
                     Self::invalidate_local_atomics(variant, memory)?;
                 }
             }
-            Value::SliceIterator { source, .. }
+            Value::RawSlice { source, .. }
+            | Value::SliceIterator { source, .. }
             | Value::MetadataPointer(source)
             | Value::DebugReference { source, .. } => {
                 Self::invalidate_local_atomics(source, memory)?

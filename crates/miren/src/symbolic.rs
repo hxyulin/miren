@@ -44,6 +44,10 @@ pub enum Value {
         address: Term,
         bits: u32,
     },
+    RawSlice {
+        source: Box<Value>,
+        length: Box<Value>,
+    },
     Input(input::InputValue),
     Bool(Term),
     Int {
@@ -147,6 +151,7 @@ impl Value {
             Self::Cell { .. }
             | Self::Atomic { .. }
             | Self::LocalAtomic { .. }
+            | Self::RawSlice { .. }
             | Self::TrackedPointer { .. }
             | Self::Reference { .. }
             | Self::SliceIterator { .. }
@@ -197,6 +202,7 @@ impl Value {
             Self::Cell { .. }
             | Self::Atomic { .. }
             | Self::LocalAtomic { .. }
+            | Self::RawSlice { .. }
             | Self::TrackedPointer { .. }
             | Self::SliceIterator { .. }
             | Self::MetadataPointer(_)
@@ -243,6 +249,7 @@ impl Value {
             | Self::Unit => false,
             Self::DebugReference { source, .. } => source.contains_mutable(),
             Self::TrackedPointer { reference, .. } => reference.contains_mutable(),
+            Self::RawSlice { source, .. } => source.contains_mutable(),
         }
     }
 
@@ -259,6 +266,7 @@ impl Value {
             | Self::MetadataPointer(source)
             | Self::DebugReference { source, .. } => source.contains_local_atomic(),
             Self::TrackedPointer { reference, .. } => reference.contains_local_atomic(),
+            Self::RawSlice { source, .. } => source.contains_local_atomic(),
             Self::Input(_)
             | Self::Bool(_)
             | Self::Int { .. }

@@ -56,6 +56,7 @@ mod storage_locations;
 use startup::AtomicStorage;
 use startup_memory::Memory;
 mod tracked_pointers;
+mod typed_slices;
 mod zeroed_storage;
 
 #[derive(Clone)]
@@ -100,7 +101,7 @@ struct Engine<'tcx> {
     static_roots: Option<usize>,
     function_pointers: Vec<(ty::Instance<'tcx>, Ty<'tcx>)>,
     static_addresses: std::collections::HashMap<DefId, Term>,
-    tracked_addresses: Vec<(tracked_pointers::AddressLocation, Term)>,
+    tracked_addresses: Vec<(tracked_pointers::AddressLocation<'tcx>, Term)>,
     steps: usize,
     call_chain: Vec<DefId>,
     failed_call_chain: Option<Vec<DefId>>,
@@ -426,6 +427,7 @@ impl<'tcx> Engine<'tcx> {
             | Value::MetadataPointer(_)
             | Value::StaticText
             | Value::FormatArguments
+            | Value::RawSlice { .. }
             | Value::TrackedPointer { .. }
             | Value::StaticSlice { .. }
             | Value::StaticView { .. }
@@ -1429,6 +1431,9 @@ impl<'tcx> Engine<'tcx> {
                 source,
                 place: true,
             },
+            (ProjectionElem::Deref, value @ Value::RawSlice { .. }) => {
+                self.raw_slice_bytes(&value, state)?
+            }
             (ProjectionElem::Deref, value @ Value::Reference { .. }) => {
                 self.reference_value(&value, &state.memory, &state.conditions)?
             }
@@ -1616,6 +1621,17 @@ impl<'tcx> Engine<'tcx> {
                 Ok(value)
             }
             Rvalue::Ref(_, BorrowKind::Shared, place) => {
+                if let Some((ProjectionElem::Deref, prefix)) = place.projection.split_last() {
+                    let base = Place {
+                        local: place.local,
+                        projection: self.tcx.mk_place_elems(prefix),
+                    };
+                    let value = self.place(state, base)?;
+                    if matches!(value, Value::RawSlice { .. }) {
+                        self.raw_slice_bytes(&value, state)?;
+                        return Ok(value);
+                    }
+                }
                 if let Some(value) = self.borrow_shared_snapshot(body, state, *place)? {
                     return Ok(value);
                 }
@@ -1805,6 +1821,7 @@ impl<'tcx> Engine<'tcx> {
                         bits,
                         signed: true,
                     }),
+                    (UnOp::PtrMetadata, Value::RawSlice { length, .. }) => Ok(*length),
                     (UnOp::PtrMetadata, Value::MetadataPointer(length)) => Ok(*length),
                     (UnOp::PtrMetadata, Value::Bytes { length, .. }) => Ok(*length),
                     (

@@ -20,7 +20,10 @@ impl<'tcx> Engine<'tcx> {
         roots: &mut Vec<Value>,
     ) -> Result<(), String> {
         match value {
-            Value::TrackedPointer { reference, .. } => {
+            Value::RawSlice {
+                source: reference, ..
+            }
+            | Value::TrackedPointer { reference, .. } => {
                 Self::collect_static_store_references(reference, roots)?;
             }
             Value::Reference { .. } => {

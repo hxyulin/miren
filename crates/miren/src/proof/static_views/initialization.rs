@@ -123,7 +123,10 @@ impl Engine<'_> {
                 }
                 Ok(())
             }
-            Value::TrackedPointer { reference, .. }
+            Value::RawSlice {
+                source: reference, ..
+            }
+            | Value::TrackedPointer { reference, .. }
             | Value::SliceIterator {
                 source: reference, ..
             }

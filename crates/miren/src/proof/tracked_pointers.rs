@@ -4,11 +4,12 @@ use symbolic::MemoryProjection;
 const MAX_TRACKED_ADDRESSES: usize = 512;
 
 #[derive(Clone, PartialEq, Eq)]
-pub(super) struct AddressLocation {
-    allocation: usize,
+pub(super) struct AddressLocation<'tcx> {
+    pub(super) allocation: usize,
+    pub(super) pointee: Ty<'tcx>,
     projection: Vec<AddressProjection>,
     extent: u64,
-    cursor: Option<(Term, Term)>,
+    pub(super) cursor: Option<(Term, Term)>,
 }
 
 #[derive(Clone, PartialEq, Eq)]
@@ -115,6 +116,7 @@ impl<'tcx> Engine<'tcx> {
         let extent = layout.size.bytes();
         let location = AddressLocation {
             allocation: *allocation,
+            pointee,
             projection,
             extent,
             cursor: None,

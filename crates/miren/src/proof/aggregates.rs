@@ -139,7 +139,7 @@ impl<'tcx> Engine<'tcx> {
         &mut self,
         id: DefId,
         body: &Body<'tcx>,
-        state: &State,
+        state: &mut State,
         kind: &AggregateKind<'tcx>,
         operands: &IndexVec<rustc_abi::FieldIdx, Operand<'tcx>>,
     ) -> Result<Value, String> {
@@ -151,6 +151,9 @@ impl<'tcx> Engine<'tcx> {
             self.validate_tracked_value(value, state)?;
         }
         match kind {
+            AggregateKind::RawPtr(pointee, mutability) => {
+                self.raw_slice_aggregate(id, *pointee, mutability.is_mut(), values, state)
+            }
             AggregateKind::Coroutine(id, args) => self.construct_coroutine(*id, args, values),
             AggregateKind::Array(element) if *element == self.tcx.types.u8 => {
                 if values.len() as u64 > MAX_ARRAY_BYTES {

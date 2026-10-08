@@ -70,7 +70,8 @@ impl<'tcx> Engine<'tcx> {
             Value::TrackedPointer { reference, .. } => {
                 Self::validate_reference_graph(reference, state, incoming, visited)
             }
-            Value::SliceIterator { source, .. }
+            Value::RawSlice { source, .. }
+            | Value::SliceIterator { source, .. }
             | Value::MetadataPointer(source)
             | Value::DebugReference { source, .. } => {
                 Self::validate_reference_graph(source, state, incoming, visited)

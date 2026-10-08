@@ -1135,3 +1135,16 @@ Host/ARM debug and optimized tests cover exact zero fields, later panics, invali
 name spoofing and model budgets. Value/type/tag mutations fail; native checks cover valid payloads
 and a changed assertion. Targeted fresh-future main probes clear ClockMux configuration, then stop
 at foreign critical-section acquisition or numeric MMIO reset-cause access.
+
+## Stage 68: tracked typed shared byte slices
+
+Address formation retains its compiler pointee type before raw casts erase it. Shared byte slice
+aggregates keep the source allocation and length; reads encode live backing storage with compiler
+field offsets and target endian order. Integers, arrays and padding-free structs are bounded by
+128 bytes and 16 levels. Slice bounds, liveness, initialization graphs and frame escapes apply;
+static stores retain source reference evidence. Other backends explicitly reject this new domain.
+
+Host/ARM debug and optimized fixtures cover byte copies, partial offsets and live updates.
+Wrong endian claims and field/value mutations refute and fail native checks. Numeric origins,
+mutable raw slices, padded storage, raw subobjects, invalid bounds, dead storage and escaping
+locals remain UNKNOWN. This is not a general raw-pointer memory interpreter.

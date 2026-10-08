@@ -73,6 +73,17 @@ have at most 128 elements. Exhaustion is UNKNOWN.
 
 ## Execution and calls
 
+Shared byte slice pointer aggregates retain their tracked source and metadata. The address
+descriptor records the compiler pointee type before pointer casts erase it. Reads use live backing
+storage and exact target-endian integer encodings and struct field offsets, with at most 128 bytes
+and 16 levels. Every byte must belong to initialized supported fields; padding is rejected. Slice
+bounds, allocation liveness, embedded reference graphs and frame escapes remain checked.
+Host/ARM debug and optimized tests cover byte reads/copies, partial offsets, live updates, wrong
+endianness and field/value mutations, with native layout checks. Numeric origins, padded storage,
+mutable slices, raw subobjects, invalid bounds, dead storage and escaping locals remain UNKNOWN.
+Float/enum/union byte encoding, larger views, arbitrary pointer loads/writes and induction over
+these retained byte slices remain unsupported.
+
 The compiler-identified `mem::zeroed` operation checks the actual zero-validity guard before
 reconstructing initialized zero-bit values. Supported payloads are bool, char, primitive integers,
 f32/f64, tuples, structs, compact compiler-sized byte arrays and at most 128 expanded array
