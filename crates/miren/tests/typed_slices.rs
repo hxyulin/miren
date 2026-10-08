@@ -72,6 +72,16 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
             proof.obligations
         );
         assert!(proof.trusted_calls.is_empty());
+        let retained_failure = match *name {
+            "prefix_escape" | "borrowed_array_escape" => Some("frame-owned storage"),
+            "dead_prefix" | "dead_borrowed_array" => Some("dead or uninitialized storage"),
+            _ => None,
+        };
+        if let Some(detail) = retained_failure {
+            assert!(proof.obligations.iter().any(|obligation| {
+                obligation.status == ProofStatus::Unknown && obligation.detail.contains(detail)
+            }));
+        }
         if *expected == ProofStatus::Refuted {
             assert!(proof.obligations.iter().any(|o| o.model.is_some()));
         }
@@ -94,6 +104,11 @@ fn compiler_typed_byte_slices_keep_layout_bounds_and_provenance() {
         ("padded_storage", ProofStatus::Unknown),
         ("outside_storage", ProofStatus::Unknown),
         ("escaping_slice", ProofStatus::Unknown),
+        ("prefix_escape", ProofStatus::Unknown),
+        ("borrowed_array_escape", ProofStatus::Unknown),
+        ("dead_prefix", ProofStatus::Unknown),
+        ("dead_borrowed_array", ProofStatus::Unknown),
+        ("prefix_and_borrowed_array_reads", ProofStatus::Proved),
         ("dead_slice", ProofStatus::Unknown),
     ];
     for target in [None, Some("thumbv7em-none-eabihf")] {

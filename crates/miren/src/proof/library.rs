@@ -314,6 +314,18 @@ impl<'tcx> Engine<'tcx> {
                     }
                 })
                 .collect::<Result<Vec<_>, _>>()?;
+            let borrowed = match raw_values
+                .first()
+                .map(|value| self.retained_raw_slice(value, state))
+                .transpose()?
+                .flatten()
+            {
+                Some(value) => value,
+                None => Value::Bytes {
+                    length: Box::new(target_length),
+                    data: data.clone(),
+                },
+            };
             self.record_model(
                 callee,
                 "shared byte slice to array; exact length controls Result",
@@ -324,14 +336,7 @@ impl<'tcx> Engine<'tcx> {
             failure.push(symbolic::not(&equal));
             return Ok(Some(vec![
                 Return {
-                    value: self.constructed(
-                        signature.output(),
-                        0,
-                        vec![Value::Bytes {
-                            length: Box::new(target_length),
-                            data: data.clone(),
-                        }],
-                    )?,
+                    value: self.constructed(signature.output(), 0, vec![borrowed])?,
                     conditions: success,
                     memory: state.memory.clone(),
                 },

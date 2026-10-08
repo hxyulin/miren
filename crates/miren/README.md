@@ -126,8 +126,9 @@ This models the checked core operation; it does not make uninitialized storage r
 Compiler-typed shared byte slices can retain a tracked source allocation and length. Reads encode
 the live backing value using its recorded compiler type, field offsets and target endian order;
 supported integers, arrays and padding-free structs occupy at most 128 bytes. Bounds, liveness and
-frame-escape checks apply. Numeric origins, mutable raw slices, padding and raw subobject formation
-remain UNKNOWN. Raw byte access does not enable arbitrary pointer loads or writes.
+frame-escape checks apply. Shared prefixes and borrowed-array conversions retain that backing
+reference; owned copies retain their copied values. Numeric origins, mutable raw slices, padding
+and raw subobject formation remain UNKNOWN. Raw byte access does not enable arbitrary pointer loads or writes.
 
 The [coverage guide](../../docs/coverage.md) is the maintained feature reference. The
 [proof guide](../../docs/proofs.md) explains the encoding and limitations, and the

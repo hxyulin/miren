@@ -1148,3 +1148,15 @@ Host/ARM debug and optimized fixtures cover byte copies, partial offsets and liv
 Wrong endian claims and field/value mutations refute and fail native checks. Numeric origins,
 mutable raw slices, padded storage, raw subobjects, invalid bounds, dead storage and escaping
 locals remain UNKNOWN. This is not a general raw-pointer memory interpreter.
+
+## Stage 69: preserve backing storage through shared slice adapters
+
+Shared prefix indexing and borrowed-array conversion retain the typed raw slice's backing
+reference, including when reached through reference wrappers. Returning an owned byte copy keeps
+its copied value. Shared adapter reads still resolve current storage, and returned views cannot
+escape frame-owned backing storage or survive its retirement.
+
+The new host/ARM debug and optimized regressions reproduce an incorrectly proved prefix escape
+before the fix. Prefix and borrowed-array escapes now remain UNKNOWN at frame-escape checks;
+dead backing storage remains UNKNOWN at liveness checks. Valid reads and owned copies prove,
+and native checks agree.

@@ -36,6 +36,49 @@ impl<'tcx> Engine<'tcx> {
         Ok(slice)
     }
 
+    pub(super) fn retained_raw_slice(
+        &self,
+        value: &Value,
+        state: &State,
+    ) -> Result<Option<Value>, String> {
+        self.validate_tracked_value(value, state)?;
+        let mut value = value.clone();
+        for _ in 0..16 {
+            match value {
+                value @ Value::RawSlice { .. } => return Ok(Some(value)),
+                Value::Reference { .. } => {
+                    value = self.reference_value(&value, &state.memory, &state.conditions)?;
+                }
+                Value::Input(_)
+                | Value::Bool(_)
+                | Value::Int { .. }
+                | Value::Float { .. }
+                | Value::Bytes { .. }
+                | Value::Adt { .. }
+                | Value::Enum { .. }
+                | Value::Cell { .. }
+                | Value::Atomic { .. }
+                | Value::LocalAtomic { .. }
+                | Value::SliceIterator { .. }
+                | Value::MetadataPointer(_)
+                | Value::StaticText
+                | Value::FormatArguments
+                | Value::RawPointer { .. }
+                | Value::TrackedPointer { .. }
+                | Value::StaticSlice { .. }
+                | Value::StaticView { .. }
+                | Value::Tuple(_)
+                | Value::Elements(_)
+                | Value::Uninitialized
+                | Value::DebugReference { .. }
+                | Value::FunctionPointer { .. }
+                | Value::Function
+                | Value::Unit => return Ok(None),
+            }
+        }
+        Err("retained byte slice reference nesting exceeds the model budget".into())
+    }
+
     pub(super) fn raw_slice_bytes(&self, slice: &Value, state: &State) -> Result<Value, String> {
         self.validate_tracked_value(slice, state)?;
         self.raw_slice_snapshot(slice, &state.memory, &state.conditions)

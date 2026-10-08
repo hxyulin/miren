@@ -130,6 +130,39 @@ pub fn outside_storage() {
     assert!(bytes.len() == 5);
 }
 
+pub fn prefix(pointer: *const [u8]) -> &'static [u8] {
+    &shared(pointer)[..2]
+}
+
+pub fn prefix_escape() -> &'static [u8] {
+    let storage = [1u8; 4];
+    prefix(core::ptr::slice_from_raw_parts(
+        (&raw const storage).cast::<u8>(),
+        4,
+    ))
+}
+
+pub fn borrowed_array(pointer: *const [u8]) -> &'static [u8; 4] {
+    shared(pointer).try_into().unwrap()
+}
+
+pub fn borrowed_array_escape() -> &'static [u8; 4] {
+    let storage = [1u8; 4];
+    borrowed_array(core::ptr::slice_from_raw_parts(
+        (&raw const storage).cast::<u8>(),
+        4,
+    ))
+}
+
+pub fn prefix_and_borrowed_array_reads() {
+    let storage = [1u8, 2, 3, 4];
+    let pointer = core::ptr::slice_from_raw_parts((&raw const storage).cast::<u8>(), 4);
+    assert!(prefix(pointer) == [1, 2]);
+    assert!(*borrowed_array(pointer) == storage);
+    let owned = *borrowed_array(pointer);
+    assert!(owned == storage);
+}
+
 pub fn escaping_slice() -> &'static [u8] {
     let storage = [1u8; 4];
     shared(core::ptr::slice_from_raw_parts(
@@ -164,6 +197,68 @@ pub fn dead_slice() {
     }
 }
 
+#[custom_mir(dialect = "runtime", phase = "optimized")]
+pub fn dead_prefix() {
+    mir! {
+        let storage: [u8; 4];
+        let pointer: *const [u8; 4];
+        let thin: *const u8;
+        let fat: *const [u8];
+        let bytes: &'static [u8];
+        {
+            storage = [1_u8; 4];
+            pointer = &raw const storage;
+            thin = CastPtrToPtr(pointer);
+            Call(
+                fat = core::ptr::slice_from_raw_parts(thin, 4_usize),
+                ReturnTo(next),
+                UnwindUnreachable()
+            )
+        }
+        next = { Call(bytes = prefix(fat), ReturnTo(read), UnwindUnreachable()) }
+        read = {
+            StorageDead(storage);
+            Call(RET = inspect_shared(bytes), ReturnTo(done), UnwindUnreachable())
+        }
+        done = { Return() }
+    }
+}
+
+#[custom_mir(dialect = "runtime", phase = "optimized")]
+pub fn dead_borrowed_array() {
+    mir! {
+        let storage: [u8; 4];
+        let pointer: *const [u8; 4];
+        let thin: *const u8;
+        let fat: *const [u8];
+        let bytes: &'static [u8; 4];
+        {
+            storage = [1_u8; 4];
+            pointer = &raw const storage;
+            thin = CastPtrToPtr(pointer);
+            Call(
+                fat = core::ptr::slice_from_raw_parts(thin, 4_usize),
+                ReturnTo(next),
+                UnwindUnreachable()
+            )
+        }
+        next = { Call(bytes = borrowed_array(fat), ReturnTo(read), UnwindUnreachable()) }
+        read = {
+            StorageDead(storage);
+            Call(RET = inspect_array(bytes), ReturnTo(done), UnwindUnreachable())
+        }
+        done = { Return() }
+    }
+}
+
+pub fn inspect_array(bytes: &[u8; 4]) {
+    assert!(bytes.len() == 4);
+}
+
+pub fn inspect_shared(bytes: &[u8]) {
+    assert!(bytes.len() == 2);
+}
+
 pub fn inspect(pointer: *const [u8]) {
     assert!(shared(pointer).len() == 4);
 }
@@ -184,5 +279,6 @@ mod tests {
         }
         partial_slice();
         updates_are_visible();
+        prefix_and_borrowed_array_reads();
     }
 }

@@ -599,6 +599,16 @@ impl<'tcx> Engine<'tcx> {
                     projection,
                     mutable: true,
                 }
+            } else if let Some(Value::RawSlice { source, .. }) = raw_values
+                .first()
+                .map(|value| self.retained_raw_slice(value, state))
+                .transpose()?
+                .flatten()
+            {
+                Value::RawSlice {
+                    source,
+                    length: Box::new(end),
+                }
             } else {
                 let Value::Bytes { data, .. } = receiver else {
                     return Err("shared prefix needs byte storage".to_owned());
