@@ -1175,3 +1175,14 @@ executor storage boundary. Their compact evidence preserves call chains, setting
 and scope exclusions without mixing them into the default survey counts or claiming whole-main
 coverage. The pass validates 408 Rust tests and 20 survey-tool tests, lint, formatting, release
 builds, dependency policy, manual hooks and the documentation build.
+
+## Stage 71: repeatable coverage of every Embassy main
+
+The main survey runner replays all 12 binary factories in distinct async-body, task-registration
+and runtime-entry scopes. Source/dependency/generated inputs and report scope/settings are checked
+at every boundary. Missing, malformed, timed-out and mutated collections cannot reach the milestone.
+The baseline has 12 UNKNOWN bodies, 12 UNKNOWN registration roots and 12 REFUTED runtime roots;
+arbitrary runtime state is not boot-failure evidence. The milestone requires a supported PROVED
+or REFUTED async-body outcome for every expected main. Explicit, fingerprinted assumption profiles
+record a separate conditional milestone. Thirty-two host tool tests pass.
+

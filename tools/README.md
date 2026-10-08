@@ -99,3 +99,71 @@ and report null for its fingerprint/unchanged flag; surveys recorded before pre-
 were retained can report inventory, post-verification and completion checkpoints only. Unrecorded
 compiler settings are not inferred from the target name. Export uses a deterministic atomic
 replacement and changes no application code or documentation data automatically.
+
+## Embassy main body survey
+
+`fleet_main_survey.py` replays every exact Embassy main factory in the binary units of a complete
+fleet survey. It verifies inventory identity and root completeness before selecting mains. Build
+release binaries first, then use a new output directory:
+
+```sh
+python3 tools/fleet_main_survey.py --survey /tmp/fleet-survey-002/summary.json \
+  --output /tmp/fleet-main-001
+```
+
+Each binary has three separately recorded roots: `async_body` selects
+`____embassy_main_task::____embassy_main_task_inner_function` with `--async-entry`;
+`task_registration` selects `__embassy_main`; `runtime_entry` selects `__cortex_m_rt_main`.
+Async analysis constructs the fresh future and follows reached polls. Factory construction alone
+cannot establish body coverage. Task registration does not poll deferred futures, and runtime
+wrapper inputs describe arbitrary root state. Runtime wrapper counterexamples do not establish
+reachable boot panics. Scheduling, startup history, cancellation, output drops and persistent-loop
+induction remain outside the body scope.
+
+`--unit` accepts exact unit identities and can be repeated for smaller probes. The output preserves
+both expected and selected unit identities; a subset never satisfies the full-main milestone.
+`--analyzer`, `--unit-timeout` and the five analysis-limit flags allow explicit configuration.
+Every replay retains captured Cargo compiler arguments and environment while clearing ambient
+miren policies. Startup assumptions, induction and native replay are disabled. Trusted contracts
+and configured root preconditions require the explicit profile options below.
+The analyzer is frozen before use. Source and dependency/generated-artifact fingerprints must
+match the input survey and remain unchanged before, after and at completion.
+
+Raw JSONL, command logs, stdout and stderr accompany `summary.json`. Missing wrapper bodies,
+malformed reports, configuration changes, timeouts and process failures become failed UNKNOWN
+collections. A partial collection exits one. A complete collection exits zero even if roots remain
+UNKNOWN. `milestone_reached` requires complete coverage of every expected async body with an
+unconditional PROVED or REFUTED result; outcomes of the other scopes cannot substitute for it.
+
+An assumption profile is opt-in and applies only to `async_body`; task registration and runtime
+wrappers remain strict. Supply both flags:
+
+```sh
+python3 tools/fleet_main_survey.py --survey /tmp/fleet-survey-002/summary.json \
+  --output /tmp/fleet-main-conditional-001 --allow-assumptions \
+  --assumptions-profile /path/to/main-assumptions.json
+```
+
+The profile has `schema_version: 1` and a `units` object mapping exact known unit identities to
+ordinary schema-1 miren contract configurations. Omitted units remain strict. Unknown unit keys are
+rejected. `--unit` subsets can use a profile containing other known units without extending
+coverage.
+Alternatively, `--contracts FILE --allow-assumptions` applies one contract configuration to every
+selected async body. The two profile forms are mutually exclusive. A contract selector that is
+unused in a body can cause the analyzer to fail that collection; per-unit configurations avoid
+mixing selectors for different boards.
+
+The full input file is snapshotted byte for byte with a SHA256 hash. Normalized per-unit contract
+snapshots, selected profiles and final source/snapshot hashes remain in the result. Changed policy
+files or snapshots invalidate collected outcomes. Reports must contain the exact normalized
+configuration. Every trusted call must match an explicitly trusted configured contract and its
+instance selector, and root preconditions must match the recorded root configuration. Startup or
+induction metadata remains rejected even with these flags.
+
+Each collected root records `conditional` from its actual assumptions and trusted calls, including
+REFUTED or UNKNOWN results that used a hypothesis. PROVED with configured preconditions is also
+conditional even when the analyzer's status label is PROVED. Such outcomes cannot satisfy
+`milestone_reached`. `conditional_milestone_reached` records the separate opt-in milestone only
+when every expected async body has a collected PROVED, PROVED_WITH_ASSUMPTIONS or REFUTED result
+with explicit conditional labels. UNKNOWN and incomplete or subset collections satisfy neither.
+These profiles are hypotheses, not verified hardware models; the runner creates none automatically.
