@@ -1,0 +1,568 @@
+{
+  "after": {
+    "analyzer_binaries": {
+      "cargo-miren": {
+        "frozen_sha256": "f6f7e08b8ae739303c28562f9e8d7da430eee800585db67f320955fba173d771",
+        "original_sha256": "f6f7e08b8ae739303c28562f9e8d7da430eee800585db67f320955fba173d771"
+      },
+      "miren": {
+        "frozen_sha256": "7bc2aeef40be1ef8f43fb772236e1946fa9e39c82dbc161dbc99083b69308679",
+        "original_sha256": "7bc2aeef40be1ef8f43fb772236e1946fa9e39c82dbc161dbc99083b69308679"
+      },
+      "miren-rustc": {
+        "frozen_sha256": "4473c11ffb2f8f9516ee48b7e466a16118f74900d1002a5bb1517d98ba6e2d1c",
+        "original_sha256": "4473c11ffb2f8f9516ee48b7e466a16118f74900d1002a5bb1517d98ba6e2d1c"
+      }
+    },
+    "analyzer_source": {
+      "changes": "",
+      "commit": "efe9d660d4341e12a04d3e12f6ac6263bfdfbe49",
+      "dirty": false
+    },
+    "compiler": "rustc 1.100.0-nightly (1303417c4 2026-09-21)\nbinary: rustc\ncommit-hash: 1303417c416e1595173d9689e7394c31e136ae95\ncommit-date: 2026-09-21\nhost: aarch64-apple-darwin\nrelease: 1.100.0-nightly\nLLVM version: 23.1.1",
+    "features": "",
+    "fleet": {
+      "changes": "?? rust-project.json",
+      "commit": "26377371e38ed3234f972bcdf6b2f9f4d26a7f02",
+      "dirty": true
+    },
+    "profile": "dev",
+    "raw_probe_summary": "/tmp/miren-embassy-main-final-20261009/summary.json",
+    "raw_probe_summary_sha256": "8b04f5c836a6ba4efc9311d9127dda866ab68074deb291fdb976209dc2508b59",
+    "raw_survey_summary": "/private/tmp/miren-fleet-pass3-final-20261009/summary.json",
+    "raw_survey_summary_sha256": "1e6a112150da09e76da6d4588aa4d42388d4b403890b7295692951633ed93b4c",
+    "solver": "Z3 version 4.15.4 - 64 bit",
+    "source_integrity": {
+      "after": {
+        "entries": 243,
+        "sha256": "b3ad9016823750ba6be007536faf9b8cdb0543060030a29ac5e83b754df358d6"
+      },
+      "before": {
+        "entries": 243,
+        "sha256": "b3ad9016823750ba6be007536faf9b8cdb0543060030a29ac5e83b754df358d6"
+      },
+      "unchanged": true
+    },
+    "target": "thumbv7em-none-eabihf",
+    "units": [
+      {
+        "analyzed_bodies": [
+          "____embassy_main_task::____embassy_main_task_inner_function",
+          "____embassy_main_task::____embassy_main_task_inner_function::{closure#0}",
+          "dm_mc02::init",
+          "<embassy_stm32::Config as core::default::Default>::default",
+          "<embassy_stm32::rcc::Config as core::default::Default>::default",
+          "embassy_stm32::rcc::Config::new",
+          "embassy_stm32::rcc::Hsi48Config::new",
+          "embassy_stm32::rcc::LsConfig::new",
+          "embassy_stm32::rcc::LsConfig::default_lsi",
+          "embassy_stm32::rcc::mux::ClockMux::default",
+          "dm_mc02::reset_cause",
+          "embassy_stm32::stm32_metapac::rcc::Rcc::rsr",
+          "core::ptr::mut_ptr::<impl *mut T>::add"
+        ],
+        "artifact_integrity": {
+          "after": {
+            "entries": 243,
+            "sha256": "66a6abf2928bc72ce47df6852448504c1403edab4e5de4448d6c439fd15a3a18"
+          },
+          "at_completion": {
+            "entries": 243,
+            "sha256": "66a6abf2928bc72ce47df6852448504c1403edab4e5de4448d6c439fd15a3a18"
+          },
+          "before": {
+            "entries": 243,
+            "sha256": "66a6abf2928bc72ce47df6852448504c1403edab4e5de4448d6c439fd15a3a18"
+          },
+          "matches_survey_at_completion": true,
+          "unchanged": true
+        },
+        "assumptions": [],
+        "first_blocker": {
+          "call_chain": [
+            "____embassy_main_task::____embassy_main_task_inner_function",
+            "____embassy_main_task::____embassy_main_task_inner_function::{closure#0}",
+            "dm_mc02::init",
+            "dm_mc02::reset_cause",
+            "embassy_stm32::stm32_metapac::rcc::Rcc::rsr",
+            "core::ptr::mut_ptr::<impl *mut T>::add"
+          ],
+          "detail": "core::ptr::mut_ptr::<impl *mut T>::add bb0: pointer Offset requires tracked allocation provenance",
+          "function": "____embassy_main_task::____embassy_main_task_inner_function",
+          "kind": "unsupported",
+          "source": {
+            "column": 1,
+            "file": "/Users/hxyulin/dev/RM/Embedded/fleet-2027/robots/engineer/upper-board/src/main.rs",
+            "line": 36
+          },
+          "status": "unknown"
+        },
+        "label": "engineer-upper-board",
+        "mir_phase": "optimized_mir with mir-opt-level=0",
+        "overflow_checks": true,
+        "panic_strategy": "abort",
+        "proved_obligation_count": 1,
+        "raw_report": "/private/tmp/miren-embassy-main-final-20261009/engineer-upper-board.jsonl",
+        "raw_report_sha256": "f024b4be0dc0616a4509279f95b53497702e7aa974b90655a83131d06ec42a38",
+        "status": "unknown",
+        "trusted_calls": [],
+        "unit": "bsp/dm-mc02/engineer-upper-board/bin/engineer-upper-board"
+      },
+      {
+        "analyzed_bodies": [
+          "____embassy_main_task::____embassy_main_task_inner_function",
+          "____embassy_main_task::____embassy_main_task_inner_function::{closure#0}",
+          "rm_c::init",
+          "<embassy_stm32::Config as core::default::Default>::default",
+          "<embassy_stm32::rcc::Config as core::default::Default>::default",
+          "embassy_stm32::rcc::Config::new",
+          "embassy_stm32::rcc::LsConfig::new",
+          "embassy_stm32::rcc::LsConfig::default_lsi",
+          "embassy_stm32::rcc::mux::ClockMux::default",
+          "embassy_stm32::init",
+          "embassy_stm32::init_hw",
+          "critical_section::with",
+          "critical_section::acquire"
+        ],
+        "artifact_integrity": {
+          "after": {
+            "entries": 225,
+            "sha256": "f6ff72c59d49cfdba718370b707907f91f220060da91b9cebf8e8bf47e50708e"
+          },
+          "at_completion": {
+            "entries": 225,
+            "sha256": "f6ff72c59d49cfdba718370b707907f91f220060da91b9cebf8e8bf47e50708e"
+          },
+          "before": {
+            "entries": 225,
+            "sha256": "f6ff72c59d49cfdba718370b707907f91f220060da91b9cebf8e8bf47e50708e"
+          },
+          "matches_survey_at_completion": true,
+          "unchanged": true
+        },
+        "assumptions": [],
+        "first_blocker": {
+          "call_chain": [
+            "____embassy_main_task::____embassy_main_task_inner_function",
+            "____embassy_main_task::____embassy_main_task_inner_function::{closure#0}",
+            "rm_c::init",
+            "embassy_stm32::init",
+            "embassy_stm32::init_hw",
+            "critical_section::with",
+            "critical_section::acquire",
+            "critical_section::acquire::_critical_section_1_0_acquire"
+          ],
+          "detail": "MIR body unavailable for critical_section::acquire::_critical_section_1_0_acquire; foreign declarations have no Rust MIR body to retain",
+          "function": "____embassy_main_task::____embassy_main_task_inner_function",
+          "kind": "unsupported",
+          "source": {
+            "column": 1,
+            "file": "/Users/hxyulin/dev/RM/Embedded/fleet-2027/bsp/rm-c-bringup/src/main.rs",
+            "line": 34
+          },
+          "status": "unknown"
+        },
+        "label": "rm-c-bringup",
+        "mir_phase": "optimized_mir with mir-opt-level=0",
+        "overflow_checks": true,
+        "panic_strategy": "abort",
+        "proved_obligation_count": 1,
+        "raw_report": "/private/tmp/miren-embassy-main-final-20261009/rm-c-bringup.jsonl",
+        "raw_report_sha256": "272312da2c23e699e099c4b25f0940cf43bf86a041541945239c1f155e2ce5f9",
+        "status": "unknown",
+        "trusted_calls": [],
+        "unit": "bsp/rm-c/rm-c-bringup/bin/rm-c-bringup"
+      }
+    ]
+  },
+  "before": {
+    "analyzer_binaries": {
+      "cargo-miren": {
+        "frozen_sha256": "f6f7e08b8ae739303c28562f9e8d7da430eee800585db67f320955fba173d771",
+        "original_sha256": "f6f7e08b8ae739303c28562f9e8d7da430eee800585db67f320955fba173d771"
+      },
+      "miren": {
+        "frozen_sha256": "92d83d49174d43dfb6bc3cb8df4c7ea5e31a77efac595be79c78be0ac92fbe5e",
+        "original_sha256": "92d83d49174d43dfb6bc3cb8df4c7ea5e31a77efac595be79c78be0ac92fbe5e"
+      },
+      "miren-rustc": {
+        "frozen_sha256": "4473c11ffb2f8f9516ee48b7e466a16118f74900d1002a5bb1517d98ba6e2d1c",
+        "original_sha256": "4473c11ffb2f8f9516ee48b7e466a16118f74900d1002a5bb1517d98ba6e2d1c"
+      }
+    },
+    "analyzer_source": {
+      "changes": "",
+      "commit": "90170db26c2b9ee345bcd698e9f8ec91452acf91",
+      "dirty": false
+    },
+    "compiler": "rustc 1.100.0-nightly (1303417c4 2026-09-21)\nbinary: rustc\ncommit-hash: 1303417c416e1595173d9689e7394c31e136ae95\ncommit-date: 2026-09-21\nhost: aarch64-apple-darwin\nrelease: 1.100.0-nightly\nLLVM version: 23.1.1",
+    "features": "",
+    "fleet": {
+      "changes": "?? rust-project.json",
+      "commit": "26377371e38ed3234f972bcdf6b2f9f4d26a7f02",
+      "dirty": true
+    },
+    "profile": "dev",
+    "raw_probe_summary": "/tmp/miren-embassy-entry-audit-baseline-fingerprinted-20261009/summary.json",
+    "raw_probe_summary_sha256": "c5bbd5fabb4600429da0e2ff2c1d1aa493d431bcd8b55c209662cfee7f7f0f20",
+    "raw_survey_summary": "/private/tmp/miren-fleet-pass2-20261009/summary.json",
+    "raw_survey_summary_sha256": "6d081e023a8982a74ab48d740109750f8845225ef4802296814e5b9b711ec2e5",
+    "solver": "Z3 version 4.15.4 - 64 bit",
+    "source_integrity": {
+      "after": {
+        "entries": 243,
+        "sha256": "b3ad9016823750ba6be007536faf9b8cdb0543060030a29ac5e83b754df358d6"
+      },
+      "before": {
+        "entries": 243,
+        "sha256": "b3ad9016823750ba6be007536faf9b8cdb0543060030a29ac5e83b754df358d6"
+      },
+      "unchanged": true
+    },
+    "target": "thumbv7em-none-eabihf",
+    "units": [
+      {
+        "analyzed_bodies": [
+          "____embassy_main_task::____embassy_main_task_inner_function",
+          "____embassy_main_task::____embassy_main_task_inner_function::{closure#0}",
+          "dm_mc02::init",
+          "<embassy_stm32::Config as core::default::Default>::default",
+          "<embassy_stm32::rcc::Config as core::default::Default>::default",
+          "embassy_stm32::rcc::Config::new",
+          "embassy_stm32::rcc::Hsi48Config::new",
+          "embassy_stm32::rcc::LsConfig::new",
+          "embassy_stm32::rcc::LsConfig::default_lsi",
+          "embassy_stm32::rcc::mux::ClockMux::default",
+          "core::mem::zeroed"
+        ],
+        "artifact_integrity": {
+          "after": {
+            "entries": 243,
+            "sha256": "e6bc1f974a5bab51aac19a4692a6ad1bbd18ee4aa1e70338a5450286c6178dd2"
+          },
+          "at_completion": {
+            "entries": 243,
+            "sha256": "e6bc1f974a5bab51aac19a4692a6ad1bbd18ee4aa1e70338a5450286c6178dd2"
+          },
+          "before": {
+            "entries": 243,
+            "sha256": "e6bc1f974a5bab51aac19a4692a6ad1bbd18ee4aa1e70338a5450286c6178dd2"
+          },
+          "matches_survey_at_completion": true,
+          "unchanged": true
+        },
+        "assumptions": [],
+        "first_blocker": {
+          "call_chain": [
+            "____embassy_main_task::____embassy_main_task_inner_function",
+            "____embassy_main_task::____embassy_main_task_inner_function::{closure#0}",
+            "dm_mc02::init",
+            "<embassy_stm32::Config as core::default::Default>::default",
+            "<embassy_stm32::rcc::Config as core::default::Default>::default",
+            "embassy_stm32::rcc::Config::new",
+            "embassy_stm32::rcc::mux::ClockMux::default",
+            "core::mem::zeroed"
+          ],
+          "detail": "core::mem::zeroed bb1: unsupported aggregate kind",
+          "function": "____embassy_main_task::____embassy_main_task_inner_function",
+          "kind": "unsupported",
+          "source": {
+            "column": 1,
+            "file": "/Users/hxyulin/dev/RM/Embedded/fleet-2027/robots/engineer/upper-board/src/main.rs",
+            "line": 36
+          },
+          "status": "unknown"
+        },
+        "label": "engineer-upper-board",
+        "mir_phase": "optimized_mir with mir-opt-level=0",
+        "overflow_checks": true,
+        "panic_strategy": "abort",
+        "proved_obligation_count": 1,
+        "raw_report": "/private/tmp/miren-embassy-entry-audit-baseline-fingerprinted-20261009/engineer-upper-board.jsonl",
+        "raw_report_sha256": "b41aa3dc7dcc6af97983679a0a81c2171dce5757dd32a25fb0ae866342d8dfcc",
+        "status": "unknown",
+        "trusted_calls": [],
+        "unit": "bsp/dm-mc02/engineer-upper-board/bin/engineer-upper-board"
+      },
+      {
+        "analyzed_bodies": [
+          "____embassy_main_task::____embassy_main_task_inner_function",
+          "____embassy_main_task::____embassy_main_task_inner_function::{closure#0}",
+          "rm_c::init",
+          "<embassy_stm32::Config as core::default::Default>::default",
+          "<embassy_stm32::rcc::Config as core::default::Default>::default",
+          "embassy_stm32::rcc::Config::new",
+          "embassy_stm32::rcc::LsConfig::new",
+          "embassy_stm32::rcc::LsConfig::default_lsi",
+          "embassy_stm32::rcc::mux::ClockMux::default",
+          "core::mem::zeroed"
+        ],
+        "artifact_integrity": {
+          "after": {
+            "entries": 225,
+            "sha256": "4e77908c16d2ec1968436a93fc964bd40faf44a539c12e9401464cbc6d1e2add"
+          },
+          "at_completion": {
+            "entries": 225,
+            "sha256": "4e77908c16d2ec1968436a93fc964bd40faf44a539c12e9401464cbc6d1e2add"
+          },
+          "before": {
+            "entries": 225,
+            "sha256": "4e77908c16d2ec1968436a93fc964bd40faf44a539c12e9401464cbc6d1e2add"
+          },
+          "matches_survey_at_completion": true,
+          "unchanged": true
+        },
+        "assumptions": [],
+        "first_blocker": {
+          "call_chain": [
+            "____embassy_main_task::____embassy_main_task_inner_function",
+            "____embassy_main_task::____embassy_main_task_inner_function::{closure#0}",
+            "rm_c::init",
+            "<embassy_stm32::Config as core::default::Default>::default",
+            "<embassy_stm32::rcc::Config as core::default::Default>::default",
+            "embassy_stm32::rcc::Config::new",
+            "embassy_stm32::rcc::mux::ClockMux::default",
+            "core::mem::zeroed"
+          ],
+          "detail": "core::mem::zeroed bb1: unsupported aggregate kind",
+          "function": "____embassy_main_task::____embassy_main_task_inner_function",
+          "kind": "unsupported",
+          "source": {
+            "column": 1,
+            "file": "/Users/hxyulin/dev/RM/Embedded/fleet-2027/bsp/rm-c-bringup/src/main.rs",
+            "line": 34
+          },
+          "status": "unknown"
+        },
+        "label": "rm-c-bringup",
+        "mir_phase": "optimized_mir with mir-opt-level=0",
+        "overflow_checks": true,
+        "panic_strategy": "abort",
+        "proved_obligation_count": 1,
+        "raw_report": "/private/tmp/miren-embassy-entry-audit-baseline-fingerprinted-20261009/rm-c-bringup.jsonl",
+        "raw_report_sha256": "c58811ad6d5c982366a8a78f578ebddc444731bac9ededeebbb78f1265edc91b",
+        "status": "unknown",
+        "trusted_calls": [],
+        "unit": "bsp/rm-c/rm-c-bringup/bin/rm-c-bringup"
+      }
+    ]
+  },
+  "factory": "____embassy_main_task::____embassy_main_task_inner_function",
+  "fingerprint_encoding": "SHA256 of UTF-8 JSON hash maps, sorted keys, compact separators.",
+  "interpretation": "UNKNOWN records the first reached unsupported operation. Earlier proved factory construction does not prove deferred main execution. No progress percentage or whole-firmware proof follows from these two probes.",
+  "limits": {
+    "max_call_depth": 16,
+    "max_query_bytes": 200000,
+    "max_steps": 8192,
+    "root_timeout_secs": 30,
+    "solver_timeout_ms": 5000
+  },
+  "measured_on": "2026-10-09",
+  "ordinary_task_registration_after": {
+    "analyzer_binaries": {
+      "cargo-miren": {
+        "frozen_sha256": "f6f7e08b8ae739303c28562f9e8d7da430eee800585db67f320955fba173d771",
+        "original_sha256": "f6f7e08b8ae739303c28562f9e8d7da430eee800585db67f320955fba173d771"
+      },
+      "miren": {
+        "frozen_sha256": "7bc2aeef40be1ef8f43fb772236e1946fa9e39c82dbc161dbc99083b69308679",
+        "original_sha256": "7bc2aeef40be1ef8f43fb772236e1946fa9e39c82dbc161dbc99083b69308679"
+      },
+      "miren-rustc": {
+        "frozen_sha256": "4473c11ffb2f8f9516ee48b7e466a16118f74900d1002a5bb1517d98ba6e2d1c",
+        "original_sha256": "4473c11ffb2f8f9516ee48b7e466a16118f74900d1002a5bb1517d98ba6e2d1c"
+      }
+    },
+    "analyzer_source": {
+      "changes": "",
+      "commit": "efe9d660d4341e12a04d3e12f6ac6263bfdfbe49",
+      "dirty": false
+    },
+    "compiler": "rustc 1.100.0-nightly (1303417c4 2026-09-21)\nbinary: rustc\ncommit-hash: 1303417c416e1595173d9689e7394c31e136ae95\ncommit-date: 2026-09-21\nhost: aarch64-apple-darwin\nrelease: 1.100.0-nightly\nLLVM version: 23.1.1",
+    "entry": "__embassy_main",
+    "features": "",
+    "fleet": {
+      "changes": "?? rust-project.json",
+      "commit": "26377371e38ed3234f972bcdf6b2f9f4d26a7f02",
+      "dirty": true
+    },
+    "limits": {
+      "max_call_depth": 16,
+      "max_query_bytes": 200000,
+      "max_steps": 8192,
+      "root_timeout_secs": 30,
+      "solver_timeout_ms": 5000
+    },
+    "profile": "dev",
+    "raw_probe_summary": "/tmp/miren-embassy-wrapper-final-20261009/summary.json",
+    "raw_probe_summary_sha256": "8cb1d98ae421ba8a6fdd4050de3dcdbe6db2cb1f0f5ed5d4eae852759057bc15",
+    "raw_survey_summary": "/private/tmp/miren-fleet-pass3-final-20261009/summary.json",
+    "raw_survey_summary_sha256": "1e6a112150da09e76da6d4588aa4d42388d4b403890b7295692951633ed93b4c",
+    "scope": "Ordinary wrapper execution and reached task registration; no deferred future polls, startup history or executor scheduling supplied.",
+    "solver": "Z3 version 4.15.4 - 64 bit",
+    "source_integrity": {
+      "after": {
+        "entries": 243,
+        "sha256": "b3ad9016823750ba6be007536faf9b8cdb0543060030a29ac5e83b754df358d6"
+      },
+      "before": {
+        "entries": 243,
+        "sha256": "b3ad9016823750ba6be007536faf9b8cdb0543060030a29ac5e83b754df358d6"
+      },
+      "unchanged": true
+    },
+    "target": "thumbv7em-none-eabihf",
+    "units": [
+      {
+        "analyzed_bodies": [
+          "__embassy_main",
+          "__embassy_main::__task_pool_get",
+          "embassy_executor::_export::TaskPoolHolder::<SIZE, ALIGN>::get",
+          "core::ptr::mut_ptr::<impl *mut T>::cast",
+          "core::ptr::const_ptr::<impl *const T>::cast",
+          "embassy_executor::raw::TaskPool::<F, N>::_spawn_async_fn",
+          "embassy_executor::raw::TaskPool::<F, N>::spawn_impl",
+          "embassy_executor::raw::AvailableTask::<F>::claim",
+          "embassy_executor::raw::state::State::spawn",
+          "core::sync::atomic::compiler_fence",
+          "embassy_executor::raw::state::State::as_u32",
+          "core::result::Result::<T, E>::is_ok",
+          "core::bool::<impl bool>::then",
+          "embassy_executor::raw::AvailableTask::<F>::claim::{closure#0}",
+          "embassy_executor::raw::AvailableTask::<F>::initialize_impl",
+          "embassy_executor::Metadata::reset",
+          "embassy_executor::raw::util::SyncUnsafeCell::<T>::set",
+          "embassy_executor::raw::util::UninitCell::<T>::write_in_place",
+          "embassy_executor::raw::util::UninitCell::<T>::as_mut_ptr",
+          "__embassy_main::{closure#0}",
+          "____embassy_main_task",
+          "____embassy_main_task::____embassy_main_task_inner_function",
+          "core::ptr::write"
+        ],
+        "artifact_integrity": {
+          "after": {
+            "entries": 243,
+            "sha256": "66a6abf2928bc72ce47df6852448504c1403edab4e5de4448d6c439fd15a3a18"
+          },
+          "at_completion": {
+            "entries": 243,
+            "sha256": "66a6abf2928bc72ce47df6852448504c1403edab4e5de4448d6c439fd15a3a18"
+          },
+          "before": {
+            "entries": 243,
+            "sha256": "66a6abf2928bc72ce47df6852448504c1403edab4e5de4448d6c439fd15a3a18"
+          },
+          "matches_survey_at_completion": true,
+          "unchanged": true
+        },
+        "assumptions": [],
+        "first_blocker": {
+          "call_chain": [
+            "__embassy_main",
+            "embassy_executor::raw::TaskPool::<F, N>::_spawn_async_fn",
+            "embassy_executor::raw::TaskPool::<F, N>::spawn_impl",
+            "embassy_executor::raw::AvailableTask::<F>::initialize_impl",
+            "embassy_executor::raw::util::UninitCell::<T>::write_in_place",
+            "core::ptr::write"
+          ],
+          "detail": "core::ptr::write bb0: unsupported owned static store shape &embassy_executor::raw::Executor",
+          "function": "__embassy_main",
+          "kind": "unsupported",
+          "source": {
+            "column": 1,
+            "file": "/Users/hxyulin/dev/RM/Embedded/fleet-2027/robots/engineer/upper-board/src/main.rs",
+            "line": 36
+          },
+          "status": "unknown"
+        },
+        "label": "engineer-upper-board",
+        "mir_phase": "optimized_mir with mir-opt-level=0",
+        "overflow_checks": true,
+        "panic_strategy": "abort",
+        "proved_obligation_count": 5,
+        "raw_report": "/private/tmp/miren-embassy-wrapper-final-20261009/engineer-upper-board.jsonl",
+        "raw_report_sha256": "a0764fbf7894eef4705a0c4fa4eb5f06f325d993c8b459abdf48419b7b28b58e",
+        "status": "unknown",
+        "trusted_calls": [],
+        "unit": "bsp/dm-mc02/engineer-upper-board/bin/engineer-upper-board"
+      },
+      {
+        "analyzed_bodies": [
+          "__embassy_main",
+          "__embassy_main::__task_pool_get",
+          "embassy_executor::_export::TaskPoolHolder::<SIZE, ALIGN>::get",
+          "core::ptr::mut_ptr::<impl *mut T>::cast",
+          "core::ptr::const_ptr::<impl *const T>::cast",
+          "embassy_executor::raw::TaskPool::<F, N>::_spawn_async_fn",
+          "embassy_executor::raw::TaskPool::<F, N>::spawn_impl",
+          "embassy_executor::raw::AvailableTask::<F>::claim",
+          "embassy_executor::raw::state::State::spawn",
+          "core::sync::atomic::compiler_fence",
+          "embassy_executor::raw::state::State::as_u32",
+          "core::result::Result::<T, E>::is_ok",
+          "core::bool::<impl bool>::then",
+          "embassy_executor::raw::AvailableTask::<F>::claim::{closure#0}",
+          "embassy_executor::raw::AvailableTask::<F>::initialize_impl",
+          "embassy_executor::Metadata::reset",
+          "embassy_executor::raw::util::SyncUnsafeCell::<T>::set",
+          "embassy_executor::raw::util::UninitCell::<T>::write_in_place",
+          "embassy_executor::raw::util::UninitCell::<T>::as_mut_ptr",
+          "__embassy_main::{closure#0}",
+          "____embassy_main_task",
+          "____embassy_main_task::____embassy_main_task_inner_function",
+          "core::ptr::write"
+        ],
+        "artifact_integrity": {
+          "after": {
+            "entries": 225,
+            "sha256": "f6ff72c59d49cfdba718370b707907f91f220060da91b9cebf8e8bf47e50708e"
+          },
+          "at_completion": {
+            "entries": 225,
+            "sha256": "f6ff72c59d49cfdba718370b707907f91f220060da91b9cebf8e8bf47e50708e"
+          },
+          "before": {
+            "entries": 225,
+            "sha256": "f6ff72c59d49cfdba718370b707907f91f220060da91b9cebf8e8bf47e50708e"
+          },
+          "matches_survey_at_completion": true,
+          "unchanged": true
+        },
+        "assumptions": [],
+        "first_blocker": {
+          "call_chain": [
+            "__embassy_main",
+            "embassy_executor::raw::TaskPool::<F, N>::_spawn_async_fn",
+            "embassy_executor::raw::TaskPool::<F, N>::spawn_impl",
+            "embassy_executor::raw::AvailableTask::<F>::initialize_impl",
+            "embassy_executor::raw::util::UninitCell::<T>::write_in_place",
+            "core::ptr::write"
+          ],
+          "detail": "core::ptr::write bb0: unsupported owned static store shape &embassy_executor::raw::Executor",
+          "function": "__embassy_main",
+          "kind": "unsupported",
+          "source": {
+            "column": 1,
+            "file": "/Users/hxyulin/dev/RM/Embedded/fleet-2027/bsp/rm-c-bringup/src/main.rs",
+            "line": 34
+          },
+          "status": "unknown"
+        },
+        "label": "rm-c-bringup",
+        "mir_phase": "optimized_mir with mir-opt-level=0",
+        "overflow_checks": true,
+        "panic_strategy": "abort",
+        "proved_obligation_count": 5,
+        "raw_report": "/private/tmp/miren-embassy-wrapper-final-20261009/rm-c-bringup.jsonl",
+        "raw_report_sha256": "5fbe915420df2a702ff5fc7fa7a3a446edd2937e60135b6791a7a18aaad7501d",
+        "status": "unknown",
+        "trusted_calls": [],
+        "unit": "bsp/rm-c/rm-c-bringup/bin/rm-c-bringup"
+      }
+    ]
+  },
+  "schema_version": 1,
+  "scope": "Fresh factory construction and reached polls until Ready; executor scheduling, startup history, cancellation, output drops and infinite-loop induction excluded.",
+  "selection": "Two separately selected fresh-future polling roots; outside default fleet survey."
+}

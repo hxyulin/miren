@@ -2,13 +2,13 @@
 
 ## Current repeatable measurement
 
-The second 2026-10-09 pass collected all 2,336 roots from all 32 ARM library/binary units in
-fleet-2027. There were 1,061 PROVED, 250 REFUTED and 1,025 UNKNOWN roots, with no
+The third 2026-10-09 pass collected all 2,336 roots from all 32 ARM library/binary units in
+fleet-2027. There were 1,063 PROVED, 250 REFUTED and 1,023 UNKNOWN roots, with no
 PROVED_WITH_ASSUMPTIONS results. All units completed collection; no entire workspace passed
 verification. Counts describe selected root domains, not line coverage or firmware safety.
 
-The source-function heuristic identifies 1,019 declarations: 490 PROVED, 226 REFUTED and
-303 UNKNOWN. Its denominator differs from the historical 976 because the firmware revision changed.
+The source-function heuristic identifies 1,019 declarations: 492 PROVED, 226 REFUTED and
+301 UNKNOWN. Its denominator differs from the historical 976 because the firmware revision changed.
 Refutations concern arbitrary supported root inputs and remain runtime unconfirmed.
 
 The [current JSON summary](/data/fleet-survey-current.json) records every root's outcome, source,
@@ -21,7 +21,7 @@ measurement artifacts.
 - Firmware revision: `26377371e38ed3234f972bcdf6b2f9f4d26a7f02`;
   tracked application source unchanged. The existing untracked `rust-project.json` remains;
   all 243 source-input fingerprints stayed equal throughout the scan.
-- Analyzer code: `90170db`, JSON schema 9; clean working tree at scan start.
+- Analyzer code: `efe9d66`, JSON schema 9; clean working tree at scan start.
   The binaries were frozen before analysis.
 - Compiler: nightly-2026-09-22; Z3 4.15.4.
 - Target: `thumbv7em-none-eabihf`; dev profile; Cargo default features and locked dependencies.
@@ -32,52 +32,81 @@ measurement artifacts.
 - No project proof configuration, startup assumptions, trusted contracts, induction
   or native replay.
 
-Compared with the first 2026-10-09 pass, five previously unknown source functions now prove:
-`referee::Decoder::new`, its default implementation, bring-up `Text::new`, engineer upper
-`arm::controller_goal` and RM-C bring-up's `Line::default`. Compact typed byte repeats account for
-four gains; exact byte-to-float decoding accounts for the fifth. All 1,056 previous proofs and
-250 refutations retain their outcomes. No roots or source classifications changed, and the
-recorded analysis configurations remain compatible. Generated/other outcomes remain unchanged.
+Compared with the second 2026-10-09 pass, two previously unknown source functions now prove:
+`link::FrictionTarget::encode` and `link::Intent::encode`. Tracked compiler-typed shared byte slices
+provide the missing byte views. All 1,061 previous proofs and 250 refutations retain their outcomes.
+No roots or source classifications changed, and the recorded analysis configurations remain
+compatible. Generated/other outcomes remain unchanged.
 
-Another 20 source functions clear their previous first blocker but remain UNKNOWN at a later gap:
+Another five source functions clear their previous first blocker but remain UNKNOWN at a later gap:
 
-- Ten UART/DMA roots now pass immutable static-reference reborrowing, then reach unsupported
-  dependency mutable `STATE` origins.
-- Five encoding helpers pass `size_of_val`, then reach unsupported `slice::from_raw_parts`
-  aggregate construction.
-- Two board initializers pass compiler zero-validity guards, then reach unsupported `mem::zeroed`
-  aggregate construction. A validity guard does not initialize a readable payload.
-- Two USB constructors pass large byte repeats, then reach an uncertified `AtomicBool` storage
-  reinterpretation; `referee::encode` reaches the separate evaluated constant-array budget.
+- Three referee helpers (`interaction`, `ui_delete_all`, `ui_number`) pass shared raw byte slice
+  construction, then reach unsupported mutable range indexing of an unsized pointee.
+- `dm_mc02::init` passes initialized zeroed configuration, then reaches numeric MMIO pointer
+  offsets while reading reset cause.
+- `rm_c::init` passes initialized zeroed configuration, then reaches a foreign critical-section
+  acquisition function with no Rust MIR body.
 
 The compact comparison counts all first-blocker text changes by source classification and includes
-text transitions for source-function roots. Compiler crate hashes and debug-type ordering also
-changed, so its 39 source diagnostic changes are not 39 semantic improvements. The 20 advances
-above are the changes whose old and new operations were inspected. Generated diagnostic text stays
-in the raw reports, while every current root and its first blocker remains in the compact data.
+text transitions for source-function roots. Compiler crate hashes and debug-type ordering can
+also change without semantic progress. The five advances above are the changes whose old and new
+operations were inspected. Generated diagnostic text stays in raw reports, while every current
+root and its first blocker remains in the compact data.
 
 Dependency artifacts, origin sidecars and generated build inputs stayed unchanged for all 32
 units at inventory, immediately before verification, after verification and completion. All four
 checkpoint maps are retained. These checks establish input integrity during collection, not
 hermetic capture of arbitrary custom build environment variables.
 
-Among the 303 unknown source-function roots, mutually exclusive first-blocker groups are:
+Among the 301 unknown source-function roots, mutually exclusive first-blocker groups are:
 
-- Dependency static origins: 16, up from six because later UART/DMA state accesses are now reached.
-- Numeric MMIO pointer offsets: 45, unchanged; these still require a hardware memory model.
+- Dependency static origins: 16.
+- Numeric MMIO pointer offsets: 46, including the newly reached board reset-cause access.
 - Trait-object input shapes: 22.
 - Solver unknown results: 46.
 - Execution limits: 28.
 - Input/constant shape budgets: 33.
-- Other unsupported inputs, operations and calls: 113.
+- Other unsupported inputs, operations and calls: 110.
 
-These first blockers guide the next stages; resolving one can expose further unsupported behavior.
-Useful next bounded work includes typed slice construction/copying, initialized zeroed storage,
-checked UART/DMA state construction, and compiler-layout subobject addresses for `each_mut`.
-Trait-object domains, hardware effects and loop/resource limits remain separate modeling work.
-The old mutable-input counts below no longer describe the current implementation.
+The next bounded work includes mutable slice range provenance, checked UART/DMA state construction,
+and compiler-layout subobject addresses for `each_mut`. Hardware effects, trait-object domains and
+loop/resource limits remain separate modeling work. The old mutable-input counts below no longer
+describe the current implementation.
+
+## Progress through Embassy main
+
+The default survey proves several generated main future factories. Factory construction does not
+execute their async bodies. Separate `--async-entry` probes select
+`____embassy_main_task::____embassy_main_task_inner_function` in RM-C bring-up and engineer-upper;
+these enter the body and execute reached polls of a fresh future. The
+[main probe evidence](/data/fleet-embassy-main-current.json) records their scope, limits, compiler
+settings, call chains and input-integrity fingerprints separately from the 2,336 default roots.
+
+Both probes previously stopped inside `ClockMux::default` at `core::mem::zeroed`. Initialized
+zeroed storage now clears that configuration path. Both main probes still report UNKNOWN:
+
+- RM-C reaches `embassy_stm32::init_hw`, then `critical_section::with` and foreign
+  `_critical_section_1_0_acquire`, whose body is unavailable.
+- Engineer-upper reaches `dm_mc02::reset_cause`, then `Rcc::rsr` and a numeric MMIO pointer offset.
+
+We can therefore progress through the async body and its pure configuration setup today. The next
+barriers require explicit platform semantics for critical sections and hardware registers.
+Full executor startup is a separate path: task registration currently stops at an unsupported
+owned static store of `&embassy_executor::raw::Executor`. It needs retained captured-reference
+storage and lifecycle modeling. Scheduling, waking, interrupts, cancellation, returned-output drops
+and induction over persistent loops are outside the fresh-future probes. A whole-main proof or
+percentage of completion would be unsupported by this evidence.
 
 ## Earlier repeatable measurements
+
+The second 2026-10-09 pass at analyzer `90170db` collected the same 2,336 roots: 1,061 PROVED,
+250 REFUTED and 1,025 UNKNOWN. Its source subset had 490 proofs, 226 refutations and 303 unknowns.
+Five previous unknown source functions proved through compact byte repeats and exact byte-to-float
+casts; all earlier proofs and refutations retained their outcomes. Another 20 source functions
+cleared their first blocker but stayed UNKNOWN: ten UART/DMA helpers, five encoding helpers,
+two board initializers, two USB constructors and referee encoding. The compact comparison retained
+source diagnostic transitions and counted generated transitions without publishing their large
+texts; all four artifact checkpoint maps stayed unchanged.
 
 The first 2026-10-09 pass at analyzer `5a2fe83` collected the same 2,336 roots: 1,056 PROVED,
 250 REFUTED and 1,030 UNKNOWN. Its source subset had 485 proofs, 226 refutations and 308 unknowns.

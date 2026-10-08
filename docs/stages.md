@@ -1160,3 +1160,18 @@ The new host/ARM debug and optimized regressions reproduce an incorrectly proved
 before the fix. Prefix and borrowed-array escapes now remain UNKNOWN at frame-escape checks;
 dead backing storage remains UNKNOWN at liveness checks. Valid reads and owned copies prove,
 and native checks agree.
+
+## Stage 70: third complete fleet pass and Embassy main boundaries
+
+A fresh scan freezes the corrected analyzer and collects all 32 units and 2,336 roots. Source
+outcomes are 492 PROVED, 226 REFUTED and 301 UNKNOWN. Two link encoders now prove; five more source
+functions clear their first blocker but stop at mutable range indexing, numeric MMIO or foreign
+critical-section acquisition. All earlier proofs and refutations retain their outcomes, with no
+root/classification changes. Application sources and dependency/generated-input maps stay unchanged.
+
+Separate fresh-future async main probes pass ClockMux zeroed configuration and reach the platform
+boundaries in both RM-C and engineer-upper. Ordinary task-registration probes record the separate
+executor storage boundary. Their compact evidence preserves call chains, settings, fingerprints
+and scope exclusions without mixing them into the default survey counts or claiming whole-main
+coverage. The pass validates 408 Rust tests and 20 survey-tool tests, lint, formatting, release
+builds, dependency policy, manual hooks and the documentation build.
