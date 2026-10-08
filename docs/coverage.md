@@ -57,6 +57,13 @@ interactions.
 Owned repeats and iteration count deferred fields against the same 256-value limit; small no-drop
 records can remain deferred, while oversized values and identity-bearing storage remain UNKNOWN.
 
+Compiler-typed `u8` MIR repeats use a constant SMT array, independent of their byte count, with
+target layout validation, bounds checks and byte updates. Host/ARM debug and optimized fixtures
+check 4,096-byte repeats, symbolic guarded indices, updates and value/bounds mutations. Reference
+snapshots cannot be mistaken for bytes: compiler element types select this representation.
+Expanded nonbyte repeats retain their 128-element and 256-owned-value limits. Explicit byte
+aggregates, evaluated constant tables and chunk operations retain their separate budgets.
+
 Constants use rustc_const_eval to read compiler layouts, discriminants and initialized scalars.
 The decoder inspects only the active variant; it does not invent values for inactive or
 uninitialized fields. Immutable references require a pointee without interior mutation, and the

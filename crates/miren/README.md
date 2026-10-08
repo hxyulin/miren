@@ -100,6 +100,11 @@ displacement and allocation bounds produce explicit validity obligations. Array 
 known extent. Numeric pointer offsets, zero-sized strides, wrapping arithmetic and raw loads/stores
 remain UNKNOWN. Retained references still undergo liveness and frame-escape checks.
 
+Compiler-typed `u8` MIR repeats use one constant SMT array and a target-width length. Their byte
+count does not expand host storage, and the compiler checks the target array layout. Bounds checks
+and byte updates remain active. Explicit byte aggregates and evaluated constant tables keep their
+existing budgets; nonbyte repeats stay limited to 128 elements and 256 owned values.
+
 The [coverage guide](../../docs/coverage.md) is the maintained feature reference. The
 [proof guide](../../docs/proofs.md) explains the encoding and limitations, and the
 [development guide](../../docs/development.md) lists required checks.

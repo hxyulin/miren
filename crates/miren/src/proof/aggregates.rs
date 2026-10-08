@@ -378,9 +378,6 @@ impl<'tcx> Engine<'tcx> {
         let count = length
             .try_to_target_usize(self.tcx)
             .ok_or("unevaluated repeat length")?;
-        if count > MAX_ARRAY_BYTES {
-            return Err("array repeat exceeds the 128-element limit".to_owned());
-        }
         if !operand
             .ty(body, self.tcx)
             .is_freeze(self.tcx, ty::TypingEnv::fully_monomorphized())
@@ -388,14 +385,10 @@ impl<'tcx> Engine<'tcx> {
             return Err("repeated interior mutable storage is not modeled".to_owned());
         }
         let value = self.operand(id, body, state, operand)?;
-        if !matches!(
-            value,
-            Value::Int {
-                bits: 8,
-                signed: false,
-                ..
+        if operand.ty(body, self.tcx) != self.tcx.types.u8 {
+            if count > MAX_ARRAY_BYTES {
+                return Err("array repeat exceeds the 128-element limit".to_owned());
             }
-        ) {
             let size = value
                 .owned_repeat_size()
                 .ok_or("repeat operand needs a small owned value")?;
@@ -404,7 +397,16 @@ impl<'tcx> Engine<'tcx> {
             }
             return Ok(Value::Elements(vec![value; count as usize]));
         }
-        let (expression, _, _) = value.integer()?;
+        let (expression, width, signed) = value.integer()?;
+        if width != 8 || signed {
+            return Err("byte repeat operand has incompatible scalar storage".to_owned());
+        }
+        let array = Ty::new_array(self.tcx, self.tcx.types.u8, count);
+        self.tcx
+            .layout_of(ty::TypingEnv::fully_monomorphized().as_query_input(array))
+            .map_err(|error| {
+                format!("byte repeat requires a valid target array layout: {error:?}")
+            })?;
         let bits = u32::from(self.tcx.sess.target.pointer_width);
         Ok(Value::Bytes {
             length: Box::new(symbolic::integer(&self.terms, count as u128, bits, false)),

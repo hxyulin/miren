@@ -1057,3 +1057,15 @@ Seventeen host tool tests include full 2,336-root compact round trips, determini
 and malformed collections, count mismatches, changed artifacts and outcome comparisons. The fresh
 32-unit fleet scan resolves 57 previous unknown source functions: 28 prove and 29 refute, with no
 previously proved or refuted root regression. Numeric MMIO pointer offsets remain unsupported.
+
+## Stage 62: compact typed byte repeats
+
+MIR repeats of compiler-typed `u8` use one constant SMT array and a target-width length after
+compiler layout validation. Byte count no longer consumes an expanded element budget. The
+interpreter checks actual compiler types, so a shared byte-reference snapshot cannot become a
+byte array. Expanded nonbyte repeats retain their element and owned-value limits.
+
+Host/ARM debug and optimized cases cover 4,096-byte repeats, symbolic guarded indexing, updates
+and unaffected cells. Incorrect contents and missing index bounds refute; reference, oversized
+nonbyte and oversized owned repeats remain UNKNOWN. A changed repeat operand refutes and fails
+native execution. This does not expand raw memory or slice/chunk support.
