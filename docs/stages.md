@@ -1121,3 +1121,17 @@ diagnostics remain in raw reports; every current root remains in the compact dat
 and debug-type ordering can change without semantic progress, which the survey guide distinguishes
 from inspected blocker advances. Null and empty blocker text sort distinctly and deterministically.
 Twenty host tool tests verify these publication boundaries alongside the existing collection checks.
+
+## Stage 67: checked initialized zeroed storage
+
+The compiler-identified core zeroed operation checks its zero-validity guard, then reconstructs
+supported initialized scalar, tuple, struct and array values. Byte arrays use compact SMT storage.
+Fieldless direct-tag enums select their compiler zero discriminant, even when it is not the first
+declared variant. Reconstruction remains bounded by 16 levels, 256 values and 128 expanded array
+elements. Unions/MaybeUninit, pointers, niche/payload enums and restricted integer reconstruction
+remain UNKNOWN; no general uninitialized payload or padding read is enabled.
+
+Host/ARM debug and optimized tests cover exact zero fields, later panics, invalid zero domains,
+name spoofing and model budgets. Value/type/tag mutations fail; native checks cover valid payloads
+and a changed assertion. Targeted fresh-future main probes clear ClockMux configuration, then stop
+at foreign critical-section acquisition or numeric MMIO reset-cause access.

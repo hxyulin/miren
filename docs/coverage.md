@@ -73,6 +73,17 @@ have at most 128 elements. Exhaustion is UNKNOWN.
 
 ## Execution and calls
 
+The compiler-identified `mem::zeroed` operation checks the actual zero-validity guard before
+reconstructing initialized zero-bit values. Supported payloads are bool, char, primitive integers,
+f32/f64, tuples, structs, compact compiler-sized byte arrays and at most 128 expanded array
+elements.
+Fieldless enums need a bounded direct-tag compiler layout and an actual zero discriminant; zero
+does not imply the first declared variant. Reconstruction uses at most 16 levels and 256 values.
+Invalid references, nonzero integers, patterns and enum tags refute the compiler panic guard.
+Unions/MaybeUninit, pointer payloads, niche/payload enums and restricted integer reconstruction
+remain UNKNOWN. Padding is not exposed as initialized readable bytes. Host/ARM debug and optimized
+tests include value/type/tag mutations and independent native checks of valid zeroed values.
+
 Shared Freeze snapshot reborrows retain the snapshot's projected value, including immutable static
 and dependency static aggregates. They do not create a temporary frame-owned allocation. The
 compiler shared-reference type and initial dereference identify this domain; tracked references

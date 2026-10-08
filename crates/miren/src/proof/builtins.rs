@@ -122,6 +122,11 @@ impl<'tcx> Engine<'tcx> {
         }
         let signature = self.call_signature(instance)?;
         if let Some(value) =
+            self.zeroed_storage(instance, signature, values, state, (caller, span))?
+        {
+            return Ok(Some(value));
+        }
+        if let Some(value) =
             self.layout_intrinsic(instance, signature, values, state, (caller, span))?
         {
             return Ok(Some(value));

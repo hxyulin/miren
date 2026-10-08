@@ -56,6 +56,7 @@ mod storage_locations;
 use startup::AtomicStorage;
 use startup_memory::Memory;
 mod tracked_pointers;
+mod zeroed_storage;
 
 #[derive(Clone)]
 struct State {

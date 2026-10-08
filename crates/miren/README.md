@@ -117,6 +117,12 @@ dereference must match this domain; nested dereferences and retained allocation 
 ordinary tracked borrowing. Embedded reference graphs remain validated. These snapshots have
 readable values but cannot establish raw address provenance.
 
+The compiler-identified `mem::zeroed` model checks the compiler zero-validity guard and constructs
+initialized zero values only for supported scalars, tuples, bounded arrays, structs and fieldless
+direct-tag enums with a compiler zero discriminant. Byte arrays remain compact. Unions,
+MaybeUninit, pointers, niche/payload enums and restricted integer reconstruction remain UNKNOWN.
+This models the checked core operation; it does not make uninitialized storage readable.
+
 The [coverage guide](../../docs/coverage.md) is the maintained feature reference. The
 [proof guide](../../docs/proofs.md) explains the encoding and limitations, and the
 [development guide](../../docs/development.md) lists required checks.
