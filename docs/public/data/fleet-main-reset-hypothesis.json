@@ -1,0 +1,101 @@
+{
+  "schema_version": 1,
+  "units": {
+    "bsp/dm-mc02/engineer-lower-board/bin/engineer-lower-board": {
+      "schema_version": 1,
+      "functions": [
+        {
+          "function": "dm_mc02::reset_cause",
+          "trusted": true,
+          "no_panic": true,
+          "modifies": [],
+          "reason": "UNVERIFIED hardware boundary: assume dm_mc02::reset_cause terminates without panic and returns a Rust-valid ResetCause while accessing/clearing reset-status MMIO flags. Physical reset flags and register side effects are not verified. No Rust caller argument storage is modified. No clock setup, fresh-startup state, singleton availability, task execution or scheduling is assumed; all remaining main body and initialization MIR still executes."
+        }
+      ]
+    },
+    "bsp/dm-mc02/engineer-upper-board/bin/engineer-upper-board": {
+      "schema_version": 1,
+      "functions": [
+        {
+          "function": "dm_mc02::reset_cause",
+          "trusted": true,
+          "no_panic": true,
+          "modifies": [],
+          "reason": "UNVERIFIED hardware boundary: assume dm_mc02::reset_cause terminates without panic and returns a Rust-valid ResetCause while accessing/clearing reset-status MMIO flags. Physical reset flags and register side effects are not verified. No Rust caller argument storage is modified. No clock setup, fresh-startup state, singleton availability, task execution or scheduling is assumed; all remaining main body and initialization MIR still executes."
+        }
+      ]
+    },
+    "bsp/dm-mc02/hero-chassis-board/bin/hero-chassis-board": {
+      "schema_version": 1,
+      "functions": [
+        {
+          "function": "dm_mc02::reset_cause",
+          "trusted": true,
+          "no_panic": true,
+          "modifies": [],
+          "reason": "UNVERIFIED hardware boundary: assume dm_mc02::reset_cause terminates without panic and returns a Rust-valid ResetCause while accessing/clearing reset-status MMIO flags. Physical reset flags and register side effects are not verified. No Rust caller argument storage is modified. No clock setup, fresh-startup state, singleton availability, task execution or scheduling is assumed; all remaining main body and initialization MIR still executes."
+        }
+      ]
+    },
+    "bsp/dm-mc02/hero-gimbal-board/bin/hero-gimbal-board": {
+      "schema_version": 1,
+      "functions": [
+        {
+          "function": "dm_mc02::reset_cause",
+          "trusted": true,
+          "no_panic": true,
+          "modifies": [],
+          "reason": "UNVERIFIED hardware boundary: assume dm_mc02::reset_cause terminates without panic and returns a Rust-valid ResetCause while accessing/clearing reset-status MMIO flags. Physical reset flags and register side effects are not verified. No Rust caller argument storage is modified. No clock setup, fresh-startup state, singleton availability, task execution or scheduling is assumed; all remaining main body and initialization MIR still executes."
+        }
+      ]
+    },
+    "bsp/dm-mc02/infantry-1-chassis-board/bin/infantry-1-chassis-board": {
+      "schema_version": 1,
+      "functions": [
+        {
+          "function": "dm_mc02::reset_cause",
+          "trusted": true,
+          "no_panic": true,
+          "modifies": [],
+          "reason": "UNVERIFIED hardware boundary: assume dm_mc02::reset_cause terminates without panic and returns a Rust-valid ResetCause while accessing/clearing reset-status MMIO flags. Physical reset flags and register side effects are not verified. No Rust caller argument storage is modified. No clock setup, fresh-startup state, singleton availability, task execution or scheduling is assumed; all remaining main body and initialization MIR still executes."
+        }
+      ]
+    },
+    "bsp/dm-mc02/infantry-1-gimbal-board/bin/infantry-1-gimbal-board": {
+      "schema_version": 1,
+      "functions": [
+        {
+          "function": "dm_mc02::reset_cause",
+          "trusted": true,
+          "no_panic": true,
+          "modifies": [],
+          "reason": "UNVERIFIED hardware boundary: assume dm_mc02::reset_cause terminates without panic and returns a Rust-valid ResetCause while accessing/clearing reset-status MMIO flags. Physical reset flags and register side effects are not verified. No Rust caller argument storage is modified. No clock setup, fresh-startup state, singleton availability, task execution or scheduling is assumed; all remaining main body and initialization MIR still executes."
+        }
+      ]
+    },
+    "bsp/dm-mc02/infantry-2-chassis-board/bin/infantry-2-chassis-board": {
+      "schema_version": 1,
+      "functions": [
+        {
+          "function": "dm_mc02::reset_cause",
+          "trusted": true,
+          "no_panic": true,
+          "modifies": [],
+          "reason": "UNVERIFIED hardware boundary: assume dm_mc02::reset_cause terminates without panic and returns a Rust-valid ResetCause while accessing/clearing reset-status MMIO flags. Physical reset flags and register side effects are not verified. No Rust caller argument storage is modified. No clock setup, fresh-startup state, singleton availability, task execution or scheduling is assumed; all remaining main body and initialization MIR still executes."
+        }
+      ]
+    },
+    "bsp/dm-mc02/infantry-2-gimbal-board/bin/infantry-2-gimbal-board": {
+      "schema_version": 1,
+      "functions": [
+        {
+          "function": "dm_mc02::reset_cause",
+          "trusted": true,
+          "no_panic": true,
+          "modifies": [],
+          "reason": "UNVERIFIED hardware boundary: assume dm_mc02::reset_cause terminates without panic and returns a Rust-valid ResetCause while accessing/clearing reset-status MMIO flags. Physical reset flags and register side effects are not verified. No Rust caller argument storage is modified. No clock setup, fresh-startup state, singleton availability, task execution or scheduling is assumed; all remaining main body and initialization MIR still executes."
+        }
+      ]
+    }
+  }
+}

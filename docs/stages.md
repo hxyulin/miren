@@ -1262,3 +1262,17 @@ core UnsafeCell, including `Cell<bool>` and nonzero-offset wrappers. Reads remai
 booleans with abstraction reasons. No initializer, write or critical section supplies stable
 history. Field/type/origin checks remain bounded; unions and MaybeUninit payloads remain UNKNOWN.
 Host/ARM debug and optimized fixtures cover core cells, typed writes and failing history claims.
+
+## Stage 80: all-main conditional first milestone
+
+The fourth full fleet pass at d94334c collects all 32 units and 2,336 roots: 1,075 PROVED,
+251 REFUTED and 1,010 UNKNOWN. All 12 registration wrappers gain proofs; rm_c::init gains a
+refutation. No previous supported outcomes regress, and all source/artifact checkpoints match.
+
+Final all-main release captures at 7257e00 use the same retained artifacts and default limits.
+Strict async bodies have four REFUTED and eight UNKNOWN outcomes. With exactly one recorded
+reset-cause hypothesis for each of eight DM robot mains, all 12 async bodies are REFUTED and the
+conditional milestone is reached. The unconditional milestone remains false. Each failure records
+arbitrary boolean state with startup/exclusion unverified; no boot-time failure is claimed.
+Both runs have 12 PROVED registration roots and 12 REFUTED runtime roots under separate atomic
+abstractions. Deterministic compact exports preserve scope, assumptions and input fingerprints.

@@ -2,102 +2,85 @@
 
 ## Current repeatable measurement
 
-The third 2026-10-09 pass collected all 2,336 roots from all 32 ARM library/binary units in
-fleet-2027. There were 1,063 PROVED, 250 REFUTED and 1,023 UNKNOWN roots, with no
-PROVED_WITH_ASSUMPTIONS results. All units completed collection; no entire workspace passed
-verification. Counts describe selected root domains, not line coverage or firmware safety.
+The fourth 2026-10-09 pass collected all 2,336 roots from all 32 ARM library/binary units in
+fleet-2027: 1,075 PROVED, 251 REFUTED and 1,010 UNKNOWN, with no assumptions. All units completed
+collection. Counts describe selected root domains, not line coverage or whole-firmware safety.
 
-The source-function heuristic identifies 1,019 declarations: 492 PROVED, 226 REFUTED and
-301 UNKNOWN. Its denominator differs from the historical 976 because the firmware revision changed.
-Refutations concern arbitrary supported root inputs and remain runtime unconfirmed.
+The source-function heuristic identifies 1,019 declarations: 492 PROVED, 227 REFUTED and
+300 UNKNOWN. Refutations concern arbitrary supported root state and remain runtime unconfirmed.
 
-The [current JSON summary](/data/fleet-survey-current.json) records every root's outcome, source,
-first blocker and compilation unit, using the documented `root_columns` indices. It also records
-frozen binary hashes, build settings and source/dependency input fingerprints. The deterministic
-[exporter](https://github.com/hxyulin/miren/blob/main/tools/README.md) recreates this compact data
-from complete raw collections. Raw inventories, solver reports and command logs remain local
-measurement artifacts.
+The [current JSON summary](/data/fleet-survey-current.json) records every root, first blocker,
+compilation unit and input-integrity evidence. The deterministic exporter recreates this compact
+publication from complete raw collections; inventories, solver reports and logs remain local.
 
 - Firmware revision: `26377371e38ed3234f972bcdf6b2f9f4d26a7f02`;
-  tracked application source unchanged. The existing untracked `rust-project.json` remains;
-  all 243 source-input fingerprints stayed equal throughout the scan.
-- Analyzer code: `efe9d66`, JSON schema 9; clean working tree at scan start.
-  The binaries were frozen before analysis.
+  all 243 source-input fingerprints stayed equal. The existing untracked `rust-project.json`
+  remains.
+- Full-survey analyzer: `d94334c`, JSON schema 9; clean working tree, frozen binaries.
 - Compiler: nightly-2026-09-22; Z3 4.15.4.
-- Target: `thumbv7em-none-eabihf`; dev profile; Cargo default features and locked dependencies.
-- All 32 units use panic abort and enabled overflow checks;
-  root/dependency MIR optimization is zero.
+- Target: `thumbv7em-none-eabihf`; dev profile, Cargo default features and locked dependencies.
+- Panic abort, enabled overflow checks and root/dependency MIR optimization zero in all 32 units.
 - Limits: 8,192 steps, call depth 16, 200,000 query bytes, 30 seconds per root and 5 seconds per
-  solver request; four verification workers, sequential Cargo inventories.
+  solver request; four verification workers and sequential Cargo inventories.
 - No project proof configuration, startup assumptions, trusted contracts, induction
   or native replay.
 
-Compared with the second 2026-10-09 pass, two previously unknown source functions now prove:
-`link::FrictionTarget::encode` and `link::Intent::encode`. Tracked compiler-typed shared byte slices
-provide the missing byte views. All 1,061 previous proofs and 250 refutations retain their outcomes.
-No roots or source classifications changed, and the recorded analysis configurations remain
-compatible. Generated/other outcomes remain unchanged.
+Compared with the third pass, all 12 generated `__embassy_main` registration wrappers now prove.
+They retain the incoming spawner executor reference without inventing executor startup history.
+`rm_c::init` now refutes at the peripheral singleton check under arbitrary valid boolean state.
+All previous 1,063 proofs and 250 refutations retain their outcomes; no roots were added or removed.
+The recorded analysis configurations remain compatible.
 
-Another five source functions clear their previous first blocker but remain UNKNOWN at a later gap:
+Foreign Rust calls now execute unique signature-matched compiler exports. Exact Cortex-M interrupt
+assembly preserves arbitrary reads and invalidates shared history; it grants no critical-section
+exclusion. Large zero-sized peripheral shapes and checked uninitialized containers have bounded
+models. Unsupported payload reads, numeric MMIO and device effects remain distinct gaps.
 
-- Three referee helpers (`interaction`, `ui_delete_all`, `ui_number`) pass shared raw byte slice
-  construction, then reach unsupported mutable range indexing of an unsized pointee.
-- `dm_mc02::init` passes initialized zeroed configuration, then reaches numeric MMIO pointer
-  offsets while reading reset cause.
-- `rm_c::init` passes initialized zeroed configuration, then reaches a foreign critical-section
-  acquisition function with no Rust MIR body.
-
-The compact comparison counts all first-blocker text changes by source classification and includes
-text transitions for source-function roots. Compiler crate hashes and debug-type ordering can
-also change without semantic progress. The five advances above are the changes whose old and new
-operations were inspected. Generated diagnostic text stays in raw reports, while every current
-root and its first blocker remains in the compact data.
-
-Dependency artifacts, origin sidecars and generated build inputs stayed unchanged for all 32
-units at inventory, immediately before verification, after verification and completion. All four
-checkpoint maps are retained. These checks establish input integrity during collection, not
+Source, dependency artifacts, origin sidecars and generated build inputs stayed unchanged at every
+recorded checkpoint for every unit. These checks establish input integrity during collection, not
 hermetic capture of arbitrary custom build environment variables.
-
-Among the 301 unknown source-function roots, mutually exclusive first-blocker groups are:
-
-- Dependency static origins: 16.
-- Numeric MMIO pointer offsets: 46, including the newly reached board reset-cause access.
-- Trait-object input shapes: 22.
-- Solver unknown results: 46.
-- Execution limits: 28.
-- Input/constant shape budgets: 33.
-- Other unsupported inputs, operations and calls: 110.
-
-The next bounded work includes mutable slice range provenance, checked UART/DMA state construction,
-and compiler-layout subobject addresses for `each_mut`. Hardware effects, trait-object domains and
-loop/resource limits remain separate modeling work. The old mutable-input counts below no longer
-describe the current implementation.
 
 ## Progress through Embassy main
 
-The default survey proves several generated main future factories. Factory construction does not
-execute their async bodies. Separate `--async-entry` probes select
-`____embassy_main_task::____embassy_main_task_inner_function` in RM-C bring-up and engineer-upper;
-these enter the body and execute reached polls of a fresh future. The
-[main probe evidence](/data/fleet-embassy-main-current.json) records their scope, limits, compiler
-settings, call chains and input-integrity fingerprints separately from the 2,336 default roots.
+The separate [all-main evidence](/data/fleet-embassy-main-current.json) covers every one of the
+12 binary mains in three scopes. Its final analyzer is `7257e00`, including certified core boolean
+cell payloads added after the full survey. It uses the same captured fleet artifacts and default
+limits. Factory construction alone does not execute the async body; `--async-entry` constructs a
+fresh future and follows its reached polls.
 
-Both probes previously stopped inside `ClockMux::default` at `core::mem::zeroed`. Initialized
-zeroed storage now clears that configuration path. Both main probes still report UNKNOWN:
+| Scope | Strict Rust run | Explicit reset-cause hypothesis |
+| --- | --- | --- |
+| Async main bodies | 4 REFUTED, 8 UNKNOWN | 12 REFUTED |
+| Task registration | 12 PROVED | 12 PROVED |
+| Runtime entry | 12 REFUTED | 12 REFUTED |
 
-- RM-C reaches `embassy_stm32::init_hw`, then `critical_section::with` and foreign
-  `_critical_section_1_0_acquire`, whose body is unavailable.
-- Engineer-upper reaches `dm_mc02::reset_cause`, then `Rcc::rsr` and a numeric MMIO pointer offset.
+The conditional first milestone is reached: every expected async main body has a supported outcome
+under the recorded policy. The strict milestone remains unreached. Exactly eight DM robot mains
+use one trusted `dm_mc02::reset_cause` call each. The
+[recorded hypothesis](/data/fleet-main-reset-hypothesis.json) assumes a panic-free, terminating
+reset-status boundary returning a valid Rust value, with no caller argument storage modifications.
+It does not verify the MMIO access, register values or hardware side effects. The remaining four
+mains and all registration/runtime roots use no trusted calls. Policy bytes and per-unit normalized
+configurations are fingerprinted and retained in the compact evidence.
 
-We can therefore progress through the async body and its pure configuration setup today. The next
-barriers require explicit platform semantics for critical sections and hardware registers.
-Full executor startup is a separate path: task registration currently stops at an unsupported
-owned static store of `&embassy_executor::raw::Executor`. It needs retained captured-reference
-storage and lifecycle modeling. Scheduling, waking, interrupts, cancellation, returned-output drops
-and induction over persistent loops are outside the fresh-future probes. A whole-main proof or
-percentage of completion would be unsupported by this evidence.
+Nine bodies refute at `embassy_stm32::Peripherals::take_with_cs` when its singleton flag is true.
+The DM bring-up and two sentry bodies refute at the RTT repeated-initialization check. Boolean reads
+admit arbitrary valid state, including inside certified core cells; initializer values, writes and
+critical sections establish no startup or stable-state history. Counterexamples carry the explicit
+abstraction reason and are not confirmed boot-time failures.
+
+This milestone establishes a supported failure path in each selected body domain. It does not
+establish complete traversal or safety of every main path, executor startup, scheduling, waking,
+interrupt handling, cancellation, returned-output drops or persistent-loop induction. The eight
+strict UNKNOWN bodies still require a Rust-supported reset boundary or a separately specified
+conditional hardware model to progress past numeric MMIO.
 
 ## Earlier repeatable measurements
+
+The third 2026-10-09 pass at analyzer `efe9d66` collected 2,336 roots: 1,063 PROVED,
+250 REFUTED and 1,023 UNKNOWN. Its source subset had 492 proofs, 226 refutations and 301 unknowns.
+Two encoding helpers gained proofs through retained typed byte slices. Its two async-body probes
+remained UNKNOWN at critical-section foreign calls and reset-cause MMIO respectively.
 
 The second 2026-10-09 pass at analyzer `90170db` collected the same 2,336 roots: 1,061 PROVED,
 250 REFUTED and 1,025 UNKNOWN. Its source subset had 490 proofs, 226 refutations and 303 unknowns.
