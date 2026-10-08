@@ -171,7 +171,7 @@ pub fn run(mut args: Vec<OsString>) -> Result<ExitCode, Box<dyn std::error::Erro
     }
     workspace.record(&reports, false, false)?;
     let build = workspace.root.join(if dependency_mir {
-        "cache/retained"
+        "cache/retained-origins-v1"
     } else {
         "cache/plain"
     });

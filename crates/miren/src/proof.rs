@@ -88,6 +88,12 @@ struct Engine<'tcx> {
     float_encodings: BTreeMap<u32, Term>,
     abstraction_symbols: BTreeMap<u32, &'static str>,
     static_views: std::cell::RefCell<Vec<static_views::StaticView<'tcx>>>,
+    static_origins: std::cell::RefCell<
+        std::collections::HashMap<
+            rustc_span::def_id::CrateNum,
+            Result<miren::static_origins::Evidence, String>,
+        >,
+    >,
     static_epoch: Option<usize>,
     static_roots: Option<usize>,
     function_pointers: Vec<(ty::Instance<'tcx>, Ty<'tcx>)>,
@@ -144,6 +150,7 @@ pub fn verify(
         float_encodings: BTreeMap::new(),
         abstraction_symbols: BTreeMap::new(),
         static_views: std::cell::RefCell::new(Vec::new()),
+        static_origins: Default::default(),
         static_epoch: None,
         static_roots: None,
         function_pointers: Vec::new(),

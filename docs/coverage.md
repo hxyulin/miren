@@ -14,7 +14,7 @@ program: resource limits and undecided queries remain separate sources of UNKNOW
 
 | Feature | Current support | Boundary |
 | --- | --- | --- |
-| Integers and bool | Symbolic target-width values, signed comparisons, exact bit-vector operations and population counts | Raw pointers remain unsupported; Unicode char and integer pattern domains are modeled |
+| Integers and bool | Symbolic target-width values, signed comparisons, exact bit-vector operations and population counts | Raw memory access remains unsupported; Unicode char and integer pattern domains are modeled |
 | Floating point | f32/f64 numeric operations, casts and tracked IEEE storage bits | Remainder/wider formats remain unsupported; arithmetic NaN encodings are conservative |
 | Bytes | Shared byte slices and fixed arrays; symbolic contents and valid-reference length bounds | Disjoint mutable byte-slice roots support guarded writes; general aliases remain unsupported |
 | Tuples | Nested values, shared references, field projections and numeric contract fields such as `value.1.0` | Destructured argument names with projected debug bindings are not contract bindings |
@@ -491,11 +491,15 @@ composite indices remain UNKNOWN. Address checks use symbolic non-null aligned b
 enabling arbitrary memory access.
 
 Static storage-origin reconstruction checks initializer MIR availability before querying rustc.
-The pinned compiler omits dependency static initializer MIR even with retained function bodies,
-so these origins remain UNKNOWN. Evaluated dependency static allocations are still available for
-supported immutable constant reads. Host/ARM debug and optimized tests preserve those reads,
-reject incorrect constant claims and changed local startup initializers, and report missing origins
-without a compiler crash.
+The pinned compiler omits dependency static initializer MIR even with retained function bodies.
+Retained builds emit artifact-bound origin metadata from a compiler pass that checks construction
+and emits its own metadata artifact. A bounded typed construction graph supports declared origins
+and narrow `u32` return transmutes, including core atomic construction. Newly constructed outer
+aggregates keep their declared type; direct constructor returns retain their primitive origin.
+Compiler types and layouts are checked without parsing serialized type names. Missing, stale,
+corrupt or unsupported evidence remains UNKNOWN. Host/ARM debug and optimized tests cover ordinary
+atomic interference, conditional startup values, source/evidence mutations and same-pass artifact
+emission. Supported immutable constant reads and local origin reconstruction remain available.
 
 Tracked thin raw addresses support MIR `Offset` within the exact compiler-sized reference extent.
 Array-to-element casts retain their array extent; signed scaling and cursor bounds are checked,

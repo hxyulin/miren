@@ -659,6 +659,15 @@ layouts must preserve size and sufficient alignment. Foreign statics, promoted m
 and unsupported origins remain UNKNOWN. Constants in executed monomorphized MIR are evaluated in
 the fully monomorphized typing environment, including generic alignment-check constants.
 
+Dependency initializer MIR is unavailable in the pinned compiler's metadata. Retained builds
+instead emit compiler-produced origin records from a bounded monomorphized construction check.
+Declared typed construction and narrow `u32` return transmutes are supported. A new outer aggregate
+establishes declared storage; direct constructor returns retain their primitive origin. The producer
+emits and hashes its own artifact in the same compiler pass. Consumers check compiler, target,
+crate/static identity, schema, artifact hash and payload checksum. The checksum detects accidental
+corruption; these records share the trust boundary of compiler-produced artifacts. They do not
+establish runtime values or verified callee summaries. Missing or unmatched records remain UNKNOWN.
+
 A view carries the static identity, original and projected pointee types, byte offset and whether
 it denotes a shared reference, raw pointer or place. Field projections use compiler layouts.
 Compiler-identified UnsafeCell get/raw_get and inlined transparent UnsafeCell pointer casts expose

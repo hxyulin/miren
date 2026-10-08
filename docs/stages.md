@@ -1024,3 +1024,23 @@ Changed, added or missing inputs invalidate affected results and leave collectio
 Twelve standalone tests cover complete nested-cwd surveys, transitive changes, new sidecars,
 artifact/generated-file mutations, symlinks and traversal limits. Artifacts remain live Cargo
 inputs; these integrity checks do not claim hermetic capture of arbitrary custom environment data.
+
+## Stage 60: checked dependency static origins
+
+Retained dependency compilation emits origin sidecars from an additional compiler pass. That pass
+checks a bounded monomorphized construction graph, emits its own metadata artifact, and only then
+hashes and seals the evidence. Compiler, target, crate/static identities, schema, artifact SHA-256
+and payload checksum must match. A versioned cache ensures dependency evidence is regenerated.
+
+Typed construction establishes declared origins. Narrow scalar-copy/return-transmute bodies retain
+their checked `u32` origin, covering the pinned core atomic constructor. A new outer aggregate
+establishes its declared storage shape; a direct returned constructor retains its primitive origin.
+Unsupported casts, opaque constants, union projections, aggregate parameters, missing bodies and
+unrecognized operations cannot produce a certificate. Compiler types are reconstructed directly;
+matching display names or storage sizes never create an origin.
+
+Host/ARM debug and optimized cases cover atomic/Site construction, conservative ordinary atomic
+reads, explicit startup values, source mutations, missing/stale/corrupt evidence and changed-source
+same-pass emission. Origin records do not prove runtime values or callee contracts. Missing
+evidence remains UNKNOWN, while local reconstruction and immutable dependency reads keep their
+existing behavior.

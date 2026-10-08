@@ -9,6 +9,7 @@ extern crate rustc_hir;
 extern crate rustc_index;
 extern crate rustc_interface;
 extern crate rustc_middle;
+extern crate rustc_session;
 extern crate rustc_span;
 
 use miren::cli::{Color, Progress};
@@ -31,6 +32,7 @@ mod identity;
 mod inventory;
 mod proof;
 mod solver;
+mod static_origin_compiler;
 mod symbolic;
 
 struct Checker {
@@ -391,6 +393,12 @@ fn parse_contract(doc: &str) -> Option<Contract> {
 
 fn main() -> ExitCode {
     let mut args: Vec<String> = std::env::args().collect();
+    if args
+        .get(1)
+        .is_some_and(|arg| arg == "--produce-static-origins")
+    {
+        return static_origin_compiler::run(&args[2..]);
+    }
     if args.get(1).is_some_and(|arg| arg == "report") {
         return match miren::cli::report_command(&args[2..]) {
             Ok(true) => ExitCode::SUCCESS,

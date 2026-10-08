@@ -22,3 +22,18 @@ pub fn frozen_slice() -> u32 {
     let values: &[u32] = &FROZEN_SLICE;
     values[0]
 }
+
+pub struct Site(pub AtomicU32);
+
+impl Site {
+    const fn new() -> Self {
+        Self(AtomicU32::new(7))
+    }
+}
+
+pub static SITE: Site = Site::new();
+
+#[inline(always)]
+pub fn site() -> &'static Site {
+    &SITE
+}

@@ -81,7 +81,18 @@ impl<'tcx> Engine<'tcx> {
     }
 
     fn static_original_type(&self, id: DefId, carrier: Ty<'tcx>) -> Result<Ty<'tcx>, String> {
-        self.require_static_origin_metadata(id)?;
+        if let Some(origin) = self.require_static_origin_metadata(id)? {
+            let original = match origin {
+                miren::static_origins::OriginKind::Declared => carrier,
+                miren::static_origins::OriginKind::U32 => self.tcx.types.u32,
+            };
+            let source = self.static_layout(original)?;
+            let target = self.static_layout(carrier)?;
+            if source.size != target.size || source.align.abi > target.align.abi {
+                return Err("dependency static origin layout differs from compiler carrier".into());
+            }
+            return Ok(original);
+        }
         let body = self.tcx.mir_for_ctfe(id);
         let mut original = None;
         for block in body.basic_blocks.iter() {
@@ -153,21 +164,39 @@ impl<'tcx> Engine<'tcx> {
         Ok(original)
     }
 
-    fn require_static_origin_metadata(&self, id: DefId) -> Result<(), String> {
+    fn require_static_origin_metadata(
+        &self,
+        id: DefId,
+    ) -> Result<Option<miren::static_origins::OriginKind>, String> {
         if self.tcx.is_foreign_item(id) {
             return Err("static views require a Rust initializer".into());
         }
-        // The pinned compiler does not encode static CTFE MIR in dependency metadata,
-        // even with always-encode-mir. is_mir_available checks optimized MIR, not CTFE MIR.
-        // Evaluated initializer allocations are encoded, but those bytes and the declared
-        // layout cannot establish the original storage type before an initializer transmute.
         if !id.is_local() {
-            return Err(format!(
-                "dependency static initializer MIR unavailable for storage origin of {}",
+            let mut cache = self.static_origins.borrow_mut();
+            let evidence = cache.entry(id.krate).or_insert_with(|| {
+                let source = self.tcx.used_crate_source(id.krate);
+                let artifact = source.rmeta.as_ref()
+                    .ok_or("dependency static origin requires the actual metadata artifact")?;
+                miren::static_origins::Evidence::read(
+                    artifact,
+                    env!("MIREN_COMPILER"),
+                    &self.tcx.sess.opts.target_triple.to_string(),
+                    &format!("{:?}", self.tcx.stable_crate_id(id.krate)),
+                )
+            }).as_ref().map_err(|error| format!(
+                "dependency static initializer MIR unavailable for storage origin of {}: {error}",
                 self.tcx.def_path_str(id)
-            ));
+            ))?;
+            let Some(origin) = evidence.origin(&format!("{:?}", self.tcx.def_path_hash(id))) else {
+                return Err(format!(
+                    "dependency static initializer MIR unavailable for storage origin of {}: \
+                     no checked storage-origin construction",
+                    self.tcx.def_path_str(id)
+                ));
+            };
+            return Ok(Some(origin));
         }
-        Ok(())
+        Ok(None)
     }
 
     fn is_transmute_initializer(&self, id: DefId, args: ty::GenericArgsRef<'tcx>) -> bool {

@@ -7,6 +7,7 @@ pub mod limits;
 pub mod project;
 pub mod replay;
 pub mod smt;
+pub mod static_origins;
 pub use config::{ContractConfig, FunctionContract};
 pub use limits::AnalysisLimits;
 

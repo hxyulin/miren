@@ -63,9 +63,21 @@ Non-Unicode source environment values make the environment capture unavailable. 
 inputs outside those Cargo variables are not captured; reports are not hermetic build artifacts.
 
 The pinned compiler retains evaluated dependency static allocations but omits their initializer
-MIR. Immutable dependency constants can still be decoded. Static storage-origin reconstruction
-requires local initializer MIR; dependency origins return UNKNOWN before issuing that unavailable
-compiler query, even when ordinary dependency function MIR has been retained.
+MIR. Immutable dependency constants can still be decoded. Retained dependency builds now emit
+`.rmeta.miren-origins.json` metadata from an additional compiler pass. That pass checks a bounded
+typed construction graph and emits the artifact it certifies before recording its SHA-256 hash.
+Compiler, target, crate/static identities, schema and a payload checksum must match on consumption.
+The retention cache is versioned so older builds cannot silently omit the new evidence.
+The wrapper buffers compiler output and publishes final artifact notifications only after both
+passes finish, preventing pipelined Cargo consumers from racing replacement metadata.
+
+The supported origins are declared typed construction and narrowly checked `u32` return
+transmutes, including the pinned core atomic constructor. Newly constructed outer aggregates keep
+their declared type; direct returned constructors retain their checked primitive origin. Rust types
+come from compiler metadata, not serialized display strings. Missing, stale, corrupt or unsupported
+origin evidence remains UNKNOWN. These records establish construction provenance, not runtime
+values, synchronization or a verified callee summary. Ordinary atomic interference stays
+conservative; startup histories still require explicit assumptions.
 
 Ordinary and async entry scopes differ: selecting an async constructor with `--entry` checks
 construction; `--async-entry` also polls its fresh future through Pending and Ready states.
