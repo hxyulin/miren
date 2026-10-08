@@ -28,6 +28,7 @@ mod coroutines;
 mod error_formatting;
 mod external;
 mod floating_intrinsics;
+mod foreign_calls;
 mod function_pointers;
 mod induction;
 mod input_references;

@@ -3,6 +3,7 @@
 
 extern crate rustc_abi;
 extern crate rustc_attr_ir;
+extern crate rustc_codegen_ssa;
 extern crate rustc_const_eval;
 extern crate rustc_driver;
 extern crate rustc_hir;
@@ -27,6 +28,7 @@ use rustc_span::Span;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
+mod compiler_exports;
 mod contracts;
 mod identity;
 mod inventory;
@@ -64,6 +66,7 @@ impl Callbacks for Checker {
     fn config(&mut self, config: &mut interface::Config) {
         // Preserve checks and prevent MIR inlining from changing the inventory boundary.
         config.opts.unstable_opts.mir_opt_level = Some(0);
+        compiler_exports::retain(config);
     }
 
     fn after_analysis<'tcx>(

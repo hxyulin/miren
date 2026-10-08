@@ -135,6 +135,11 @@ fields such as a task spawner's executor reference. One interior/mutable root st
 supported; additional potentially aliased graphs remain UNKNOWN. Stores preserve reference escape
 and liveness evidence. This does not supply executor startup history or enable shared writes.
 
+Metadata-only dependency builds retain the compiler's exported symbol index. A foreign Rust ABI
+call can execute a unique, strong, explicitly exported, signature-matched retained Rust body.
+Missing, ambiguous, native, dynamic, weak and unsupported targets remain UNKNOWN. Declaration
+contracts are not substituted for an implementation; target contracts and the actual body execute.
+
 The [coverage guide](../../docs/coverage.md) is the maintained feature reference. The
 [proof guide](../../docs/proofs.md) explains the encoding and limitations, and the
 [development guide](../../docs/development.md) lists required checks.

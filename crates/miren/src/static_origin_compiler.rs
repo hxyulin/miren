@@ -38,6 +38,10 @@ struct Producer {
 }
 
 impl Callbacks for Producer {
+    fn config(&mut self, config: &mut interface::Config) {
+        super::compiler_exports::retain(config);
+    }
+
     fn after_analysis<'tcx>(
         &mut self,
         _compiler: &interface::Compiler,

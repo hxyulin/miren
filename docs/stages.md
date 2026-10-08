@@ -1198,3 +1198,15 @@ mutations, dead/frame-owned borrows, alias rejection and invalidating effects. N
 checks agree. Recorded RM-C and engineer-upper registration wrappers prove without startup
 assumptions;
 this stage does not execute their deferred future bodies.
+
+## Stage 73: retained compiler foreign Rust exports
+
+Metadata-only builds retain compiler reachability and exported-symbol queries. The dependency cache
+policy changes so earlier metadata without this evidence is rebuilt. Exact foreign Rust ABI symbols
+resolve only to unique, strong, explicit, signature-matched retained Rust bodies. No declaration,
+annotation, missing body or native-library boundary becomes a successful implementation. Target
+contracts and actual MIR execute.
+
+Compiler integration uses temporary third-party dependency copies and unsafe-forbidden entry
+fixtures. Positive return values prove; assertion and implementation-panic mutations refute;
+missing or unsupported bodies remain UNKNOWN on host/ARM debug and optimized builds.

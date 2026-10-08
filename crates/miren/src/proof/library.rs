@@ -73,6 +73,9 @@ impl<'tcx> Engine<'tcx> {
                 conditions.push(safe);
             }
         }
+        if let Some(target) = self.foreign_rust_target(instance)? {
+            return self.call_instance(target, values, conditions, memory, stack, site);
+        }
         self.execute(instance, values, conditions, memory, stack)
     }
 
