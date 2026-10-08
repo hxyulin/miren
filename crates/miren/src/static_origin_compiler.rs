@@ -161,6 +161,16 @@ fn check_construction<'tcx>(
     if body.basic_blocks.len() > 128 || body.local_decls.len() > 512 {
         return None;
     }
+    if uninitialized_constructor(tcx, id, &body) || cell_constructor(tcx, id, &body) {
+        construction.push(Construction {
+            definition: key,
+            kind: OriginKind::Declared,
+            mir_sha256: digest(format!("{body:?}").as_bytes()),
+            calls: Vec::new(),
+        });
+        active.remove(&instance);
+        return Some(OriginKind::Declared);
+    }
     // Parameters carry only scalar values; aggregate arguments could hide an earlier origin.
     if body.args_iter().any(|local| {
         !matches!(
@@ -220,6 +230,173 @@ fn check_construction<'tcx>(
         calls,
     });
     Some(kind)
+}
+
+fn uninitialized_constructor<'tcx>(
+    tcx: TyCtxt<'tcx>,
+    id: rustc_span::def_id::DefId,
+    body: &Body<'tcx>,
+) -> bool {
+    if !tcx.is_diagnostic_item(rustc_span::Symbol::intern("maybe_uninit_uninit"), id)
+        || body.arg_count != 0
+        || body.basic_blocks.len() != 1
+    {
+        return false;
+    }
+    let ty::Adt(def, _) = body.return_ty().kind() else {
+        return false;
+    };
+    if tcx.lang_items().get(rustc_attr_ir::LangItem::MaybeUninit) != Some(def.did())
+        || !def.is_union()
+    {
+        return false;
+    }
+    let block = &body.basic_blocks[START_BLOCK];
+    if !matches!(block.terminator().kind, TerminatorKind::Return) {
+        return false;
+    }
+    let mut returned = false;
+    let mut units = vec![false; body.local_decls.len()];
+    for statement in &block.statements {
+        match &statement.kind {
+            StatementKind::StorageLive(_)
+            | StatementKind::StorageDead(_)
+            | StatementKind::Nop
+            | StatementKind::ConstEvalCounter => {}
+            StatementKind::Assign(assignment) => {
+                let (destination, value) = assignment.as_ref();
+                if let Rvalue::Use(Operand::Constant(unit), _) = value
+                    && unit.const_.ty().is_unit()
+                    && destination.projection.is_empty()
+                    && body.local_decls[destination.local].ty.is_unit()
+                {
+                    units[destination.local.as_usize()] = true;
+                    continue;
+                }
+                let Rvalue::Aggregate(kind, fields) = value else {
+                    return false;
+                };
+                if matches!(kind.as_ref(), AggregateKind::Tuple)
+                    && fields.is_empty()
+                    && destination.projection.is_empty()
+                    && body.local_decls[destination.local].ty.is_unit()
+                {
+                    units[destination.local.as_usize()] = true;
+                    continue;
+                }
+                let AggregateKind::Adt(aggregate, _, args, _, Some(field)) = kind.as_ref() else {
+                    return false;
+                };
+                let unit_operand = fields.iter().next();
+                if destination.local != RETURN_PLACE
+                    || !destination.projection.is_empty()
+                    || returned
+                    || *aggregate != def.did()
+                    || ty::Ty::new_adt(tcx, *def, args) != body.return_ty()
+                    || fields.len() != 1
+                    || def.non_enum_variant().fields[*field].name.as_str() != "uninit"
+                    || !fields
+                        .iter()
+                        .next()
+                        .unwrap()
+                        .ty(&body.local_decls, tcx)
+                        .is_unit()
+                    || !matches!(unit_operand, Some(Operand::Move(source) | Operand::Copy(source))
+                        if source.projection.is_empty() && units[source.local.as_usize()])
+                {
+                    return false;
+                }
+                returned = true;
+            }
+            _ => return false,
+        }
+    }
+    returned
+}
+
+fn cell_constructor<'tcx>(
+    tcx: TyCtxt<'tcx>,
+    id: rustc_span::def_id::DefId,
+    body: &Body<'tcx>,
+) -> bool {
+    if body.arg_count != 1 || body.basic_blocks.len() != 1 || tcx.item_name(id).as_str() != "new" {
+        return false;
+    }
+    let ty::Adt(def, args) = body.return_ty().kind() else {
+        return false;
+    };
+    let is_cell = |id| {
+        tcx.lang_items().get(rustc_attr_ir::LangItem::UnsafeCell) == Some(id)
+            || tcx.is_diagnostic_item(rustc_span::Symbol::intern("SyncUnsafeCell"), id)
+    };
+    if !is_cell(def.did())
+        || id.krate != def.did().krate
+        || tcx.def_kind(id) != DefKind::AssocFn
+        || args.type_at(0) != body.local_decls[Local::from_usize(1)].ty
+    {
+        return false;
+    }
+    let block = &body.basic_blocks[START_BLOCK];
+    if !matches!(block.terminator().kind, TerminatorKind::Return) {
+        return false;
+    }
+    let mut derived = vec![false; body.local_decls.len()];
+    derived[1] = true;
+    for statement in &block.statements {
+        match &statement.kind {
+            StatementKind::StorageLive(_)
+            | StatementKind::StorageDead(_)
+            | StatementKind::Nop
+            | StatementKind::ConstEvalCounter => {}
+            StatementKind::Assign(assignment) => {
+                let (destination, value) = assignment.as_ref();
+                if let Rvalue::Use(Operand::Move(source) | Operand::Copy(source), _) = value
+                    && source.projection.is_empty()
+                    && destination.projection.is_empty()
+                    && derived[source.local.as_usize()]
+                    && body.local_decls[source.local].ty == body.local_decls[destination.local].ty
+                {
+                    derived[destination.local.as_usize()] = true;
+                    continue;
+                }
+                let Rvalue::Aggregate(kind, fields) = value else {
+                    return false;
+                };
+                let AggregateKind::Adt(aggregate, _, arguments, _, None) = kind.as_ref() else {
+                    return false;
+                };
+                let Some(Operand::Move(source) | Operand::Copy(source)) = fields.iter().next()
+                else {
+                    return false;
+                };
+                let aggregate_def = tcx.adt_def(*aggregate);
+                let field = aggregate_def.non_enum_variant().fields.iter().next();
+                let Some(field) = field else {
+                    return false;
+                };
+                let Ok(field_ty) = tcx.try_normalize_erasing_regions(
+                    ty::TypingEnv::fully_monomorphized(),
+                    field.ty(tcx, arguments),
+                ) else {
+                    return false;
+                };
+                if !destination.projection.is_empty()
+                    || !source.projection.is_empty()
+                    || fields.len() != 1
+                    || !derived[source.local.as_usize()]
+                    || !is_cell(*aggregate)
+                    || field_ty != body.local_decls[source.local].ty
+                    || ty::Ty::new_adt(tcx, aggregate_def, arguments)
+                        != body.local_decls[destination.local].ty
+                {
+                    return false;
+                }
+                derived[destination.local.as_usize()] = true;
+            }
+            _ => return false,
+        }
+    }
+    derived[RETURN_PLACE.as_usize()]
 }
 
 fn primitive_transmute<'tcx>(tcx: TyCtxt<'tcx>, body: &Body<'tcx>) -> bool {
@@ -328,6 +505,12 @@ impl<'tcx> Visitor<'tcx> for ConstructionChecker<'_, 'tcx> {
     fn visit_rvalue(&mut self, value: &Rvalue<'tcx>, location: Location) {
         let supported = match value {
             Rvalue::Use(..) | Rvalue::Repeat(..) => true,
+            Rvalue::Cast(CastKind::IntToInt, operand, target)
+                if operand.ty(&self.body.local_decls, self.tcx).is_bool()
+                    && *target == self.tcx.types.u8 =>
+            {
+                true
+            }
             Rvalue::Aggregate(kind, _) => match kind.as_ref() {
                 AggregateKind::Array(_) | AggregateKind::Tuple => true,
                 AggregateKind::Adt(id, ..) => !self.tcx.adt_def(*id).is_union(),

@@ -1227,3 +1227,12 @@ information without symbolic scalar values. The existing root input budget remai
 shape depth and type/field edge budgets remain enforced. Unions, uninhabited types and unsupported
 references remain UNKNOWN. Host/ARM debug and optimized fixtures verify large trusted peripheral
 outputs with explicit assumptions, failing assertion mutations and unsupported shape boundaries.
+
+## Stage 76: certified uninitialized storage containers
+
+Dependency origin checking recognizes the compiler-identified MaybeUninit uninitialized unit
+field and exact core cell constructor forwarding. A narrow bool-to-u8 encoding supports portable
+atomic construction. This certifies container provenance without initializing payload bytes.
+Shared payload reads before or after stores remain UNKNOWN. Host/ARM compiler fixtures check
+stores, refuted mutations, spoofed/initialized unions and stale artifact rejection. The retained
+origin cache policy refreshes certificates for these construction rules.

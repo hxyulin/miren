@@ -149,6 +149,10 @@ Compiler-typed inhabited zero-sized aggregates use bounded shared input shapes, 
 peripheral token structures. They create no scalar symbols and preserve the root input budget.
 Unions, uninhabited types and unsupported references remain UNKNOWN.
 
+Checked dependency origins can certify uninitialized MaybeUninit containers through exact core
+cell constructors. Certification grants no initialized payload or read history. Only the exact
+bool-to-u8 scalar encoding needed by portable atomics is added to construction checking.
+
 The [coverage guide](../../docs/coverage.md) is the maintained feature reference. The
 [proof guide](../../docs/proofs.md) explains the encoding and limitations, and the
 [development guide](../../docs/development.md) lists required checks.
