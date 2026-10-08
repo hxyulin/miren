@@ -130,6 +130,11 @@ frame-escape checks apply. Shared prefixes and borrowed-array conversions retain
 reference; owned copies retain their copied values. Numeric origins, mutable raw slices, padding
 and raw subobject formation remain UNKNOWN. Raw byte access does not enable arbitrary pointer loads or writes.
 
+Shared non-Freeze root references retain incoming read-only storage identity, including nested
+fields such as a task spawner's executor reference. One interior/mutable root storage graph is
+supported; additional potentially aliased graphs remain UNKNOWN. Stores preserve reference escape
+and liveness evidence. This does not supply executor startup history or enable shared writes.
+
 The [coverage guide](../../docs/coverage.md) is the maintained feature reference. The
 [proof guide](../../docs/proofs.md) explains the encoding and limitations, and the
 [development guide](../../docs/development.md) lists required checks.

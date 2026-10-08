@@ -1186,3 +1186,15 @@ arbitrary runtime state is not boot-failure evidence. The milestone requires a s
 or REFUTED async-body outcome for every expected main. Explicit, fingerprinted assumption profiles
 record a separate conditional milestone. Thirty-two host tool tests pass.
 
+## Stage 72: retained incoming shared storage
+
+Compiler-typed root values retain incoming read-only non-Freeze reference storage, including nested
+Spawner executor fields. One interior/mutable storage graph is supported; additional alias-sensitive
+graphs remain UNKNOWN. Static stores validate Freeze snapshots against exact pointee shapes and
+retain tracked reference escape/liveness evidence. Non-Freeze snapshots remain unsupported.
+
+Host/ARM debug and optimized tests cover guarded stores, refuted assertions, type and value
+mutations, dead/frame-owned borrows, alias rejection and invalidating effects. Native mutation
+checks agree. Recorded RM-C and engineer-upper registration wrappers prove without startup
+assumptions;
+this stage does not execute their deferred future bodies.

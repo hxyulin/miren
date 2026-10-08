@@ -30,6 +30,7 @@ mod external;
 mod floating_intrinsics;
 mod function_pointers;
 mod induction;
+mod input_references;
 mod inputs;
 mod integer_intrinsics;
 mod interior;
@@ -315,7 +316,11 @@ impl<'tcx> Engine<'tcx> {
                 memory.push(Some(value));
                 arguments.push(Value::Cell { allocation: 0 });
             } else {
-                arguments.push(self.argument(id, ty, &mut conditions)?);
+                let value = self.argument(id, ty, &mut conditions)?;
+                let prior_allocations = memory.len();
+                let value = self.retain_shared_input_storage(ty, value, &mut memory, 0)?;
+                interior_root |= memory.len() > prior_allocations;
+                arguments.push(value);
             }
         }
         if !async_entry {

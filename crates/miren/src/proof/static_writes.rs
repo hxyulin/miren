@@ -189,15 +189,30 @@ impl<'tcx> Engine<'tcx> {
             {
                 self.validate_tracked_value(&value, state)
             }
-            (ty::Ref(_, _, mutability), Value::Reference { mutable, .. })
+            (ty::Ref(_, pointee, mutability), Value::Reference { mutable, .. })
                 if !mutability.is_mut() || *mutable =>
             {
                 self.validate_tracked_value(&value, state)?;
-                self.reference_value(&value, &state.memory, &state.conditions)?;
+                let stored = self.reference_value(&value, &state.memory, &state.conditions)?;
+                if pointee.is_freeze(self.tcx, env) {
+                    self.static_store_value(*pointee, &stored, state, depth + 1, values)?;
+                }
                 Ok(())
             }
             (ty::Ref(..) | ty::RawPtr(..), Value::StaticView { .. }) => {
                 self.static_stored_address(ty, &value, state)
+            }
+            (ty::Ref(_, pointee, mutability), _)
+                if !mutability.is_mut()
+                    && pointee.is_freeze(self.tcx, env)
+                    && !matches!(value, Value::RawSlice { .. } | Value::Reference { .. }) =>
+            {
+                // Shared freeze inputs and reborrows may carry the validated pointee
+                // snapshot instead of an allocation handle. Validate that exact pointee
+                // shape, retaining any references nested in it; do not invent an address
+                // or establish facts about the destination's mutable static payload.
+                self.validate_tracked_value(&value, state)?;
+                self.static_store_value(*pointee, &value, state, depth + 1, values)
             }
             (ty::FnPtr(..), Value::FunctionPointer { .. }) => {
                 self.known_function_pointer(&value, ty).map(|_| ())
