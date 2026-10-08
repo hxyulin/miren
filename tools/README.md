@@ -167,3 +167,27 @@ conditional even when the analyzer's status label is PROVED. Such outcomes canno
 when every expected async body has a collected PROVED, PROVED_WITH_ASSUMPTIONS or REFUTED result
 with explicit conditional labels. UNKNOWN and incomplete or subset collections satisfy neither.
 These profiles are hypotheses, not verified hardware models; the runner creates none automatically.
+
+`fleet_main_export.py` publishes compact evidence from a complete strict capture, with an optional
+separate conditional capture:
+
+```sh
+python3 tools/fleet_main_export.py --strict /tmp/fleet-main-001/summary.json \
+  --conditional /tmp/fleet-main-conditional-001/summary.json \
+  --output docs/public/data/fleet-embassy-main-current.json
+```
+
+The exporter checks all 12 expected mains and their three exact scopes against the captured fleet
+inventory. It revalidates raw reports, proof policies, compiler completion, frozen analyzer bytes,
+source fingerprints, dependency checkpoints and policy snapshot bytes. A strict/conditional pair
+must share captured survey, analyzer binaries, source revision, limits and unchanged input hashes.
+Partial or subset captures, stale evidence and unsupported milestone claims fail without replacing
+published evidence. Complete UNKNOWN results can be published with both milestones false.
+
+The deterministic output preserves strict and conditional outcomes separately, blocker locations
+and call chains, actual assumptions, trusted calls and normalized per-unit contracts. It retains
+exact source fingerprints, aggregate dependency fingerprints, raw report and summary hashes, and
+exporter-tool hashes. Counterexample and query payloads are represented by canonical JSON SHA256
+fingerprints; raw SMT, MIR and large dependency path maps remain in the original captures. Output
+larger than 500 KiB is rejected before atomic replacement. Registration or runtime outcomes never
+substitute for the async-body milestone, and conditional outcomes remain explicitly conditional.

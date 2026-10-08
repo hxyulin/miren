@@ -1245,3 +1245,12 @@ critical-section assembly establishes startup or exclusion history. Already-take
 claims refute with explicit abstraction labels. Numeric addresses, incorrect declared types,
 immutable storage and readonly writes remain UNKNOWN. Safe custom MIR fixtures cover host/ARM
 and debug/optimized compilation plus initializer mutations.
+
+## Stage 78: compact all-main evidence publication
+
+The main exporter validates complete strict and optional conditional captures against their
+inventories and raw proof reports. It rejects subset collection, mismatched paired provenance,
+changed policies and unsupported milestone claims. Compact output preserves root scopes, blocker
+chains, assumptions, trusted calls and exact source fingerprints without raw solver queries.
+Publication is atomic; invalid input cannot replace the previous evidence file. Seven focused
+host tests cover capture/report mutations and failed publication.
