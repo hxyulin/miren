@@ -490,6 +490,13 @@ including side effects and short circuiting. Mutable opaque element storage and 
 composite indices remain UNKNOWN. Address checks use symbolic non-null aligned bases without
 enabling arbitrary memory access.
 
+Static storage-origin reconstruction checks initializer MIR availability before querying rustc.
+The pinned compiler omits dependency static initializer MIR even with retained function bodies,
+so these origins remain UNKNOWN. Evaluated dependency static allocations are still available for
+supported immutable constant reads. Host/ARM debug and optimized tests preserve those reads,
+reject incorrect constant claims and changed local startup initializers, and report missing origins
+without a compiler crash.
+
 Certified initialized static `Copy + Freeze` enum places support discriminant-only reads. Each read
 is a fresh logical tag constrained to compiler-declared variants, including signed sparse tags and
 pointer-bearing option tags. One saved observation stays consistent; separate storage reads need

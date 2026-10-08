@@ -81,6 +81,7 @@ impl<'tcx> Engine<'tcx> {
     }
 
     fn static_original_type(&self, id: DefId, carrier: Ty<'tcx>) -> Result<Ty<'tcx>, String> {
+        self.require_static_origin_metadata(id)?;
         let body = self.tcx.mir_for_ctfe(id);
         let mut original = None;
         for block in body.basic_blocks.iter() {
@@ -150,6 +151,23 @@ impl<'tcx> Engine<'tcx> {
             return Err("static initializer does not preserve storage size and alignment".into());
         }
         Ok(original)
+    }
+
+    fn require_static_origin_metadata(&self, id: DefId) -> Result<(), String> {
+        if self.tcx.is_foreign_item(id) {
+            return Err("static views require a Rust initializer".into());
+        }
+        // The pinned compiler does not encode static CTFE MIR in dependency metadata,
+        // even with always-encode-mir. is_mir_available checks optimized MIR, not CTFE MIR.
+        // Evaluated initializer allocations are encoded, but those bytes and the declared
+        // layout cannot establish the original storage type before an initializer transmute.
+        if !id.is_local() {
+            return Err(format!(
+                "dependency static initializer MIR unavailable for storage origin of {}",
+                self.tcx.def_path_str(id)
+            ));
+        }
+        Ok(())
     }
 
     fn is_transmute_initializer(&self, id: DefId, args: ty::GenericArgsRef<'tcx>) -> bool {

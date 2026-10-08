@@ -985,3 +985,15 @@ Before/after host and ARM runs over reference lifetime, tracked pointer, corouti
 fixtures produce identical complete proof records and SMT queries for 173 root reports. The full
 compiler/runtime suite passes. This refactor creates a focused validation boundary without adding
 reference permissions or language coverage.
+
+## Stage 57: unavailable dependency static origins remain unknown
+
+The fleet survey exposed rustc query panics when storage-origin reconstruction requested dependency
+static initializer MIR. The pinned metadata format retains evaluated static allocations but omits
+their CTFE bodies. Origin reconstruction now checks that boundary and returns UNKNOWN before the
+query. Supported immutable dependency scalar/slice reads still decode the evaluated allocations.
+
+Host/ARM debug and optimized fixtures cover ordinary/startup domains, local initializer proofs,
+changed initializer refutations, immutable dependency reads and incorrect constant claims, and
+dependency mutable origins remaining UNKNOWN. Ordinary dependency bodies remain interpreted.
+No unavailable body, initializer annotation or storage layout becomes a proof assumption.

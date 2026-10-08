@@ -62,6 +62,11 @@ replays restore those inputs without inheriting analysis policies or registry cr
 Non-Unicode source environment values make the environment capture unavailable. Custom environment
 inputs outside those Cargo variables are not captured; reports are not hermetic build artifacts.
 
+The pinned compiler retains evaluated dependency static allocations but omits their initializer
+MIR. Immutable dependency constants can still be decoded. Static storage-origin reconstruction
+requires local initializer MIR; dependency origins return UNKNOWN before issuing that unavailable
+compiler query, even when ordinary dependency function MIR has been retained.
+
 Ordinary and async entry scopes differ: selecting an async constructor with `--entry` checks
 construction; `--async-entry` also polls its fresh future through Pending and Ready states.
 Executor scheduling, cancellation and unbounded suspension require additional models or proofs.
