@@ -642,6 +642,13 @@ reference transmutes, metadata-bearing pointers, pointer arithmetic and derefere
 incomplete. Tests check host and ARM widths, signed and truncating casts, null constants, copied
 handles, aggregate constructors, rejected operations and mutations, with native replay.
 
+Tracked allocation addresses additionally support MIR `Offset` for a compiler-sized reference
+extent. The compiler pointee stride scales target-width signed counts in double-width arithmetic.
+Validity obligations require a representable signed displacement and a resulting cursor between
+zero and the extent, inclusive. One-past addresses can be formed and moved back; raw dereferences
+remain UNKNOWN. Reference liveness and frame-escape checks still apply to offset pointers. These
+validity obligations do not turn undefined pointer formation into an observed runtime panic.
+
 ## Opaque static storage views
 
 Ordinary execution can retain compiler provenance for a whole reference to an interior-mutable

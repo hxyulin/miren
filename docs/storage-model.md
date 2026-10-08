@@ -139,8 +139,15 @@ tracked reference reborrows can supply these pointers; value snapshots cannot es
 Same-place reborrows share an address term, ignoring const/mutable pointer spelling. Supported thin
 casts retain the reference, while integer exposure supplies only address bits.
 
-Creating a pointer does not authorize a load or store through it. Raw dereferences and arithmetic
-remain UNKNOWN. Direct projected raw addresses need compiler layout offsets and remain unsupported;
+MIR `Offset` uses the compiler pointee stride and the exact reference's sized storage extent.
+Array-to-element casts retain the array extent. Signed scaled displacement must fit target `isize`,
+and the resulting byte cursor must stay within that extent, including its one-past endpoint.
+Double-width arithmetic checks these conditions before constructing the address. Reverse offsets
+retain their original symbolic base; validity failures remain distinct from panic obligations.
+
+Creating or offsetting a pointer does not authorize a load or store through it. Raw dereferences,
+numeric pointer offsets, zero-sized strides and wrapping pointer arithmetic remain UNKNOWN.
+Direct projected raw addresses need compiler layout offsets and remain unsupported;
 this avoids assuming that a packed field is aligned merely because its type has alignment.
 Snapshots retain pointer identity rather than copying its pointee as an owned value. Liveness and
 frame-escape checks traverse the retained reference, including pointers nested in stored aggregates.

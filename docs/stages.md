@@ -997,3 +997,17 @@ Host/ARM debug and optimized fixtures cover ordinary/startup domains, local init
 changed initializer refutations, immutable dependency reads and incorrect constant claims, and
 dependency mutable origins remaining UNKNOWN. Ordinary dependency bodies remain interpreted.
 No unavailable body, initializer annotation or storage layout becomes a proof assumption.
+
+## Stage 58: bounded tracked pointer offsets
+
+Tracked raw address identities retain the exact compiler-sized reference extent and a byte cursor.
+MIR `Offset` obtains its stride from the compiler pointee type, checks signed scaled displacement
+and cursor bounds with double-width arithmetic, and preserves the original symbolic base.
+Array-to-element casts retain their array extent; one-past formation and reverse offsets are
+supported without granting raw memory access. Liveness and frame-escape validation remain active.
+
+Host/ARM debug and optimized tests cover address relationships, later panic preservation, signed
+overflow and bounds validity failures, and stride/bounds mutations. Native tests cross-check valid
+relationships and the incorrect-stride assertion. Numeric pointers, zero-sized strides, wrapping
+arithmetic, untracked snapshots and raw dereferences remain UNKNOWN. Validity failures are recorded
+separately from panic-safety failures.

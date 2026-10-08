@@ -497,6 +497,14 @@ supported immutable constant reads. Host/ARM debug and optimized tests preserve 
 reject incorrect constant claims and changed local startup initializers, and report missing origins
 without a compiler crash.
 
+Tracked thin raw addresses support MIR `Offset` within the exact compiler-sized reference extent.
+Array-to-element casts retain their array extent; signed scaling and cursor bounds are checked,
+including one-past formation and reverse offsets. Host/ARM debug and optimized fixtures check
+address relationships, later panics, validity refutations and stride/bounds mutations. Native tests
+cross-check valid address relationships and the wrong-stride assertion. Numeric offsets, zero-sized
+strides, wrapping arithmetic, untracked reference snapshots, raw dereferences and frame escapes
+remain UNKNOWN. Offset validity refutations do not claim an observed runtime panic.
+
 Certified initialized static `Copy + Freeze` enum places support discriminant-only reads. Each read
 is a fresh logical tag constrained to compiler-declared variants, including signed sparse tags and
 pointer-bearing option tags. One saved observation stays consistent; separate storage reads need

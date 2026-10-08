@@ -7,6 +7,8 @@ const MAX_TRACKED_ADDRESSES: usize = 512;
 pub(super) struct AddressLocation {
     allocation: usize,
     projection: Vec<AddressProjection>,
+    extent: u64,
+    cursor: Option<(Term, Term)>,
 }
 
 #[derive(Clone, PartialEq, Eq)]
@@ -109,9 +111,13 @@ impl<'tcx> Engine<'tcx> {
                 }
             })
             .collect::<Result<Vec<_>, _>>()?;
+        let layout = self.static_layout(pointee)?;
+        let extent = layout.size.bytes();
         let location = AddressLocation {
             allocation: *allocation,
             projection,
+            extent,
+            cursor: None,
         };
         let bits = u32::from(self.tcx.sess.target.pointer_width);
         let address = if let Some((_, address)) = self
@@ -126,12 +132,21 @@ impl<'tcx> Engine<'tcx> {
             }
             let address = self.fresh_abstraction(
                 Sort::BitVec(bits),
-                "tracked allocation addresses are symbolic; relative offsets are not modeled",
+                "tracked allocation base addresses are symbolic",
             );
             self.tracked_addresses.push((location, address.clone()));
             address
         };
-        let layout = self.static_layout(pointee)?;
+        if u128::from(extent) > (1u128 << (bits - 1)) - 1 {
+            return Err("tracked raw address extent exceeds target isize::MAX".into());
+        }
+        let limit = self
+            .terms
+            .bit_vector((1u128 << bits) - 1 - u128::from(extent), bits)?;
+        state.conditions.push(
+            self.terms
+                .apply(Op::BvUnsignedLe, &[address.clone(), limit])?,
+        );
         let zero = self.terms.bit_vector(0, bits)?;
         state.conditions.push(symbolic::not(
             &self
@@ -147,6 +162,120 @@ impl<'tcx> Engine<'tcx> {
             .push(self.terms.apply(Op::Equal, &[low, zero])?);
         Ok(Value::TrackedPointer {
             reference: Box::new(reference),
+            address,
+            bits,
+        })
+    }
+
+    pub(super) fn tracked_pointer_offset(
+        &mut self,
+        id: DefId,
+        source: Ty<'tcx>,
+        pointer: Value,
+        count: Value,
+        state: &mut State,
+    ) -> Result<Value, String> {
+        self.validate_tracked_value(&pointer, state)?;
+        let Value::TrackedPointer {
+            reference,
+            address,
+            bits,
+        } = pointer
+        else {
+            return Err("pointer Offset requires tracked allocation provenance".into());
+        };
+        let ty::RawPtr(pointee, _) = source.kind() else {
+            return Err("pointer Offset requires a thin raw pointer".into());
+        };
+        let stride = self.static_layout(*pointee)?.size.bytes();
+        if stride == 0 {
+            return Err("zero-sized pointer Offset is not modeled".into());
+        }
+        let (count, count_bits, signed) = count.integer()?;
+        if count_bits != bits || !signed {
+            return Err("pointer Offset requires target-width isize displacement".into());
+        }
+        let location = self
+            .tracked_addresses
+            .iter()
+            .find(|(_, existing)| *existing == address)
+            .map(|(location, _)| location.clone())
+            .ok_or("pointer Offset lacks a compiler-certified tracked extent")?;
+        if self.tracked_addresses.len() >= MAX_TRACKED_ADDRESSES {
+            return Err("tracked raw address identity budget reached".into());
+        }
+        // Double-width arithmetic retains the full signed product and cursor sum.
+        // Every admitted extent and stride fits the target's signed object bound.
+        if u128::from(stride) > (1u128 << (bits - 1)) - 1 {
+            return Err("pointer Offset stride exceeds target isize::MAX".into());
+        }
+        let wide_bits = bits * 2;
+        let extended_count = self.terms.apply(Op::SignExtend(bits), &[count])?;
+        let scale = self.terms.bit_vector(u128::from(stride), wide_bits)?;
+        let displacement = self.terms.apply(Op::BvMul, &[extended_count, scale])?;
+        let (base, old_offset) = location
+            .cursor
+            .clone()
+            .unwrap_or((address.clone(), self.terms.bit_vector(0, wide_bits)?));
+        let offset = self
+            .terms
+            .apply(Op::BvAdd, &[old_offset, displacement.clone()])?;
+        let zero = self.terms.bit_vector(0, wide_bits)?;
+        let extent = self
+            .terms
+            .bit_vector(u128::from(location.extent), wide_bits)?;
+        let max = self
+            .terms
+            .bit_vector((1u128 << (bits - 1)) - 1, wide_bits)?;
+        let min = self.terms.apply(
+            Op::SignExtend(bits),
+            &[self.terms.bit_vector(1u128 << (bits - 1), bits)?],
+        )?;
+        let conditions = [
+            self.terms
+                .apply(Op::BvSignedGe, &[displacement.clone(), min])?,
+            self.terms.apply(Op::BvSignedLe, &[displacement, max])?,
+            self.terms.apply(Op::BvSignedGe, &[offset.clone(), zero])?,
+            self.terms
+                .apply(Op::BvSignedLe, &[offset.clone(), extent])?,
+        ];
+        let valid = self.terms.apply(Op::And, &conditions)?;
+        self.require(
+            id,
+            self.tcx.def_span(id),
+            &state.conditions,
+            &valid,
+            ObligationKind::Validity,
+            "pointer Offset must fit signed target displacement and its tracked allocation".into(),
+        )?;
+        state.conditions.push(valid);
+        let low = self.terms.apply(
+            Op::Extract {
+                high: bits - 1,
+                low: 0,
+            },
+            std::slice::from_ref(&offset),
+        )?;
+        let address = self.terms.apply(Op::BvAdd, &[base.clone(), low])?;
+        if !self
+            .tracked_addresses
+            .iter()
+            .any(|(_, existing)| *existing == address)
+        {
+            self.tracked_addresses.push((
+                AddressLocation {
+                    cursor: Some((base, offset)),
+                    ..location
+                },
+                address.clone(),
+            ));
+        }
+        self.record_model(
+            id,
+            "tracked in-allocation or one-past raw address; no raw memory access",
+        );
+        Ok(Value::TrackedPointer {
+            reference,
             address,
             bits,
         })

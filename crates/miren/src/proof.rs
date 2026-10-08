@@ -1696,6 +1696,10 @@ impl<'tcx> Engine<'tcx> {
             Rvalue::BinaryOp(operation, operands) => {
                 let left = self.operand(id, body, state, &operands.0)?;
                 let right = self.operand(id, body, state, &operands.1)?;
+                if *operation == BinOp::Offset {
+                    let source = operands.0.ty(&body.local_decls, self.tcx);
+                    return self.tracked_pointer_offset(id, source, left, right, state);
+                }
                 let operation = match operation {
                     BinOp::AddUnchecked | BinOp::SubUnchecked | BinOp::MulUnchecked => {
                         let checked = match operation {

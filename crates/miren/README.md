@@ -82,6 +82,12 @@ It traverses nested aggregates, pointer backing storage, iterator sources and st
 accepting dependent operations. The implementation lives separately from memory projection and
 mutation; this separation does not change the supported reference domain.
 
+Tracked thin raw addresses support MIR `Offset` within a compiler-sized reference extent, including
+one-past formation and reverse offsets. Compiler pointee layout supplies the stride; scaled signed
+displacement and allocation bounds produce explicit validity obligations. Array casts retain their
+known extent. Numeric pointer offsets, zero-sized strides, wrapping arithmetic and raw loads/stores
+remain UNKNOWN. Retained references still undergo liveness and frame-escape checks.
+
 The [coverage guide](../../docs/coverage.md) is the maintained feature reference. The
 [proof guide](../../docs/proofs.md) explains the encoding and limitations, and the
 [development guide](../../docs/development.md) lists required checks.
