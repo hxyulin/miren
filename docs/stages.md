@@ -1254,3 +1254,11 @@ changed policies and unsupported milestone claims. Compact output preserves root
 chains, assumptions, trusted calls and exact source fingerprints without raw solver queries.
 Publication is atomic; invalid input cannot replace the previous evidence file. Seven focused
 host tests cover capture/report mutations and failed publication.
+
+## Stage 79: certified boolean cell payloads
+
+Boolean static reads extend through exact certified compiler struct/tuple field paths containing
+core UnsafeCell, including `Cell<bool>` and nonzero-offset wrappers. Reads remain arbitrary valid
+booleans with abstraction reasons. No initializer, write or critical section supplies stable
+history. Field/type/origin checks remain bounded; unions and MaybeUninit payloads remain UNKNOWN.
+Host/ARM debug and optimized fixtures cover core cells, typed writes and failing history claims.

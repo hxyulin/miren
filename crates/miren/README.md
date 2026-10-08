@@ -79,11 +79,15 @@ origin evidence remains UNKNOWN. These records establish construction provenance
 values, synchronization or a verified callee summary. Ordinary atomic interference stays
 conservative; startup histories still require explicit assumptions.
 
-Whole mutable Rust `bool` statics support typed direct reads and writes through compiler-backed
-allocation provenance. Each read admits either valid boolean value, including after writes;
+Whole mutable Rust `bool` statics and certified boolean fields inside compiler-identified
+`UnsafeCell` storage support typed direct reads and writes through compiler-backed allocation
+provenance. This includes core `Cell<bool>` storage. Interior reads require matching declared
+and original types and an exact bounded struct/tuple field path through the core `UnsafeCell`
+lang item; unions and uninitialized payloads remain unsupported. Each read admits either valid
+boolean value, including after writes;
 initializers and critical sections establish no startup or shared-state history. Counterexamples
 that depend on this abstraction record its reason. Foreign storage, numeric addresses, different
-scalar types, interior offsets and mismatched storage origins remain UNKNOWN. Readonly pointers
+scalar types, unauthenticated interior offsets and mismatched storage origins remain UNKNOWN. Readonly pointers
 cannot authorize writes.
 
 Ordinary and async entry scopes differ: selecting an async constructor with `--entry` checks

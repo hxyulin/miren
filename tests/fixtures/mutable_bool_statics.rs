@@ -1,6 +1,6 @@
 #![no_std]
 #![forbid(unsafe_code)]
-#![feature(custom_mir, core_intrinsics)]
+#![feature(custom_mir, core_intrinsics, sync_unsafe_cell)]
 
 use core::intrinsics::mir::*;
 
@@ -83,5 +83,55 @@ pub fn readonly_write_is_unknown() {
 
 pub fn numeric_address_is_unknown() {
     let pointer: *const bool = cast(0x2000_0000_usize);
+    assert!(!read(pointer));
+}
+
+
+use core::cell::{Cell, SyncUnsafeCell};
+
+struct Wrapper {
+    padding: u64,
+    value: bool,
+}
+
+static mut CELL: Cell<bool> = Cell::new(false);
+static WRAPPER: SyncUnsafeCell<Wrapper> = SyncUnsafeCell::new(Wrapper {
+    padding: 7,
+    value: false,
+});
+static BYTE_CELL: SyncUnsafeCell<u8> = SyncUnsafeCell::new(0);
+static UNINIT_CELL: SyncUnsafeCell<core::mem::MaybeUninit<bool>> =
+    SyncUnsafeCell::new(core::mem::MaybeUninit::uninit());
+
+#[custom_mir(dialect = "runtime", phase = "optimized")]
+fn borrow<T>(pointer: *mut T) -> &'static T {
+    mir! {{ RET = &*pointer; Return() }}
+}
+
+pub fn valid_cell_bool() {
+    let value = borrow(&raw mut CELL).get();
+    assert!(value || !value);
+}
+
+pub fn cell_already_taken() {
+    assert!(!borrow(&raw mut CELL).get());
+}
+
+pub fn cell_write_does_not_establish_history() {
+    borrow(&raw mut CELL).set(true);
+    assert!(borrow(&raw mut CELL).get());
+}
+
+pub fn nested_cell_already_taken() {
+    let wrapper = borrow(WRAPPER.get());
+    assert!(!wrapper.value);
+}
+
+pub fn wrong_cell_scalar_is_unknown() {
+    assert!(read(BYTE_CELL.get()) == 0);
+}
+
+pub fn uninitialized_bool_is_unknown() {
+    let pointer: *const bool = cast(UNINIT_CELL.get());
     assert!(!read(pointer));
 }

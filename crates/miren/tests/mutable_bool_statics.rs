@@ -41,6 +41,15 @@ fn verify(path: &Path, target: Option<&str>, optimized: bool) {
         ("immutable_storage_is_unknown", ProofStatus::Unknown),
         ("readonly_write_is_unknown", ProofStatus::Unknown),
         ("numeric_address_is_unknown", ProofStatus::Unknown),
+        ("valid_cell_bool", ProofStatus::Proved),
+        ("cell_already_taken", ProofStatus::Refuted),
+        (
+            "cell_write_does_not_establish_history",
+            ProofStatus::Refuted,
+        ),
+        ("nested_cell_already_taken", ProofStatus::Refuted),
+        ("wrong_cell_scalar_is_unknown", ProofStatus::Unknown),
+        ("uninitialized_bool_is_unknown", ProofStatus::Unknown),
     ];
     let directory = Directory::new();
     let mut command = Command::new(env!("CARGO_BIN_EXE_miren"));

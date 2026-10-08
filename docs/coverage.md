@@ -712,3 +712,8 @@ Their declared initializer and preceding writes establish no runtime history. Su
 writes discard shared history. The model requires exact bool storage at offset zero and rejects
 numeric addresses, immutable storage and readonly writes. Counterexamples relying on arbitrary
 state or unstable reads carry an abstraction reason; they do not establish a boot-time panic.
+
+Certified bool payloads inside core UnsafeCell, including `Cell<bool>`, use the same arbitrary-read
+model. A bounded compiler struct/tuple field path must match the exact declared storage type and
+byte offset. Unions and MaybeUninit paths remain unsupported; reads grant no initialization,
+startup, exclusion or stable shared-state evidence.
