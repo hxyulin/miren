@@ -145,6 +145,10 @@ supported compiler assembly shapes. Reads have arbitrary 32-bit values and do no
 interrupt state. Writes invalidate published atomic/startup history. Other assembly remains UNKNOWN;
 these operations do not prove critical-section exclusion or interrupt scheduling.
 
+Compiler-typed inhabited zero-sized aggregates use bounded shared input shapes, including large
+peripheral token structures. They create no scalar symbols and preserve the root input budget.
+Unions, uninhabited types and unsupported references remain UNKNOWN.
+
 The [coverage guide](../../docs/coverage.md) is the maintained feature reference. The
 [proof guide](../../docs/proofs.md) explains the encoding and limitations, and the
 [development guide](../../docs/development.md) lists required checks.

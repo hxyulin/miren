@@ -1219,3 +1219,11 @@ startup claim. Mask writes invalidate published atomic/startup facts and do not 
 critical-section exclusion. Other assembly remains UNKNOWN. Safe compiler fixtures call existing
 Cortex-M dependency
 APIs, exercise reachable panics and reject instruction/operand/option mutations.
+
+## Stage 75: compact zero-sized input structures
+
+Compiler-typed, inhabited zero-sized structs, tuples and bounded arrays use shared input shape
+information without symbolic scalar values. The existing root input budget remains unchanged;
+shape depth and type/field edge budgets remain enforced. Unions, uninhabited types and unsupported
+references remain UNKNOWN. Host/ARM debug and optimized fixtures verify large trusted peripheral
+outputs with explicit assumptions, failing assertion mutations and unsupported shape boundaries.

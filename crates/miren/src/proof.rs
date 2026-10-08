@@ -60,6 +60,7 @@ use startup::AtomicStorage;
 use startup_memory::Memory;
 mod tracked_pointers;
 mod typed_slices;
+mod zero_sized_inputs;
 mod zeroed_storage;
 
 #[derive(Clone)]
@@ -111,6 +112,9 @@ struct Engine<'tcx> {
     input_depth: usize,
     input_values: usize,
     input_shapes: std::collections::HashMap<Ty<'tcx>, std::rc::Rc<symbolic::input::InputShape>>,
+    zero_sized_inputs:
+        std::collections::HashMap<Ty<'tcx>, std::rc::Rc<symbolic::input::InputShape>>,
+    zero_sized_input_nodes: usize,
     prefer_lazy_inputs: bool,
     building_mutable_input: bool,
     started: std::time::Instant,
@@ -168,6 +172,8 @@ pub fn verify(
         input_depth: 0,
         input_values: 0,
         input_shapes: std::collections::HashMap::new(),
+        zero_sized_inputs: std::collections::HashMap::new(),
+        zero_sized_input_nodes: 0,
         prefer_lazy_inputs: false,
         building_mutable_input: false,
         started: std::time::Instant::now(),
@@ -515,6 +521,9 @@ impl<'tcx> Engine<'tcx> {
         ty: Ty<'tcx>,
         conditions: &mut Vec<Term>,
     ) -> Result<Value, String> {
+        if let Some(value) = self.zero_sized_argument(ty)? {
+            return Ok(value);
+        }
         if let Some(value) = self.lazy_argument(ty)? {
             return Ok(value);
         }
