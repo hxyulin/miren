@@ -1044,3 +1044,16 @@ reads, explicit startup values, source mutations, missing/stale/corrupt evidence
 same-pass emission. Origin records do not prove runtime values or callee contracts. Missing
 evidence remains UNKNOWN, while local reconstruction and immutable dependency reads keep their
 existing behavior.
+
+## Stage 61: deterministic survey publication
+
+A standalone exporter validates complete collections, root/unit identities, classification counts
+and source/artifact checkpoint consistency before producing compact documentation data. It sorts
+units, files and blockers deterministically, preserves every root, and compares status transitions,
+configuration compatibility and proof regressions. Missing older artifact evidence remains explicit.
+Later surveys also retain the already-enforced pre-verification artifact map.
+
+Seventeen host tool tests include full 2,336-root compact round trips, deterministic output, partial
+and malformed collections, count mismatches, changed artifacts and outcome comparisons. The fresh
+32-unit fleet scan resolves 57 previous unknown source functions: 28 prove and 29 refute, with no
+previously proved or refuted root regression. Numeric MMIO pointer offsets remain unsupported.

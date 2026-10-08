@@ -2,43 +2,55 @@
 
 ## Current repeatable measurement
 
-On 2026-10-08, the repeatable runner collected all 2,336 roots from all 32 ARM library/binary
-units in fleet-2027. There were 1,028 PROVED, 221 REFUTED and 1,087 UNKNOWN roots, with no
+On 2026-10-09, the repeatable runner collected all 2,336 roots from all 32 ARM library/binary
+units in fleet-2027. There were 1,056 PROVED, 250 REFUTED and 1,030 UNKNOWN roots, with no
 PROVED_WITH_ASSUMPTIONS results. All units completed collection; no entire workspace passed
 verification. Counts describe selected root domains, not line coverage or firmware safety.
 
-The source-function heuristic below identifies 1,019 declarations: 457 PROVED, 197 REFUTED and
-365 UNKNOWN. Its denominator differs from the historical 976 because the firmware revision changed.
+The source-function heuristic below identifies 1,019 declarations: 485 PROVED, 226 REFUTED and
+308 UNKNOWN. Its denominator differs from the historical 976 because the firmware revision changed.
 Refutations concern arbitrary supported root inputs and remain runtime unconfirmed.
 
 The [current JSON summary](/data/fleet-survey-current.json) records every root's outcome, source,
 first blocker and compilation unit, using the documented `root_columns` indices. It also records
-the frozen binary hashes, build settings and source-input fingerprint. Raw inventories, solver
-reports and command logs remain local measurement artifacts.
+the frozen binary hashes, build settings and source/dependency input fingerprints. The deterministic
+[exporter](https://github.com/hxyulin/miren/blob/main/tools/README.md) recreates this compact data
+from complete raw collections. Raw inventories, solver reports and command logs remain local
+measurement artifacts.
 
 - Firmware revision: `26377371e38ed3234f972bcdf6b2f9f4d26a7f02`;
   tracked application source unchanged.
   The working tree contains an untracked `rust-project.json`; all source-input hashes stayed equal
   throughout the scan.
-- Analyzer code: `defa81a`, JSON schema 9. Recorded analyzer working-tree differences are survey
-  documentation and runner whitespace; the binaries were frozen before analysis.
+- Analyzer code: `5a2fe83`, JSON schema 9; clean working tree at scan start.
+  The binaries were frozen before analysis.
 - Compiler: nightly-2026-09-22; Z3 4.15.4.
 - Target: `thumbv7em-none-eabihf`; dev profile; Cargo default features and locked dependencies.
 - All 32 units use panic abort and enabled overflow checks;
   root/dependency MIR optimization is zero.
 - Limits: 8,192 steps, call depth 16, 200,000 query bytes, 30 seconds per root and 5 seconds per
   solver request; four verification workers, sequential Cargo inventories.
-- No project proof configuration, startup assumptions, trusted sidecars, induction or native replay.
+- No project proof configuration, startup assumptions, trusted contracts, induction or native replay.
 
-The pre-fix runner collected a partial baseline: 13 units crashed when rustc queried dependency
-static initializer MIR absent from metadata. The storage-origin guard recovers collection for those
-units while keeping unavailable origins UNKNOWN. The same 2,336 roots remain selected, and no
-previously proved root regressed. The recovered reports add 556 proofs and 171 refutations to the
-baseline's collected outcomes; these are recovered results, not newly supported initializer bodies.
+Compared with the complete 2026-10-08 measurement, checked dependency-origin metadata resolves
+57 previously unknown source functions: 28 now prove and 29 refute. All 1,028 previously proved
+roots and 221 previously refuted roots retain their outcomes. No roots were added or removed, and
+the recorded analysis configurations remain compatible. Constructor origin records do not assume
+runtime atomic values or verify callee contracts.
 
-Among the 365 unknown source-function roots, mutually exclusive first-blocker groups are:
+Tracked pointer offsets pass their host/ARM mutation tests but add no proofs to this fleet scan.
+All 45 offset blockers use numeric MMIO addresses and still lack allocation provenance; offset
+support does not invent a hardware memory model. The remaining six dependency-origin blockers
+concern Embassy CAN/USB storage outside the bounded construction model.
 
-- Dependency static origin MIR: 63.
+Dependency artifacts, origin sidecars and generated build inputs stayed unchanged for all 32
+units. The compact data records inventory, post-verification and completion fingerprints; this
+run also enforced pre-verification comparisons without storing that extra map. Later runner
+versions record that checkpoint explicitly. No source inputs changed during collection.
+
+Among the 308 unknown source-function roots, mutually exclusive first-blocker groups are:
+
+- Dependency static origin MIR: 6.
 - Raw pointer offset operations: 45.
 - Trait-object input shapes: 22.
 - Solver unknown results: 46.
@@ -48,6 +60,11 @@ Among the 365 unknown source-function roots, mutually exclusive first-blocker gr
 
 These first blockers guide the next stages; resolving one can expose further unsupported behavior.
 The old mutable-input counts below no longer describe the current implementation.
+
+The complete 2026-10-08 baseline had 1,028 proofs, 221 refutations and 1,087 unknown roots.
+It followed a partial pre-guard run in which 13 units crashed on unavailable dependency CTFE MIR.
+The guard recovered collection without inventing origin evidence, adding 556 proofs and
+171 refutations to that partial baseline. The current origin stage then expands supported evidence.
 
 ## Historical 2026-10-06 survey
 

@@ -401,6 +401,8 @@ def survey(args):
         print(f"Inventory {name}: {len(units)} expected units", file=sys.stderr, flush=True)
         record, _ = execute(command, workspace, env, prefix, args.build_timeout)
         inventories, errors = reports(jsonl.read_bytes() if jsonl.exists() else b"")
+        if record.get("returncode") != 0:
+            errors.append("inventory process did not exit successfully")
         item = {"id": name, "inventory": record, "errors": errors, "expected_units": len(units)}
         summary["workspaces"].append(item)
         for unit in units:
@@ -454,6 +456,7 @@ def survey(args):
         integrity_error = None
         try:
             before = artifact_hashes(unit["artifact_inputs"])
+            unit["artifact_hashes_before_verify"] = before
             if before != unit["artifact_hashes"]:
                 integrity_error = "dependency/build inputs changed before verification"
         except (OSError, ValueError) as error:
@@ -528,7 +531,8 @@ def survey(args):
     summary["status"] = "complete" if (
         summary["units"] and not summary["errors"]
         and all(u["status"] == "complete" for u in summary["units"])
-        and all(w["inventory"]["status"] == "complete" and not w["errors"]
+        and all(w["inventory"]["status"] == "complete"
+                and w["inventory"].get("returncode") == 0 and not w["errors"]
                 for w in summary["workspaces"])) else "partial"
     summary["first_blockers"] = {}
     for root in summary["roots"]:

@@ -62,3 +62,27 @@ Run the standalone tests without compiling Rust:
 ```sh
 python3 -m unittest discover -s tools -p 'test_*.py'
 ```
+
+To publish a completed measurement, export its validated full summary:
+
+```sh
+python3 tools/fleet_survey_export.py /tmp/fleet-survey-002/summary.json \
+  --output /tmp/fleet-survey-compact.json --measured-on 2026-10-09 \
+  --previous /tmp/fleet-survey-001/summary.json
+```
+
+The exporter rejects partial or inconsistent current collections, missing roots, duplicate
+identities, count mismatches, failed unit/workspace collection and changed source/artifact
+evidence. It preserves every root through the existing schema-1 `root_columns`, sorted unit, file
+and blocker tables, plus counts and source classification. The explicit measurement date is
+required; it is not inferred from file timestamps. An optional previous full summary records
+baseline counts, unit failures, outcome transitions, added/removed roots, previously proved
+regressions and incompatible configurations. The previous collection may be partial, with its
+status preserved in the comparison.
+
+Compact provenance stores source and artifact aggregate SHA256 fingerprints instead of all
+artifact paths. Artifact checkpoint coverage is explicit: older surveys have no artifact evidence
+and report null for its fingerprint/unchanged flag; surveys recorded before pre-verification maps
+were retained can report inventory, post-verification and completion checkpoints only. Unrecorded
+compiler settings are not inferred from the target name. Export uses a deterministic atomic
+replacement and changes no application code or documentation data automatically.

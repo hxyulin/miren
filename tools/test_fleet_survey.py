@@ -202,7 +202,7 @@ class SurveyTests(unittest.TestCase):
                      "missing_proof", "configuration_mutation", "file_mutation", "missing_target",
                      "missing_compiler", "unsupported_schema", "artifact_mutation", "new_sidecar",
                      "transitive_mutation", "generated_mutation",
-                     "source_mutation", "inventory_fail"):
+                     "source_mutation", "inventory_fail", "inventory_late_fail"):
             with self.subTest(mode=mode):
                 self.source.write_text("pub fn checked() {}\n")
                 dependencies = self.directory / "target/deps"
@@ -325,7 +325,7 @@ if mode == "host_build" and "inventory" in args:
                                  str(root / "build.rs")])
     data += json.dumps(host) + "\n"
 path.write_text(data)
-sys.exit(0 if "inventory" in args else 1)
+sys.exit(0 if "inventory" in args and mode != "inventory_late_fail" else 1)
 """
 
 
