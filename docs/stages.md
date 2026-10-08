@@ -1210,3 +1210,12 @@ contracts and actual MIR execute.
 Compiler integration uses temporary third-party dependency copies and unsafe-forbidden entry
 fixtures. Positive return values prove; assertion and implementation-panic mutations refute;
 missing or unsupported bodies remain UNKNOWN on host/ARM debug and optimized builds.
+
+## Stage 74: conservative Cortex-M interrupt-register assembly
+
+Exact compiler PRIMASK read/write and interrupt mask assembly shapes use typed operand, target,
+option and fallthrough guards. Reads remain arbitrary 32-bit abstractions, with no stable-state or
+startup claim. Mask writes invalidate published atomic/startup facts and do not grant
+critical-section exclusion. Other assembly remains UNKNOWN. Safe compiler fixtures call existing
+Cortex-M dependency
+APIs, exercise reachable panics and reject instruction/operand/option mutations.

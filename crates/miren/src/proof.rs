@@ -17,6 +17,7 @@ const MAX_INPUT_DEPTH: usize = 16;
 const MAX_INPUT_VALUES: usize = 512;
 
 mod aggregates;
+mod arm_interrupts;
 mod array_equality;
 mod async_entries;
 mod atomic_intrinsics;
@@ -1338,6 +1339,10 @@ impl<'tcx> Engine<'tcx> {
                         continue;
                     }
                     queue.push_back((*target, state));
+                }
+                TerminatorKind::InlineAsm { .. } => {
+                    let target = self.arm_interrupt_asm(id, body, &mut state, &terminator.kind)?;
+                    queue.push_back((target, state));
                 }
                 TerminatorKind::Unreachable => {
                     return Err("reachable MIR unreachable terminator".to_owned());

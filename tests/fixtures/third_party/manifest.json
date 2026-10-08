@@ -1,0 +1,131 @@
+{
+  "archives": [
+    {
+      "archive": "bare-metal-0.2.5.crate",
+      "bytes": 7923,
+      "license": "MIT OR Apache-2.0",
+      "name": "bare-metal",
+      "sha256": "5deb64efa5bd81e31fcd1938615a6d98c82eafcbcd787162b6f63b91d6bac5b3",
+      "source": "https://static.crates.io/crates/bare-metal/bare-metal-0.2.5.crate",
+      "version": "0.2.5"
+    },
+    {
+      "archive": "bitfield-0.13.2.crate",
+      "bytes": 16479,
+      "license": "MIT OR Apache-2.0",
+      "name": "bitfield",
+      "sha256": "46afbd2983a5d5a7bd740ccb198caf5b82f45c40c09c0eed36052d91cb92e719",
+      "source": "https://static.crates.io/crates/bitfield/bitfield-0.13.2.crate",
+      "version": "0.13.2"
+    },
+    {
+      "archive": "cortex-m-0.7.9.crate",
+      "bytes": 55777,
+      "license": "MIT OR Apache-2.0",
+      "name": "cortex-m",
+      "sha256": "844b9697e922c99847eed515c6eb6d101e7ce62ff556fcaec243798291427ee8",
+      "source": "https://static.crates.io/crates/cortex-m/cortex-m-0.7.9.crate",
+      "version": "0.7.9"
+    },
+    {
+      "archive": "cortex-m-macros-0.7.8.crate",
+      "bytes": 3447,
+      "license": "MIT OR Apache-2.0",
+      "name": "cortex-m-macros",
+      "sha256": "6d1922be58519ad40368fc4ca595a2cefa51a7abf947be3b0c90586dc7dbd0e2",
+      "source": "https://static.crates.io/crates/cortex-m-macros/cortex-m-macros-0.7.8.crate",
+      "version": "0.7.8"
+    },
+    {
+      "archive": "embedded-hal-0.2.7.crate",
+      "bytes": 32623,
+      "license": "MIT OR Apache-2.0",
+      "name": "embedded-hal",
+      "sha256": "35949884794ad573cf46071e41c9b60efb0cb311e3ca01f7af807af1debc66ff",
+      "source": "https://static.crates.io/crates/embedded-hal/embedded-hal-0.2.7.crate",
+      "version": "0.2.7"
+    },
+    {
+      "archive": "embedded-hal-1.0.0.crate",
+      "bytes": 29801,
+      "license": "MIT OR Apache-2.0",
+      "name": "embedded-hal",
+      "sha256": "361a90feb7004eca4019fb28352a9465666b24f840f5c3cddf0ff13920590b89",
+      "source": "https://static.crates.io/crates/embedded-hal/embedded-hal-1.0.0.crate",
+      "version": "1.0.0"
+    },
+    {
+      "archive": "nb-0.1.3.crate",
+      "bytes": 10112,
+      "license": "MIT OR Apache-2.0",
+      "name": "nb",
+      "sha256": "801d31da0513b6ec5214e9bf433a77966320625a37860f910be265be6e18d06f",
+      "source": "https://static.crates.io/crates/nb/nb-0.1.3.crate",
+      "version": "0.1.3"
+    },
+    {
+      "archive": "nb-1.1.0.crate",
+      "bytes": 11686,
+      "license": "MIT OR Apache-2.0",
+      "name": "nb",
+      "sha256": "8d5439c4ad607c3c23abf66de8c8bf57ba8adcd1f129e699851a6e43935d339d",
+      "source": "https://static.crates.io/crates/nb/nb-1.1.0.crate",
+      "version": "1.1.0"
+    },
+    {
+      "archive": "rustc_version-0.2.3.crate",
+      "bytes": 10210,
+      "license": "MIT/Apache-2.0",
+      "name": "rustc_version",
+      "sha256": "138e3e0acb6c9fb258b19b67cb8abd63c00679d2851805ea151465464fe9030a",
+      "source": "https://static.crates.io/crates/rustc_version/rustc_version-0.2.3.crate",
+      "version": "0.2.3"
+    },
+    {
+      "archive": "semver-0.9.0.crate",
+      "bytes": 17344,
+      "license": "MIT/Apache-2.0",
+      "name": "semver",
+      "sha256": "1d7eb9ef2c18661902cc47e535f9bc51b78acd254da71d375c2f6720d9a40403",
+      "source": "https://static.crates.io/crates/semver/semver-0.9.0.crate",
+      "version": "0.9.0"
+    },
+    {
+      "archive": "semver-parser-0.7.0.crate",
+      "bytes": 10268,
+      "license": "MIT/Apache-2.0",
+      "name": "semver-parser",
+      "sha256": "388a1df253eca08550bef6c72392cfe7c30914bf41df5269b68cbd6ff8f570a3",
+      "source": "https://static.crates.io/crates/semver-parser/semver-parser-0.7.0.crate",
+      "version": "0.7.0"
+    },
+    {
+      "archive": "vcell-0.1.3.crate",
+      "bytes": 6377,
+      "license": "MIT OR Apache-2.0",
+      "name": "vcell",
+      "sha256": "77439c1b53d2303b20d9459b1ade71a83c716e3f9c34f3228c00e6f185d6c002",
+      "source": "https://static.crates.io/crates/vcell/vcell-0.1.3.crate",
+      "version": "0.1.3"
+    },
+    {
+      "archive": "void-1.0.2.crate",
+      "bytes": 2356,
+      "license": "MIT",
+      "name": "void",
+      "sha256": "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d",
+      "source": "https://static.crates.io/crates/void/void-1.0.2.crate",
+      "version": "1.0.2"
+    },
+    {
+      "archive": "volatile-register-0.2.2.crate",
+      "bytes": 9508,
+      "license": "MIT OR Apache-2.0",
+      "name": "volatile-register",
+      "sha256": "de437e2a6208b014ab52972a27e59b33fa2920d3e00fe05026167a1c509d19cc",
+      "source": "https://static.crates.io/crates/volatile-register/volatile-register-0.2.2.crate",
+      "version": "0.2.2"
+    }
+  ],
+  "schema_version": 1
+}

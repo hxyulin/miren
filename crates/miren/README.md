@@ -140,6 +140,11 @@ call can execute a unique, strong, explicitly exported, signature-matched retain
 Missing, ambiguous, native, dynamic, weak and unsupported targets remain UNKNOWN. Declaration
 contracts are not substituted for an implementation; target contracts and the actual body execute.
 
+Exact Cortex-M PRIMASK read/write and interrupt mask instructions have a conservative model for
+supported compiler assembly shapes. Reads have arbitrary 32-bit values and do not establish stable
+interrupt state. Writes invalidate published atomic/startup history. Other assembly remains UNKNOWN;
+these operations do not prove critical-section exclusion or interrupt scheduling.
+
 The [coverage guide](../../docs/coverage.md) is the maintained feature reference. The
 [proof guide](../../docs/proofs.md) explains the encoding and limitations, and the
 [development guide](../../docs/development.md) lists required checks.
