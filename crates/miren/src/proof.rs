@@ -34,6 +34,7 @@ mod inputs;
 mod integer_intrinsics;
 mod interior;
 mod iterators;
+mod layout_intrinsics;
 mod library;
 mod membership;
 mod memory;
@@ -1922,6 +1923,9 @@ impl<'tcx> Engine<'tcx> {
                     return Ok(value);
                 }
                 if let Some(value) = self.context_transmute(source, *target, &value)? {
+                    return Ok(value);
+                }
+                if let Some(value) = self.byte_array_scalar_transmute(source, *target, &value)? {
                     return Ok(value);
                 }
                 if let Some(bits) = self.float_type(source)

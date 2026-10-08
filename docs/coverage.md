@@ -73,6 +73,19 @@ have at most 128 elements. Exhaustion is UNKNOWN.
 
 ## Execution and calls
 
+Compiler-identified `size_of_val` accepts sized target layouts and modeled slice length metadata,
+including nonbyte element strides. Trait-object and arbitrary raw unsized metadata remain UNKNOWN.
+The compiler zero-initialization validity guard uses its actual validity query and records a
+panic-safety obligation; passing the guard does not initialize storage or authorize payload reads.
+Host/ARM debug and optimized cases cover valid and invalid layouts, subsequent panics and a
+same-name function that must execute its own body.
+
+Equal-sized initialized byte arrays can transmute to primitive integers or f32/f64 in the target's
+native endian order. Float decoding preserves signed zero and NaN payload/sign bits. Boolean,
+character, restricted integer and reference targets remain UNKNOWN. Byte-order and target-type
+mutations check both the successful and unsupported boundaries; native execution independently
+checks the supported bit encodings.
+
 | Feature | Current support | Boundary |
 | --- | --- | --- |
 | Branches | Path-sensitive states; discard a branch only after an exact constant UNSAT decision or an unsat solver response | Ordinary mode does not merge states; induction forms per-block relations |

@@ -1069,3 +1069,16 @@ Host/ARM debug and optimized cases cover 4,096-byte repeats, symbolic guarded in
 and unaffected cells. Incorrect contents and missing index bounds refute; reference, oversized
 nonbyte and oversized owned repeats remain UNKNOWN. A changed repeat operand refutes and fails
 native execution. This does not expand raw memory or slice/chunk support.
+
+## Stage 63: compiler layout guards and exact byte scalar encodings
+
+Compiler-identified size queries use sized target layouts or retained slice metadata and element
+stride. The compiler zero-validity guard emits a panic-safety obligation without supplying any
+initialized payload. Equal-sized initialized byte arrays decode into primitive integers or f32/f64
+using the target endian order, preserving exact float storage bits.
+
+Host/ARM debug and optimized tests cover sized and slice queries, invalid zero guards, later panics,
+signed zero, signaling NaN payloads and a same-name guard that executes its own body. Value and guard
+mutations refute. Character, restricted integer, Boolean and reference byte casts remain UNKNOWN;
+return-type mutations confirm these boundaries. Native checks agree with supported layout/encoding
+claims. Option/NonZero niche casts and arbitrary unsized pointer metadata remain unsupported.

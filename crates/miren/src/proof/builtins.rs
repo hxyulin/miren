@@ -121,6 +121,11 @@ impl<'tcx> Engine<'tcx> {
             };
         }
         let signature = self.call_signature(instance)?;
+        if let Some(value) =
+            self.layout_intrinsic(instance, signature, values, state, (caller, span))?
+        {
+            return Ok(Some(value));
+        }
         self.check_fence_ordering(instance, signature, values, state, (caller, span))?;
         self.check_pointer_store_ordering(instance, signature, values, state, (caller, span))?;
         if let Some(value) =

@@ -105,6 +105,12 @@ count does not expand host storage, and the compiler checks the target array lay
 and byte updates remain active. Explicit byte aggregates and evaluated constant tables keep their
 existing budgets; nonbyte repeats stay limited to 128 elements and 256 owned values.
 
+Compiler-identified `size_of_val` uses target layouts or retained slice length and element stride.
+The compiler's zero-validity guard creates a panic obligation without initializing storage.
+Initialized byte arrays can become equal-sized primitive integers or f32/f64 using target endian
+order, retaining exact IEEE bits. Character, restricted integer, reference and Boolean byte casts
+remain UNKNOWN.
+
 The [coverage guide](../../docs/coverage.md) is the maintained feature reference. The
 [proof guide](../../docs/proofs.md) explains the encoding and limitations, and the
 [development guide](../../docs/development.md) lists required checks.
