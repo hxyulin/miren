@@ -111,6 +111,12 @@ Initialized byte arrays can become equal-sized primitive integers or f32/f64 usi
 order, retaining exact IEEE bits. Character, restricted integer, reference and Boolean byte casts
 remain UNKNOWN.
 
+Reborrowing a shared Freeze pointee snapshot retains its projected snapshot instead of creating
+an allocation owned by the temporary reference local. The compiler reference type and leading
+dereference must match this domain; nested dereferences and retained allocation references use
+ordinary tracked borrowing. Embedded reference graphs remain validated. These snapshots have
+readable values but cannot establish raw address provenance.
+
 The [coverage guide](../../docs/coverage.md) is the maintained feature reference. The
 [proof guide](../../docs/proofs.md) explains the encoding and limitations, and the
 [development guide](../../docs/development.md) lists required checks.

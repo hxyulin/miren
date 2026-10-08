@@ -1082,3 +1082,16 @@ signed zero, signaling NaN payloads and a same-name guard that executes its own 
 mutations refute. Character, restricted integer, Boolean and reference byte casts remain UNKNOWN;
 return-type mutations confirm these boundaries. Native checks agree with supported layout/encoding
 claims. Option/NonZero niche casts and arbitrary unsized pointer metadata remain unsupported.
+
+## Stage 64: shared Freeze snapshot reborrows
+
+Reborrowing an immutable snapshot no longer invents a temporary allocation whose StorageDead can
+incorrectly reject a returned static reference. Compiler shared-reference/Freeze types and an
+initial dereference select the snapshot domain. Additional dereferences and actual retained
+allocation references use the ordinary tracked path. Embedded graphs are validated before and
+after projection; no storage retirement or escape rule is weakened.
+
+Host/ARM debug and optimized fixtures cover whole/projected static values, retained dependency
+static returns, shared inputs and mutation of actual local tracked storage. Initializer and field
+mutations refute. Dead and nested-dead references, escaping local pointers and snapshot address
+observation remain UNKNOWN with their original diagnostic boundaries.

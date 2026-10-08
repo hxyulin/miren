@@ -5,6 +5,13 @@ value. Equal pointer bits, equal layout sizes and equal symbolic values do not e
 allocation identity. Compiler layouts establish where typed subobjects live; they do not establish
 which bytes are initialized or whether another actor can change them.
 
+The current shared Freeze reference domain can represent pointees as read-only value snapshots.
+Reborrowing such a snapshot through an initial dereference retains the projected snapshot without
+inventing an allocation owned by the temporary reference local. Compiler types select this domain;
+actual tracked references keep their allocation, capability and liveness checks. Embedded reference
+graphs are validated before accepting the projection. These snapshots cannot supply a raw address
+identity. Local allocation retirement and frame-escape checks remain active.
+
 ## First migration stage: footprints and subobject certificates
 
 The ordinary interpreter now checks static address extents through a common `StorageFootprint`.

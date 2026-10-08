@@ -73,6 +73,14 @@ have at most 128 elements. Exhaustion is UNKNOWN.
 
 ## Execution and calls
 
+Shared Freeze snapshot reborrows retain the snapshot's projected value, including immutable static
+and dependency static aggregates. They do not create a temporary frame-owned allocation. The
+compiler shared-reference type and initial dereference identify this domain; tracked references
+retain their original allocation and liveness rules. Host/ARM debug and optimized tests cover
+whole/projected static returns, input projections and local mutation. Initializer/projection
+mutations refute; dead/nested references, frame-owned escaping pointers and snapshot raw addresses
+remain UNKNOWN. Snapshots still supply no allocation identity or mutable access.
+
 Compiler-identified `size_of_val` accepts sized target layouts and modeled slice length metadata,
 including nonbyte element strides. Trait-object and arbitrary raw unsized metadata remain UNKNOWN.
 The compiler zero-initialization validity guard uses its actual validity query and records a

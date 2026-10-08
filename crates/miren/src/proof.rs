@@ -1614,7 +1614,12 @@ impl<'tcx> Engine<'tcx> {
                 }
                 Ok(value)
             }
-            Rvalue::Ref(_, BorrowKind::Shared, place) => self.borrow(state, *place, false),
+            Rvalue::Ref(_, BorrowKind::Shared, place) => {
+                if let Some(value) = self.borrow_shared_snapshot(body, state, *place)? {
+                    return Ok(value);
+                }
+                self.borrow(state, *place, false)
+            }
             Rvalue::Ref(_, BorrowKind::Mut { .. }, place) => self.borrow(state, *place, true),
             Rvalue::RawPtr(
                 kind @ (rustc_middle::mir::RawPtrKind::Const | rustc_middle::mir::RawPtrKind::Mut),

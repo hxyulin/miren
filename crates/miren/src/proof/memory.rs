@@ -427,6 +427,50 @@ impl<'tcx> Engine<'tcx> {
         Ok((allocation, path, writable))
     }
 
+    pub(super) fn borrow_shared_snapshot(
+        &self,
+        body: &Body<'tcx>,
+        state: &State,
+        place: Place<'tcx>,
+    ) -> Result<Option<Value>, String> {
+        let ty::Ref(_, pointee, mutability) = body.local_decls[place.local].ty.kind() else {
+            return Ok(None);
+        };
+        if mutability.is_mut()
+            || !pointee.is_freeze(self.tcx, ty::TypingEnv::fully_monomorphized())
+            || !matches!(place.projection.first(), Some(ProjectionElem::Deref))
+            || place
+                .projection
+                .iter()
+                .skip(1)
+                .any(|element| matches!(element, ProjectionElem::Deref))
+        {
+            return Ok(None);
+        }
+        let source = self.local(state, place.local.as_usize())?.materialize()?;
+        if !matches!(
+            source,
+            Value::Adt { .. }
+                | Value::Enum { .. }
+                | Value::Tuple(_)
+                | Value::Elements(_)
+                | Value::Bytes { .. }
+                | Value::Int { .. }
+                | Value::Float { .. }
+                | Value::Bool(_)
+                | Value::Unit
+        ) {
+            return Ok(None);
+        }
+        // Shared freeze references can be represented by pointee snapshots. Reborrowing a
+        // snapshot must not invent an allocation owned by the temporary reference local.
+        // Actual retained references keep their allocation and liveness checks in `borrow`.
+        self.validate_tracked_value(&source, state)?;
+        let value = self.place(state, place)?;
+        self.validate_tracked_value(&value, state)?;
+        Ok(Some(value))
+    }
+
     pub(super) fn borrow(
         &self,
         state: &mut State,
