@@ -119,6 +119,70 @@ class MainSurveyTests(unittest.TestCase):
                 main.checked_proof(self.unit, self.inventory, changed, self.directory,
                                    "async_body", survey.LIMITS, 0, config, True)
 
+    def test_storage_effect_policy_requires_an_explicit_trusted_boundary(self):
+        legacy = self.conditional_config()
+        raw = copy.deepcopy(legacy)
+        raw["functions"][0]["storage_effect"] = None
+        self.assertEqual(main.normalized_contract_config(raw), legacy)
+        raw["functions"][0]["storage_effect"] = "preserve_existing_ordinary_storage"
+        normalized = main.normalized_contract_config(raw)
+        self.assertIn("trusted-storage:v1:selector=device::initialize [];",
+                      main.storage_assumption(normalized["functions"][0]))
+        for changes in ({"trusted": False}, {"no_panic": False}, {"reason": ""},
+                        {"modifies": []}, {"modifies": ["arg0"]},
+                        {"returns_alias": "arg0"}, {"storage_effect": "global_only"}):
+            with self.subTest(changes=changes):
+                changed = copy.deepcopy(raw)
+                changed["functions"][0].update(changes)
+                with self.assertRaises(ValueError):
+                    main.normalized_contract_config(changed)
+
+    def test_storage_effect_proofs_require_the_exact_used_boundary_premise(self):
+        report, config = self.conditional_report()
+        config["functions"][0]["storage_effect"] = "preserve_existing_ordinary_storage"
+        proof = report["functions"][0]["proof"]
+        premise = main.storage_assumption(config["functions"][0])
+        proof["entry_assumptions"] = [premise]
+        checked = main.checked_proof(self.unit, self.inventory, report, self.directory,
+                                     "async_body", survey.LIMITS, 0, config, True)
+        self.assertEqual(checked["entry_assumptions"], [premise])
+        with self.assertRaises(ValueError):
+            self.checked(report)
+        for entries in ([], [premise, premise], [premise.replace("v1:", "v2:")],
+                        [premise.replace("Explicit test hypothesis", "changed")],
+                        [premise, "fresh Rust statics"], [premise, "startup-isolated"]):
+            with self.subTest(entries=entries):
+                changed = copy.deepcopy(report)
+                changed["functions"][0]["proof"]["entry_assumptions"] = entries
+                with self.assertRaises(ValueError):
+                    main.checked_proof(self.unit, self.inventory, changed, self.directory,
+                                       "async_body", survey.LIMITS, 0, config, True)
+        unused = copy.deepcopy(report)
+        unused["functions"][0]["proof"]["trusted_calls"] = []
+        with self.assertRaises(ValueError):
+            main.checked_proof(self.unit, self.inventory, unused, self.directory,
+                               "async_body", survey.LIMITS, 0, config, True)
+
+    def test_storage_and_hardware_premises_compose_without_policy_leakage(self):
+        report, config = self.conditional_report()
+        config["functions"][0]["storage_effect"] = "preserve_existing_ordinary_storage"
+        config["hardware"] = self.hardware_config()["hardware"]
+        proof = report["functions"][0]["proof"]
+        storage = main.storage_assumption(config["functions"][0])
+        hardware = main.hardware_assumption(config["hardware"])
+        for entries in ([storage], [storage, hardware], [hardware, storage]):
+            proof["entry_assumptions"] = entries
+            checked = main.checked_proof(self.unit, self.inventory, report, self.directory,
+                                         "async_body", survey.LIMITS, 0, config, True)
+            self.assertEqual(checked["entry_assumptions"], entries)
+        for status in ("refuted", "unknown"):
+            changed = copy.deepcopy(report)
+            changed["functions"][0]["proof"].update(status=status,
+                                                    obligations=[{"status": status}])
+            checked = main.checked_proof(self.unit, self.inventory, changed, self.directory,
+                                         "async_body", survey.LIMITS, 1, config, True)
+            self.assertEqual(checked["status"], status)
+
     def hardware_config(self):
         return main.normalized_contract_config({"schema_version": 1, "functions": [],
             "hardware": {"schema_version": 1, "device": "stm32h723vg", "pointer_bits": 32,

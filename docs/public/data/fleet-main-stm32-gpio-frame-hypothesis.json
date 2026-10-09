@@ -1,0 +1,862 @@
+{
+  "schema_version": 1,
+  "units": {
+    "bsp/dm-mc02/dm-mc02-bringup/bin/dm-mc02-bringup": {
+      "schema_version": 1,
+      "functions": [
+        {
+          "function": "dm_mc02::reset_cause",
+          "trusted": true,
+          "no_panic": true,
+          "modifies": [],
+          "reason": "UNVERIFIED reset-status hardware boundary for DM-MC02 STM32H723VG feature stm32h723vg: assume dm_mc02::reset_cause terminates without panic and returns a Rust-valid ResetCause while accessing and clearing the exact reset-status MMIO flags. Physical MMIO validity and register side effects are assumed for this call only. The actual reset_cause body performs no Rust storage mutation, so its existing empty modifies list is retained. This reset summary assumes no oscillator/clock setup, singleton availability, fresh-startup state, token ownership, alias/lifetime guarantees, boot, scheduler, interrupt delivery or SEV; the separate embassy_stm32::init hypothesis records its stronger premises."
+        },
+        {
+          "function": "embassy_stm32::init",
+          "trusted": true,
+          "no_panic": true,
+          "reason": "UNVERIFIED whole-initialization hypothesis for DM-MC02 with exact STM32H723VG feature stm32h723vg: assume the board has a working 24 MHz HSE crystal oscillator and that the actual dm_mc02::init configuration is legal and establishes PLL1 SYSCLK 520 MHz, AHB 260 MHz, APB1/2/3/4 130 MHz, PLL2Q FDCAN 80 MHz and HSI48 USB 48 MHz with USB-SOF synchronization plus CSI/I/O compensation. Assume physical MMIO addresses, widths and access conditions are valid and oscillator/PLL/power/clock ready polls terminate. This entire embassy_stm32::init call is assumed to be the single successful first HAL initialization with its singleton available; it terminates without panic and returns Rust-valid exclusively owned peripheral tokens with no conflicting owners or aliases at return. ADDITIONAL UNVERIFIED Rust frame premise for this exact initialization call: it does not mutate, publish, or retire pre-existing ordinary tracked Rust storage, including the fresh application future. Rust singleton, clock and time-driver static effects remain opaque: all static/startup and atomic precision is still invalidated. This is an explicit stronger conditional effect, not a private-storage or alias-reachability theorem. It supplies no general runtime exclusivity or later task/interrupt guarantee. The summary cannot bypass unsupported return ownership/types or certify subsequent lifetime/alias transitions, concurrent hardware access, boot, task execution, scheduler behavior, interrupt delivery or SEV.",
+          "storage_effect": "preserve_existing_ordinary_storage"
+        }
+      ],
+      "hardware": {
+        "schema_version": 2,
+        "device": "stm32h723vg",
+        "pointer_bits": 32,
+        "reason": "UNVERIFIED GPIO read-modify-write premise for stm32h723vg: configured bounded byte transports and exact aligned u32 register reads/writes terminate without trapping or causing unmodeled tracked Rust storage mutations. Each read admits an independent arbitrary u32 value; no readback, register stability, physical correlation, pin-state observation, clock readiness, interrupt delivery, SEV semantics or executor progress is assumed. Rust callback, lifetime and interference checks remain active. Device build indicators are configuration evidence, not physical device certification.",
+        "regions": [
+          {
+            "name": "GPIOC",
+            "start": 1476528128,
+            "length": 32
+          }
+        ],
+        "write_registers": [
+          {
+            "name": "GPIOC_BSRR",
+            "address": 1476528152
+          },
+          {
+            "name": "GPIOC_PUPDR",
+            "address": 1476528140
+          },
+          {
+            "name": "GPIOC_OTYPER",
+            "address": 1476528132
+          },
+          {
+            "name": "GPIOC_OSPEEDR",
+            "address": 1476528136
+          },
+          {
+            "name": "GPIOC_MODER",
+            "address": 1476528128
+          }
+        ],
+        "read_registers": [
+          {
+            "name": "GPIOC_PUPDR",
+            "address": 1476528140
+          },
+          {
+            "name": "GPIOC_OTYPER",
+            "address": 1476528132
+          },
+          {
+            "name": "GPIOC_OSPEEDR",
+            "address": 1476528136
+          },
+          {
+            "name": "GPIOC_MODER",
+            "address": 1476528128
+          }
+        ]
+      }
+    },
+    "bsp/dm-mc02/engineer-lower-board/bin/engineer-lower-board": {
+      "schema_version": 1,
+      "functions": [
+        {
+          "function": "dm_mc02::reset_cause",
+          "trusted": true,
+          "no_panic": true,
+          "modifies": [],
+          "reason": "UNVERIFIED reset-status hardware boundary for DM-MC02 STM32H723VG feature stm32h723vg: assume dm_mc02::reset_cause terminates without panic and returns a Rust-valid ResetCause while accessing and clearing the exact reset-status MMIO flags. Physical MMIO validity and register side effects are assumed for this call only. The actual reset_cause body performs no Rust storage mutation, so its existing empty modifies list is retained. This reset summary assumes no oscillator/clock setup, singleton availability, fresh-startup state, token ownership, alias/lifetime guarantees, boot, scheduler, interrupt delivery or SEV; the separate embassy_stm32::init hypothesis records its stronger premises."
+        },
+        {
+          "function": "embassy_stm32::init",
+          "trusted": true,
+          "no_panic": true,
+          "reason": "UNVERIFIED whole-initialization hypothesis for DM-MC02 with exact STM32H723VG feature stm32h723vg: assume the board has a working 24 MHz HSE crystal oscillator and that the actual dm_mc02::init configuration is legal and establishes PLL1 SYSCLK 520 MHz, AHB 260 MHz, APB1/2/3/4 130 MHz, PLL2Q FDCAN 80 MHz and HSI48 USB 48 MHz with USB-SOF synchronization plus CSI/I/O compensation. Assume physical MMIO addresses, widths and access conditions are valid and oscillator/PLL/power/clock ready polls terminate. This entire embassy_stm32::init call is assumed to be the single successful first HAL initialization with its singleton available; it terminates without panic and returns Rust-valid exclusively owned peripheral tokens with no conflicting owners or aliases at return. ADDITIONAL UNVERIFIED Rust frame premise for this exact initialization call: it does not mutate, publish, or retire pre-existing ordinary tracked Rust storage, including the fresh application future. Rust singleton, clock and time-driver static effects remain opaque: all static/startup and atomic precision is still invalidated. This is an explicit stronger conditional effect, not a private-storage or alias-reachability theorem. It supplies no general runtime exclusivity or later task/interrupt guarantee. The summary cannot bypass unsupported return ownership/types or certify subsequent lifetime/alias transitions, concurrent hardware access, boot, task execution, scheduler behavior, interrupt delivery or SEV.",
+          "storage_effect": "preserve_existing_ordinary_storage"
+        }
+      ],
+      "hardware": {
+        "schema_version": 2,
+        "device": "stm32h723vg",
+        "pointer_bits": 32,
+        "reason": "UNVERIFIED GPIO read-modify-write premise for stm32h723vg: configured bounded byte transports and exact aligned u32 register reads/writes terminate without trapping or causing unmodeled tracked Rust storage mutations. Each read admits an independent arbitrary u32 value; no readback, register stability, physical correlation, pin-state observation, clock readiness, interrupt delivery, SEV semantics or executor progress is assumed. Rust callback, lifetime and interference checks remain active. Device build indicators are configuration evidence, not physical device certification.",
+        "regions": [
+          {
+            "name": "GPIOC",
+            "start": 1476528128,
+            "length": 32
+          }
+        ],
+        "write_registers": [
+          {
+            "name": "GPIOC_BSRR",
+            "address": 1476528152
+          },
+          {
+            "name": "GPIOC_PUPDR",
+            "address": 1476528140
+          },
+          {
+            "name": "GPIOC_OTYPER",
+            "address": 1476528132
+          },
+          {
+            "name": "GPIOC_OSPEEDR",
+            "address": 1476528136
+          },
+          {
+            "name": "GPIOC_MODER",
+            "address": 1476528128
+          }
+        ],
+        "read_registers": [
+          {
+            "name": "GPIOC_PUPDR",
+            "address": 1476528140
+          },
+          {
+            "name": "GPIOC_OTYPER",
+            "address": 1476528132
+          },
+          {
+            "name": "GPIOC_OSPEEDR",
+            "address": 1476528136
+          },
+          {
+            "name": "GPIOC_MODER",
+            "address": 1476528128
+          }
+        ]
+      }
+    },
+    "bsp/dm-mc02/engineer-upper-board/bin/engineer-upper-board": {
+      "schema_version": 1,
+      "functions": [
+        {
+          "function": "dm_mc02::reset_cause",
+          "trusted": true,
+          "no_panic": true,
+          "modifies": [],
+          "reason": "UNVERIFIED reset-status hardware boundary for DM-MC02 STM32H723VG feature stm32h723vg: assume dm_mc02::reset_cause terminates without panic and returns a Rust-valid ResetCause while accessing and clearing the exact reset-status MMIO flags. Physical MMIO validity and register side effects are assumed for this call only. The actual reset_cause body performs no Rust storage mutation, so its existing empty modifies list is retained. This reset summary assumes no oscillator/clock setup, singleton availability, fresh-startup state, token ownership, alias/lifetime guarantees, boot, scheduler, interrupt delivery or SEV; the separate embassy_stm32::init hypothesis records its stronger premises."
+        },
+        {
+          "function": "embassy_stm32::init",
+          "trusted": true,
+          "no_panic": true,
+          "reason": "UNVERIFIED whole-initialization hypothesis for DM-MC02 with exact STM32H723VG feature stm32h723vg: assume the board has a working 24 MHz HSE crystal oscillator and that the actual dm_mc02::init configuration is legal and establishes PLL1 SYSCLK 520 MHz, AHB 260 MHz, APB1/2/3/4 130 MHz, PLL2Q FDCAN 80 MHz and HSI48 USB 48 MHz with USB-SOF synchronization plus CSI/I/O compensation. Assume physical MMIO addresses, widths and access conditions are valid and oscillator/PLL/power/clock ready polls terminate. This entire embassy_stm32::init call is assumed to be the single successful first HAL initialization with its singleton available; it terminates without panic and returns Rust-valid exclusively owned peripheral tokens with no conflicting owners or aliases at return. ADDITIONAL UNVERIFIED Rust frame premise for this exact initialization call: it does not mutate, publish, or retire pre-existing ordinary tracked Rust storage, including the fresh application future. Rust singleton, clock and time-driver static effects remain opaque: all static/startup and atomic precision is still invalidated. This is an explicit stronger conditional effect, not a private-storage or alias-reachability theorem. It supplies no general runtime exclusivity or later task/interrupt guarantee. The summary cannot bypass unsupported return ownership/types or certify subsequent lifetime/alias transitions, concurrent hardware access, boot, task execution, scheduler behavior, interrupt delivery or SEV.",
+          "storage_effect": "preserve_existing_ordinary_storage"
+        }
+      ],
+      "hardware": {
+        "schema_version": 2,
+        "device": "stm32h723vg",
+        "pointer_bits": 32,
+        "reason": "UNVERIFIED GPIO read-modify-write premise for stm32h723vg: configured bounded byte transports and exact aligned u32 register reads/writes terminate without trapping or causing unmodeled tracked Rust storage mutations. Each read admits an independent arbitrary u32 value; no readback, register stability, physical correlation, pin-state observation, clock readiness, interrupt delivery, SEV semantics or executor progress is assumed. Rust callback, lifetime and interference checks remain active. Device build indicators are configuration evidence, not physical device certification.",
+        "regions": [
+          {
+            "name": "GPIOC",
+            "start": 1476528128,
+            "length": 32
+          }
+        ],
+        "write_registers": [
+          {
+            "name": "GPIOC_BSRR",
+            "address": 1476528152
+          },
+          {
+            "name": "GPIOC_PUPDR",
+            "address": 1476528140
+          },
+          {
+            "name": "GPIOC_OTYPER",
+            "address": 1476528132
+          },
+          {
+            "name": "GPIOC_OSPEEDR",
+            "address": 1476528136
+          },
+          {
+            "name": "GPIOC_MODER",
+            "address": 1476528128
+          }
+        ],
+        "read_registers": [
+          {
+            "name": "GPIOC_PUPDR",
+            "address": 1476528140
+          },
+          {
+            "name": "GPIOC_OTYPER",
+            "address": 1476528132
+          },
+          {
+            "name": "GPIOC_OSPEEDR",
+            "address": 1476528136
+          },
+          {
+            "name": "GPIOC_MODER",
+            "address": 1476528128
+          }
+        ]
+      }
+    },
+    "bsp/dm-mc02/hero-chassis-board/bin/hero-chassis-board": {
+      "schema_version": 1,
+      "functions": [
+        {
+          "function": "dm_mc02::reset_cause",
+          "trusted": true,
+          "no_panic": true,
+          "modifies": [],
+          "reason": "UNVERIFIED reset-status hardware boundary for DM-MC02 STM32H723VG feature stm32h723vg: assume dm_mc02::reset_cause terminates without panic and returns a Rust-valid ResetCause while accessing and clearing the exact reset-status MMIO flags. Physical MMIO validity and register side effects are assumed for this call only. The actual reset_cause body performs no Rust storage mutation, so its existing empty modifies list is retained. This reset summary assumes no oscillator/clock setup, singleton availability, fresh-startup state, token ownership, alias/lifetime guarantees, boot, scheduler, interrupt delivery or SEV; the separate embassy_stm32::init hypothesis records its stronger premises."
+        },
+        {
+          "function": "embassy_stm32::init",
+          "trusted": true,
+          "no_panic": true,
+          "reason": "UNVERIFIED whole-initialization hypothesis for DM-MC02 with exact STM32H723VG feature stm32h723vg: assume the board has a working 24 MHz HSE crystal oscillator and that the actual dm_mc02::init configuration is legal and establishes PLL1 SYSCLK 520 MHz, AHB 260 MHz, APB1/2/3/4 130 MHz, PLL2Q FDCAN 80 MHz and HSI48 USB 48 MHz with USB-SOF synchronization plus CSI/I/O compensation. Assume physical MMIO addresses, widths and access conditions are valid and oscillator/PLL/power/clock ready polls terminate. This entire embassy_stm32::init call is assumed to be the single successful first HAL initialization with its singleton available; it terminates without panic and returns Rust-valid exclusively owned peripheral tokens with no conflicting owners or aliases at return. ADDITIONAL UNVERIFIED Rust frame premise for this exact initialization call: it does not mutate, publish, or retire pre-existing ordinary tracked Rust storage, including the fresh application future. Rust singleton, clock and time-driver static effects remain opaque: all static/startup and atomic precision is still invalidated. This is an explicit stronger conditional effect, not a private-storage or alias-reachability theorem. It supplies no general runtime exclusivity or later task/interrupt guarantee. The summary cannot bypass unsupported return ownership/types or certify subsequent lifetime/alias transitions, concurrent hardware access, boot, task execution, scheduler behavior, interrupt delivery or SEV.",
+          "storage_effect": "preserve_existing_ordinary_storage"
+        }
+      ],
+      "hardware": {
+        "schema_version": 2,
+        "device": "stm32h723vg",
+        "pointer_bits": 32,
+        "reason": "UNVERIFIED GPIO read-modify-write premise for stm32h723vg: configured bounded byte transports and exact aligned u32 register reads/writes terminate without trapping or causing unmodeled tracked Rust storage mutations. Each read admits an independent arbitrary u32 value; no readback, register stability, physical correlation, pin-state observation, clock readiness, interrupt delivery, SEV semantics or executor progress is assumed. Rust callback, lifetime and interference checks remain active. Device build indicators are configuration evidence, not physical device certification.",
+        "regions": [
+          {
+            "name": "GPIOC",
+            "start": 1476528128,
+            "length": 32
+          }
+        ],
+        "write_registers": [
+          {
+            "name": "GPIOC_BSRR",
+            "address": 1476528152
+          },
+          {
+            "name": "GPIOC_PUPDR",
+            "address": 1476528140
+          },
+          {
+            "name": "GPIOC_OTYPER",
+            "address": 1476528132
+          },
+          {
+            "name": "GPIOC_OSPEEDR",
+            "address": 1476528136
+          },
+          {
+            "name": "GPIOC_MODER",
+            "address": 1476528128
+          }
+        ],
+        "read_registers": [
+          {
+            "name": "GPIOC_PUPDR",
+            "address": 1476528140
+          },
+          {
+            "name": "GPIOC_OTYPER",
+            "address": 1476528132
+          },
+          {
+            "name": "GPIOC_OSPEEDR",
+            "address": 1476528136
+          },
+          {
+            "name": "GPIOC_MODER",
+            "address": 1476528128
+          }
+        ]
+      }
+    },
+    "bsp/dm-mc02/hero-gimbal-board/bin/hero-gimbal-board": {
+      "schema_version": 1,
+      "functions": [
+        {
+          "function": "dm_mc02::reset_cause",
+          "trusted": true,
+          "no_panic": true,
+          "modifies": [],
+          "reason": "UNVERIFIED reset-status hardware boundary for DM-MC02 STM32H723VG feature stm32h723vg: assume dm_mc02::reset_cause terminates without panic and returns a Rust-valid ResetCause while accessing and clearing the exact reset-status MMIO flags. Physical MMIO validity and register side effects are assumed for this call only. The actual reset_cause body performs no Rust storage mutation, so its existing empty modifies list is retained. This reset summary assumes no oscillator/clock setup, singleton availability, fresh-startup state, token ownership, alias/lifetime guarantees, boot, scheduler, interrupt delivery or SEV; the separate embassy_stm32::init hypothesis records its stronger premises."
+        },
+        {
+          "function": "embassy_stm32::init",
+          "trusted": true,
+          "no_panic": true,
+          "reason": "UNVERIFIED whole-initialization hypothesis for DM-MC02 with exact STM32H723VG feature stm32h723vg: assume the board has a working 24 MHz HSE crystal oscillator and that the actual dm_mc02::init configuration is legal and establishes PLL1 SYSCLK 520 MHz, AHB 260 MHz, APB1/2/3/4 130 MHz, PLL2Q FDCAN 80 MHz and HSI48 USB 48 MHz with USB-SOF synchronization plus CSI/I/O compensation. Assume physical MMIO addresses, widths and access conditions are valid and oscillator/PLL/power/clock ready polls terminate. This entire embassy_stm32::init call is assumed to be the single successful first HAL initialization with its singleton available; it terminates without panic and returns Rust-valid exclusively owned peripheral tokens with no conflicting owners or aliases at return. ADDITIONAL UNVERIFIED Rust frame premise for this exact initialization call: it does not mutate, publish, or retire pre-existing ordinary tracked Rust storage, including the fresh application future. Rust singleton, clock and time-driver static effects remain opaque: all static/startup and atomic precision is still invalidated. This is an explicit stronger conditional effect, not a private-storage or alias-reachability theorem. It supplies no general runtime exclusivity or later task/interrupt guarantee. The summary cannot bypass unsupported return ownership/types or certify subsequent lifetime/alias transitions, concurrent hardware access, boot, task execution, scheduler behavior, interrupt delivery or SEV.",
+          "storage_effect": "preserve_existing_ordinary_storage"
+        }
+      ],
+      "hardware": {
+        "schema_version": 2,
+        "device": "stm32h723vg",
+        "pointer_bits": 32,
+        "reason": "UNVERIFIED GPIO read-modify-write premise for stm32h723vg: configured bounded byte transports and exact aligned u32 register reads/writes terminate without trapping or causing unmodeled tracked Rust storage mutations. Each read admits an independent arbitrary u32 value; no readback, register stability, physical correlation, pin-state observation, clock readiness, interrupt delivery, SEV semantics or executor progress is assumed. Rust callback, lifetime and interference checks remain active. Device build indicators are configuration evidence, not physical device certification.",
+        "regions": [
+          {
+            "name": "GPIOC",
+            "start": 1476528128,
+            "length": 32
+          }
+        ],
+        "write_registers": [
+          {
+            "name": "GPIOC_BSRR",
+            "address": 1476528152
+          },
+          {
+            "name": "GPIOC_PUPDR",
+            "address": 1476528140
+          },
+          {
+            "name": "GPIOC_OTYPER",
+            "address": 1476528132
+          },
+          {
+            "name": "GPIOC_OSPEEDR",
+            "address": 1476528136
+          },
+          {
+            "name": "GPIOC_MODER",
+            "address": 1476528128
+          }
+        ],
+        "read_registers": [
+          {
+            "name": "GPIOC_PUPDR",
+            "address": 1476528140
+          },
+          {
+            "name": "GPIOC_OTYPER",
+            "address": 1476528132
+          },
+          {
+            "name": "GPIOC_OSPEEDR",
+            "address": 1476528136
+          },
+          {
+            "name": "GPIOC_MODER",
+            "address": 1476528128
+          }
+        ]
+      }
+    },
+    "bsp/dm-mc02/infantry-1-chassis-board/bin/infantry-1-chassis-board": {
+      "schema_version": 1,
+      "functions": [
+        {
+          "function": "dm_mc02::reset_cause",
+          "trusted": true,
+          "no_panic": true,
+          "modifies": [],
+          "reason": "UNVERIFIED reset-status hardware boundary for DM-MC02 STM32H723VG feature stm32h723vg: assume dm_mc02::reset_cause terminates without panic and returns a Rust-valid ResetCause while accessing and clearing the exact reset-status MMIO flags. Physical MMIO validity and register side effects are assumed for this call only. The actual reset_cause body performs no Rust storage mutation, so its existing empty modifies list is retained. This reset summary assumes no oscillator/clock setup, singleton availability, fresh-startup state, token ownership, alias/lifetime guarantees, boot, scheduler, interrupt delivery or SEV; the separate embassy_stm32::init hypothesis records its stronger premises."
+        },
+        {
+          "function": "embassy_stm32::init",
+          "trusted": true,
+          "no_panic": true,
+          "reason": "UNVERIFIED whole-initialization hypothesis for DM-MC02 with exact STM32H723VG feature stm32h723vg: assume the board has a working 24 MHz HSE crystal oscillator and that the actual dm_mc02::init configuration is legal and establishes PLL1 SYSCLK 520 MHz, AHB 260 MHz, APB1/2/3/4 130 MHz, PLL2Q FDCAN 80 MHz and HSI48 USB 48 MHz with USB-SOF synchronization plus CSI/I/O compensation. Assume physical MMIO addresses, widths and access conditions are valid and oscillator/PLL/power/clock ready polls terminate. This entire embassy_stm32::init call is assumed to be the single successful first HAL initialization with its singleton available; it terminates without panic and returns Rust-valid exclusively owned peripheral tokens with no conflicting owners or aliases at return. ADDITIONAL UNVERIFIED Rust frame premise for this exact initialization call: it does not mutate, publish, or retire pre-existing ordinary tracked Rust storage, including the fresh application future. Rust singleton, clock and time-driver static effects remain opaque: all static/startup and atomic precision is still invalidated. This is an explicit stronger conditional effect, not a private-storage or alias-reachability theorem. It supplies no general runtime exclusivity or later task/interrupt guarantee. The summary cannot bypass unsupported return ownership/types or certify subsequent lifetime/alias transitions, concurrent hardware access, boot, task execution, scheduler behavior, interrupt delivery or SEV.",
+          "storage_effect": "preserve_existing_ordinary_storage"
+        }
+      ],
+      "hardware": {
+        "schema_version": 2,
+        "device": "stm32h723vg",
+        "pointer_bits": 32,
+        "reason": "UNVERIFIED GPIO read-modify-write premise for stm32h723vg: configured bounded byte transports and exact aligned u32 register reads/writes terminate without trapping or causing unmodeled tracked Rust storage mutations. Each read admits an independent arbitrary u32 value; no readback, register stability, physical correlation, pin-state observation, clock readiness, interrupt delivery, SEV semantics or executor progress is assumed. Rust callback, lifetime and interference checks remain active. Device build indicators are configuration evidence, not physical device certification.",
+        "regions": [
+          {
+            "name": "GPIOC",
+            "start": 1476528128,
+            "length": 32
+          }
+        ],
+        "write_registers": [
+          {
+            "name": "GPIOC_BSRR",
+            "address": 1476528152
+          },
+          {
+            "name": "GPIOC_PUPDR",
+            "address": 1476528140
+          },
+          {
+            "name": "GPIOC_OTYPER",
+            "address": 1476528132
+          },
+          {
+            "name": "GPIOC_OSPEEDR",
+            "address": 1476528136
+          },
+          {
+            "name": "GPIOC_MODER",
+            "address": 1476528128
+          }
+        ],
+        "read_registers": [
+          {
+            "name": "GPIOC_PUPDR",
+            "address": 1476528140
+          },
+          {
+            "name": "GPIOC_OTYPER",
+            "address": 1476528132
+          },
+          {
+            "name": "GPIOC_OSPEEDR",
+            "address": 1476528136
+          },
+          {
+            "name": "GPIOC_MODER",
+            "address": 1476528128
+          }
+        ]
+      }
+    },
+    "bsp/dm-mc02/infantry-1-gimbal-board/bin/infantry-1-gimbal-board": {
+      "schema_version": 1,
+      "functions": [
+        {
+          "function": "dm_mc02::reset_cause",
+          "trusted": true,
+          "no_panic": true,
+          "modifies": [],
+          "reason": "UNVERIFIED reset-status hardware boundary for DM-MC02 STM32H723VG feature stm32h723vg: assume dm_mc02::reset_cause terminates without panic and returns a Rust-valid ResetCause while accessing and clearing the exact reset-status MMIO flags. Physical MMIO validity and register side effects are assumed for this call only. The actual reset_cause body performs no Rust storage mutation, so its existing empty modifies list is retained. This reset summary assumes no oscillator/clock setup, singleton availability, fresh-startup state, token ownership, alias/lifetime guarantees, boot, scheduler, interrupt delivery or SEV; the separate embassy_stm32::init hypothesis records its stronger premises."
+        },
+        {
+          "function": "embassy_stm32::init",
+          "trusted": true,
+          "no_panic": true,
+          "reason": "UNVERIFIED whole-initialization hypothesis for DM-MC02 with exact STM32H723VG feature stm32h723vg: assume the board has a working 24 MHz HSE crystal oscillator and that the actual dm_mc02::init configuration is legal and establishes PLL1 SYSCLK 520 MHz, AHB 260 MHz, APB1/2/3/4 130 MHz, PLL2Q FDCAN 80 MHz and HSI48 USB 48 MHz with USB-SOF synchronization plus CSI/I/O compensation. Assume physical MMIO addresses, widths and access conditions are valid and oscillator/PLL/power/clock ready polls terminate. This entire embassy_stm32::init call is assumed to be the single successful first HAL initialization with its singleton available; it terminates without panic and returns Rust-valid exclusively owned peripheral tokens with no conflicting owners or aliases at return. ADDITIONAL UNVERIFIED Rust frame premise for this exact initialization call: it does not mutate, publish, or retire pre-existing ordinary tracked Rust storage, including the fresh application future. Rust singleton, clock and time-driver static effects remain opaque: all static/startup and atomic precision is still invalidated. This is an explicit stronger conditional effect, not a private-storage or alias-reachability theorem. It supplies no general runtime exclusivity or later task/interrupt guarantee. The summary cannot bypass unsupported return ownership/types or certify subsequent lifetime/alias transitions, concurrent hardware access, boot, task execution, scheduler behavior, interrupt delivery or SEV.",
+          "storage_effect": "preserve_existing_ordinary_storage"
+        }
+      ],
+      "hardware": {
+        "schema_version": 2,
+        "device": "stm32h723vg",
+        "pointer_bits": 32,
+        "reason": "UNVERIFIED GPIO read-modify-write premise for stm32h723vg: configured bounded byte transports and exact aligned u32 register reads/writes terminate without trapping or causing unmodeled tracked Rust storage mutations. Each read admits an independent arbitrary u32 value; no readback, register stability, physical correlation, pin-state observation, clock readiness, interrupt delivery, SEV semantics or executor progress is assumed. Rust callback, lifetime and interference checks remain active. Device build indicators are configuration evidence, not physical device certification.",
+        "regions": [
+          {
+            "name": "GPIOC",
+            "start": 1476528128,
+            "length": 32
+          }
+        ],
+        "write_registers": [
+          {
+            "name": "GPIOC_BSRR",
+            "address": 1476528152
+          },
+          {
+            "name": "GPIOC_PUPDR",
+            "address": 1476528140
+          },
+          {
+            "name": "GPIOC_OTYPER",
+            "address": 1476528132
+          },
+          {
+            "name": "GPIOC_OSPEEDR",
+            "address": 1476528136
+          },
+          {
+            "name": "GPIOC_MODER",
+            "address": 1476528128
+          }
+        ],
+        "read_registers": [
+          {
+            "name": "GPIOC_PUPDR",
+            "address": 1476528140
+          },
+          {
+            "name": "GPIOC_OTYPER",
+            "address": 1476528132
+          },
+          {
+            "name": "GPIOC_OSPEEDR",
+            "address": 1476528136
+          },
+          {
+            "name": "GPIOC_MODER",
+            "address": 1476528128
+          }
+        ]
+      }
+    },
+    "bsp/dm-mc02/infantry-2-chassis-board/bin/infantry-2-chassis-board": {
+      "schema_version": 1,
+      "functions": [
+        {
+          "function": "dm_mc02::reset_cause",
+          "trusted": true,
+          "no_panic": true,
+          "modifies": [],
+          "reason": "UNVERIFIED reset-status hardware boundary for DM-MC02 STM32H723VG feature stm32h723vg: assume dm_mc02::reset_cause terminates without panic and returns a Rust-valid ResetCause while accessing and clearing the exact reset-status MMIO flags. Physical MMIO validity and register side effects are assumed for this call only. The actual reset_cause body performs no Rust storage mutation, so its existing empty modifies list is retained. This reset summary assumes no oscillator/clock setup, singleton availability, fresh-startup state, token ownership, alias/lifetime guarantees, boot, scheduler, interrupt delivery or SEV; the separate embassy_stm32::init hypothesis records its stronger premises."
+        },
+        {
+          "function": "embassy_stm32::init",
+          "trusted": true,
+          "no_panic": true,
+          "reason": "UNVERIFIED whole-initialization hypothesis for DM-MC02 with exact STM32H723VG feature stm32h723vg: assume the board has a working 24 MHz HSE crystal oscillator and that the actual dm_mc02::init configuration is legal and establishes PLL1 SYSCLK 520 MHz, AHB 260 MHz, APB1/2/3/4 130 MHz, PLL2Q FDCAN 80 MHz and HSI48 USB 48 MHz with USB-SOF synchronization plus CSI/I/O compensation. Assume physical MMIO addresses, widths and access conditions are valid and oscillator/PLL/power/clock ready polls terminate. This entire embassy_stm32::init call is assumed to be the single successful first HAL initialization with its singleton available; it terminates without panic and returns Rust-valid exclusively owned peripheral tokens with no conflicting owners or aliases at return. ADDITIONAL UNVERIFIED Rust frame premise for this exact initialization call: it does not mutate, publish, or retire pre-existing ordinary tracked Rust storage, including the fresh application future. Rust singleton, clock and time-driver static effects remain opaque: all static/startup and atomic precision is still invalidated. This is an explicit stronger conditional effect, not a private-storage or alias-reachability theorem. It supplies no general runtime exclusivity or later task/interrupt guarantee. The summary cannot bypass unsupported return ownership/types or certify subsequent lifetime/alias transitions, concurrent hardware access, boot, task execution, scheduler behavior, interrupt delivery or SEV.",
+          "storage_effect": "preserve_existing_ordinary_storage"
+        }
+      ],
+      "hardware": {
+        "schema_version": 2,
+        "device": "stm32h723vg",
+        "pointer_bits": 32,
+        "reason": "UNVERIFIED GPIO read-modify-write premise for stm32h723vg: configured bounded byte transports and exact aligned u32 register reads/writes terminate without trapping or causing unmodeled tracked Rust storage mutations. Each read admits an independent arbitrary u32 value; no readback, register stability, physical correlation, pin-state observation, clock readiness, interrupt delivery, SEV semantics or executor progress is assumed. Rust callback, lifetime and interference checks remain active. Device build indicators are configuration evidence, not physical device certification.",
+        "regions": [
+          {
+            "name": "GPIOC",
+            "start": 1476528128,
+            "length": 32
+          }
+        ],
+        "write_registers": [
+          {
+            "name": "GPIOC_BSRR",
+            "address": 1476528152
+          },
+          {
+            "name": "GPIOC_PUPDR",
+            "address": 1476528140
+          },
+          {
+            "name": "GPIOC_OTYPER",
+            "address": 1476528132
+          },
+          {
+            "name": "GPIOC_OSPEEDR",
+            "address": 1476528136
+          },
+          {
+            "name": "GPIOC_MODER",
+            "address": 1476528128
+          }
+        ],
+        "read_registers": [
+          {
+            "name": "GPIOC_PUPDR",
+            "address": 1476528140
+          },
+          {
+            "name": "GPIOC_OTYPER",
+            "address": 1476528132
+          },
+          {
+            "name": "GPIOC_OSPEEDR",
+            "address": 1476528136
+          },
+          {
+            "name": "GPIOC_MODER",
+            "address": 1476528128
+          }
+        ]
+      }
+    },
+    "bsp/dm-mc02/infantry-2-gimbal-board/bin/infantry-2-gimbal-board": {
+      "schema_version": 1,
+      "functions": [
+        {
+          "function": "dm_mc02::reset_cause",
+          "trusted": true,
+          "no_panic": true,
+          "modifies": [],
+          "reason": "UNVERIFIED reset-status hardware boundary for DM-MC02 STM32H723VG feature stm32h723vg: assume dm_mc02::reset_cause terminates without panic and returns a Rust-valid ResetCause while accessing and clearing the exact reset-status MMIO flags. Physical MMIO validity and register side effects are assumed for this call only. The actual reset_cause body performs no Rust storage mutation, so its existing empty modifies list is retained. This reset summary assumes no oscillator/clock setup, singleton availability, fresh-startup state, token ownership, alias/lifetime guarantees, boot, scheduler, interrupt delivery or SEV; the separate embassy_stm32::init hypothesis records its stronger premises."
+        },
+        {
+          "function": "embassy_stm32::init",
+          "trusted": true,
+          "no_panic": true,
+          "reason": "UNVERIFIED whole-initialization hypothesis for DM-MC02 with exact STM32H723VG feature stm32h723vg: assume the board has a working 24 MHz HSE crystal oscillator and that the actual dm_mc02::init configuration is legal and establishes PLL1 SYSCLK 520 MHz, AHB 260 MHz, APB1/2/3/4 130 MHz, PLL2Q FDCAN 80 MHz and HSI48 USB 48 MHz with USB-SOF synchronization plus CSI/I/O compensation. Assume physical MMIO addresses, widths and access conditions are valid and oscillator/PLL/power/clock ready polls terminate. This entire embassy_stm32::init call is assumed to be the single successful first HAL initialization with its singleton available; it terminates without panic and returns Rust-valid exclusively owned peripheral tokens with no conflicting owners or aliases at return. ADDITIONAL UNVERIFIED Rust frame premise for this exact initialization call: it does not mutate, publish, or retire pre-existing ordinary tracked Rust storage, including the fresh application future. Rust singleton, clock and time-driver static effects remain opaque: all static/startup and atomic precision is still invalidated. This is an explicit stronger conditional effect, not a private-storage or alias-reachability theorem. It supplies no general runtime exclusivity or later task/interrupt guarantee. The summary cannot bypass unsupported return ownership/types or certify subsequent lifetime/alias transitions, concurrent hardware access, boot, task execution, scheduler behavior, interrupt delivery or SEV.",
+          "storage_effect": "preserve_existing_ordinary_storage"
+        }
+      ],
+      "hardware": {
+        "schema_version": 2,
+        "device": "stm32h723vg",
+        "pointer_bits": 32,
+        "reason": "UNVERIFIED GPIO read-modify-write premise for stm32h723vg: configured bounded byte transports and exact aligned u32 register reads/writes terminate without trapping or causing unmodeled tracked Rust storage mutations. Each read admits an independent arbitrary u32 value; no readback, register stability, physical correlation, pin-state observation, clock readiness, interrupt delivery, SEV semantics or executor progress is assumed. Rust callback, lifetime and interference checks remain active. Device build indicators are configuration evidence, not physical device certification.",
+        "regions": [
+          {
+            "name": "GPIOC",
+            "start": 1476528128,
+            "length": 32
+          }
+        ],
+        "write_registers": [
+          {
+            "name": "GPIOC_BSRR",
+            "address": 1476528152
+          },
+          {
+            "name": "GPIOC_PUPDR",
+            "address": 1476528140
+          },
+          {
+            "name": "GPIOC_OTYPER",
+            "address": 1476528132
+          },
+          {
+            "name": "GPIOC_OSPEEDR",
+            "address": 1476528136
+          },
+          {
+            "name": "GPIOC_MODER",
+            "address": 1476528128
+          }
+        ],
+        "read_registers": [
+          {
+            "name": "GPIOC_PUPDR",
+            "address": 1476528140
+          },
+          {
+            "name": "GPIOC_OTYPER",
+            "address": 1476528132
+          },
+          {
+            "name": "GPIOC_OSPEEDR",
+            "address": 1476528136
+          },
+          {
+            "name": "GPIOC_MODER",
+            "address": 1476528128
+          }
+        ]
+      }
+    },
+    "bsp/dm-mc02/sentry-chassis-board/bin/sentry-chassis-board": {
+      "schema_version": 1,
+      "functions": [
+        {
+          "function": "dm_mc02::reset_cause",
+          "trusted": true,
+          "no_panic": true,
+          "modifies": [],
+          "reason": "UNVERIFIED reset-status hardware boundary for DM-MC02 STM32H723VG feature stm32h723vg: assume dm_mc02::reset_cause terminates without panic and returns a Rust-valid ResetCause while accessing and clearing the exact reset-status MMIO flags. Physical MMIO validity and register side effects are assumed for this call only. The actual reset_cause body performs no Rust storage mutation, so its existing empty modifies list is retained. This reset summary assumes no oscillator/clock setup, singleton availability, fresh-startup state, token ownership, alias/lifetime guarantees, boot, scheduler, interrupt delivery or SEV; the separate embassy_stm32::init hypothesis records its stronger premises."
+        },
+        {
+          "function": "embassy_stm32::init",
+          "trusted": true,
+          "no_panic": true,
+          "reason": "UNVERIFIED whole-initialization hypothesis for DM-MC02 with exact STM32H723VG feature stm32h723vg: assume the board has a working 24 MHz HSE crystal oscillator and that the actual dm_mc02::init configuration is legal and establishes PLL1 SYSCLK 520 MHz, AHB 260 MHz, APB1/2/3/4 130 MHz, PLL2Q FDCAN 80 MHz and HSI48 USB 48 MHz with USB-SOF synchronization plus CSI/I/O compensation. Assume physical MMIO addresses, widths and access conditions are valid and oscillator/PLL/power/clock ready polls terminate. This entire embassy_stm32::init call is assumed to be the single successful first HAL initialization with its singleton available; it terminates without panic and returns Rust-valid exclusively owned peripheral tokens with no conflicting owners or aliases at return. ADDITIONAL UNVERIFIED Rust frame premise for this exact initialization call: it does not mutate, publish, or retire pre-existing ordinary tracked Rust storage, including the fresh application future. Rust singleton, clock and time-driver static effects remain opaque: all static/startup and atomic precision is still invalidated. This is an explicit stronger conditional effect, not a private-storage or alias-reachability theorem. It supplies no general runtime exclusivity or later task/interrupt guarantee. The summary cannot bypass unsupported return ownership/types or certify subsequent lifetime/alias transitions, concurrent hardware access, boot, task execution, scheduler behavior, interrupt delivery or SEV.",
+          "storage_effect": "preserve_existing_ordinary_storage"
+        }
+      ],
+      "hardware": {
+        "schema_version": 2,
+        "device": "stm32h723vg",
+        "pointer_bits": 32,
+        "reason": "UNVERIFIED GPIO read-modify-write premise for stm32h723vg: configured bounded byte transports and exact aligned u32 register reads/writes terminate without trapping or causing unmodeled tracked Rust storage mutations. Each read admits an independent arbitrary u32 value; no readback, register stability, physical correlation, pin-state observation, clock readiness, interrupt delivery, SEV semantics or executor progress is assumed. Rust callback, lifetime and interference checks remain active. Device build indicators are configuration evidence, not physical device certification.",
+        "regions": [
+          {
+            "name": "GPIOC",
+            "start": 1476528128,
+            "length": 32
+          }
+        ],
+        "write_registers": [
+          {
+            "name": "GPIOC_BSRR",
+            "address": 1476528152
+          },
+          {
+            "name": "GPIOC_PUPDR",
+            "address": 1476528140
+          },
+          {
+            "name": "GPIOC_OTYPER",
+            "address": 1476528132
+          },
+          {
+            "name": "GPIOC_OSPEEDR",
+            "address": 1476528136
+          },
+          {
+            "name": "GPIOC_MODER",
+            "address": 1476528128
+          }
+        ],
+        "read_registers": [
+          {
+            "name": "GPIOC_PUPDR",
+            "address": 1476528140
+          },
+          {
+            "name": "GPIOC_OTYPER",
+            "address": 1476528132
+          },
+          {
+            "name": "GPIOC_OSPEEDR",
+            "address": 1476528136
+          },
+          {
+            "name": "GPIOC_MODER",
+            "address": 1476528128
+          }
+        ]
+      }
+    },
+    "bsp/dm-mc02/sentry-gimbal-board/bin/sentry-gimbal-board": {
+      "schema_version": 1,
+      "functions": [
+        {
+          "function": "dm_mc02::reset_cause",
+          "trusted": true,
+          "no_panic": true,
+          "modifies": [],
+          "reason": "UNVERIFIED reset-status hardware boundary for DM-MC02 STM32H723VG feature stm32h723vg: assume dm_mc02::reset_cause terminates without panic and returns a Rust-valid ResetCause while accessing and clearing the exact reset-status MMIO flags. Physical MMIO validity and register side effects are assumed for this call only. The actual reset_cause body performs no Rust storage mutation, so its existing empty modifies list is retained. This reset summary assumes no oscillator/clock setup, singleton availability, fresh-startup state, token ownership, alias/lifetime guarantees, boot, scheduler, interrupt delivery or SEV; the separate embassy_stm32::init hypothesis records its stronger premises."
+        },
+        {
+          "function": "embassy_stm32::init",
+          "trusted": true,
+          "no_panic": true,
+          "reason": "UNVERIFIED whole-initialization hypothesis for DM-MC02 with exact STM32H723VG feature stm32h723vg: assume the board has a working 24 MHz HSE crystal oscillator and that the actual dm_mc02::init configuration is legal and establishes PLL1 SYSCLK 520 MHz, AHB 260 MHz, APB1/2/3/4 130 MHz, PLL2Q FDCAN 80 MHz and HSI48 USB 48 MHz with USB-SOF synchronization plus CSI/I/O compensation. Assume physical MMIO addresses, widths and access conditions are valid and oscillator/PLL/power/clock ready polls terminate. This entire embassy_stm32::init call is assumed to be the single successful first HAL initialization with its singleton available; it terminates without panic and returns Rust-valid exclusively owned peripheral tokens with no conflicting owners or aliases at return. ADDITIONAL UNVERIFIED Rust frame premise for this exact initialization call: it does not mutate, publish, or retire pre-existing ordinary tracked Rust storage, including the fresh application future. Rust singleton, clock and time-driver static effects remain opaque: all static/startup and atomic precision is still invalidated. This is an explicit stronger conditional effect, not a private-storage or alias-reachability theorem. It supplies no general runtime exclusivity or later task/interrupt guarantee. The summary cannot bypass unsupported return ownership/types or certify subsequent lifetime/alias transitions, concurrent hardware access, boot, task execution, scheduler behavior, interrupt delivery or SEV.",
+          "storage_effect": "preserve_existing_ordinary_storage"
+        }
+      ],
+      "hardware": {
+        "schema_version": 2,
+        "device": "stm32h723vg",
+        "pointer_bits": 32,
+        "reason": "UNVERIFIED GPIO read-modify-write premise for stm32h723vg: configured bounded byte transports and exact aligned u32 register reads/writes terminate without trapping or causing unmodeled tracked Rust storage mutations. Each read admits an independent arbitrary u32 value; no readback, register stability, physical correlation, pin-state observation, clock readiness, interrupt delivery, SEV semantics or executor progress is assumed. Rust callback, lifetime and interference checks remain active. Device build indicators are configuration evidence, not physical device certification.",
+        "regions": [
+          {
+            "name": "GPIOC",
+            "start": 1476528128,
+            "length": 32
+          }
+        ],
+        "write_registers": [
+          {
+            "name": "GPIOC_BSRR",
+            "address": 1476528152
+          },
+          {
+            "name": "GPIOC_PUPDR",
+            "address": 1476528140
+          },
+          {
+            "name": "GPIOC_OTYPER",
+            "address": 1476528132
+          },
+          {
+            "name": "GPIOC_OSPEEDR",
+            "address": 1476528136
+          },
+          {
+            "name": "GPIOC_MODER",
+            "address": 1476528128
+          }
+        ],
+        "read_registers": [
+          {
+            "name": "GPIOC_PUPDR",
+            "address": 1476528140
+          },
+          {
+            "name": "GPIOC_OTYPER",
+            "address": 1476528132
+          },
+          {
+            "name": "GPIOC_OSPEEDR",
+            "address": 1476528136
+          },
+          {
+            "name": "GPIOC_MODER",
+            "address": 1476528128
+          }
+        ]
+      }
+    },
+    "bsp/rm-c/rm-c-bringup/bin/rm-c-bringup": {
+      "schema_version": 1,
+      "functions": [
+        {
+          "function": "embassy_stm32::init",
+          "trusted": true,
+          "no_panic": true,
+          "reason": "UNVERIFIED whole-initialization hypothesis for RM-C with exact STM32F407IG feature stm32f407ig: assume the board has a working 12 MHz HSE crystal oscillator and that the actual rm_c::init configuration is legal and establishes PLL SYSCLK/AHB 168 MHz, APB1 42 MHz, APB2 84 MHz and PLLQ USB 48 MHz. Assume physical MMIO addresses, widths and access conditions are valid and oscillator/PLL/power/clock ready polls terminate. This entire embassy_stm32::init call is assumed to be the single successful first HAL initialization with its singleton available; it terminates without panic and returns Rust-valid exclusively owned peripheral tokens with no conflicting owners or aliases at return. ADDITIONAL UNVERIFIED Rust frame premise for this exact initialization call: it does not mutate, publish, or retire pre-existing ordinary tracked Rust storage, including the fresh application future. Rust singleton, clock and time-driver static effects remain opaque: all static/startup and atomic precision is still invalidated. This is an explicit stronger conditional effect, not a private-storage or alias-reachability theorem. It supplies no general runtime exclusivity or later task/interrupt guarantee. The summary cannot bypass unsupported return ownership/types or certify subsequent lifetime/alias transitions, concurrent hardware access, boot, task execution, scheduler behavior, interrupt delivery or SEV.",
+          "storage_effect": "preserve_existing_ordinary_storage"
+        }
+      ],
+      "hardware": {
+        "schema_version": 2,
+        "device": "stm32f407ig",
+        "pointer_bits": 32,
+        "reason": "UNVERIFIED GPIO read-modify-write premise for stm32f407ig: configured bounded byte transports and exact aligned u32 register reads/writes terminate without trapping or causing unmodeled tracked Rust storage mutations. Each read admits an independent arbitrary u32 value; no readback, register stability, physical correlation, pin-state observation, clock readiness, interrupt delivery, SEV semantics or executor progress is assumed. Rust callback, lifetime and interference checks remain active. Device build indicators are configuration evidence, not physical device certification.",
+        "regions": [
+          {
+            "name": "GPIOH",
+            "start": 1073880064,
+            "length": 32
+          }
+        ],
+        "write_registers": [
+          {
+            "name": "GPIOH_BSRR",
+            "address": 1073880088
+          },
+          {
+            "name": "GPIOH_PUPDR",
+            "address": 1073880076
+          },
+          {
+            "name": "GPIOH_OTYPER",
+            "address": 1073880068
+          },
+          {
+            "name": "GPIOH_OSPEEDR",
+            "address": 1073880072
+          },
+          {
+            "name": "GPIOH_MODER",
+            "address": 1073880064
+          }
+        ],
+        "read_registers": [
+          {
+            "name": "GPIOH_PUPDR",
+            "address": 1073880076
+          },
+          {
+            "name": "GPIOH_OTYPER",
+            "address": 1073880068
+          },
+          {
+            "name": "GPIOH_OSPEEDR",
+            "address": 1073880072
+          },
+          {
+            "name": "GPIOH_MODER",
+            "address": 1073880064
+          }
+        ]
+      }
+    }
+  }
+}

@@ -206,9 +206,9 @@ The model allows 1..16 disjoint regions of 1..4096 bytes inside the STM32 periph
 window and 1..64 uniquely named, aligned registers wholly inside those regions. Schema 1 admits
 only exact unsigned 32-bit writes, including compiler-certified transparent u32 register values.
 Admitted forward byte-address arithmetic must stay within a configured region without wrapping;
-admitting transport alone grants no register access. Numeric hardware addresses never become retained
-Rust allocations or references. Unmapped addresses, unsupported widths, reads without permission and missing models
-stay UNKNOWN.
+admitting transport alone grants no register access. Numeric hardware addresses never become
+retained Rust allocations or references. Unmapped addresses, unsupported widths, reads without
+permission and missing models stay UNKNOWN.
 Hardware stores retain the existing conservative publication/startup history invalidation.
 
 The interpreter executes the actual register write callback and its Rust assertions and arithmetic.
@@ -243,3 +243,37 @@ invalidation as writes, and retained ordinary RAM reads keep their existing sema
 Native replay refuses reports with hardware configuration or a recorded hardware-model premise,
 including a counterexample reached before the first hardware operation. The API supplies symbolic
 analysis effects without a native hardware execution implementation.
+
+### Preserving ordinary storage at a trusted boundary
+
+`FunctionContract.storage_effect` can opt into
+`TrustedStorageEffect::PreserveExistingOrdinaryStorage`, serialized as
+`"preserve_existing_ordinary_storage"`. The exact trusted call must have `no_panic` and a nonempty
+reason, with no `modifies` list or alias return. This is a stronger conditional premise: the call
+will not mutate, publish or retire any pre-existing ordinary tracked storage. It is not inferred
+from argument reachability or the absence of a known alias.
+
+For example, a HAL initialization model can retain the fresh application's future while leaving
+singleton, clock and time-driver effects opaque:
+
+```json
+{
+  "function": "embassy_stm32::init",
+  "trusted": true,
+  "no_panic": true,
+  "storage_effect": "preserve_existing_ordinary_storage",
+  "reason": "UNVERIFIED initialization and frame premise; static effects remain opaque"
+}
+```
+
+The analyzer certifies pure owned boundary inputs against compiler types and actual symbolic
+values before admitting this effect. References, raw pointers, interior mutable/atomic inputs and
+opaque shapes remain unsupported. Existing dead allocations remain dead. Static views and startup
+history are invalidated, and atomic values retain conservative interference. The model does not
+promise unchanged hardware or static state, initialize an executor, or preserve storage across
+later unrelated calls.
+
+Every admitted use records the exact versioned selector/effect/reason premise and trusted call in
+the report. Later REFUTED and UNKNOWN outcomes retain it. Strict defaults and existing omitted
+`modifies` contracts keep their conservative behavior. Native replay refuses configured or recorded
+storage effects because this API has no native implementation of the external boundary.

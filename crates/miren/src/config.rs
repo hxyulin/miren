@@ -12,6 +12,15 @@ pub struct ContractConfig {
     pub hardware: Option<crate::HardwareModel>,
 }
 
+/// Explicit frame premise for an exact selected trusted call, never inferred from reachability.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TrustedStorageEffect {
+    /// No mutation, publication or retirement of pre-existing ordinary tracked storage.
+    /// Static/startup state and atomic precision are still invalidated.
+    PreserveExistingOrdinaryStorage,
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct FunctionContract {
@@ -30,6 +39,8 @@ pub struct FunctionContract {
     pub no_panic: bool,
     #[serde(default)]
     pub modifies: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub storage_effect: Option<TrustedStorageEffect>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub returns_alias: Option<String>,
     #[serde(default)]
@@ -96,6 +107,17 @@ impl ContractConfig {
                 syn::parse_str::<syn::Expr>(predicate)
                     .map_err(|error| format!("invalid contract predicate: {error}"))?;
             }
+            if function.storage_effect.is_some()
+                && (!function.trusted
+                    || function.modifies.is_some()
+                    || function.returns_alias.is_some())
+            {
+                return Err(concat!(
+                    "storage_effect requires trusted=true and ",
+                    "conflicts with modifies or returns_alias"
+                )
+                .into());
+            }
             if function.trusted {
                 if !function.no_panic
                     || function
@@ -140,6 +162,22 @@ impl FunctionContract {
             |instance| format!("{} {instance}", self.function),
         )
     }
+    /// Canonical premise recorded only when this selected trusted effect is actually used.
+    pub fn storage_assumption(&self) -> Option<String> {
+        self.storage_effect.map(|effect| {
+            let effect = match effect {
+                TrustedStorageEffect::PreserveExistingOrdinaryStorage => {
+                    "preserve_existing_ordinary_storage"
+                }
+            };
+            format!(
+                "trusted-storage:v1:selector={};effect={effect};reason={}",
+                self.selector(),
+                self.reason.as_deref().unwrap_or_default()
+            )
+        })
+    }
+
     pub fn metadata(&self) -> Vec<Contract> {
         let mut result = Vec::new();
         if self.no_panic {
@@ -162,5 +200,60 @@ impl FunctionContract {
             }
         }
         result
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn explicit_storage_effect_is_versioned_reported_and_excludes_conflicting_effects() {
+        let legacy = serde_json::json!({ "schema_version":1, "functions":[{
+            "function":"fixture::init", "trusted":true, "no_panic":true,
+            "reason":"no mutation, publication or retirement of pre-existing ordinary storage"
+        }] });
+        let config: ContractConfig = serde_json::from_value(legacy.clone()).unwrap();
+        config.validate().unwrap();
+        assert!(config.functions[0].storage_assumption().is_none());
+        assert!(
+            serde_json::to_value(config).unwrap()["functions"][0]
+                .get("storage_effect")
+                .is_none()
+        );
+        let mut opt_in = legacy.clone();
+        opt_in["functions"][0]["storage_effect"] =
+            serde_json::json!("preserve_existing_ordinary_storage");
+        let config: ContractConfig = serde_json::from_value(opt_in.clone()).unwrap();
+        config.validate().unwrap();
+        assert_eq!(
+            config.functions[0].storage_assumption().unwrap(),
+            concat!(
+                "trusted-storage:v1:selector=fixture::init;",
+                "effect=preserve_existing_ordinary_storage;",
+                "reason=no mutation, publication or retirement of pre-existing ordinary storage"
+            )
+        );
+        let mut instance = config.clone();
+        instance.functions[0].instance = Some("[u32]".into());
+        assert!(
+            instance.functions[0]
+                .storage_assumption()
+                .unwrap()
+                .contains("selector=fixture::init [u32];")
+        );
+        for (field, value) in [
+            ("modifies", serde_json::json!([])),
+            ("returns_alias", serde_json::json!("arg0")),
+            ("trusted", serde_json::json!(false)),
+            ("reason", serde_json::json!("")),
+            ("no_panic", serde_json::json!(false)),
+        ] {
+            let mut invalid = opt_in.clone();
+            invalid["functions"][0][field] = value;
+            let config: ContractConfig = serde_json::from_value(invalid).unwrap();
+            assert!(config.validate().is_err(), "{field}");
+        }
+        opt_in["functions"][0]["storage_effect"] = serde_json::json!("preserve_everything");
+        assert!(serde_json::from_value::<ContractConfig>(opt_in).is_err());
     }
 }

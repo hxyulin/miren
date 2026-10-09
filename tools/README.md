@@ -300,3 +300,19 @@ This is a newly exposed Rust translation gap, not a register-read failure or dem
 panic. Three earlier RTT refutations remain unchanged. Counterexamples that depend on sampled
 register values are labeled as abstract device-correlation witnesses. Raw capture:
 `/tmp/miren-stage128-main-gpio-rmw-20261009`.
+
+Separate `fleet-main-stm32{h7,f4,}-gpio-frame-hypothesis.json` profiles add an explicit trusted
+initialization storage effect to the schema-2 GPIO policies. The exact init call promises no
+mutation, publication or retirement of pre-existing ordinary tracked storage; static/startup and
+atomic precision remain invalidated. This stronger unverified premise is not a privacy inference
+or an empty modifies list. Earlier profiles and captures remain unchanged. Main policy validation
+requires the exact selector/effect/reason premise for every used storage-effect boundary and
+rejects unused, duplicate, altered or unrelated premises. Hardware premises compose independently;
+strict, registration and runtime scopes retain their original policies.
+
+The additional `fleet-main-stm32{h7,f4,}-gpio-af-frame-hypothesis.json` profiles permit the two
+alternate-function words for GPIOA/B/C/D/E/H in 40-byte regions, using the selected compiler PAC
+base addresses. These remain explicit unverified access hypotheses; other ports/registers are
+unmapped. The complete replay clears the future-frame loss and reaches RCC pointer constants on
+eight H7 mains plus retired USB static storage on the F4 main. Outcomes remain three REFUTED and
+nine UNKNOWN; no completed main proof or native boot claim is added.

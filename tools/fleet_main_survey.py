@@ -102,7 +102,7 @@ def normalized_contract_config(value):
     functions, selectors = [], set()
     for raw in value["functions"]:
         require(isinstance(raw, dict) and "function" in raw
-                and set(raw) <= {"function", "returns_alias", *defaults},
+                and set(raw) <= {"function", "returns_alias", "storage_effect", *defaults},
                 "invalid configured function fields")
         spec = {**defaults, **raw}
         name = spec["function"]
@@ -128,6 +128,13 @@ def normalized_contract_config(value):
         if spec["trusted"]:
             require(spec["no_panic"] and spec["reason"] and spec["reason"].strip(),
                     "trusted contracts require no_panic and a reason")
+        if spec.get("storage_effect") is None:
+            spec.pop("storage_effect", None)
+        else:
+            require(spec["storage_effect"] == "preserve_existing_ordinary_storage"
+                    and spec["trusted"] and spec["modifies"] is None
+                    and spec.get("returns_alias") is None,
+                    "storage effect requires a trusted boundary without modifies or alias return")
         functions.append(spec)
     result = {"schema_version": 1, "functions": functions}
     if value.get("hardware") is not None:
@@ -198,6 +205,11 @@ def contract_selector(spec):
     return spec["function"] + (" " + spec["instance"] if spec["instance"] is not None else "")
 
 
+def storage_assumption(spec):
+    return (f"trusted-storage:v1:selector={contract_selector(spec)};"
+            f"effect={spec['storage_effect']};reason={spec['reason']}")
+
+
 def validate_proof_policy(proof, report, unit, name, config, allow_assumptions):
     require(all(isinstance(proof.get(key, []), list) for key in
                 ("assumptions", "entry_assumptions", "trusted_calls", "invariants")),
@@ -212,8 +224,6 @@ def validate_proof_policy(proof, report, unit, name, config, allow_assumptions):
     require(report.get("contract_config") == config, "contract configuration mismatch")
     hardware = config.get("hardware")
     entries = proof.get("entry_assumptions", [])
-    require(entries == [] or (hardware is not None and entries == [hardware_assumption(hardware)]),
-            "unexpected startup or hardware assumptions")
     matched = proof.get("matched_contracts", [])
     require(isinstance(matched, list)
             and all(selector in {contract_selector(s) for s in config["functions"]}
@@ -227,6 +237,7 @@ def validate_proof_policy(proof, report, unit, name, config, allow_assumptions):
             "unexpected root preconditions")
     trusted = proof.get("trusted_calls", [])
     require(isinstance(trusted, list), "invalid trusted calls")
+    required_storage = set()
     for call in trusted:
         require(isinstance(call, dict) and isinstance(call.get("contract"), dict)
                 and call["contract"] in config["functions"] and call["contract"]["trusted"],
@@ -237,6 +248,15 @@ def validate_proof_policy(proof, report, unit, name, config, allow_assumptions):
                 and isinstance(call.get("instance"), str)
                 and (spec["instance"] is None or spec["instance"] == call["instance"]),
                 "unauthorized trusted call instance")
+        if spec.get("storage_effect") is not None:
+            required_storage.add(storage_assumption(spec))
+    allowed = required_storage.copy()
+    if hardware is not None:
+        allowed.add(hardware_assumption(hardware))
+    require(all(isinstance(entry, str) for entry in entries)
+            and len(entries) == len(set(entries))
+            and required_storage <= set(entries) <= allowed,
+            "unexpected or missing hardware/storage assumptions")
     if proof["status"] == "proved_with_assumptions":
         require(bool(assumptions or trusted or entries),
                 "conditional proof has no recorded assumptions")

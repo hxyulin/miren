@@ -443,3 +443,15 @@ must match compiler identity and discriminants; symbolic tags must already have 
 in the exact legal set, including sparse signed tags. The result preserves those bits without an
 extra premise. Default/C repr, payloads, layouts without an initialized direct tag, reverse
 integer-to-enum reconstruction and mismatched primitive types remain UNKNOWN. PAC methods execute their actual MIR.
+
+The public `TrustedStorageEffect::PreserveExistingOrdinaryStorage` can be selected through
+`FunctionContract.storage_effect` on an exact trusted boundary with a reason and no modifies/alias
+return declaration. It explicitly promises no mutation, publication or retirement of pre-existing
+ordinary tracked storage. Compiler types and raw symbolic boundary inputs must certify bounded
+pure owned values before snapshots; pointer/reference/interior mutable and opaque inputs remain
+unsupported. Constructed fieldless enum inventories admit at most 1024 variants; payload
+inventories stay bounded at 256 and complete symbolic inventories consume the 512-value budget.
+Ordinary root-input and transmute limits stay unchanged. Existing dead storage stays dead, while
+static views, startup values and atomic precision are invalidated. Every used effect records its exact versioned selector/reason premise.
+This provides an opt-in frame boundary for future external state models without inferring privacy
+from call arguments. Legacy unknown effects stay conservative; native replay refuses this mode.

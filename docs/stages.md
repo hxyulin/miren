@@ -2510,3 +2510,59 @@ assumptions: `/tmp/miren-stage129-main-strict-20261009`.
 All 559 Rust workspace tests and 53 Python tests pass, along with formatting, cargo lint, release
 builds, cargo deny, documentation builds and manual hooks. Existing enum-input and NonZero
 compiler controls also pass independently.
+
+## Stage 130: Explicit ordinary-storage effects for external models
+
+FunctionContract.storage_effect and public TrustedStorageEffect add a separate opt-in premise
+that an exact trusted call does not mutate, publish or retire pre-existing ordinary tracked storage.
+It requires trusted/no_panic/reason and rejects modifies or alias-return combinations. Bounded
+compiler and raw-value input certificates precede snapshots, rejecting references, raw pointers,
+callbacks, interior mutable/atomic storage, opaque shapes and direct/nested pattern restrictions.
+Scalar/ScalarPair wrappers must match actual typed-field validity and offsets. Constructed
+fieldless inventories admit up to 1024 variants; payload inventories retain 256 and symbolic
+inventories consume the existing 512-value budget. Root-input and transmute limits are unchanged.
+
+Existing ordinary allocations are retained, dead allocations remain dead, and the special static
+view epoch is retired. Static/startup and local/published atomic precision remain invalidated.
+The exact used selector/effect/reason premise is recorded with the trusted call and survives later
+REFUTED/UNKNOWN outcomes. Legacy omitted-modifies behavior remains conservative. Configured or
+recorded effects refuse native replay, including unused policies and removed configurations.
+
+Four compiler integrations cover host/ARM O0/O2 ordinary/future conditional proofs, mutation
+refutation/native failure, legacy UNKNOWN, pointer/alias/restricted-input and return refusals,
+dead storage, static/atomic invalidation, replay refusal and 512/1024/1025 fieldless bounds.
+One public DTO unit and one ABI unit validate compatibility/conflicts and stricter scalar validity.
+Three Python policy tests demand the exact used premise and reject configuration/reason/version,
+duplicate, unused and unrelated assumption mutations. Independent implementation/policy review
+approves the final certificate and effect rules. Full final validation expects 565 Rust/56 Python.
+
+Separate STM32 GPIO frame profiles preserve previous policies and explicitly record the stronger
+initialization premise. The final twelve-main replay clears future-frame loss for all nine affected
+bodies; the narrow GPIO policy then stops eight H7 bodies at alternate-function access, and the F4
+body at retired USB static storage. Capture:
+`/tmp/miren-stage130-main-gpio-frame-final-20261010`.
+
+Additional separate GPIO alternate-function profiles configure GPIOA/B/C/D/E/H, with exact two AFR
+words and 40-byte regions using the selected compiler PAC addresses. This is still an unverified
+access premise; other ports/registers remain unmapped. Their complete replay gets eight H7 bodies
+to RccInfo::enable_and_reset_with_cs at an unsupported pointer constant; the F4 static boundary
+remains. Capture: `/tmp/miren-stage130-main-gpio-af-frame-20261010`. All captures retain three
+previous RTT refutations, nine UNKNOWN, twelve registration proofs and twelve runtime refutations.
+All twelve fresh application bodies are entered. This adds no completed main proof or native boot
+claim. Next pointer/static boundaries are under independent audit.
+
+Independent source audit identifies the next H7 pointer as the ordinary Rust REFCOUNTS [u8;3]
+static, not an MMIO reference. The raw constant decoder lacks its compiler static provenance.
+The F4 target is EP_OUT:StaticCell<[u8;256]>, with its view conservatively retired by the init effect.
+Fresh future construction alone proves neither zero refcounts nor an unused USB cell. Exact
+constant/allocation identity remains inferred from source and the recorded MIR block because the
+capture does not dump the operand; the audit records this limitation:
+`/tmp/miren-stage130-next-blockers-audit.md`. No epoch restoration, zero-state assumption or
+modifies:[] substitution was introduced.
+
+Final frozen validation passes all 565 Rust workspace tests and 56 Python tests, formatting,
+cargo lint, release builds, cargo deny, documentation builds and manual hooks. Four affected
+compiler integrations also pass after fixture-only line wrapping. Final strict and legacy GPIO
+captures each match all 36 stage-129 obligation arrays exactly:
+`/tmp/miren-stage130-main-strict-final-20261010` and
+`/tmp/miren-stage130-main-gpio-legacy-final-20261010`.

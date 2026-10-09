@@ -63,6 +63,7 @@ mod static_views;
 mod static_writes;
 mod storage_layout;
 mod storage_locations;
+mod trusted_storage;
 use startup::AtomicStorage;
 use startup_memory::Memory;
 mod raw_subobjects;

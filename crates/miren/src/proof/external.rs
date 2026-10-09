@@ -1,5 +1,5 @@
 use super::*;
-use miren::{FunctionContract, TrustedCall};
+use miren::{FunctionContract, TrustedCall, TrustedStorageEffect};
 
 pub(super) fn canonical_name(tcx: TyCtxt<'_>, id: DefId) -> String {
     if id.is_local() {
@@ -308,6 +308,13 @@ impl<'tcx> Engine<'tcx> {
         if signature.inputs().len() != values.len() {
             return Err("summary call arity mismatch".to_owned());
         }
+        if let Some(effect) = spec.storage_effect {
+            match effect {
+                TrustedStorageEffect::PreserveExistingOrdinaryStorage => {
+                    self.certify_trusted_owned_inputs(&signature, values, &state.conditions)?
+                }
+            }
+        }
         let snapshots = self.snapshots(values, &state.memory, &state.conditions)?;
         let body = self.instantiated_body(instance).ok();
         let mut bindings = if let Some(body) = &body {
@@ -421,6 +428,18 @@ impl<'tcx> Engine<'tcx> {
                     _ => return Err("summary effect reference is unsupported".to_owned()),
                 }
             }
+        } else if let Some(effect) = spec.storage_effect {
+            match effect {
+                TrustedStorageEffect::PreserveExistingOrdinaryStorage => {
+                    // Explicit frame premise, not an inference from argument reachability.
+                    if let Some(epoch) = self.static_epoch {
+                        let slot = memory
+                            .get_mut(epoch)
+                            .ok_or("static effect epoch outside memory")?;
+                        *slot = None;
+                    }
+                }
+            }
         } else {
             let roots = self
                 .static_roots
@@ -484,6 +503,11 @@ impl<'tcx> Engine<'tcx> {
         }
         if !self.feasible(&conditions)? {
             return Err("trusted summary has inconsistent return/state constraints".to_owned());
+        }
+        if let Some(assumption) = spec.storage_assumption()
+            && !self.proof.entry_assumptions.contains(&assumption)
+        {
+            self.proof.entry_assumptions.push(assumption);
         }
         self.proof.trusted_calls.push(TrustedCall {
             contract: spec,

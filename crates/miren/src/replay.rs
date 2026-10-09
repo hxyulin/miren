@@ -119,7 +119,22 @@ pub fn replay_report(report: &mut Report) {
             .entry_assumptions
             .iter()
             .any(|assumption| assumption.starts_with("hardware-model:"));
-        let result = if hardware_configured || hardware_used {
+        let storage_configured = report.contract_config.as_ref().is_some_and(|config| {
+            config
+                .functions
+                .iter()
+                .any(|function| function.storage_effect.is_some())
+        });
+        let storage_used = proof
+            .entry_assumptions
+            .iter()
+            .any(|s| s.starts_with("trusted-storage:"));
+        let result = if storage_configured || storage_used {
+            ReplayResult::new(
+                ReplayStatus::Unsupported,
+                "external storage effects have no native replay implementation",
+            )
+        } else if hardware_configured || hardware_used {
             ReplayResult::new(
                 ReplayStatus::Unsupported,
                 "external hardware models have no native replay implementation",

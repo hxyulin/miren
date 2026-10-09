@@ -989,3 +989,23 @@ The twelve-main schema-2 replay clears that conversion gap for all nine affected
 Their next UNKNOWN is a tracked-storage reference diagnostic in the application future, under audit.
 The other three retain earlier RTT refutations. This traversal progress adds no completed main proof
 and supplies no executor or native boot guarantee.
+
+Stage 130 adds an explicit trusted storage effect API for a call that promises not to mutate,
+publish or retire pre-existing ordinary tracked storage. Pure owned compiler/value input
+certification precedes snapshots, and static/startup plus atomic precision remains invalidated.
+Existing dead allocations are never revived. The exact used selector/effect/reason premise is
+recorded separately; strict defaults and legacy omitted-modifies boundaries are unchanged.
+This addresses conservative future-frame invalidation only under the stronger recorded premise,
+without establishing a general private-storage or alias-reachability theorem.
+
+Final STM32 frame-profile replay clears lost future storage for all nine affected bodies. With
+separate alternate-function GPIO permissions, eight H7 bodies reach an unsupported RCC pointer
+constant and the F4 body reaches retired USB static storage. All remain UNKNOWN; the other three
+keep earlier RTT refutations. The new boundaries require further storage/device modeling.
+
+Independent source audit identifies the H7 pointer as ordinary Rust
+`embassy_stm32::_generated::REFCOUNTS: [u8; 3]`, taken with `addr_of_mut!`; the raw constant decoder
+currently handles numeric bits and misses allocation-backed static provenance. The F4 object is
+`rm_c::UsbPort::open::EP_OUT: StaticCell<[u8; 256]>`, whose view is retired by the opaque static
+effects. Neither diagnostic establishes a firmware lifetime failure. Static identity alone would
+not prove zero refcounts or an unused USB cell; those need separate state/effect evidence.

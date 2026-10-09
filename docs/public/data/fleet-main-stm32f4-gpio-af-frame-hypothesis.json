@@ -1,0 +1,371 @@
+{
+  "schema_version": 1,
+  "units": {
+    "bsp/rm-c/rm-c-bringup/bin/rm-c-bringup": {
+      "schema_version": 1,
+      "functions": [
+        {
+          "function": "embassy_stm32::init",
+          "trusted": true,
+          "no_panic": true,
+          "reason": "UNVERIFIED whole-initialization hypothesis for RM-C with exact STM32F407IG feature stm32f407ig: assume the board has a working 12 MHz HSE crystal oscillator and that the actual rm_c::init configuration is legal and establishes PLL SYSCLK/AHB 168 MHz, APB1 42 MHz, APB2 84 MHz and PLLQ USB 48 MHz. Assume physical MMIO addresses, widths and access conditions are valid and oscillator/PLL/power/clock ready polls terminate. This entire embassy_stm32::init call is assumed to be the single successful first HAL initialization with its singleton available; it terminates without panic and returns Rust-valid exclusively owned peripheral tokens with no conflicting owners or aliases at return. ADDITIONAL UNVERIFIED Rust frame premise for this exact initialization call: it does not mutate, publish, or retire pre-existing ordinary tracked Rust storage, including the fresh application future. Rust singleton, clock and time-driver static effects remain opaque: all static/startup and atomic precision is still invalidated. This is an explicit stronger conditional effect, not a private-storage or alias-reachability theorem. It supplies no general runtime exclusivity or later task/interrupt guarantee. The summary cannot bypass unsupported return ownership/types or certify subsequent lifetime/alias transitions, concurrent hardware access, boot, task execution, scheduler behavior, interrupt delivery or SEV.",
+          "storage_effect": "preserve_existing_ordinary_storage"
+        }
+      ],
+      "hardware": {
+        "schema_version": 2,
+        "device": "stm32f407ig",
+        "pointer_bits": 32,
+        "reason": "UNVERIFIED GPIO output and alternate-function access premise for stm32f407ig: configured bounded byte transports and exact aligned u32 register reads/writes terminate without trapping or causing unmodeled tracked Rust storage mutations. Each read admits an independent arbitrary u32 value; no readback, register stability, physical correlation, pin-state observation, clock readiness, interrupt delivery, SEV semantics or executor progress is assumed. Rust callback, lifetime and interference checks remain active. Device build indicators are configuration evidence, not physical device certification. Configured GPIOA/B/C/D/E/H base addresses follow the selected compiler PAC definitions; the two AFR words have separate read/write permissions. Other GPIO ports and registers remain unmapped, and these definitions do not certify physical access conditions.",
+        "regions": [
+          {
+            "name": "GPIOA",
+            "start": 1073872896,
+            "length": 40
+          },
+          {
+            "name": "GPIOB",
+            "start": 1073873920,
+            "length": 40
+          },
+          {
+            "name": "GPIOC",
+            "start": 1073874944,
+            "length": 40
+          },
+          {
+            "name": "GPIOD",
+            "start": 1073875968,
+            "length": 40
+          },
+          {
+            "name": "GPIOE",
+            "start": 1073876992,
+            "length": 40
+          },
+          {
+            "name": "GPIOH",
+            "start": 1073880064,
+            "length": 40
+          }
+        ],
+        "write_registers": [
+          {
+            "name": "GPIOA_BSRR",
+            "address": 1073872920
+          },
+          {
+            "name": "GPIOA_PUPDR",
+            "address": 1073872908
+          },
+          {
+            "name": "GPIOA_OTYPER",
+            "address": 1073872900
+          },
+          {
+            "name": "GPIOA_OSPEEDR",
+            "address": 1073872904
+          },
+          {
+            "name": "GPIOA_MODER",
+            "address": 1073872896
+          },
+          {
+            "name": "GPIOA_AFRL",
+            "address": 1073872928
+          },
+          {
+            "name": "GPIOA_AFRH",
+            "address": 1073872932
+          },
+          {
+            "name": "GPIOB_BSRR",
+            "address": 1073873944
+          },
+          {
+            "name": "GPIOB_PUPDR",
+            "address": 1073873932
+          },
+          {
+            "name": "GPIOB_OTYPER",
+            "address": 1073873924
+          },
+          {
+            "name": "GPIOB_OSPEEDR",
+            "address": 1073873928
+          },
+          {
+            "name": "GPIOB_MODER",
+            "address": 1073873920
+          },
+          {
+            "name": "GPIOB_AFRL",
+            "address": 1073873952
+          },
+          {
+            "name": "GPIOB_AFRH",
+            "address": 1073873956
+          },
+          {
+            "name": "GPIOC_BSRR",
+            "address": 1073874968
+          },
+          {
+            "name": "GPIOC_PUPDR",
+            "address": 1073874956
+          },
+          {
+            "name": "GPIOC_OTYPER",
+            "address": 1073874948
+          },
+          {
+            "name": "GPIOC_OSPEEDR",
+            "address": 1073874952
+          },
+          {
+            "name": "GPIOC_MODER",
+            "address": 1073874944
+          },
+          {
+            "name": "GPIOC_AFRL",
+            "address": 1073874976
+          },
+          {
+            "name": "GPIOC_AFRH",
+            "address": 1073874980
+          },
+          {
+            "name": "GPIOD_BSRR",
+            "address": 1073875992
+          },
+          {
+            "name": "GPIOD_PUPDR",
+            "address": 1073875980
+          },
+          {
+            "name": "GPIOD_OTYPER",
+            "address": 1073875972
+          },
+          {
+            "name": "GPIOD_OSPEEDR",
+            "address": 1073875976
+          },
+          {
+            "name": "GPIOD_MODER",
+            "address": 1073875968
+          },
+          {
+            "name": "GPIOD_AFRL",
+            "address": 1073876000
+          },
+          {
+            "name": "GPIOD_AFRH",
+            "address": 1073876004
+          },
+          {
+            "name": "GPIOE_BSRR",
+            "address": 1073877016
+          },
+          {
+            "name": "GPIOE_PUPDR",
+            "address": 1073877004
+          },
+          {
+            "name": "GPIOE_OTYPER",
+            "address": 1073876996
+          },
+          {
+            "name": "GPIOE_OSPEEDR",
+            "address": 1073877000
+          },
+          {
+            "name": "GPIOE_MODER",
+            "address": 1073876992
+          },
+          {
+            "name": "GPIOE_AFRL",
+            "address": 1073877024
+          },
+          {
+            "name": "GPIOE_AFRH",
+            "address": 1073877028
+          },
+          {
+            "name": "GPIOH_BSRR",
+            "address": 1073880088
+          },
+          {
+            "name": "GPIOH_PUPDR",
+            "address": 1073880076
+          },
+          {
+            "name": "GPIOH_OTYPER",
+            "address": 1073880068
+          },
+          {
+            "name": "GPIOH_OSPEEDR",
+            "address": 1073880072
+          },
+          {
+            "name": "GPIOH_MODER",
+            "address": 1073880064
+          },
+          {
+            "name": "GPIOH_AFRL",
+            "address": 1073880096
+          },
+          {
+            "name": "GPIOH_AFRH",
+            "address": 1073880100
+          }
+        ],
+        "read_registers": [
+          {
+            "name": "GPIOA_PUPDR",
+            "address": 1073872908
+          },
+          {
+            "name": "GPIOA_OTYPER",
+            "address": 1073872900
+          },
+          {
+            "name": "GPIOA_OSPEEDR",
+            "address": 1073872904
+          },
+          {
+            "name": "GPIOA_MODER",
+            "address": 1073872896
+          },
+          {
+            "name": "GPIOA_AFRL",
+            "address": 1073872928
+          },
+          {
+            "name": "GPIOA_AFRH",
+            "address": 1073872932
+          },
+          {
+            "name": "GPIOB_PUPDR",
+            "address": 1073873932
+          },
+          {
+            "name": "GPIOB_OTYPER",
+            "address": 1073873924
+          },
+          {
+            "name": "GPIOB_OSPEEDR",
+            "address": 1073873928
+          },
+          {
+            "name": "GPIOB_MODER",
+            "address": 1073873920
+          },
+          {
+            "name": "GPIOB_AFRL",
+            "address": 1073873952
+          },
+          {
+            "name": "GPIOB_AFRH",
+            "address": 1073873956
+          },
+          {
+            "name": "GPIOC_PUPDR",
+            "address": 1073874956
+          },
+          {
+            "name": "GPIOC_OTYPER",
+            "address": 1073874948
+          },
+          {
+            "name": "GPIOC_OSPEEDR",
+            "address": 1073874952
+          },
+          {
+            "name": "GPIOC_MODER",
+            "address": 1073874944
+          },
+          {
+            "name": "GPIOC_AFRL",
+            "address": 1073874976
+          },
+          {
+            "name": "GPIOC_AFRH",
+            "address": 1073874980
+          },
+          {
+            "name": "GPIOD_PUPDR",
+            "address": 1073875980
+          },
+          {
+            "name": "GPIOD_OTYPER",
+            "address": 1073875972
+          },
+          {
+            "name": "GPIOD_OSPEEDR",
+            "address": 1073875976
+          },
+          {
+            "name": "GPIOD_MODER",
+            "address": 1073875968
+          },
+          {
+            "name": "GPIOD_AFRL",
+            "address": 1073876000
+          },
+          {
+            "name": "GPIOD_AFRH",
+            "address": 1073876004
+          },
+          {
+            "name": "GPIOE_PUPDR",
+            "address": 1073877004
+          },
+          {
+            "name": "GPIOE_OTYPER",
+            "address": 1073876996
+          },
+          {
+            "name": "GPIOE_OSPEEDR",
+            "address": 1073877000
+          },
+          {
+            "name": "GPIOE_MODER",
+            "address": 1073876992
+          },
+          {
+            "name": "GPIOE_AFRL",
+            "address": 1073877024
+          },
+          {
+            "name": "GPIOE_AFRH",
+            "address": 1073877028
+          },
+          {
+            "name": "GPIOH_PUPDR",
+            "address": 1073880076
+          },
+          {
+            "name": "GPIOH_OTYPER",
+            "address": 1073880068
+          },
+          {
+            "name": "GPIOH_OSPEEDR",
+            "address": 1073880072
+          },
+          {
+            "name": "GPIOH_MODER",
+            "address": 1073880064
+          },
+          {
+            "name": "GPIOH_AFRL",
+            "address": 1073880096
+          },
+          {
+            "name": "GPIOH_AFRH",
+            "address": 1073880100
+          }
+        ]
+      }
+    }
+  }
+}
