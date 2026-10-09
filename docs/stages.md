@@ -3066,3 +3066,39 @@ Final standalone evidence: `/tmp/miren-stage144-capabilities-20261010`, with 80 
 72 REFUTED and 44 UNKNOWN outcomes, unchanged frozen inputs/binaries and no collection errors.
 Validation passes 605 Rust tests, 68 Python tests, formatting, cargo lint, release builds,
 cargo deny, documentation build and manual hooks. No default proof budget is changed.
+
+## Stage 145: bounded readonly scalar slice comparison
+
+Primitive slice `contains`, `PartialEq::eq` and `ne` now compare readonly scalar descriptors under
+actual path-proven scan bounds. Inputs retain their arbitrary valid lengths; the 128-element limit
+bounds comparison work only. Equality returns on mismatching lengths before requiring a scan bound.
+Original tracked sources are validated even for empty or mismatching-length paths. Each selected
+scalar is observed under a feasible in-bounds candidate condition, and the complete guarded result
+preserves the original comparison path. Compiler element identities, descriptor contexts and typed
+array metadata remain exact. Floating equality follows numeric NaN/signed-zero rules; Char equality
+compares its decoded Unicode scalar rather than unrestricted storage seeds. Existing custom finite
+`PartialEq` bodies retain receiver order, mutation effects and short circuiting.
+
+Dedicated host/ARM O0/O2 compiler controls cover 17 roots per build: 10 PROVED, 2 REFUTED and 5
+UNKNOWN. They cover bounded selected-word membership, Bool and Char, floating NaNs and signed zero,
+local array equality, full inputs above 128 items with short views, empty views, mismatching
+lengths, false membership/reflexivity claims, unbounded scan frontiers and dead original backing and
+an unavailable custom comparison body. Actual helper index mutation preserves in-bounds reads and
+must refute the unchanged one-word-prefix claim. No new input cap, environment assumption, alias
+root or raw-access permission is introduced. The shared manifest adds a scalar-slice comparison
+family with bounded membership P/R and unrestricted scan U controls. This isolated branch has 49
+cases across 18 families, expecting 20 PROVED, 18 REFUTED and 11 UNKNOWN per configuration.
+
+Final standalone evidence: `/tmp/miren-stage145-capabilities-20261010`, with 80 PROVED, 72 REFUTED
+and 44 UNKNOWN outcomes, unchanged frozen inputs/binaries and no collection errors. This isolated
+stage passes 604 Rust tests, 68 Python tests, formatting, cargo lint, release builds, cargo deny,
+documentation build and manual hooks. Independent review approves the checked selection, numeric
+semantics, source lifetime and selected core body-availability checks. No default proof or solver
+budget is raised.
+
+After integration with stage 144, the shared baseline contains 52 cases in 19 families, expecting
+21 PROVED, 19 REFUTED and 12 UNKNOWN per configuration. The merged standalone evidence is
+`/tmp/miren-stage145-merged-capabilities-20261010`: 84 PROVED, 76 REFUTED and 48 UNKNOWN,
+unchanged frozen inputs/binaries and no collection errors. Merged validation passes 607 Rust
+tests, 68 Python tests, formatting, cargo lint, release builds, cargo deny, documentation build
+and manual hooks. Both independently reviewed feature stages retain their original test domains.

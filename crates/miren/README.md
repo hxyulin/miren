@@ -616,8 +616,8 @@ and compose element projections; copied handles do not renew dead storage. Primi
 logical SMT arrays, with floating storage bits preserved. Char observations encode every valid
 Unicode scalar; their unrestricted seed is not physical storage or a native Char witness. Exact
 compiler element identities, layout, array sorts and contexts are checked at typed boundaries.
-Competing borrowed roots, mutable slices, refined or composite elements, raw access, whole-slice
-comparison and unbounded iteration retain their existing unsupported frontiers. Byte slice
+Competing borrowed roots, mutable slices, refined or composite elements, raw access and unbounded
+iteration retain their existing unsupported frontiers. Byte slice
 representations and their input policy remain unchanged.
 
 Read-only scalar slices support exact core shared iterator cursors with arbitrary valid lengths.
@@ -628,3 +628,13 @@ use checked target-usize terms and the original compiler element identity; no ra
 iterator rights are added. Floating reads retain storage bits and Char reads decode valid scalars.
 Whole-slice callbacks still require complete execution or a separate loop proof; step exhaustion
 returns ResourceLimit UNKNOWN rather than narrowing the admitted input length.
+
+Primitive readonly scalar slice membership and equality support a proven comparison length of at
+most 128 elements. This is a work limit on the actual call path, not an input length cap. Equality
+checks lengths first; different lengths require no scan. A bounded subview can compare even when
+its original input exceeds the work limit. Both models validate the original tracked references
+before empty or mismatching-length returns and select elements only under proven in-bounds paths.
+Floating comparisons use numeric equality, including NaN inequality and signed-zero equality;
+Char comparisons use valid decoded scalar values. Custom finite element comparisons still execute
+actual `PartialEq` bodies and retain their effects. Unbounded scalar scans remain `UNKNOWN` with a
+resource-limit diagnostic. The models add no alias roots, assumptions, or raw-access rights.

@@ -1187,3 +1187,12 @@ Floating input bits and decoded character values preserve stage-143 correlations
 still require complete execution or a supported invariant; an unrestricted wrapping fold reaches
 the default execution time budget. The 49-case/18-family baseline expects 80 PROVED, 72 REFUTED
 and 44 UNKNOWN outcomes across host/ARM O0/O2.
+
+Stage 145 supports primitive slice membership and equality when actual path conditions prove
+the comparison work fits within 128 elements. This bounds execution work without restricting
+the incoming slice domain. Equality can resolve mismatching lengths without scanning. Original
+backing must remain valid even for empty views or unequal lengths, and selected concrete core
+bodies must be available. Floating comparisons retain numeric NaN and signed-zero semantics;
+character comparisons use decoded Unicode values. Unbounded scans remain UNKNOWN. Combined with
+stage 144, the 52-case/19-family baseline expects 84 PROVED, 76 REFUTED and 48 UNKNOWN outcomes
+across host/ARM O0/O2.

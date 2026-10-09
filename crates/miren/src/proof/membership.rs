@@ -89,6 +89,14 @@ impl<'tcx> Engine<'tcx> {
         {
             return Ok(None);
         }
+        self.instantiated_body(instance)?;
+        let [raw_first, raw_second] = raw_values else {
+            return Err("slice membership requires two tracked arguments".into());
+        };
+        for (expected, value) in [(*first, raw_first), (*second, raw_second)] {
+            self.validate_tracked_value(value, state)?;
+            self.validate_scalar_slice_value(expected, value, &state.memory, &state.conditions)?;
+        }
         let [first, second] = values else {
             return Err("slice membership requires two modeled arguments".to_owned());
         };
@@ -172,6 +180,41 @@ impl<'tcx> Engine<'tcx> {
                     member = self.terms.apply(Op::Or, &[member, equal])?;
                 }
             }
+            Value::ScalarSlice { .. } => {
+                let length = self.scalar_slice_length(&slice, &state.conditions)?;
+                let (length_term, bits, _) = length.integer()?;
+                let limit = self
+                    .terms
+                    .bit_vector(MAX_MEMBERSHIP_ELEMENTS as u128, bits)?;
+                let outside = self
+                    .terms
+                    .apply(Op::BvUnsignedGt, &[length_term.clone(), limit])?;
+                if self.feasible(&[state.conditions.clone(), vec![outside]].concat())? {
+                    return Err(self.categorized_error(
+                        UnknownCategory::ResourceLimit,
+                        "scalar membership needs a proven length at most 128".into(),
+                    ));
+                }
+                let count = match symbolic::constant(&length_term) {
+                    Some(symbolic::Constant::BitVec { value, .. }) => value as usize,
+                    _ => MAX_MEMBERSHIP_ELEMENTS,
+                };
+                for index in 0..count {
+                    let index = self.iterator_index(index as u128);
+                    let inside = self
+                        .terms
+                        .apply(Op::BvUnsignedLt, &[index.integer()?.0, length_term.clone()])?;
+                    let conditions = [state.conditions.clone(), vec![inside.clone()]].concat();
+                    if !self.feasible(&conditions)? {
+                        continue;
+                    }
+                    let item = self.scalar_slice_select(&slice, &index, &conditions)?;
+                    let equal =
+                        symbolic::binary(&self.terms, "eq", item, needle.clone())?.boolean()?;
+                    let equal = self.terms.apply(Op::And, &[inside, equal])?;
+                    member = self.terms.apply(Op::Or, &[member, equal])?;
+                }
+            }
             Value::Input(_)
             | Value::Bool(_)
             | Value::Int { .. }
@@ -193,7 +236,6 @@ impl<'tcx> Engine<'tcx> {
             | Value::TrackedPointer { .. }
             | Value::StaticSlice { .. }
             | Value::StaticView { .. }
-            | Value::ScalarSlice { .. }
             | Value::MaybeUninit { .. }
             | Value::Uninitialized
             | Value::TraitObject { .. }

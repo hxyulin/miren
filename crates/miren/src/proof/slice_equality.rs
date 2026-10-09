@@ -51,13 +51,24 @@ impl<'tcx> Engine<'tcx> {
         if left_mut.is_mut() || right_mut.is_mut() || !signature.output().is_bool() {
             return Ok(None);
         }
+        self.instantiated_body(instance)?;
+        let [raw_left, raw_right] = raw_values else {
+            return Err("slice equality requires two tracked arguments".into());
+        };
+        for (expected, value) in [
+            (signature.inputs()[0], raw_left),
+            (signature.inputs()[1], raw_right),
+        ] {
+            self.validate_tracked_value(value, state)?;
+            self.validate_scalar_slice_value(expected, value, &state.memory, &state.conditions)?;
+        }
         let [left, right] = values else {
             return Err("slice equality requires two modeled arguments".into());
         };
         let left = left.materialize()?;
         let right = right.materialize()?;
-        let left_length = self.equality_slice_length(&left)?;
-        let right_length = self.equality_slice_length(&right)?;
+        let left_length = self.equality_slice_length(&left, &state.conditions)?;
+        let right_length = self.equality_slice_length(&right, &state.conditions)?;
         let same_length =
             symbolic::binary(&self.terms, "eq", left_length.clone(), right_length)?.boolean()?;
         let negate = name == Symbol::intern("ne");
@@ -86,7 +97,10 @@ impl<'tcx> Engine<'tcx> {
             .terms
             .apply(Op::BvUnsignedGt, &[length.clone(), limit])?;
         if self.feasible(&[conditions.clone(), vec![outside]].concat())? {
-            return Err("slice equality needs a proven length at most 128".into());
+            return Err(self.categorized_error(
+                UnknownCategory::ResourceLimit,
+                "slice equality needs a proven length at most 128".into(),
+            ));
         }
         let primitive = left_element == right_element
             && (left_element.is_bool()
@@ -120,13 +134,19 @@ impl<'tcx> Engine<'tcx> {
         };
         let mut equal = self.terms.boolean(true);
         for index in 0..count {
-            let left = self.slice_equality_item(&left, left_element, index, bits)?;
-            let right = self.slice_equality_item(&right, right_element, index, bits)?;
-            let item = symbolic::binary(&self.terms, "eq", left, right)?.boolean()?;
-            let index = self.terms.bit_vector(index as u128, bits)?;
+            let index_term = self.terms.bit_vector(index as u128, bits)?;
             let inside = self
                 .terms
-                .apply(Op::BvUnsignedLt, &[index, length.clone()])?;
+                .apply(Op::BvUnsignedLt, &[index_term, length.clone()])?;
+            let selected_conditions = [conditions.clone(), vec![inside.clone()]].concat();
+            if !self.feasible(&selected_conditions)? {
+                continue;
+            }
+            let left =
+                self.slice_equality_item(&left, left_element, index, bits, &selected_conditions)?;
+            let right =
+                self.slice_equality_item(&right, right_element, index, bits, &selected_conditions)?;
+            let item = symbolic::binary(&self.terms, "eq", left, right)?.boolean()?;
             let item = self.terms.apply(Op::Or, &[symbolic::not(&inside), item])?;
             equal = self.terms.apply(Op::And, &[equal, item])?;
         }
@@ -142,8 +162,9 @@ impl<'tcx> Engine<'tcx> {
         Ok(Some(returns))
     }
 
-    fn equality_slice_length(&self, source: &Value) -> Result<Value, String> {
+    fn equality_slice_length(&self, source: &Value, conditions: &[Term]) -> Result<Value, String> {
         match source {
+            Value::ScalarSlice { .. } => self.scalar_slice_length(source, conditions),
             Value::Bytes { length, .. } => Ok((**length).clone()),
             Value::Elements(fields) => Ok(self.iterator_index(fields.len() as u128)),
             Value::Bool(_)
@@ -166,7 +187,6 @@ impl<'tcx> Engine<'tcx> {
             | Value::TrackedPointer { .. }
             | Value::StaticSlice { .. }
             | Value::StaticView { .. }
-            | Value::ScalarSlice { .. }
             | Value::MaybeUninit { .. }
             | Value::Uninitialized
             | Value::TraitObject { .. }
@@ -183,8 +203,12 @@ impl<'tcx> Engine<'tcx> {
         element: Ty<'tcx>,
         index: usize,
         bits: u32,
+        conditions: &[Term],
     ) -> Result<Value, String> {
         match value {
+            Value::ScalarSlice { .. } => {
+                self.scalar_slice_select(value, &self.iterator_index(index as u128), conditions)
+            }
             Value::Elements(elements) => elements
                 .get(index)
                 .cloned()
@@ -218,7 +242,6 @@ impl<'tcx> Engine<'tcx> {
             | Value::TrackedPointer { .. }
             | Value::StaticSlice { .. }
             | Value::StaticView { .. }
-            | Value::ScalarSlice { .. }
             | Value::MaybeUninit { .. }
             | Value::Uninitialized
             | Value::TraitObject { .. }

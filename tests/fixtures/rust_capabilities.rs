@@ -342,6 +342,22 @@ pub fn external_float_remainder(value: f32) -> f32 {
     unsafe { opaque_float_remainder(value, 3.0) }
 }
 
+pub fn bounded_scalar_contains(values: &[u16]) {
+    if !values.is_empty() && values.len() <= 4 {
+        assert!(values.contains(&values[0]));
+    }
+}
+
+pub fn bounded_scalar_contains_wrong_claim(values: &[u16]) {
+    if !values.is_empty() && values.len() <= 4 {
+        assert!(!values.contains(&values[0]));
+    }
+}
+
+pub fn unbounded_scalar_contains(values: &[u16], needle: u16) -> bool {
+    values.contains(&needle)
+}
+
 #[cfg(test)]
 mod native {
     use super::*;
@@ -350,6 +366,10 @@ mod native {
     #[test]
     fn positives() {
         integers(199);
+        bounded_scalar_contains(&[]);
+        bounded_scalar_contains(&[0, u16::MAX]);
+        bounded_scalar_contains(&[3, 7, 11, 13]);
+        bounded_scalar_contains(&[7; 129]);
         open_slice_read_correlation(&[], 0);
         open_slice_read_correlation(&[0, 1, u16::MAX], 2);
         open_slice_read_correlation(&[u16::MAX; 129], 128);
@@ -394,6 +414,12 @@ mod native {
         drop_effects();
         let mut context = Context::from_waker(Waker::noop());
         async_poll(15, &mut context);
+    }
+
+    #[test]
+    #[should_panic]
+    fn scalar_contains_negative_control() {
+        bounded_scalar_contains_wrong_claim(&[3, 7]);
     }
 
     #[test]
