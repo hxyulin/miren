@@ -2276,3 +2276,13 @@ encode retains its audited bounds refutation. Captures: `/tmp/miren-stage123/rep
 All 72 strict/reset main obligation arrays match stage 122 exactly. Twelve isolated runtime
 wrappers retain both startup premises, unfinished weak-CAS retry frontiers and unsupported SEV.
 Captures: `/tmp/miren-stage123-main-{strict,reset}-20261009` and `/tmp/miren-stage123/runtime`.
+
+## Fleet publication 16: Exact optional integer constructor proof
+
+The complete clean frozen 738c142 collection has 1,119 PROVED, 256 REFUTED and 961 UNKNOWN roots,
+with no assumptions. Source declarations have 524 PROVED, 232 REFUTED and 263 UNKNOWN outcomes.
+Only dm_mc02::nominal_bit_timing changes UNKNOWN to PROVED versus pass 15; all previous proofs
+and refutations remain intact. No roots were added/removed and no analysis configuration differs.
+Stage 123 lazy enums are outside this frozen run. All 243 firmware fingerprints and four artifact
+checkpoints per unit remain unchanged. Export repeats byte-for-byte. The separately frozen main
+evidence remains preserved. Raw capture: `/tmp/miren-fleet-pass16-20261009`.

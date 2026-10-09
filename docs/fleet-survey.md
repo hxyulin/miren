@@ -2,12 +2,12 @@
 
 ## Current repeatable measurement
 
-The fifteenth 2026-10-09 pass collected all 2,336 roots from all 32 ARM library/binary units in
-fleet-2027: 1,118 PROVED, 256 REFUTED and 962 UNKNOWN, with no assumptions. All units completed
+The sixteenth 2026-10-09 pass collected all 2,336 roots from all 32 ARM library/binary units in
+fleet-2027: 1,119 PROVED, 256 REFUTED and 961 UNKNOWN, with no assumptions. All units completed
 collection. Counts describe selected root domains, not line coverage or whole-firmware safety.
 
-The source-function heuristic identifies 1,019 declarations: 523 PROVED, 232 REFUTED and
-264 UNKNOWN. Refutations concern arbitrary supported root state and remain runtime unconfirmed.
+The source-function heuristic identifies 1,019 declarations: 524 PROVED, 232 REFUTED and
+263 UNKNOWN. Refutations concern arbitrary supported root state and remain runtime unconfirmed.
 
 The [current JSON summary](/data/fleet-survey-current.json) records every root, first blocker,
 compilation unit and input-integrity evidence. The deterministic exporter recreates this compact
@@ -16,7 +16,7 @@ publication from complete raw collections; inventories, solver reports and logs 
 - Firmware revision: `26377371e38ed3234f972bcdf6b2f9f4d26a7f02`;
   all 243 source-input fingerprints stayed equal. The existing untracked `rust-project.json`
   remains.
-- Full-survey analyzer: `9f2c7c9`, JSON schema 9; clean working tree, frozen binaries.
+- Full-survey analyzer: `738c142`, JSON schema 9; clean working tree, frozen binaries.
 - Compiler: nightly-2026-09-22; Z3 4.15.4.
 - Target: `thumbv7em-none-eabihf`; dev profile, Cargo default features and locked dependencies.
 - Panic abort, enabled overflow checks and root/dependency MIR optimization zero in all 32 units.
@@ -25,28 +25,27 @@ publication from complete raw collections; inventories, solver reports and logs 
 - No project proof configuration, startup assumptions, trusted contracts, induction
   or native replay.
 
-Compared with the last published thirteenth pass, KeyTracker::state, Dr16::from_raw and
-Can1Bus::velocities move UNKNOWN to PROVED without assumptions. Fieldless enum choices retain
-exact discriminants; eligible single shared immutable inputs retain their caller-owned live
-storage. Both UI helpers remain PROVED. All previous 1,115 proofs and 256 refutations retain their
-outcomes. There are no added/removed roots, incompatible analysis configurations or resource-limit
-outcome regressions. This collection also includes the core NonZero getter identity fix; user
-lookalike get bodies execute instead of receiving that model.
+Compared with the fifteenth pass, dm_mc02::nominal_bit_timing moves UNKNOWN to PROVED without
+assumptions. Analysis executes the actual core NonZero constructor bodies and certifies their
+exact zero-only optional integer niche. Zero remains None rather than being excluded. All previous
+1,118 proofs and 256 refutations retain their outcomes. There are no added/removed roots,
+incompatible analysis configurations or resource-limit outcome regressions. Dr16, KeyTracker,
+Can1Bus and both UI proofs remain intact.
 
 Compiler return-type metadata now separates direct future construction from function bodies:
 
 | Root scope | Roots | PROVED | REFUTED | UNKNOWN |
 | --- | ---: | ---: | ---: | ---: |
-| Function body | 2,232 | 1,068 | 256 | 908 |
+| Function body | 2,232 | 1,069 | 256 | 907 |
 | Direct coroutine factory | 104 | 50 | 0 | 54 |
 
-All roots have compiler-backed scope metadata. Among source-heuristic roots, 508 proofs concern
+All roots have compiler-backed scope metadata. Among source-heuristic roots, 509 proofs concern
 function bodies and fifteen concern future construction. A function-body label can still describe
 a generated wrapper; it does not imply execution of a wrapped task. Explicit task polling remains
 separate from this function-only collection.
 
-Nineteen source and 455 generated UNKNOWN diagnostics changed only compiler display. Two source
-UNKNOWN grouping changes concern solver/step/time budgets without changing outcomes. Raw diagnostics
+Nineteen source and 455 generated UNKNOWN diagnostics changed only compiler display. One source
+UNKNOWN grouping change concerns solver diagnostics without changing its outcome. Raw diagnostics
 stay separate from display normalization and proof outcomes.
 
 The constructor checkers share body availability, monomorphized MIR loading, resource caps,
@@ -66,7 +65,7 @@ not hermetic capture of arbitrary custom build environment variables.
 
 The separate [all-main evidence](/data/fleet-embassy-main-current.json) covers every one of the
 12 binary mains in three scopes. Its refreshed analyzer is `03e66a2`; the full fleet measurement
-above remains frozen at `9f2c7c9`. Both use the same captured fleet artifacts and default limits.
+above remains frozen at `738c142`. Both use the same captured fleet artifacts and default limits.
 Factory construction alone does not
 execute the async body; `--async-entry` constructs a fresh future and follows its reached polls.
 
