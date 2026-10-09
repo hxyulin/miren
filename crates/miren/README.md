@@ -201,3 +201,7 @@ retain independent storage. Evaluated constants check every occurrence before re
 initialized values, with at most 2,048 visited values, sixteen levels and 128 array elements.
 Owned repeats retain the 256-value budget but charge validated shared payloads once and bounded
 clone handles separately; unsupported payloads and interior mutation remain UNKNOWN.
+
+Mutable byte ranges use the exact compiler `Range<usize>` SliceIndex implementation. Analysis checks
+start <= end <= slice length and preserves the backing allocation through nested projections.
+Non-byte ranges and missing writable provenance remain UNKNOWN.

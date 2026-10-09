@@ -1365,3 +1365,11 @@ before lossless exact-type reuse, with 2,048 visits, sixteen levels and 128 arra
 validate bounded operands and charge actual shared clone handles within the existing 256-value
 budget. Unsupported initialization, payloads and interior mutation remain UNKNOWN. Compiler and
 native mutation tests check large tables, repeat values, copy independence and resource boundaries.
+
+## Stage 90: Retained mutable byte slice ranges
+
+Exact compiler core `Range<usize>` SliceIndex::index_mut checks start <= end <= length and returns a
+writable byte projection into its original allocation. Nested and empty ranges preserve offsets,
+lengths and updates. Invalid bounds refute; readonly, non-byte, arbitrary raw and dead backing stay
+UNKNOWN. Host/ARM positive, negative and unknown tests plus native mutations check the model;
+lookalike user methods execute their own bodies. Unchecked non-byte iterator adapters remain gaps.

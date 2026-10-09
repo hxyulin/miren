@@ -749,3 +749,9 @@ is still read and validated before reuse. Limits count all 2,048 CTFE visits, no
 Owned repeats validate their operand within 256 values, then charge bounded shared clone handles.
 Nested array copies and writes, large tables, signed-zero/NaN bits, unsupported payloads and budget
 boundaries have compiler and mutation tests.
+
+Exact core `Range<usize>` mutable byte slicing checks start <= end <= current length as a panic
+obligation and returns a writable projection into the original allocation. Nested and empty ranges
+retain their correct offsets and lengths. Invalid bounds refute; non-byte, readonly, arbitrary raw
+and dead backing remain UNKNOWN. Host/ARM and native mutations check bounds, updates and model
+identity, including similarly named user implementations that execute their actual bodies.

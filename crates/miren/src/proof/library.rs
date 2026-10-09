@@ -100,6 +100,9 @@ impl<'tcx> Engine<'tcx> {
         if Some(callee.krate) != core {
             return Ok(None);
         }
+        if let Some(results) = self.mutable_slice_range(instance, raw_values, state, site)? {
+            return Ok(Some(results));
+        }
         if let Some(results) = self.volatile_load(instance, raw_values, state)? {
             return Ok(Some(results));
         }

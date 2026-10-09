@@ -41,6 +41,7 @@ mod layout_intrinsics;
 mod library;
 mod membership;
 mod memory;
+mod mutable_slice_ranges;
 mod opaque_function_inputs;
 mod owned_iterators;
 mod pointer_atomic_cas;
