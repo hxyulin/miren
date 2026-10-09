@@ -62,9 +62,17 @@ not hermetic capture of arbitrary custom build environment variables.
 ## Progress through Embassy main
 
 The separate [all-main evidence](/data/fleet-embassy-main-current.json) covers every one of the
-12 binary mains in three scopes. Its final analyzer is `a65192d`, matching the full survey.
-It uses the same captured fleet artifacts and default limits. Factory construction alone does not
+12 binary mains in three scopes. Its refreshed analyzer is `03e66a2`; the full fleet measurement
+above remains frozen at `a65192d`. Both use the same captured fleet artifacts and default limits.
+Factory construction alone does not
 execute the async body; `--async-entry` constructs a fresh future and follows its reached polls.
+
+The fresh-future entry milestone is reached in strict Rust: **all twelve application async mains
+enter their own coroutine poll bodies**, with no additional assumptions. The compact evidence
+retains the exact poll instance, source and factory-rooted call chain. Records are emitted only
+after argument validation and a satisfiable start-block path; constructor analysis does not count.
+All traces fit the bounded 512-entry budget without truncation. This establishes symbolic entry
+from the selected fresh future, independently of subsequent panic or unsupported hardware paths.
 
 | Scope | Strict Rust run | Explicit reset-cause hypothesis |
 | --- | --- | --- |
@@ -94,8 +102,9 @@ false initializers. These are not confirmed firmware defects: the runtime reset 
 its hardware prerequisites are outside the selected Rust root domain. Safe local lifecycle tests
 prove fresh initialization and refute a second call, with native mutation checks.
 
-This milestone establishes a supported failure path in each selected body domain. It does not
-establish complete traversal or safety of every main path, executor startup, scheduling, waking,
+The conditional supported-outcome milestone establishes a failure path in each selected body
+domain. Neither milestone establishes complete traversal or safety of every main path, executor
+startup, scheduling, waking,
 interrupt handling, cancellation, returned-output drops or persistent-loop induction. The eight
 strict UNKNOWN bodies still require a Rust-supported reset boundary or a separately specified
 conditional hardware model to progress past numeric MMIO.

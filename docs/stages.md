@@ -1558,3 +1558,26 @@ cannot satisfy this milestone. Existing supported-outcome milestones retain thei
 No executor scheduling or hardware instruction is skipped to manufacture a runtime-to-poll proof.
 Full workspace tests, lint, formatting, release builds, dependency checks, tool tests, documentation
 builds and manual hooks pass.
+
+
+## Stage 104: All twelve fresh-future application entries reached
+
+Frozen clean analyzer `03e66a2` records entry into the exact application coroutine poll for all
+twelve expected Embassy binary mains in both strict and existing reset-profile captures. All traces
+fit the 512-entry budget without truncation; sources, concrete instances and factory-rooted call
+chains are retained. The fresh-future entry milestone is true with no new assumptions. The
+supported-outcome milestones remain separate: strict async bodies have four REFUTED and eight
+UNKNOWN outcomes; the exact reset-only hypothesis retains twelve conditional refutations and eight
+trusted calls. Registration and runtime outcomes remain twelve PROVED and twelve REFUTED
+respectively.
+
+All 72 strict/reset root obligation arrays, including SMT queries, models and call chains, match
+pass eight exactly. Sources and dependency/generated artifacts retain their captured hashes.
+The compact exporter validates both complete captures before publication. This does not establish
+runtime-to-first-poll, hardware boot reachability or complete application panic freedom.
+
+All 470 Rust workspace tests, 48 Python tests, workspace Clippy, formatting, release builds,
+dependency checks, documentation builds and manual hooks pass. Application code remains untouched.
+Local captures are `/tmp/miren-fresh-entry-{strict,reset}-20261009`; the comparison manifest has
+SHA-256
+`ce28d8505179a52f167815107df379b5af5000e073f331dd6c80f5e903c3b443`.
