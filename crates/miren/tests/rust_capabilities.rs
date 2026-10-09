@@ -43,6 +43,7 @@ struct Case {
     family: String,
     expected: String,
     unknown_reason: Option<String>,
+    unknown_category: Option<UnknownCategory>,
 }
 
 fn manifest() -> Manifest {
@@ -53,6 +54,7 @@ fn manifest() -> Manifest {
     for case in &manifest.cases {
         assert!(!case.family.is_empty());
         assert_eq!(case.expected == "unknown", case.unknown_reason.is_some());
+        assert!(case.unknown_category.is_none() || case.expected == "unknown");
     }
     manifest
 }
@@ -136,7 +138,8 @@ fn check_report(report: &Report, cases: &[Case], target: Option<&str>, optimized
                     && obligation
                         .detail
                         .contains(case.unknown_reason.as_deref().unwrap())
-                    && obligation.unknown_category == Some(UnknownCategory::Semantics)
+                    && obligation.unknown_category
+                        == Some(case.unknown_category.unwrap_or(UnknownCategory::Semantics))
             }));
         }
     }
@@ -194,6 +197,7 @@ fn actual_reference_mutation_refutes_and_fails_native() {
         family: "reference_slice".into(),
         expected: "refuted".into(),
         unknown_reason: None,
+        unknown_category: None,
     }];
     for target in [None, Some("thumbv7em-none-eabihf")] {
         for optimized in [false, true] {

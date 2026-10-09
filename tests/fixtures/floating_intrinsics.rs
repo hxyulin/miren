@@ -129,7 +129,7 @@ pub fn an_intrinsic_name_does_not_replace_a_user_body() {
     let _ = floorf32(1.0);
 }
 
-pub fn remainder_is_still_unsupported(value: f32) -> f32 {
+pub fn ordinary_remainder(value: f32) -> f32 {
     value % 2.5
 }
 

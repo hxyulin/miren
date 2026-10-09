@@ -119,6 +119,7 @@ pub enum Op {
     FpSub,
     FpMul,
     FpDiv,
+    FpRem,
     FpRoundToIntegral,
     FpSqrt,
     FpFma,
@@ -529,6 +530,7 @@ fn result_sort(op: Op, args: &[Term]) -> Result<Sort, String> {
         Op::FpEqual | Op::FpLt | Op::FpLe | Op::FpGt | Op::FpGe => {
             same_pair(float).map(|_| Sort::Bool)
         }
+        Op::FpRem => same_pair(float),
         Op::FpAdd | Op::FpSub | Op::FpMul | Op::FpDiv => match sorts.as_slice() {
             [Sort::RoundingMode, left, right] if left == right && float(left) => {
                 Some((*left).clone())

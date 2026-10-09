@@ -100,7 +100,7 @@ fn slice_comparisons_preserve_numeric_guards_custom_calls_and_limits_on_host_and
         ("custom_panics", ProofStatus::Refuted),
         ("unbounded", ProofStatus::Unknown),
         ("over_budget", ProofStatus::Unknown),
-        ("unsupported_comparison", ProofStatus::Unknown),
+        ("remainder_comparison", ProofStatus::Proved),
     ];
     for target in [None, Some("thumbv7em-none-eabihf")] {
         for optimized in [false, true] {

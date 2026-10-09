@@ -85,10 +85,7 @@ fn integer_probes_preserve_float_domains_and_real_failures_on_host_and_arm() {
             "a_full_float_counterexample_must_keep_the_integer_input",
             ProofStatus::Refuted,
         ),
-        (
-            "unsupported_float_operations_stay_unknown",
-            ProofStatus::Unknown,
-        ),
+        ("floating_remainder_executes", ProofStatus::Proved),
         (
             "a_signed_index_keeps_both_range_guards",
             ProofStatus::Proved,

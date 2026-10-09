@@ -83,7 +83,7 @@ pub fn wrong_roundtrip(sample: f32) {
     assert!(restored == 0.0);
 }
 
-pub fn unsupported_remainder(reading: f32) -> f32 {
+pub fn remainder(reading: f32) -> f32 {
     reading % 3.0
 }
 

@@ -246,6 +246,7 @@ fn operator(op: Op, result_sort: &Sort) -> String {
         Op::FpSub => "fp.sub",
         Op::FpMul => "fp.mul",
         Op::FpDiv => "fp.div",
+        Op::FpRem => "fp.rem",
         Op::FpRoundToIntegral => "fp.roundToIntegral",
         Op::FpSqrt => "fp.sqrt",
         Op::FpFma => "fp.fma",

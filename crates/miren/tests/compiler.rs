@@ -2334,7 +2334,7 @@ fn floating_paths_preserve_nan_zero_rounding_saturation_and_call_bounds_on_host_
         ("bounded", ProofStatus::Proved),
         ("guarded_call", ProofStatus::Proved),
         ("bad_call", ProofStatus::Refuted),
-        ("unsupported_remainder", ProofStatus::Unknown),
+        ("remainder", ProofStatus::Proved),
         ("unsupported_bits", ProofStatus::Proved),
     ];
     for target in [None, Some("thumbv7em-none-eabihf")] {

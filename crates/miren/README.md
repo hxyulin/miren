@@ -595,3 +595,15 @@ Actual core construction, extraction, and inhabitance guards execute. Uninitiali
 character payloads remain `UNKNOWN`; `[char; 0]` can produce its unique empty value. Restricted
 scalar patterns, raw/reference payloads, partial initialization, and all existing budgets keep
 their earlier boundaries.
+
+Ordinary Rust binary32/binary64 `%` now uses exact truncating remainder semantics. The typed SMT
+operation retains IEEE nearest-even remainder, then corrects a nonzero residual with the opposite
+sign by adding the dividend-signed absolute divisor. The finite corrected residual is exactly
+representable in the original binary format; no rounded quotient is constructed. Strict ordered
+comparisons preserve dividend-signed zero and the existing NaN/infinity/zero-divisor behavior.
+Arithmetic results retain no raw-bit certificate, so NaN payload choices keep the existing storage
+abstraction. Exact format, sort, and context checks remain mandatory, and ordinary solver budgets
+and missing-body refusals still apply. Equality between actual floating bit conversions and a finite
+nonzero constant can use exact bit equality; its unique encoding justifies the rewrite without a
+path premise. Comparisons against zero, infinity, and NaN retain their floating semantics.
+Fast/algebraic remainder intrinsics are not included.

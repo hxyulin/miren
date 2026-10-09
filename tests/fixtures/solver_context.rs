@@ -21,7 +21,7 @@ pub fn a_full_float_counterexample_must_keep_the_integer_input(index: u8) {
     }
 }
 
-pub fn unsupported_float_operations_stay_unknown(value: f32) -> f32 {
+pub fn floating_remainder_executes(value: f32) -> f32 {
     value % 3.0
 }
 
@@ -48,7 +48,10 @@ mod tests {
             a_widened_byte_stays_below_its_first_unrepresentable_bound(index);
             for scale in [f32::NEG_INFINITY, f32::NAN, -0.0, 0.0, 1.0, f32::INFINITY] {
                 let expected = if scale.is_finite() && index < 6 { 7 } else { 0 };
-                assert_eq!(a_float_branch_keeps_its_integer_index_guard(index, scale), expected);
+                assert_eq!(
+                    a_float_branch_keeps_its_integer_index_guard(index, scale),
+                    expected
+                );
             }
         }
         for index in i8::MIN..=i8::MAX {

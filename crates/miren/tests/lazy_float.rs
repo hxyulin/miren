@@ -16,7 +16,7 @@ fn unused_float_encodings_are_lazy_but_observations_recover_every_required_bindi
         ("transitive_roundtrip", ProofStatus::Proved),
         ("stable_copied_encoding", ProofStatus::Proved),
         ("wrong_roundtrip", ProofStatus::Refuted),
-        ("unsupported_remainder", ProofStatus::Unknown),
+        ("remainder", ProofStatus::Proved),
     ];
     for target in [None, Some("thumbv7em-none-eabihf")] {
         let mut command = Command::new(env!("CARGO_BIN_EXE_miren"));

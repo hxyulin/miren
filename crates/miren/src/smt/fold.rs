@@ -21,6 +21,7 @@ pub(super) fn simplify(context: &Context, op: Op, args: &[Term], sort: &Sort) ->
             }
             bit_vector(context, op, args, sort)
         }
+        (Op::FpEqual, [left, right]) => float_encoding_equality(context, left, right),
         (Op::Equal, [left, right]) if left == right => Some(context.boolean(true)),
         (Op::Equal, [left, right]) if left.sort() == &Sort::Bool => {
             for (constant, value) in [(left, right), (right, left)] {
@@ -339,4 +340,55 @@ fn bit_vector(context: &Context, op: Op, args: &[Term], sort: &Sort) -> Option<T
     };
     mask(*bits)?;
     context.bit_vector(result, *bits).ok()
+}
+
+fn float_encoding_equality(context: &Context, left: &Term, right: &Term) -> Option<Term> {
+    let Kind::Apply(
+        Op::FloatFromBits {
+            exponent,
+            significand,
+        },
+        first,
+    ) = &left.node.kind
+    else {
+        return None;
+    };
+    let Kind::Apply(
+        Op::FloatFromBits {
+            exponent: other_exponent,
+            significand: other_significand,
+        },
+        second,
+    ) = &right.node.kind
+    else {
+        return None;
+    };
+    if exponent != other_exponent || significand != other_significand {
+        return None;
+    }
+    let (magnitude, exponent_mask) = match (*exponent, *significand) {
+        (8, 24) => (0x7fff_ffff_u128, 0x7f80_0000_u128),
+        (11, 53) => (0x7fff_ffff_ffff_ffff_u128, 0x7ff0_0000_0000_0000_u128),
+        _ => return None,
+    };
+    let [first] = first.as_slice() else {
+        return None;
+    };
+    let [second] = second.as_slice() else {
+        return None;
+    };
+    let finite_nonzero = |value: &Term| match value.constant() {
+        Some(Constant::BitVec(bits)) => {
+            bits & magnitude != 0 && bits & exponent_mask != exponent_mask
+        }
+        Some(Constant::Bool(_) | Constant::Rounding(_)) | None => false,
+    };
+    if !finite_nonzero(first) && !finite_nonzero(second) {
+        return None;
+    }
+    // A finite nonzero binary float has exactly one encoding. NaNs and both zero
+    // encodings are excluded from the constant side, so fp.eq is exact raw equality.
+    context
+        .apply(Op::Equal, &[first.clone(), second.clone()])
+        .ok()
 }

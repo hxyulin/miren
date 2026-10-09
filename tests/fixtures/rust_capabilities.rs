@@ -285,6 +285,27 @@ pub fn maybe_uninit_char_uninitialized() -> char {
     unsafe { core::mem::MaybeUninit::<char>::uninit().assume_init() }
 }
 
+pub fn float_remainder(negative: bool) {
+    let value = if negative { -5.0f32 } else { 5.0f32 };
+    assert!(value % 3.0 == if negative { -2.0 } else { 2.0 });
+}
+
+pub fn float_remainder_wrong_claim(negative: bool) {
+    let value = if negative { -5.0f32 } else { 5.0f32 };
+    assert!(value % 3.0 == if negative { 2.0 } else { -1.0 });
+}
+
+#[cfg(not(test))]
+unsafe extern "Rust" {
+    fn opaque_float_remainder(value: f32, divisor: f32) -> f32;
+}
+
+#[cfg(not(test))]
+pub fn external_float_remainder(value: f32) -> f32 {
+    // A declaration is not a verified body, even when its name suggests remainder.
+    unsafe { opaque_float_remainder(value, 3.0) }
+}
+
 #[cfg(test)]
 mod native {
     use super::*;
@@ -293,6 +314,8 @@ mod native {
     #[test]
     fn positives() {
         integers(199);
+        float_remainder(false);
+        float_remainder(true);
         raw_pointer_metadata(usize::MAX);
         maybe_uninit_round_trip(0, false);
         maybe_uninit_round_trip(u32::MAX, true);

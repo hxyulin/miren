@@ -101,19 +101,22 @@
       "entry": "open_function_pointer",
       "family": "open_dispatch",
       "expected": "unknown",
-      "unknown_reason": "indirect call through an arbitrary function-pointer input is unsupported"
+      "unknown_reason": "indirect call through an arbitrary function-pointer input is unsupported",
+      "unknown_category": "semantics"
     },
     {
       "entry": "open_trait_object",
       "family": "open_dispatch",
       "expected": "unknown",
-      "unknown_reason": "unsupported argument type dyn"
+      "unknown_reason": "unsupported argument type dyn",
+      "unknown_category": "semantics"
     },
     {
       "entry": "open_slice",
       "family": "unbounded_slice",
       "expected": "unknown",
-      "unknown_reason": "only read-only byte slices and byte arrays are modeled"
+      "unknown_reason": "only read-only byte slices and byte arrays are modeled",
+      "unknown_category": "semantics"
     },
     {
       "entry": "retained_prefix_index",
@@ -134,7 +137,8 @@
       "entry": "raw_reference_grant",
       "family": "raw_pointer",
       "expected": "unknown",
-      "unknown_reason": "raw memory access requires a verified temporal permission certificate"
+      "unknown_reason": "raw memory access requires a verified temporal permission certificate",
+      "unknown_category": "semantics"
     },
     {
       "entry": "tuple_array_choice",
@@ -150,7 +154,8 @@
       "entry": "tuple_array_symbolic_write",
       "family": "tuple_array",
       "expected": "unknown",
-      "unknown_reason": "array write index is not uniquely determined"
+      "unknown_reason": "array write index is not uniquely determined",
+      "unknown_category": "semantics"
     },
     {
       "entry": "maybe_uninit_round_trip",
@@ -166,7 +171,8 @@
       "entry": "maybe_uninit_uninitialized",
       "family": "maybe_uninit",
       "expected": "unknown",
-      "unknown_reason": "MaybeUninit payload is not initialized"
+      "unknown_reason": "MaybeUninit payload is not initialized",
+      "unknown_category": "semantics"
     },
     {
       "entry": "maybe_uninit_array",
@@ -182,7 +188,8 @@
       "entry": "maybe_uninit_array_uninitialized",
       "family": "maybe_uninit",
       "expected": "unknown",
-      "unknown_reason": "MaybeUninit payload is not initialized"
+      "unknown_reason": "MaybeUninit payload is not initialized",
+      "unknown_category": "semantics"
     },
     {
       "entry": "checked_char",
@@ -198,7 +205,8 @@
       "entry": "char_invalid_float_bits",
       "family": "char",
       "expected": "unknown",
-      "unknown_reason": "char formation requires a proven Unicode scalar value"
+      "unknown_reason": "char formation requires a proven Unicode scalar value",
+      "unknown_category": "semantics"
     },
     {
       "entry": "maybe_uninit_char",
@@ -214,7 +222,25 @@
       "entry": "maybe_uninit_char_uninitialized",
       "family": "maybe_uninit",
       "expected": "unknown",
-      "unknown_reason": "MaybeUninit payload is not initialized"
+      "unknown_reason": "MaybeUninit payload is not initialized",
+      "unknown_category": "semantics"
+    },
+    {
+      "entry": "float_remainder",
+      "family": "float_remainder",
+      "expected": "proved"
+    },
+    {
+      "entry": "float_remainder_wrong_claim",
+      "family": "float_remainder",
+      "expected": "refuted"
+    },
+    {
+      "entry": "external_float_remainder",
+      "family": "float_remainder",
+      "expected": "unknown",
+      "unknown_reason": "no compiler-exported Rust definition matches the foreign symbol",
+      "unknown_category": "missing_compiler_evidence"
     }
   ]
 }

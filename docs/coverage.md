@@ -15,7 +15,7 @@ program: resource limits and undecided queries remain separate sources of UNKNOW
 | Feature | Current support | Boundary |
 | --- | --- | --- |
 | Integers and bool | Symbolic target-width values, signed comparisons, exact bit-vector operations and population counts | Raw memory access remains unsupported; Unicode char and integer pattern domains are modeled |
-| Floating point | f32/f64 numeric operations, casts and tracked IEEE storage bits | Remainder/wider formats remain unsupported; arithmetic NaN encodings are conservative |
+| Floating point | f32/f64 arithmetic, remainder, casts and IEEE bits | Wider formats; NaN bits |
 | Bytes | Shared byte slices and fixed arrays; symbolic contents and valid-reference length bounds | Disjoint mutable byte-slice roots support guarded writes; general aliases remain unsupported |
 | Tuples | Nested values, shared references, field projections and numeric contract fields such as `value.1.0` | Destructured argument names with projected debug bindings are not contract bindings |
 | Structs | Nested local/dependency structs, concrete generic fields and supported shared-reference fields | Unions, reference fields in mutable root pointees and unresolved generics remain unsupported |
@@ -152,7 +152,7 @@ Mixed floating-point paths can discharge an integer/Boolean safety check with a 
 non-floating query. Only UNSAT is accepted; SAT/UNKNOWN use the original full query, including all
 floating constraints, and counterexample models come from that full query. Host/ARM and native
 cases cover guarded array accesses, integer facts that require a float constraint, actual linked
-counterexamples, unsupported remainder and an off-by-one mutation. Feasibility checks keep the full
+counterexamples, remainder operations and an off-by-one mutation. Feasibility checks keep the full
 path, and their failing queries now appear in UNKNOWN reports. No alternate floating-point tactic
 or repeated UNKNOWN retry is enabled.
 
@@ -186,7 +186,7 @@ unsupported callees and exhausted execution/solver budgets remain UNKNOWN. Host/
 optimized cases cover guarded comparisons, byte arrays at the limit, nested and derived records,
 cross-type comparisons, overridden inequality, reachable and skipped panics, counterfeit method
 names and the budget boundary. Three failing mutations are refuted and replayed natively.
-Unsupported float remainder inside an element comparison remains UNKNOWN.
+Ordinary float remainder inside an element comparison uses the same numeric model as direct MIR.
 This comparison model currently applies to ordinary execution.
 
 ## Contracts and root selection
@@ -216,7 +216,7 @@ and grouped unknown reasons. An empty inventory or zero selected roots establish
 | Generated arrays | Synthetic ticket/parcel/label cases, function items, zero length, 18/128-element arrays and exact value-budget boundary on host/ARM | Bad callback assertions, overflows, call bounds and label mutations refute; drops, storage identities and larger shapes remain UNKNOWN |
 | Iterator audit regressions | Mixed forward/reverse skips, usize::MAX exhaustion, zero-sized elements, skipped byte storage and shared Cell aliases on host/ARM; 1,792 native cases | Wrong alias, false reset-state claims and exhaustion mutations refute; unsupported views remain UNKNOWN |
 | Aggregate inputs | Nested/generic structs, tuples, shared byte fields and fixed struct arrays on host/ARM | An off-by-one nested call guard is refuted; mutable/recursive/oversized shapes are UNKNOWN |
-| Floats | Host/ARM numeric and storage tests, signaling/quiet NaN inputs, payloads, signed zero, casts and same-width transmutes | Wrong masks/signs and fixed arithmetic-NaN claims refute; remainder stays UNKNOWN and NaN encodings may overapproximate the target |
+| Floats | Host/ARM numeric, storage and remainder controls | NaN bits may overapproximate targets |
 | Symbolic enums | Signed tags, Option/Result payloads, foreign nested inputs and entry snapshots on host/ARM | Variant/payload/off-by-one call mutations are refuted; unsupported payloads stay UNKNOWN |
 | Array patterns | Fixed float arrays and guarded byte slices with start/end projections on host/ARM | An unequal-endpoint assertion is refuted; float slices remain UNKNOWN |
 | Aggregate constants | Option::as_ref, niche layouts, signed enum tags, nested fields and immutable storage on host/ARM | Wrong payloads/guards and a mutated constant index refute; unions, mutable storage, unsupported transmutes and oversized shapes remain UNKNOWN |
@@ -369,11 +369,11 @@ IEEE nearest-even operations; its stored result is constrained to that numeric v
 conservatively allow all payloads/signs, including signaling encodings. Repeated reads of one
 stored result use the same bits, while a bit-level NaN counterexample may not replay on the target.
 
-The storage fixture checks 17 roots on host/ARM: 13 prove, three refute and one remains unknown.
+The storage fixture checks 17 roots on host/ARM: 13 prove and four refute.
 A changed sign mask refutes. Native checks include signed zero, subnormals, infinities and both
 kinds of NaN for f32/f64, plus 1,024 integer-cast/arithmetic inputs. Checked sidecars force actual
 core to_bits/from_bits bodies through typed transmutes and retain the same outcomes without
-library summaries. Remainder and wider floating-point formats remain unsupported.
+library summaries. Ordinary remainder is supported; wider floating-point formats remain unsupported.
 
 Compiler-identified binary32/binary64 floor, ceil, trunc, round, round_ties_even, sqrt and fused
 multiply-add intrinsics now have typed IEEE models. Directional rounding uses RTN, RTP and RTZ;
@@ -382,8 +382,8 @@ numeric results retain stable storage encodings with the existing conservative N
 This applies to the pinned compiler's experimental no_std core_float_math wrappers. It does not
 replace user functions with matching names or summarize a dependency's math implementation.
 
-The intrinsic fixture checks 14 roots on host/ARM: eight prove, five refute and remainder stays
-unknown. Cases cover positive/negative rounding ties, signed zeros, infinities, NaNs, subnormals,
+The intrinsic fixture checks 14 roots on host/ARM: nine prove and five refute.
+Cases cover positive/negative rounding ties, signed zeros, infinities, NaNs, subnormals,
 invalid square roots and a fused result differing from separate multiply/add. Native tests replay
 the positive cases and all five failing mutations. Floating-point induction remains unsupported;
 adding ordinary intrinsic models does not extend the loop-state encoding.
@@ -1140,3 +1140,23 @@ nonempty character payloads remain Semantics UNKNOWN, while an eligible empty ch
 has its unique empty value. The original type/layout, initialization and resource certificates
 remain required; raw pattern types and reference-forming operations remain unsupported. The
 41-case/16-family baseline expects 68 PROVED, 60 REFUTED and 36 UNKNOWN across four builds.
+
+Stage 142 models ordinary binary32/binary64 remainder with exact same-format operands.
+[Rust remainder](https://doc.rust-lang.org/std/ops/trait.Rem.html) uses a truncating quotient;
+[SMT remainder](https://smt-lib.org/theories-FloatingPoint.shtml) uses a nearest-even quotient.
+The translation computes the IEEE remainder and, when its nonzero sign opposes the dividend,
+adds the dividend-signed divisor magnitude. This correction is an independently reviewed
+derivation. The truncating residual is exactly representable: when the dividend is smaller,
+it is the dividend; otherwise it is an integer multiple of the divisor's binary lattice unit,
+with fewer than one significand's worth of bits. The correction addition therefore rounds exactly,
+including subnormals, and cannot overflow. Strict ordered sign comparisons preserve signed zero
+and leave exceptional NaN results unchanged. Arithmetic storage keeps the existing conservative
+NaN encoding policy; no raw-bit certificate is fabricated.
+
+Compiler controls exercise actual remainder and compound assignment bodies, both divisor signs,
+nearest ties, signed zero, subnormal and extreme values, infinities, zero divisors and NaNs.
+Numeric equality guards retain their full input domain. Equality against a finite nonzero constant
+may use exact encoding equality when both actual terms are same-format bit-to-float conversions;
+zero and NaN comparisons retain numeric semantics. Independent SMT checks validate this rewrite.
+Missing external bodies, wider formats and unfinished solver queries remain UNKNOWN. The baseline
+has 44 cases in 17 families, expecting 72 PROVED, 64 REFUTED and 40 UNKNOWN across four builds.

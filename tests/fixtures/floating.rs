@@ -97,7 +97,7 @@ pub fn bad_call(value: f32) -> f32 {
     }
 }
 
-pub fn unsupported_remainder(value: f32) -> f32 {
+pub fn remainder(value: f32) -> f32 {
     value % 3.0
 }
 

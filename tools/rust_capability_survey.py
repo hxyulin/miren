@@ -12,6 +12,8 @@ from fleet_survey import digest, execute, freeze_analyzer, revision, save
 
 
 STATUSES = {"proved", "refuted", "unknown"}
+UNKNOWN_CATEGORIES = {"semantics", "missing_compiler_evidence", "solver", "resource_limit",
+                      "external_environment", "unclassified"}
 
 
 def load_manifest(path, repository):
@@ -35,13 +37,18 @@ def load_manifest(path, repository):
                 or case.get("expected") not in STATUSES
                 or not isinstance(case.get("family"), str) or not case["family"]):
             raise ValueError("invalid or duplicate capability case")
-        if set(case) - {"entry", "family", "expected", "unknown_reason"}:
+        if set(case) - {"entry", "family", "expected", "unknown_reason", "unknown_category"}:
             raise ValueError("unrecognized capability case field")
         reason = case.get("unknown_reason")
         if case["expected"] == "unknown" and (not isinstance(reason, str) or not reason):
             raise ValueError("UNKNOWN capability needs its documented frontier")
         if case["expected"] != "unknown" and reason is not None:
             raise ValueError("supported capability cannot declare an UNKNOWN frontier")
+        if "unknown_category" in case:
+            category = case["unknown_category"]
+            if (case["expected"] != "unknown" or not isinstance(category, str)
+                    or category not in UNKNOWN_CATEGORIES):
+                raise ValueError("UNKNOWN category must name a supported producer cause")
         entries.add(case["entry"])
     return manifest, fixture
 
@@ -86,6 +93,8 @@ def check_report(report, cases):
         if status == "unknown" and not any(
                 o.get("status") == "unknown"
                 and case.get("unknown_reason", "") in o.get("detail", "")
+                and ("unknown_category" not in case
+                     or o.get("unknown_category") == case["unknown_category"])
                 for o in obligations):
             errors.append(case["entry"] + ": missing expected UNKNOWN frontier")
         results.append({"entry": case["entry"], "family": case["family"],

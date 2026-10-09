@@ -57,6 +57,19 @@ class CapabilityReports(unittest.TestCase):
         self.report["functions"][2]["proof"]["obligations"][0]["detail"] = "missing body"
         self.assertTrue(check_report(self.report, self.cases)[1])
 
+    def test_declared_unknown_category_requires_the_matching_producer_cause(self):
+        case = self.cases[2]
+        obligation = self.report["functions"][2]["proof"]["obligations"][0]
+        for category in ["semantics", "missing_compiler_evidence"]:
+            case["unknown_category"] = category
+            obligation["unknown_category"] = category
+            self.assertEqual(check_report(self.report, self.cases)[1], [])
+            for wrong in ["unclassified", "solver", None]:
+                obligation["unknown_category"] = wrong
+                self.assertTrue(check_report(self.report, self.cases)[1])
+            del obligation["unknown_category"]
+            self.assertTrue(check_report(self.report, self.cases)[1])
+
     def test_witness_requires_nonempty_query_and_model_strings(self):
         for field in ["query", "model"]:
             for value in [True, 7, {}, "", None]:
@@ -111,7 +124,13 @@ class CapabilityReports(unittest.TestCase):
                           [{"entry": "x", "family": "x", "expected": "unknown",
                             "unknown_reason": []}],
                           [{"entry": "x", "family": "x", "expected": "proved",
-                            "unrecognized": True}]]:
+                            "unrecognized": True}],
+                          [{"entry": "x", "family": "x", "expected": "unknown",
+                            "unknown_reason": "x", "unknown_category": []}],
+                          [{"entry": "x", "family": "x", "expected": "unknown",
+                            "unknown_reason": "x", "unknown_category": "invented"}],
+                          [{"entry": "x", "family": "x", "expected": "proved",
+                            "unknown_category": "semantics"}]]:
                 manifest["cases"] = cases
                 path.write_text(json.dumps(manifest))
                 with self.assertRaises(ValueError):

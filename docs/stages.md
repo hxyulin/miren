@@ -2942,3 +2942,46 @@ Final standalone evidence: `/tmp/miren-stage141-capabilities-20261010`, with 68 
 Validation passes 594 Rust tests, 67 Python tests, formatting, cargo lint, release builds,
 cargo deny, documentation build and manual hooks. Independent review approves current-condition
 propagation, exact character payload proofs and unchanged initialization/access boundaries.
+
+
+## Stage 142: exact ordinary floating remainder
+
+Ordinary binary32/binary64 MIR remainder now uses SMT IEEE remainder with an exact sign correction
+to implement the truncating Rust operation. A typed two-operand `FpRem` term validates equal
+floating formats and the printer emits the actual `fp.rem` operator. The numeric model checks
+declared width, actual sorts and symbolic contexts. Strict ordered comparisons select a correction
+only for a nonzero residual whose sign opposes the dividend. The correction's finite result is
+exactly representable, including subnormals; no rounded quotient or bounded integer is introduced.
+Signed zero and exceptional results follow the existing IEEE and arithmetic-NaN encoding policy.
+Results acquire no retained raw-bit certificate, assumptions or access rights.
+
+The independently reviewed derivation is described in [coverage](coverage.md). Wider formats,
+fast/algebraic intrinsics and external declarations without actual bodies retain their own
+unsupported boundaries. Resource limits and solver UNKNOWN retain their ordinary meaning.
+
+An unchanged ordinary f64 numeric-guard control exposed a default-budget solver timeout before
+checking the remainder. Exact encoding equality for same-format bit-to-float terms against a
+finite nonzero constant gives a proof-preserving guard normalization. It adds no input premise
+and leaves zero and NaN comparisons unchanged. The original numeric-guard case is retained;
+no application rewrite or global budget increase is used to obtain a preferred result.
+
+The capability manifest adds remainder P/R and missing-external-body U cases, reaching 44 cases
+across 17 families: 18 PROVED, 16 REFUTED and 10 UNKNOWN expected per compiler configuration.
+
+The missing-body control has a compiler-evidence cause rather than a semantic cause. The shared
+manifest now declares each expected UNKNOWN category, and both consumers require the diagnostic
+and category to match on the same unfinished obligation. The optional field preserves legacy
+runner manifests; malformed categories and category-only mutations fail rather than changing
+proof status or accepting an unrelated frontier.
+
+Existing remainder controls in eight compiler fixtures now have their actual supported outcomes:
+seven previously unsupported execution/comparison controls prove, and the false storage-bit claim
+refutes. The wider full-suite scan includes ordinary intrinsic and numeric-loop fixtures; their
+remaining guard, mutation and resource tests keep their original semantics.
+
+Final standalone evidence: `/tmp/miren-stage142-capabilities-20261010`, with 72 PROVED,
+64 REFUTED and 40 UNKNOWN outcomes, unchanged frozen inputs/binaries and no collection errors.
+Validation passes 598 Rust tests, 68 Python tests, formatting, cargo lint, release builds,
+cargo deny, documentation build and manual hooks. Compiler controls cover host/ARM O0/O2,
+actual helper mutations and valid native execution. Independent review approves the exact
+remainder derivation, guard normalization and unchanged missing-body/access boundaries.

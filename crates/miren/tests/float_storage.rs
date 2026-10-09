@@ -79,7 +79,7 @@ fn storage_labels_preserve_ieee_encodings_and_keep_arithmetic_nan_bits_unconstra
         ("bad_sign_label", ProofStatus::Refuted),
         ("bad_special_label", ProofStatus::Refuted),
         ("bad_calculated_nan_label", ProofStatus::Refuted),
-        ("unsupported_remainder", ProofStatus::Unknown),
+        ("wrong_remainder_storage_claim", ProofStatus::Refuted),
     ];
     for target in [None, Some("thumbv7em-none-eabihf")] {
         let names: Vec<_> = entries.iter().map(|(name, _)| *name).collect();

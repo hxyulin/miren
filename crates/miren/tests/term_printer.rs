@@ -25,7 +25,11 @@ fn every_operator_prints_a_formula_equivalent_to_its_independent_smt_encoding() 
     let raw = context.symbol(7, Sort::BitVec(32)).unwrap();
     let rne = context.rounding(Rounding::NearestEven);
     let rtz = context.rounding(Rounding::TowardZero);
-    let mut cases = Vec::new();
+    let mut cases = vec![(
+        Op::FpRem,
+        vec![f.clone(), g.clone()],
+        "(fp.rem v4 v5)".to_owned(),
+    )];
     for (op, name) in [
         (Op::BvAdd, "bvadd"),
         (Op::BvSub, "bvsub"),
@@ -203,7 +207,7 @@ fn every_operator_prints_a_formula_equivalent_to_its_independent_smt_encoding() 
         vec![rne, f.clone(), g.clone(), f],
         "(fp.fma RNE v4 v5 v4)".to_owned(),
     ));
-    assert_eq!(cases.len(), 64);
+    assert_eq!(cases.len(), 65);
     let mut script = String::from("(set-logic ALL)\n(set-option :timeout 5000)\n");
     for (index, sort) in [
         (0, "(_ BitVec 8)"),

@@ -88,7 +88,7 @@ pub fn bad_calculated_nan_label() {
     assert!(calculated.to_bits() == 0x7fc0_0000);
 }
 
-pub fn unsupported_remainder(sample: f32) {
+pub fn wrong_remainder_storage_claim(sample: f32) {
     let remainder = sample % 2.0;
     assert!(remainder.to_bits() == sample.to_bits());
 }

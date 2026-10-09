@@ -340,7 +340,9 @@ The manifest is shared with `cargo test -p miren --test rust_capabilities`. Each
 and ARM at O0/O2 with overflow checks and strict premises. Full reports, commands, binary hashes
 and input hashes are retained. Exit zero means the declared P/R/U expectations and unknown
 frontiers matched, not that all cases proved. Missing roots, assumptions, changed outcomes, absent
-refutation witnesses and changed fixture/manifest inputs fail the collection. The runner does not
-execute counterexamples; valid native/mutation controls live in the Cargo integration test.
+refutation witnesses and changed fixture/manifest inputs fail the collection. When a case declares
+`unknown_category`, its producer cause must match on the same unfinished obligation as the expected
+diagnostic. Legacy cases without that optional field retain diagnostic-only matching. The runner
+does not execute counterexamples; valid native/mutation controls live in the Cargo integration test.
 
 See [the capability roadmap](../docs/rust-capabilities.md) for scope and extension boundaries.

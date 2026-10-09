@@ -60,13 +60,66 @@ fn invalid_sorts_and_arity_are_rejected_before_simplification() {
     let context = Context::default();
     let false_value = context.boolean(false);
     let word = context.bit_vector(1, 8).unwrap();
-    for op in [Op::BvAdd, Op::Equal, Op::And, Op::FpEqual, Op::Select] {
+    for op in [
+        Op::BvAdd,
+        Op::Equal,
+        Op::And,
+        Op::FpEqual,
+        Op::FpRem,
+        Op::Select,
+    ] {
         assert!(
             context
                 .apply(op, &[false_value.clone(), word.clone()])
                 .is_err()
         );
     }
+    let single = context
+        .symbol(
+            20,
+            Sort::Float {
+                exponent: 8,
+                significand: 24,
+            },
+        )
+        .unwrap();
+    let double = context
+        .symbol(
+            21,
+            Sort::Float {
+                exponent: 11,
+                significand: 53,
+            },
+        )
+        .unwrap();
+    assert!(context.apply(Op::FpRem, &[]).is_err());
+    assert!(
+        context
+            .apply(Op::FpRem, std::slice::from_ref(&single))
+            .is_err()
+    );
+    assert!(context.apply(Op::FpRem, &[single.clone(), double]).is_err());
+    assert!(
+        context
+            .apply(
+                Op::FpRem,
+                &[
+                    context.rounding(Rounding::NearestEven),
+                    single.clone(),
+                    single.clone()
+                ]
+            )
+            .is_err()
+    );
+    let other = Context::default().symbol(0, single.sort().clone()).unwrap();
+    assert!(context.apply(Op::FpRem, &[single.clone(), other]).is_err());
+    assert_eq!(
+        context
+            .apply(Op::FpRem, &[single.clone(), single.clone()])
+            .unwrap()
+            .sort(),
+        single.sort()
+    );
     assert!(context.apply(Op::Not, &[]).is_err());
     assert!(
         context
@@ -738,4 +791,128 @@ fn long_literal_store_chains_are_walked_without_recursive_select_rewriting() {
     );
     let wrong_key = context.bit_vector(0, 16).unwrap();
     assert!(context.apply(Op::Select, &[backing, wrong_key]).is_err());
+}
+
+#[test]
+fn finite_nonzero_float_guards_preserve_exact_encoding_and_exceptional_comparisons() {
+    let context = Context::default();
+    let mut queries = Vec::new();
+    for (symbol, bits, exponent, significand, constants, excluded) in [
+        (
+            30,
+            32,
+            8,
+            24,
+            vec![
+                1u128,
+                0x007f_ffff,
+                0x0080_0000,
+                0x3f80_0000,
+                0xc0a0_0000,
+                0x7f7f_ffff,
+                0x8000_0001,
+            ],
+            vec![0u128, 0x8000_0000, 0x7f80_0000, 0xff80_0000, 0x7fc0_0001],
+        ),
+        (
+            31,
+            64,
+            11,
+            53,
+            vec![
+                1u128,
+                0x000f_ffff_ffff_ffff,
+                0x0010_0000_0000_0000,
+                0x3ff0_0000_0000_0000,
+                0xc014_0000_0000_0000,
+                0x7fef_ffff_ffff_ffff,
+                0x8000_0000_0000_0001,
+            ],
+            vec![
+                0u128,
+                0x8000_0000_0000_0000,
+                0x7ff0_0000_0000_0000,
+                0xfff0_0000_0000_0000,
+                0x7ff8_0000_0000_0001,
+            ],
+        ),
+    ] {
+        let raw = context.symbol(symbol, Sort::BitVec(bits)).unwrap();
+        let value = context
+            .apply(
+                Op::FloatFromBits {
+                    exponent,
+                    significand,
+                },
+                std::slice::from_ref(&raw),
+            )
+            .unwrap();
+        let declaration = format!("(declare-const v{symbol} (_ BitVec {bits}))\n");
+        for constant in constants {
+            let raw_constant = context.bit_vector(constant, bits).unwrap();
+            let other = context
+                .apply(
+                    Op::FloatFromBits {
+                        exponent,
+                        significand,
+                    },
+                    std::slice::from_ref(&raw_constant),
+                )
+                .unwrap();
+            let expected = format!(
+                "(fp.eq ((_ to_fp {exponent} {significand}) v{symbol}) \
+                ((_ to_fp {exponent} {significand}) {}))",
+                raw_constant.smt(100).unwrap()
+            );
+            for arguments in [
+                [value.clone(), other.clone()],
+                [other.clone(), value.clone()],
+            ] {
+                let folded = context.apply(Op::FpEqual, &arguments).unwrap();
+                assert!(!folded.uses_floating_point());
+                assert!(folded.smt(200).unwrap().contains("(= "));
+                queries.push(format!("{declaration}{}", equivalent(&folded, &expected)));
+            }
+        }
+        for constant in excluded {
+            let raw_constant = context.bit_vector(constant, bits).unwrap();
+            let other = context
+                .apply(
+                    Op::FloatFromBits {
+                        exponent,
+                        significand,
+                    },
+                    &[raw_constant],
+                )
+                .unwrap();
+            let comparison = context.apply(Op::FpEqual, &[value.clone(), other]).unwrap();
+            assert!(comparison.uses_floating_point());
+            assert!(comparison.smt(500).unwrap().starts_with("(fp.eq "));
+        }
+    }
+    for (bits, exponent, significand, magnitude, exponent_mask) in [
+        (32, 8, 24, 0x7fff_ffff_u128, 0x7f80_0000_u128),
+        (
+            64,
+            11,
+            53,
+            0x7fff_ffff_ffff_ffff_u128,
+            0x7ff0_0000_0000_0000_u128,
+        ),
+    ] {
+        queries.push(format!(
+            "(declare-const raw_x (_ BitVec {bits}))\n\
+             (declare-const raw_y (_ BitVec {bits}))\n\
+             (assert (not (= (bvand raw_y (_ bv{magnitude} {bits})) (_ bv0 {bits}))))\n\
+             (assert (not (= (bvand raw_y (_ bv{exponent_mask} {bits})) \
+                 (_ bv{exponent_mask} {bits}))))\n\
+             (assert (not (= \
+                 (fp.eq ((_ to_fp {exponent} {significand}) raw_x) \
+                        ((_ to_fp {exponent} {significand}) raw_y)) \
+                 (= raw_x raw_y))))"
+        ));
+    }
+    for answer in solve(&queries) {
+        assert_eq!(answer, "unsat");
+    }
 }

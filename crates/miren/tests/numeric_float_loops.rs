@@ -12,7 +12,7 @@ fn numeric_only_float_work_does_not_exhaust_the_query_budget_or_discard_index_gu
         ("repeated_numeric_work", ProofStatus::Proved),
         ("numeric_work_keeps_its_guard", ProofStatus::Proved),
         ("numeric_work_with_bad_index", ProofStatus::Refuted),
-        ("unsupported_numeric_work", ProofStatus::Unknown),
+        ("numeric_remainder_work", ProofStatus::Proved),
     ];
     for target in [None, Some("thumbv7em-none-eabihf")] {
         let mut command = Command::new(env!("CARGO_BIN_EXE_miren"));

@@ -1,4 +1,4 @@
-use super::{Context, Op, Value, not};
+use super::{Context, Op, Sort, Term, Value, not};
 use miren::smt::Rounding;
 
 fn format(bits: u32) -> (u32, u32) {
@@ -97,12 +97,18 @@ pub fn binary(
             term
         }));
     }
+    if operation == "rem" {
+        return Ok(Value::Float {
+            expression: remainder(context, a, b, bits)?,
+            bits,
+            raw_bits: None,
+        });
+    }
     let op = match operation {
         "add" => Op::FpAdd,
         "sub" => Op::FpSub,
         "mul" => Op::FpMul,
         "div" => Op::FpDiv,
-        // SMT fp.rem uses the IEEE nearest-integer quotient, unlike Rust's %.
         _ => return Err(format!("unsupported floating-point operation {operation}")),
     };
     Ok(Value::Float {
@@ -110,6 +116,66 @@ pub fn binary(
         bits,
         raw_bits: None,
     })
+}
+
+fn remainder(context: &Context, dividend: Term, divisor: Term, bits: u32) -> Result<Term, String> {
+    let (exponent, significand) = match bits {
+        32 => (8, 24),
+        64 => (11, 53),
+        _ => return Err("floating remainder requires binary32 or binary64 operands".into()),
+    };
+    let expected = Sort::Float {
+        exponent,
+        significand,
+    };
+    if dividend.sort() != &expected
+        || divisor.sort() != &expected
+        || !dividend.belongs_to(context)
+        || !divisor.belongs_to(context)
+    {
+        return Err("floating remainder operands have inconsistent type, sort or context".into());
+    }
+    let zero = context.apply(
+        Op::FloatFromBits {
+            exponent,
+            significand,
+        },
+        &[context.bit_vector(0, bits)?],
+    )?;
+    let ieee = context.apply(Op::FpRem, &[dividend.clone(), divisor.clone()])?;
+    let positive = context.apply(Op::FpGt, &[dividend.clone(), zero.clone()])?;
+    let negative = context.apply(Op::FpLt, &[dividend, zero.clone()])?;
+    let residual_negative = context.apply(Op::FpLt, &[ieee.clone(), zero.clone()])?;
+    let residual_positive = context.apply(Op::FpGt, &[ieee.clone(), zero])?;
+    let opposite = context.apply(
+        Op::Or,
+        &[
+            context.apply(Op::And, &[residual_negative, positive])?,
+            context.apply(Op::And, &[residual_positive, negative.clone()])?,
+        ],
+    )?;
+    let magnitude = context.apply(Op::FpAbs, &[divisor])?;
+    let direction = context.apply(
+        Op::Ite,
+        &[
+            negative,
+            context.apply(Op::FpNeg, std::slice::from_ref(&magnitude))?,
+            magnitude,
+        ],
+    )?;
+    // IEEE remainder uses a nearest-even quotient. If its nonzero residual has the
+    // opposite sign, adding the dividend-signed divisor gives the truncating residual.
+    // That finite binary residual is exactly representable, so RNE cannot change it.
+    // Strict ordered comparisons leave signed zeros and exceptional NaNs untouched.
+    let corrected = context.apply(
+        Op::FpAdd,
+        &[
+            context.rounding(Rounding::NearestEven),
+            ieee.clone(),
+            direction,
+        ],
+    )?;
+    context.apply(Op::Ite, &[opposite, corrected, ieee])
 }
 
 pub fn float_cast(context: &Context, value: Value, bits: u32) -> Result<Value, String> {
@@ -231,4 +297,65 @@ pub fn integer_cast(
         bits,
         signed,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn remainder_checks_actual_float_formats_and_preserves_arithmetic_encoding_policy() {
+        let context = Context::default();
+        for bits in [32, 64] {
+            let value = float(&context, 0, bits);
+            let result = binary(&context, "rem", value.clone(), value.clone()).unwrap();
+            let Value::Float {
+                expression,
+                bits: actual,
+                raw_bits,
+            } = result
+            else {
+                unreachable!()
+            };
+            assert_eq!(actual, bits);
+            assert!(raw_bits.is_none());
+            let printed = expression.smt(20_000).unwrap();
+            assert!(printed.contains("fp.rem"));
+            assert!(!printed.contains("fp.div"));
+            let foreign = Context::default();
+            assert!(binary(&context, "rem", value.clone(), float(&foreign, 0, bits)).is_err());
+            let forged = Value::Float {
+                expression: context.bit_vector(0, bits).unwrap(),
+                bits,
+                raw_bits: None,
+            };
+            assert!(binary(&context, "rem", forged, value).is_err());
+        }
+        let narrow = context
+            .symbol(
+                0,
+                Sort::Float {
+                    exponent: 11,
+                    significand: 53,
+                },
+            )
+            .unwrap();
+        for bits in [16, 32, 128] {
+            let forged = Value::Float {
+                expression: narrow.clone(),
+                bits,
+                raw_bits: None,
+            };
+            assert!(binary(&context, "rem", forged.clone(), forged).is_err());
+        }
+        assert!(
+            binary(
+                &context,
+                "rem",
+                float(&context, 0, 32),
+                float(&context, 0, 64)
+            )
+            .is_err()
+        );
+    }
 }

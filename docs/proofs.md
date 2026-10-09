@@ -40,7 +40,8 @@ including NaN signs/payloads. Moves, negation, abs and clamp preserve the select
 to_bits and same-width integer/float transmutes expose it. Each numeric arithmetic result gets
 one stable encoding constrained to its IEEE value. For NaN, this permits every payload/sign,
 including signaling encodings. This overapproximation makes proofs conservative, while bit-level
-NaN counterexamples may not replay on the target. Float remainder remains unknown.
+NaN counterexamples may not replay on the target. Ordinary f32/f64 remainder uses a truncating
+quotient, translated from IEEE nearest-even remainder with an exact sign correction.
 Booleans are SMT booleans. Byte contents are SMT arrays; slice lengths satisfy
 valid-reference bounds. Struct fields are independent inputs, including private fields. No
 constructor invariant is inferred for an arbitrary struct parameter.
@@ -401,9 +402,9 @@ does not need decoding. Constant shape limits are eight levels and 256 values, w
 trusted translation boundary; it does not execute arbitrary runtime calls in rustc's interpreter.
 
 Coverage remains limited by enum/struct slices, general aliasing, interior-mutable root
-combinations, unresolved generic inputs, float remainder, trait objects, unknown function pointers
-and general iterator machinery, pointer-based drop glue and several MIR operations/constants,
-including some constant shapes. Ordinary synchronous destructors execute through rustc's concrete
+combinations, unresolved generic inputs, wider float formats, trait objects, unknown function
+pointers and general iterator machinery, pointer-based drop glue and several MIR operations and
+constant shapes. Ordinary synchronous destructors execute through rustc's concrete
 DropGlue MIR. Their normal-return effects and ordered field drops are checked; unwinding remains
 unsupported.
 Non-byte input arrays are limited to 256 elements. Symbolic bounded indices work for integers,

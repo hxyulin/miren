@@ -90,7 +90,7 @@ impl PartialEq for Remainder {
     }
 }
 
-pub fn unsupported_element_comparisons_stay_unknown(value: f32) -> bool {
+pub fn remainder_element_comparisons(value: f32) -> bool {
     [Remainder(value)] == [Remainder(1.0)]
 }
 
@@ -242,7 +242,7 @@ mod tests {
     #[test]
     fn float_edges_match_native_numeric_equality() {
         float_edges();
-        assert!(unsupported_element_comparisons_stay_unknown(3.0));
+        assert!(remainder_element_comparisons(3.0));
         for a in [f64::NEG_INFINITY, -0.0, 0.0, 1.0, f64::INFINITY, f64::NAN] {
             for b in [f64::NEG_INFINITY, -0.0, 0.0, 1.0, f64::INFINITY, f64::NAN] {
                 float_guard([a; 2], [b; 2]);

@@ -111,10 +111,7 @@ fn array_comparisons_preserve_numeric_guards_custom_calls_and_limits_on_host_and
             ProofStatus::Refuted,
         ),
         ("over_budget", ProofStatus::Unknown),
-        (
-            "unsupported_element_comparisons_stay_unknown",
-            ProofStatus::Unknown,
-        ),
+        ("remainder_element_comparisons", ProofStatus::Proved),
     ];
     for target in [None, Some("thumbv7em-none-eabihf")] {
         for optimized in [false, true] {

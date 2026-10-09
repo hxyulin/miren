@@ -191,7 +191,7 @@ impl PartialEq for Remainder {
     }
 }
 
-pub fn unsupported_comparison(value: f32) -> bool {
+pub fn remainder_comparison(value: f32) -> bool {
     [Remainder(value)][..] == [Remainder(1.0)][..]
 }
 

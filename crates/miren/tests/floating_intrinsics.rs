@@ -25,7 +25,7 @@ const ENTRIES: &[(&str, ProofStatus)] = &[
         "an_intrinsic_name_does_not_replace_a_user_body",
         ProofStatus::Refuted,
     ),
-    ("remainder_is_still_unsupported", ProofStatus::Unknown),
+    ("ordinary_remainder", ProofStatus::Proved),
 ];
 
 #[test]
