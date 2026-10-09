@@ -424,7 +424,8 @@ callbacks and Rust arithmetic execute. Configured device/pointer-width evidence 
 physical validity and unmodeled hardware/Rust effects are assumptions. Numeric addresses never
 become retained Rust allocations, references or read permission. Each actual model use records
 its premise even on refuted/unknown roots. Unsupported operations remain UNKNOWN. See the
-[external model guide](../../docs/contracts.md#external-model-api) for limits and future state models.
+[external model guide](../../docs/contracts.md#external-model-api) for limits and future
+state models.
 
 
 Hardware schema 2 adds `MmioReadRegister` and `with_read_register`. Exact numeric u32 reads return
@@ -434,3 +435,11 @@ certificate. Actual read-modify-write callbacks and their Rust effects execute, 
 conservatively invalidates publication/startup history. Tracked RAM reads retain existing behavior.
 Schema 1 stays write-only with its empty read list omitted. Native replay refuses configured or
 recorded hardware models, including an unused policy on an earlier counterexample.
+
+Fieldless enum-to-integer transmutes require an explicit integer repr and exactly that primitive
+as the target. Compiler layout must certify an initialized direct scalar tag with matching size,
+alignment, width, signedness and zero offset. Concrete variants and complete symbolic inventories
+must match compiler identity and discriminants; symbolic tags must already have proven membership
+in the exact legal set, including sparse signed tags. The result preserves those bits without an
+extra premise. Default/C repr, payloads, layouts without an initialized direct tag, reverse
+integer-to-enum reconstruction and mismatched primitive types remain UNKNOWN. PAC methods execute their actual MIR.

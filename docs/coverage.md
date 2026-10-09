@@ -975,3 +975,17 @@ replay refuses configured or recorded hardware models. Schema-1 serialization st
 The nine hardware-profile fleet paths pass BSRR and PUPDR read, then reach an unsupported Rust
 fieldless enum-to-u8 transmute inside the actual setter callback. They remain UNKNOWN; no fixed
 register values, readback, hardware-ready assumptions or new completed main proof are introduced.
+
+Stage 129 supports strict fieldless enum-to-integer Transmute with an explicit integer repr and
+exact matching target primitive. The compiler must certify a non-Drop initialized direct scalar
+layout, equal size/alignment, zero tag offset and exact tag width/signedness. Every represented
+variant and symbolic inventory entry is checked against compiler metadata. Symbolic tags require
+proven membership in the exact legal set, including holes and signed discriminants; conversion
+preserves the original bits and adds no validity assumption. C/default repr, payloads, layouts
+without an initialized direct tag, reverse reconstruction and mismatched primitives remain UNKNOWN. Actual PAC
+`to_bits` methods execute their Rust bodies rather than receiving a device-specific summary.
+
+The twelve-main schema-2 replay clears that conversion gap for all nine affected application bodies.
+Their next UNKNOWN is a tracked-storage reference diagnostic in the application future, under audit.
+The other three retain earlier RTT refutations. This traversal progress adds no completed main proof
+and supplies no executor or native boot guarantee.

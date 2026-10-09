@@ -2480,3 +2480,33 @@ application-body entry milestone remain unchanged. Capture:
 All 554 Rust workspace tests and 53 Python tests pass, along with formatting, cargo lint,
 release builds, cargo deny, documentation builds and manual hooks. Positive, negative and unknown
 compiler controls include native callback mutation failures; hardware replay remains refused.
+The separate strict stage-128 twelve-main capture matches all 36 stage-127 obligation arrays
+exactly, without device assumptions: `/tmp/miren-stage128-main-strict-20261009`.
+
+## Stage 129: Compiler-certified fieldless enum representation
+
+Strict enum-to-integer Transmute now requires an explicit integer repr and exactly that primitive
+as target. The compiler must certify a bounded non-Drop fieldless initialized direct scalar layout
+with matching size, ABI alignment, tag width/signedness and zero offset. Every compiler tag is
+checked against scalar validity and every represented variant against exact compiler metadata.
+Symbolic inventories must be complete and their existing tag must have proven exact-set membership.
+Conversion preserves represented bits without adding a precondition or external premise.
+
+Three internal tests reject forged identities/tags/inventories, wrong context/type metadata and
+sparse holes. Two compiler integrations cover host/ARM O0/O2 concrete and symbolic sparse/signed
+values, certified singleton, u128/isize, refuted claims and a pure native mutation failure.
+Reverse reconstruction, payloads, C/default repr, mismatched types and Drop remain UNKNOWN.
+Independent review approves the certificate and controls. Full validation expects 559 Rust tests.
+
+The complete twelve-main schema-2 replay clears the prior PAC Pupdr::to_bits blocker for all nine
+conditional UNKNOWN mains. These now progress through GPIO callbacks and stop at a tracked-storage
+reference diagnostic in the application future. Three earlier RTT refutations remain; registration
+is twelve PROVED and ordinary runtime twelve REFUTED. All twelve fresh bodies are still entered.
+This is traversal progress, not a completed main proof. Capture:
+`/tmp/miren-stage129-main-gpio-rmw-20261009`.
+The separate strict stage-129 capture matches all 36 stage-128 obligation arrays exactly, without
+assumptions: `/tmp/miren-stage129-main-strict-20261009`.
+
+All 559 Rust workspace tests and 53 Python tests pass, along with formatting, cargo lint, release
+builds, cargo deny, documentation builds and manual hooks. Existing enum-input and NonZero
+compiler controls also pass independently.

@@ -26,6 +26,7 @@ mod builtins;
 mod call_metadata;
 mod constants;
 mod coroutines;
+mod enum_transmutes;
 mod error_formatting;
 mod external;
 mod floating_intrinsics;
@@ -2104,6 +2105,18 @@ impl<'tcx> Engine<'tcx> {
             Rvalue::Cast(CastKind::Transmute, operand, target) => {
                 let source = operand.ty(&body.local_decls, self.tcx);
                 let value = self.operand(id, body, state, operand)?;
+                if let Some(value) = self.fieldless_enum_integer_transmute(
+                    source,
+                    *target,
+                    &value,
+                    &state.conditions,
+                )? {
+                    self.record_model(
+                        id,
+                        "compiler-certified fieldless enum; exact integer repr bits",
+                    );
+                    return Ok(value);
+                }
                 if let Some(value) =
                     self.integer_nonzero_option_transmute(source, *target, &value)?
                 {

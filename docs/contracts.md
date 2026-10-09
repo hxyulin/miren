@@ -167,10 +167,9 @@ application source. It is absent from legacy configuration and disabled in stric
 
 Hardware schema 1 supplies bounded byte-address transport and exact write-only u32 register
 accesses for STM32H723VG or STM32F407IG. Schema 2 adds explicitly permitted independent reads.
-Both are conditional models.
-The current devices require a 32-bit compiler pointer domain. Build indicators must match the
-selected device; these indicators do
-not establish which physical chip exists. Register access, device validity and absence of
+Both are conditional models. The current devices require a 32-bit compiler pointer domain. Build
+indicators must match the selected device; these indicators do not establish which physical chip
+exists. Register access, device validity and absence of
 unmodeled Rust storage effects remain explicit premises in the required reason.
 
 The public `HardwareModel`, `HardwareDevice`, `MmioRegion` and `MmioWriteRegister` types are
@@ -183,6 +182,12 @@ integration, run the example
 ```sh
 cargo run --locked -p miren --example stm32_model -- stm32h723vg > /tmp/h7-model.json
 ```
+
+An integration can write the validated configuration to a sidecar and invoke miren with
+`--contracts FILE --allow-assumptions`, then consume `--jsonl` reports. The same configuration can
+include explicit function boundaries in `functions`; hardware permission does not supply a missing
+function body. This API describes symbolic effects. It does not register executable emulator
+callbacks or initialize an Embassy executor.
 
 Its hardware section has this form; JSON addresses are decimal integers:
 
@@ -201,9 +206,9 @@ The model allows 1..16 disjoint regions of 1..4096 bytes inside the STM32 periph
 window and 1..64 uniquely named, aligned registers wholly inside those regions. Schema 1 admits
 only exact unsigned 32-bit writes, including compiler-certified transparent u32 register values.
 Admitted forward byte-address arithmetic must stay within a configured region without wrapping;
-admitting transport
-alone grants no register access. Numeric hardware addresses never become retained Rust allocations
-or references. Unmapped addresses, unsupported widths, reads and missing models stay UNKNOWN.
+admitting transport alone grants no register access. Numeric hardware addresses never become retained
+Rust allocations or references. Unmapped addresses, unsupported widths, reads without permission and missing models
+stay UNKNOWN.
 Hardware stores retain the existing conservative publication/startup history invalidation.
 
 The interpreter executes the actual register write callback and its Rust assertions and arithmetic.
@@ -217,7 +222,6 @@ operations and effects; Embassy state models need separate Rust initialization, 
 lifetime semantics. The existing `--startup` and `--startup-isolated` premises remain explicit and
 independent of hardware permission. No fixed register value, hardware readiness, instruction
 behavior, executor progress or loop termination follows from these models.
-
 
 Hardware schema 2 adds optional `read_registers`, containing the same `{name, address}` fields as
 write registers. `with_read_register` opts into schema 2. Up to 64 reads and 64 writes are allowed,
