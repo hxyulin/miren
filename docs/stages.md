@@ -1851,3 +1851,12 @@ retain all 72 obligation arrays exactly. All twelve isolated runtime wrappers no
 unfinished weak-CAS retry frontier and a specific unsupported SEV diagnostic, with the actual
 __pender call chain. Captures: `/tmp/miren-stage113-main-{strict,reset}-20261009` and
 `/tmp/miren-stage113-runtime`. No application or assumption changes.
+
+The complete tenth ordinary fleet pass freezes clean stage 111 analyzer 2169311. All 32 ARM units
+and 2,336 roots completed collection: 1,113 PROVED, 255 REFUTED and 968 UNKNOWN, without assumptions.
+Exactly the two independently audited Chassis/Arm roots move UNKNOWN to REFUTED; no previous proof
+regresses and no roots are added or removed. Source-heuristic counts are 518/231/270. Firmware and
+all 243 source-input fingerprints match the ninth pass; every unit's four artifact checkpoints
+remain consistent. Raw capture: `/tmp/miren-fleet-pass10-20261009/summary.json`. Deterministic export
+validation passes before publication. This function-root survey does not establish runtime polling
+or constructor-state reachability.
