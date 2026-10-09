@@ -642,6 +642,9 @@ pub fn select_element(
     index: &Value,
 ) -> Result<Value, String> {
     let (index, index_bits, _) = index.integer()?;
+    if let Some(value) = constant_integer_choice(context, elements, &index, index_bits)? {
+        return Ok(value);
+    }
     let mut result = elements.last().cloned().ok_or("empty array index")?;
     for (position, element) in elements.iter().enumerate().rev().skip(1) {
         let condition = context.apply(
@@ -699,4 +702,63 @@ pub fn select_element(
         };
     }
     Ok(result)
+}
+
+fn constant_integer_choice(
+    context: &Context,
+    elements: &[Value],
+    index: &Term,
+    index_bits: u32,
+) -> Result<Option<Value>, String> {
+    if elements.is_empty() || elements.len() > MAX_REPEAT_VALUES {
+        return Ok(None);
+    }
+    let Value::Int { bits, signed, .. } = &elements[0] else {
+        return Ok(None);
+    };
+    if !elements.iter().all(|value| {
+        matches!(value,
+        Value::Int { expression, bits: other_bits, signed: other_signed }
+        if other_bits == bits && other_signed == signed
+            && matches!(expression.constant(), Some(miren::smt::Constant::BitVec(_))))
+    }) {
+        return Ok(None);
+    }
+    if index_bits < usize::BITS && elements.len() > (1_usize << index_bits) {
+        return Ok(None);
+    }
+    if index.sort() != &Sort::BitVec(index_bits) || !index.belongs_to(context) {
+        return Err("constant array choice index requires its declared context and width".into());
+    }
+    let mut expressions = Vec::with_capacity(elements.len());
+    for value in elements {
+        let Value::Int { expression, .. } = value else {
+            return Err("constant array choice requires integer elements".into());
+        };
+        if expression.sort() != &Sort::BitVec(*bits) || !expression.belongs_to(context) {
+            return Err(
+                "constant array choice element requires its declared context and width".into(),
+            );
+        }
+        expressions.push(expression.clone());
+    }
+    let default = expressions.last().ok_or("empty array index")?;
+    let mut array = context.apply(Op::ConstArray { index_bits }, std::slice::from_ref(default))?;
+    // Match the existing choice: unmatched indices select the last element, and earlier
+    // positions take precedence. Keys are distinct because the index capacity was checked.
+    for (position, expression) in expressions.iter().enumerate().rev().skip(1) {
+        array = context.apply(
+            Op::Store,
+            &[
+                array,
+                context.bit_vector(position as u128, index_bits)?,
+                expression.clone(),
+            ],
+        )?;
+    }
+    Ok(Some(Value::Int {
+        expression: context.apply(Op::Select, &[array, index.clone()])?,
+        bits: *bits,
+        signed: *signed,
+    }))
 }

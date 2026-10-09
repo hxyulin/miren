@@ -1973,3 +1973,39 @@ outcomes, with no added/removed roots or incompatible provenance. Source-heurist
 CRC query-size diagnostic. Firmware/source fingerprints and artifact checkpoints remain consistent.
 Raw capture: `/tmp/miren-fleet-pass12-20261009/summary.json`. Deterministic export validation passes
 before publication; main evidence remains separately frozen at 03e66a2.
+
+## Stage 117: Shared constant integer lookup tables
+
+Bounded homogeneous constant integer array choices use shared SMT arrays instead of repeated
+conditional chains. The representation preserves target width, signedness, exact element values
+and the previous last-element default for every unmatched index. Index keys must fit their bit
+width, and actual term sorts and analysis contexts must match declared metadata. Existing compiler
+bounds, origin and liveness checks remain authoritative. Symbolic, mixed, Boolean, floating-point
+and pointer choices keep their prior behavior. The representation adds no assumptions or larger
+budgets.
+
+Independent Z3 equivalence covers full index domains, including out-of-range indices, with signed
+and unsigned payload widths through 128 bits and 256-entry tables. Context and forged-width cases
+are rejected. Host/ARM O0/O2 compiler fixtures prove guarded table reads, signed exact-value claims
+and a CRC16 packet with 21 symbolic payload bytes; wrong checksums refute and untracked pointers
+stay UNKNOWN. Changing a signed array entry refutes and fails native execution.
+
+The earlier ui_number query contains sixteen independent 255-branch CRC16 choices, dominating
+its 194,879-byte shared forest. A textual prototype replacing those exact choices with one shared
+array reduces it to 27,109 bytes; independent Z3 checks establish lookup equivalence over every
+32-bit index, including unmatched indices, and retain whole-query UNSAT. These measurements use
+saved stage115 evidence; actual caller replays follow release validation.
+
+All 73 binary SMT/symbolic tests and 44 affected integration tests pass, including existing term,
+byte-view, scalar-table and owned-iterator regressions. New compiler tests cover host/ARM at O0/O2
+and failing native execution after an array-value mutation. Formatting, workspace Clippy and diff
+checks pass. No application or assumption changes.
+
+All 525 Rust workspace tests and 48 Python tests pass. Release builds, dependency checks,
+documentation builds and manual hooks pass. Actual referee::ui_number now PROVES through both
+CRC bodies, with 380 checked obligations, no trusted calls and no entry assumptions. ui_delete_all
+remains PROVED and the audited encode refutation remains unchanged. Captures:
+`/tmp/miren-stage117/replay`. All 72 strict/reset main obligation arrays match stage 116 exactly.
+All twelve isolated runtime wrappers retain unfinished weak-CAS retry frontiers and unsupported
+SEV before the first executor poll. Captures: `/tmp/miren-stage117-main-{strict,reset}-20261009`
+and `/tmp/miren-stage117/runtime`. These replays do not establish hardware or boot validity.

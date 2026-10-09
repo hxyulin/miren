@@ -873,3 +873,9 @@ with query-wide local DAG sharing. Ordinary queries retain their previous text a
 prefixes. The fallback preserves all conditions, models and floating-point probes; budgets stay
 unchanged, and oversized results remain UNKNOWN. Compiler CRC16 fixtures cover host/ARM O0/O2
 PROVED, REFUTED and UNKNOWN outcomes and a natively failing table-index mutation.
+
+Constant homogeneous integer array choices share an SMT table across index expressions. Exact
+width, signedness, context and index-key capacity checks preserve all element values and the prior
+unmatched-index default. Compiler bounds and storage checks stay active. Host/ARM O0/O2 fixtures
+cover guarded lookup and a 21-byte symbolic CRC payload, with failing native array-value mutations.
+Other scalar and pointer choices retain their previous domain.

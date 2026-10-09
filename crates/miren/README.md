@@ -336,3 +336,11 @@ budget. Oversized queries retry with one Boolean conjunction and shared local le
 all original conditions, under the same whole-script budget. This preserves floating-point
 conditions and separate non-floating probes; unsupported or still oversized queries remain UNKNOWN.
 Handwritten solver queries retain their original representation.
+
+Bounded homogeneous constant integer array choices use shared SMT arrays instead of repeated
+conditional chains. The representation preserves target width, signedness, exact element values
+and the previous last-element default for every unmatched index. Index keys must fit their bit
+width, and actual term sorts and analysis contexts must match declared metadata. Existing compiler
+bounds, origin and liveness checks remain authoritative. Symbolic, mixed, Boolean, floating-point
+and pointer choices keep their prior behavior. The representation adds no assumptions or larger
+budgets.

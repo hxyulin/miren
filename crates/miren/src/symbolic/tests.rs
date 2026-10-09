@@ -207,3 +207,197 @@ fn moving_references_through_owned_iterators_does_not_enable_identity_repeats() 
     let cells = Value::Elements(vec![Value::Cell { allocation: 0 }].into());
     assert_eq!(cells.owned_iterator_size(), None);
 }
+
+fn legacy_integer_choice(context: &Context, elements: &[Value], index: &Value) -> Value {
+    let (index, index_bits, _) = index.integer().unwrap();
+    let mut result = elements.last().unwrap().clone();
+    for (position, value) in elements.iter().enumerate().rev().skip(1) {
+        let Value::Int {
+            expression,
+            bits,
+            signed,
+        } = value
+        else {
+            panic!("integer fixture")
+        };
+        let (otherwise, _, _) = result.integer().unwrap();
+        let condition = context
+            .apply(
+                Op::Equal,
+                &[
+                    index.clone(),
+                    context.bit_vector(position as u128, index_bits).unwrap(),
+                ],
+            )
+            .unwrap();
+        result = Value::Int {
+            expression: context
+                .apply(Op::Ite, &[condition, expression.clone(), otherwise])
+                .unwrap(),
+            bits: *bits,
+            signed: *signed,
+        };
+    }
+    result
+}
+
+#[test]
+fn constant_integer_choices_match_legacy_for_all_indices_and_declared_widths() {
+    use crate::solver::{Answer, Query, Solver};
+    let mut solver = Solver::default();
+    for (length, index_bits, bits, signed) in [
+        (1, 8, 8, false),
+        (3, 8, 16, true),
+        (256, 8, 16, false),
+        (256, 32, 16, false),
+        (5, 64, 128, true),
+    ] {
+        let context = Context::default();
+        let index = Value::Int {
+            expression: context.symbol(0, Sort::BitVec(index_bits)).unwrap(),
+            bits: index_bits,
+            signed: false,
+        };
+        let elements: Vec<_> = (0..length)
+            .map(|value| integer(&context, (value as u128).wrapping_mul(7919), bits, signed))
+            .collect();
+        let actual = super::select_element(&context, &elements, &index).unwrap();
+        let legacy = legacy_integer_choice(&context, &elements, &index);
+        let equal = binary(&context, "eq", actual.clone(), legacy)
+            .unwrap()
+            .boolean()
+            .unwrap();
+        let failure = context.apply(Op::Not, &[equal]).unwrap();
+        let query = Query::new(&context.declarations(), &[], &failure.smt(200_000).unwrap());
+        assert!(
+            matches!(solver.check_query(&query), Answer::Unsat),
+            "length={length} index_bits={index_bits} bits={bits} signed={signed}"
+        );
+        let (_, actual_bits, actual_signed) = actual.integer().unwrap();
+        assert_eq!((actual_bits, actual_signed), (bits, signed));
+    }
+}
+
+#[test]
+fn constant_integer_choice_keeps_last_default_and_rejects_forged_metadata() {
+    let context = Context::default();
+    let elements = [
+        integer(&context, 3, 16, true),
+        integer(&context, 4, 16, true),
+    ];
+    for index in [0, 1, 2, 255] {
+        let index = integer(&context, index, 8, false);
+        let (actual, _, _) = super::select_element(&context, &elements, &index)
+            .unwrap()
+            .integer()
+            .unwrap();
+        let expected =
+            if index.integer().unwrap().0.constant() == Some(miren::smt::Constant::BitVec(0)) {
+                3
+            } else {
+                4
+            };
+        use crate::solver::{Answer, Query, Solver};
+        let equal = context
+            .apply(
+                Op::Equal,
+                &[actual, context.bit_vector(expected, 16).unwrap()],
+            )
+            .unwrap();
+        let failure = context.apply(Op::Not, &[equal]).unwrap();
+        assert!(matches!(
+            Solver::default().check_query(&Query::new(&[], &[], &failure.smt(200_000).unwrap())),
+            Answer::Unsat
+        ));
+    }
+    let foreign = Context::default();
+    let foreign_index = Value::Int {
+        expression: foreign.symbol(0, Sort::BitVec(8)).unwrap(),
+        bits: 8,
+        signed: false,
+    };
+    assert!(super::select_element(&context, &elements, &foreign_index).is_err());
+    let wrong_width = Value::Int {
+        expression: context.symbol(0, Sort::BitVec(16)).unwrap(),
+        bits: 8,
+        signed: false,
+    };
+    assert!(super::select_element(&context, &elements, &wrong_width).is_err());
+    let wrong_element = Value::Int {
+        expression: context.bit_vector(3, 8).unwrap(),
+        bits: 16,
+        signed: true,
+    };
+    assert!(
+        super::select_element(&context, &[wrong_element], &integer(&context, 0, 8, false)).is_err()
+    );
+    let foreign_element = integer(&foreign, 3, 16, true);
+    assert!(
+        super::select_element(
+            &context,
+            &[foreign_element],
+            &integer(&context, 0, 8, false)
+        )
+        .is_err()
+    );
+}
+
+#[test]
+fn compact_integer_choice_leaves_symbolic_mixed_and_narrow_index_choices_unchanged() {
+    let context = Context::default();
+    let index = Value::Int {
+        expression: context.symbol(0, Sort::BitVec(1)).unwrap(),
+        bits: 1,
+        signed: false,
+    };
+    let over_capacity = [
+        integer(&context, 3, 8, false),
+        integer(&context, 4, 8, false),
+        integer(&context, 5, 8, false),
+    ];
+    let actual = super::select_element(&context, &over_capacity, &index)
+        .unwrap()
+        .integer()
+        .unwrap()
+        .0;
+    let legacy = legacy_integer_choice(&context, &over_capacity, &index)
+        .integer()
+        .unwrap()
+        .0;
+    assert_eq!(actual, legacy);
+    let symbolic = Value::Int {
+        expression: context.symbol(1, Sort::BitVec(8)).unwrap(),
+        bits: 8,
+        signed: false,
+    };
+    let elements = [integer(&context, 3, 8, false), symbolic];
+    let actual = super::select_element(&context, &elements, &index)
+        .unwrap()
+        .integer()
+        .unwrap()
+        .0;
+    let legacy = legacy_integer_choice(&context, &elements, &index)
+        .integer()
+        .unwrap()
+        .0;
+    assert_eq!(actual, legacy);
+    let mixed = [
+        integer(&context, 3, 8, false),
+        integer(&context, 4, 8, true),
+    ];
+    assert!(super::select_element(&context, &mixed, &index).is_err());
+    assert!(super::select_element(&context, &[], &index).is_err());
+    let booleans = [
+        Value::Bool(context.boolean(false)),
+        Value::Bool(context.boolean(true)),
+    ];
+    assert!(
+        super::select_element(&context, &booleans, &index)
+            .unwrap()
+            .boolean()
+            .unwrap()
+            .smt(200_000)
+            .unwrap()
+            .contains("ite")
+    );
+}
