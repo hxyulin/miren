@@ -242,6 +242,13 @@ Mutable byte ranges use the exact compiler `Range<usize>` SliceIndex implementat
 start <= end <= slice length and preserves the backing allocation through nested projections.
 Non-byte ranges and missing writable provenance remain UNKNOWN.
 
+Byte-view writes count generated SMT array stores against a 128-write budget. Fixed short copies
+can update larger compact byte allocations while preserving all other bytes. Symbolic copy lengths
+still require capacity-many stores and remain UNKNOWN when that bound exceeds the budget, including
+guarded ranges whose lengths do not simplify to constants. Region bounds, equal copy lengths,
+writable provenance and allocation liveness remain checked. Typed-byte encoding and expanded-value
+limits are unchanged.
+
 Compiler inventories record whether each function directly returns a coroutine. Fleet surveys
 separate those future-construction roots from function-body roots; explicit async polling remains
 a separate capture. Older inventories without this metadata remain unclassified.

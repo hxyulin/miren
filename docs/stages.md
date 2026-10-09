@@ -1860,3 +1860,35 @@ all 243 source-input fingerprints match the ninth pass; every unit's four artifa
 remain consistent. Raw capture: `/tmp/miren-fleet-pass10-20261009/summary.json`. Deterministic export
 validation passes before publication. This function-root survey does not establish runtime polling
 or constructor-state reachability.
+
+## Stage 114: Byte-view write budgets
+
+Byte-view updates now bound actual generated array stores rather than the destination allocation
+capacity. A fixed five-byte copy into a 136-byte compact array generates five stores; a symbolic
+length retains the conservative capacity-many-store bound. The 128-write budget, fixed allocation
+capacity, target-width index sorts, exact source/view length equality, region bounds and writable
+allocation liveness remain enforced. Typed-byte encoding and chunk-view budgets are unchanged.
+
+Two new compiler integration tests cover host/ARM and O0/O2 with positive, refuted and unknown
+outcomes, empty end ranges, guarded offsets, nested regions, 128-store boundary copies and preserved
+neighbors in 136-, 256- and 4,096-byte allocations. Retired destinations and writes exceeding the
+budget remain UNKNOWN. Guarded symbolic offsets retain proved bounds but can have unsimplified
+length expressions and remain UNKNOWN. Mutating an actual copied source byte breaks analysis and
+native execution.
+
+Diagnostic ordinary replays clear the allocation-capacity blocker in referee::encode and its two UI
+callers. Encode now REFUTES an oversized arbitrary-root payload: reported length 262,135 makes
+7 + length exceed the 136-byte buffer. Independent SMT rechecks validate the complete model/path
+and failing bounds; adding safety is UNSAT. Under data.len() <= 127, this failure is UNSAT while
+the path remains SAT. Actual UI callers supply payload lengths 8 and 21, so this private-root
+refutation does not establish a caller defect. Both UI helpers now reach actual CRC16 update_table
+and remain UNKNOWN at the unchanged query-size limit. Captures: `/tmp/miren-stage114/replay`.
+The complete published survey remains frozen at stage 111 until a fresh whole-fleet capture.
+
+All 17 focused byte-view integration tests pass, including existing chunk, repeated-byte, mutable
+range and typed-slice regressions. Formatting and workspace Clippy pass. The existing 129-byte
+as_chunks_mut fixture remains UNKNOWN at its separate chunk-view budget.
+
+All 512 Rust workspace tests and 48 Python tests pass. Formatting, workspace Clippy, release builds,
+dependency checks, documentation builds and manual hooks pass. Independent review found no required
+soundness fixes. No application or assumption changes.

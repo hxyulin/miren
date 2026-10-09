@@ -3,6 +3,7 @@ use super::*;
 use symbolic::MemoryProjection;
 
 const MAX_ALLOCATIONS: usize = 512;
+const MAX_BYTE_VIEW_WRITES: u128 = 128;
 
 impl<'tcx> Engine<'tcx> {
     pub(super) fn byte_subslice(
@@ -761,9 +762,6 @@ impl<'tcx> Engine<'tcx> {
         else {
             return Err("byte view updates need a fixed allocation capacity".to_owned());
         };
-        if count > 128 {
-            return Err("byte view allocation exceeds the 128-byte budget".to_owned());
-        }
         let (offset, bits, signed) = offset.integer()?;
         let (length, length_bits, length_signed) = length.integer()?;
         if signed || length_signed || bits != length_bits {
@@ -773,9 +771,13 @@ impl<'tcx> Engine<'tcx> {
             Some(symbolic::Constant::BitVec { value, .. }) if value <= count => Some(value),
             _ => None,
         };
+        let writes = fixed_length.unwrap_or(count);
+        if writes > MAX_BYTE_VIEW_WRITES {
+            return Err("byte view update exceeds the 128-write budget".to_owned());
+        }
         let original = data.clone();
         let mut copied = original.clone();
-        for index in 0..fixed_length.unwrap_or(count) {
+        for index in 0..writes {
             let cell = self.terms.bit_vector(index, bits)?;
             let target = self
                 .terms
