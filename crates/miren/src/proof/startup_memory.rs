@@ -3,13 +3,13 @@ use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub(super) struct StaticAtomicLocation {
+pub(super) struct StaticLocation {
     pub(super) definition: DefId,
     pub(super) offset: u64,
     pub(super) bytes: u64,
 }
 
-impl StaticAtomicLocation {
+impl StaticLocation {
     pub(super) fn overlaps(self, other: Self) -> bool {
         self.definition == other.definition
             && self.offset < other.offset + other.bytes
@@ -20,14 +20,14 @@ impl StaticAtomicLocation {
 #[derive(Clone, Default)]
 pub(super) struct Memory {
     allocations: Rc<Vec<Option<Value>>>,
-    pub(super) startup_atomics: std::collections::HashMap<StaticAtomicLocation, Value>,
+    pub(super) startup_values: std::collections::HashMap<StaticLocation, Value>,
     pub(super) startup_invalidated: bool,
     pub(super) static_uninitialized: Vec<usize>,
 }
 
 impl Memory {
     pub(super) fn invalidate_startup(&mut self) {
-        self.startup_atomics.clear();
+        self.startup_values.clear();
         self.startup_invalidated = true;
     }
 }
@@ -83,8 +83,8 @@ impl<'a> IntoIterator for &'a mut Memory {
 mod tests {
     use super::*;
 
-    fn atomic_location(index: usize) -> StaticAtomicLocation {
-        StaticAtomicLocation {
+    fn atomic_location(index: usize) -> StaticLocation {
+        StaticLocation {
             definition: DefId {
                 krate: rustc_span::def_id::LOCAL_CRATE,
                 index: rustc_span::def_id::DefIndex::from_usize(index),
@@ -151,25 +151,23 @@ mod tests {
         let location = atomic_location(7);
         let other_location = atomic_location(8);
         let mut original: Memory = vec![Some(Value::Unit)].into();
-        original.startup_atomics.insert(location, Value::Unit);
+        original.startup_values.insert(location, Value::Unit);
         original.static_uninitialized.push(4);
         let mut branch = original.clone();
         branch.static_uninitialized.clear();
         assert_eq!(original.static_uninitialized, vec![4]);
-        branch
-            .startup_atomics
-            .insert(location, Value::Uninitialized);
-        branch.startup_atomics.insert(other_location, Value::Unit);
-        assert!(matches!(original.startup_atomics[&location], Value::Unit));
-        assert!(!original.startup_atomics.contains_key(&other_location));
+        branch.startup_values.insert(location, Value::Uninitialized);
+        branch.startup_values.insert(other_location, Value::Unit);
+        assert!(matches!(original.startup_values[&location], Value::Unit));
+        assert!(!original.startup_values.contains_key(&other_location));
         branch.invalidate_startup();
-        assert!(branch.startup_atomics.is_empty());
+        assert!(branch.startup_values.is_empty());
         assert!(branch.startup_invalidated);
         assert!(!original.startup_invalidated);
-        assert_eq!(original.startup_atomics.len(), 1);
+        assert_eq!(original.startup_values.len(), 1);
         let invalidated_branch = branch.clone();
         assert!(invalidated_branch.startup_invalidated);
-        assert!(invalidated_branch.startup_atomics.is_empty());
+        assert!(invalidated_branch.startup_values.is_empty());
         assert!(Rc::ptr_eq(&original.allocations, &branch.allocations));
         assert!(Rc::ptr_eq(
             &branch.allocations,

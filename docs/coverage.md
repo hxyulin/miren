@@ -720,7 +720,16 @@ state or unstable reads carry an abstraction reason; they do not establish a boo
 Certified bool payloads inside core UnsafeCell, including `Cell<bool>`, use the same arbitrary-read
 model. A bounded compiler struct/tuple field path must match the exact declared storage type and
 byte offset. Unions and MaybeUninit paths remain unsupported; reads grant no initialization,
-startup, exclusion or stable shared-state evidence.
+startup, exclusion or stable shared-state evidence in ordinary analysis.
+
+Under the explicit `--startup` domain, those same certified boolean locations use checked compiler
+initializer bytes and branch-local writes. A shared static footprint map prevents boolean and
+integer atomic histories from describing overlapping bytes independently. Nonboolean stores and
+opaque calls invalidate known and unseen histories; subsequent writes do not restore precision.
+Host/ARM O0/O2 compiler cases cover conditional first use, repeated use, independent allocations
+and fields, branch-local updates, mixed disjoint atomic history and unsupported pointer/storage
+cases. Initializer mutations refute the conditional proof; separate native runs confirm first use,
+repeated use and the mutation. Default outcomes and async startup rejection remain unchanged.
 
 Concrete trait-object unsizing preserves a compiler Unsize certificate and exact vtable slot.
 Actual method bodies execute with retained storage, mutations and lifetimes. Arbitrary dyn roots

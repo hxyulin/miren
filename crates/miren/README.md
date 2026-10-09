@@ -84,9 +84,15 @@ Whole mutable Rust `bool` statics and certified boolean fields inside compiler-i
 provenance. This includes core `Cell<bool>` storage. Interior reads require matching declared
 and original types and an exact bounded struct/tuple field path through the core `UnsafeCell`
 lang item; unions and uninitialized payloads remain unsupported. Each read admits either valid
-boolean value, including after writes;
-initializers and critical sections establish no startup or shared-state history. Counterexamples
-that depend on this abstraction record its reason. Foreign storage, numeric addresses, different
+boolean value, including after writes, in ordinary analysis. Initializers and critical sections
+establish no startup or shared-state history. Explicit `--startup` records fresh initial values and
+no external changes to tracked static storage before pointer publication or opaque calls. In that
+conditional domain, certified boolean reads use initializer values and exact branch-local writes,
+sharing storage footprints and invalidation with integer atomics. Nonboolean static writes, mixed
+or overlapping views and opaque boundaries discard precision; later writes cannot restore it.
+Conditional first use proves, repeated initialization refutes, and unsupported pointers remain
+UNKNOWN. This does not establish reset execution or enable startup facts in async roots.
+Counterexamples that depend on arbitrary-read abstraction record its reason. Foreign storage, numeric addresses, different
 scalar types, unauthenticated interior offsets and mismatched storage origins remain UNKNOWN.
 Readonly pointers
 cannot authorize writes.

@@ -1503,3 +1503,33 @@ and four artifact checkpoints remain unchanged. Fresh strict/reset main replays 
 outcomes and policy, with no new assumptions. All 464 Rust tests, 44 Python tool tests, formatting,
 Clippy, release builds, dependency checks, documentation builds and manual hooks pass. The compact
 exporters validate complete evidence before publication. Application code remains untouched.
+
+
+## Stage 102: Explicit startup history for certified boolean statics
+
+The existing opt-in startup domain now retains certified whole mutable bool and exact core
+UnsafeCell/Cell boolean payload values. Integer atomics and booleans share allocation/offset/size
+identities, one branch-local history map and scalar initializer decoding. Boolean bytes must be
+initialized, provenance-free and encoded as 0 or 1. Typed boolean writes update only their exact
+location; nonboolean writes, mixed/overlapping histories and opaque effects discard precision,
+including unseen initializers. Writes after invalidation do not restore the premise.
+
+Entry assumptions explicitly cover no external changes to tracked static storage before pointer
+publication or opaque calls. Conditional proofs remain PROVED_WITH_ASSUMPTIONS. Default shared
+boolean reads remain arbitrary, and async roots still cannot inherit startup facts. This stage does
+not verify reset execution, MMIO, interrupt exclusion or any fleet main's boot reachability.
+
+Host/ARM O0/O2 cases cover first/repeated initialization, Cell storage, nonzero-offset payloads,
+independent fields, disjoint integer atomic updates, weak-CAS branch histories, boundary and typed
+write invalidation, unsupported pointers and initializer mutations. Separate native runs confirm
+fresh/repeated outcomes and the mutation. Full workspace tests, lint, formatting, release builds,
+dependency checks, tool tests, documentation builds and manual hooks pass.
+
+A diagnostic replay of all twelve runtime wrappers preserves every strict obligation, SMT query
+and model from pass eight. Selecting the explicit startup domain instead clears task allocation
+and reaches Spawner::spawn, then refutes the Cordyceps stack's next-link-is-empty debug assertion
+at stack.rs:129. All twelve failures depend on the still-arbitrary initialized static Option
+discriminant; Links::new declares None. This is a missing enum-history model, not a confirmed boot
+panic. The existing integer-atomic startup premise enables this traversal; it is not a new default
+proof or an effect of boolean history. Local captures remain under
+`/tmp/miren-startup-bools-runtime-comparison`, with binary/report hashes and dirty-source provenance.

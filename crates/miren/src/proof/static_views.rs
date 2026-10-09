@@ -314,7 +314,7 @@ impl<'tcx> Engine<'tcx> {
                         "uninitialized static payload reads need an initialization model".into(),
                     );
                 }
-                if let Some(value) = self.mutable_bool_static_read(view)? {
+                if let Some(value) = self.mutable_bool_static_read(view, state)? {
                     return Ok(value);
                 }
                 if self.atomic_shape(view.ty).is_some() {
@@ -517,8 +517,10 @@ impl<'tcx> Engine<'tcx> {
                 self.static_store_value(view.ty, value, state, 0, &mut 0)?;
                 self.retain_static_store_references(value, state)?;
                 self.reinitialize_static_place(view, state);
-                state.memory.invalidate_startup();
-                // Shared payload reads stay opaque; this store supplies no value/history facts.
+                if !self.store_startup_bool(view, value, state)? {
+                    state.memory.invalidate_startup();
+                }
+                // Ordinary shared payload reads stay opaque; startup is an explicit root domain.
                 return Ok(true);
             }
             if length == place.projection.len() {

@@ -508,15 +508,16 @@ and compiler logs are temporary; JSON and JSONL retain structured replay evidenc
 
 Use `--verify --startup --entry start` for a zero-argument startup function. Add
 `--allow-assumptions` to accept a conditional proof. This assumes that Rust statics have their
-declared initializer values on entry, with no external atomic interference before a publication or
-opaque boundary. The terminal and JSON reports list these entry assumptions separately from
-contracts. Cargo forwards the same options.
+declared initializer values on entry, with no external changes to tracked static storage before
+pointer publication or opaque calls. The terminal and JSON reports list these entry assumptions
+separately from contracts. Cargo forwards the same options.
 
-Supported integer static atomics retain initial values and sequential updates through branches,
-calls and callbacks. Typed static stores, overlapping views and trusted calls discard precise
-history; unseen statics cannot regain initializer values afterward. Arbitrary-root analysis keeps
-shared atomic reads conservative. Startup roots with arguments, unsupported initializer storage and
-cyclic induction remain UNKNOWN. This mode does not verify the reset handler, runtime loader,
+Supported integer static atomics and certified boolean static payloads retain initial values and
+sequential updates through branches and calls. This includes whole mutable bool statics and exact
+UnsafeCell/Cell boolean fields. Other typed static stores, mixed or overlapping views and trusted
+calls discard precision; unseen statics and later writes cannot restore invalidated history.
+Arbitrary-root analysis keeps shared atomic and boolean reads conservative. Startup roots with
+arguments, unsupported initializer storage and cyclic induction remain UNKNOWN. This mode does not verify the reset handler, runtime loader,
 hardware initialization or an interrupt/task execution environment.
 
 Saved reports preserve `functions[].proof.entry_assumptions`. Recompiling with `--from-report`

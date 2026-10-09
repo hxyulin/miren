@@ -1,5 +1,5 @@
 use super::*;
-use startup_memory::StaticAtomicLocation;
+use startup_memory::StaticLocation;
 
 impl<'tcx> Engine<'tcx> {
     pub(in crate::proof) fn static_atomic_storage(
@@ -8,7 +8,7 @@ impl<'tcx> Engine<'tcx> {
         receiver_ty: Ty<'tcx>,
         payload_ty: Ty<'tcx>,
         state: &State,
-    ) -> Result<StaticAtomicLocation, String> {
+    ) -> Result<StaticLocation, String> {
         let env = ty::TypingEnv::fully_monomorphized();
         let receiver_ty = self
             .tcx
@@ -65,7 +65,7 @@ impl<'tcx> Engine<'tcx> {
         {
             return Err("static atomic access requires exactly sized scalar storage".into());
         }
-        Ok(StaticAtomicLocation {
+        Ok(StaticLocation {
             definition: view.static_id,
             offset: view.offset,
             bytes: receiver_layout.size.bytes(),
@@ -78,7 +78,7 @@ impl<'tcx> Engine<'tcx> {
         state: &State,
         bits: u32,
         signed: bool,
-    ) -> Result<StaticAtomicLocation, String> {
+    ) -> Result<StaticLocation, String> {
         let view = self.static_view(value, state)?;
         if !matches!(self.atomic_shape(view.ty), Some(Value::Atomic { bits: b, signed: s })
             if (bits, signed) == (b, s))

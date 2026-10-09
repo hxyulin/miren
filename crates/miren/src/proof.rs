@@ -260,7 +260,7 @@ impl<'tcx> Engine<'tcx> {
             self.proof.entry_assumptions = vec![
                 "Fresh startup: Rust statics have their declared initializer values on entry"
                     .into(),
-                "No external actor changes static atomics before a publication or opaque boundary"
+                "No external changes to tracked static storage before pointer publication or opaque calls"
                     .into(),
             ];
             if body.arg_count != 0 {

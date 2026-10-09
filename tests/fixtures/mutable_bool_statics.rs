@@ -86,18 +86,19 @@ pub fn numeric_address_is_unknown() {
     assert!(!read(pointer));
 }
 
-
 use core::cell::{Cell, SyncUnsafeCell};
 
 struct Wrapper {
     padding: u64,
     value: bool,
+    other: bool,
 }
 
 static mut CELL: Cell<bool> = Cell::new(false);
 static WRAPPER: SyncUnsafeCell<Wrapper> = SyncUnsafeCell::new(Wrapper {
     padding: 7,
     value: false,
+    other: false,
 });
 static BYTE_CELL: SyncUnsafeCell<u8> = SyncUnsafeCell::new(0);
 static UNINIT_CELL: SyncUnsafeCell<core::mem::MaybeUninit<bool>> =
@@ -134,4 +135,118 @@ pub fn wrong_cell_scalar_is_unknown() {
 pub fn uninitialized_bool_is_unknown() {
     let pointer: *const bool = cast(UNINIT_CELL.get());
     assert!(!read(pointer));
+}
+
+pub fn repeated_bool_initialization() {
+    already_taken();
+    already_taken();
+}
+
+pub fn repeated_cell_initialization() {
+    let cell = borrow(&raw mut CELL);
+    assert!(!cell.get());
+    cell.set(true);
+    assert!(!cell.get());
+}
+
+pub fn independent_boolean_locations() {
+    already_taken();
+    let cell = borrow(&raw mut CELL);
+    assert!(!cell.get());
+    cell.set(true);
+    assert!(read(&raw const TAKEN));
+    assert!(cell.get());
+    nested_cell_already_taken();
+}
+
+static COUNTER: core::sync::atomic::AtomicU16 = core::sync::atomic::AtomicU16::new(0);
+
+pub fn boolean_and_atomic_histories_are_disjoint() {
+    use core::sync::atomic::Ordering;
+    COUNTER.store(7, Ordering::Relaxed);
+    already_taken();
+    assert!(COUNTER.load(Ordering::Relaxed) == 7);
+    assert!(read(&raw const TAKEN));
+}
+
+pub fn conditional_writes_keep_branch_history() {
+    use core::sync::atomic::Ordering;
+    if COUNTER
+        .compare_exchange_weak(0, 1, Ordering::Relaxed, Ordering::Relaxed)
+        .is_ok()
+    {
+        write(&raw mut TAKEN, true);
+        assert!(read(&raw const TAKEN));
+    } else {
+        assert!(!read(&raw const TAKEN));
+    }
+}
+
+pub fn boundary() {}
+
+pub fn boundary_invalidates_known_boolean_history() {
+    already_taken();
+    boundary();
+    assert!(read(&raw const TAKEN));
+}
+
+pub fn boundary_invalidates_unseen_boolean_history() {
+    boundary();
+    already_taken();
+}
+
+pub fn writes_do_not_restore_invalidated_boolean_history() {
+    boundary();
+    write(&raw mut TAKEN, false);
+    assert!(!read(&raw const TAKEN));
+}
+
+pub fn nonboolean_write_invalidates_boolean_history() {
+    already_taken();
+    write(BYTE_CELL.get(), 1);
+    assert!(read(&raw const TAKEN));
+}
+
+pub fn independent_fields_in_one_allocation() {
+    let wrapper = WRAPPER.get();
+    write(synthetic::first(wrapper), true);
+    assert!(read(synthetic::first(wrapper)));
+    assert!(!read(synthetic::second(wrapper)));
+}
+
+mod synthetic {
+    use super::*;
+
+    #[custom_mir(dialect = "runtime", phase = "optimized")]
+    pub fn first(pointer: *mut Wrapper) -> *mut bool {
+        mir! {{ RET = &raw mut (*pointer).value; Return() }}
+    }
+
+    #[custom_mir(dialect = "runtime", phase = "optimized")]
+    pub fn second(pointer: *mut Wrapper) -> *mut bool {
+        mir! {{ RET = &raw mut (*pointer).other; Return() }}
+    }
+}
+
+#[cfg(test)]
+mod native {
+    #[test]
+    fn fresh() {
+        super::already_taken();
+    }
+
+    #[test]
+    fn twice() {
+        super::repeated_bool_initialization();
+    }
+
+    #[test]
+    fn fresh_cell() {
+        super::cell_write_does_not_establish_history();
+    }
+
+    #[test]
+    fn twice_cell() {
+        super::repeated_cell_initialization();
+    }
 }

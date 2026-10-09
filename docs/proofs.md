@@ -847,12 +847,16 @@ replay for every byte input.
 ### Conditional startup entry
 
 An explicit `--startup` run assumes fresh Rust static initializers for a zero-argument root and no
-external atomic interference before a publication or opaque boundary. This premise is recorded in
-`entry_assumptions`; a successful proof is PROVED_WITH_ASSUMPTIONS. Supported certified integer
-static atomics use checked initializer values and branch-local updates. Overlapping views, typed
-static stores and trusted boundaries invalidate precise history, including future first accesses.
-Default arbitrary roots still allow arbitrary shared atomic state. The mode does not verify reset
-or runtime initialization and does not yet encode startup histories into cyclic induction.
+external changes to tracked static storage before pointer publication or opaque calls. This premise
+is recorded in `entry_assumptions`; a successful proof is PROVED_WITH_ASSUMPTIONS. Certified integer
+atomics and boolean static payloads share exact allocation/offset/size identities and branch-local
+updates. Boolean initializer reads check initialized bytes, provenance and the valid 0/1 encoding;
+this applies only to the previously supported whole mutable bool and UnsafeCell field paths.
+Nonboolean static stores, mixed or overlapping views and trusted boundaries discard precise history,
+including future first accesses. A later boolean write cannot restore invalidated history.
+Default roots retain arbitrary shared state. The mode does not verify reset or runtime
+initialization
+and cannot import startup facts into async entry analysis or cyclic induction.
 
 ### Primitive atomic intrinsic stores
 

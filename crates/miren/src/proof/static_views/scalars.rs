@@ -1,5 +1,6 @@
-//! Whole compiler-backed mutable boolean statics, without startup or shared-state history.
+//! Certified boolean statics; ordinary reads are opaque, startup history is explicitly assumed.
 use super::*;
+use startup_memory::StaticLocation;
 
 impl<'tcx> Engine<'tcx> {
     pub(super) fn mutable_bool_static_constant(
@@ -64,7 +65,79 @@ impl<'tcx> Engine<'tcx> {
     pub(super) fn mutable_bool_static_read(
         &self,
         view: StaticView<'tcx>,
+        state: &State,
     ) -> Result<Option<Value>, String> {
+        let Some(location) = self.mutable_bool_static_location(view)? else {
+            return Ok(None);
+        };
+        if self.startup && !state.memory.startup_invalidated {
+            if let Some(Value::Bool(value)) = state.memory.startup_values.get(&location) {
+                return Ok(Some(Value::Bool(value.clone())));
+            }
+            if !state
+                .memory
+                .startup_values
+                .keys()
+                .any(|other| location.overlaps(*other))
+            {
+                let value = match self.startup_scalar_initializer(location)? {
+                    0 => false,
+                    1 => true,
+                    _ => return Err("startup boolean initializer has an invalid encoding".into()),
+                };
+                return Ok(Some(Value::Bool(self.terms.boolean(value))));
+            }
+        }
+        // Ordinary or invalidated reads admit either valid value, including after a write.
+        Ok(Some(Value::Bool(self.fresh_abstraction(
+            Sort::Bool,
+            if self.startup {
+                "mutable boolean static reads admit arbitrary valid values; startup and exclusion \
+                 are invalidated or overlap"
+            } else {
+                "mutable boolean static reads admit arbitrary valid values; startup and exclusion \
+                 are unverified"
+            },
+        ))))
+    }
+
+    pub(super) fn store_startup_bool(
+        &self,
+        view: StaticView<'tcx>,
+        value: &Value,
+        state: &mut State,
+    ) -> Result<bool, String> {
+        if !self.startup {
+            return Ok(false);
+        }
+        let Some(location) = self.mutable_bool_static_location(view)? else {
+            return Ok(false);
+        };
+        let Value::Bool(_) = value else {
+            return Err("startup boolean store needs a valid boolean value".into());
+        };
+        if state.memory.startup_invalidated {
+            return Ok(true);
+        }
+        if state.memory.startup_values.iter().any(|(other, stored)| {
+            location.overlaps(*other) && (*other != location || !matches!(stored, Value::Bool(_)))
+        }) {
+            state.memory.invalidate_startup();
+            return Ok(true);
+        }
+        if !state.memory.startup_values.contains_key(&location)
+            && state.memory.startup_values.len() >= startup::MAX_STARTUP_LOCATIONS
+        {
+            return Err("startup boolean history exceeds the 128-location budget".into());
+        }
+        state.memory.startup_values.insert(location, value.clone());
+        Ok(true)
+    }
+
+    fn mutable_bool_static_location(
+        &self,
+        view: StaticView<'tcx>,
+    ) -> Result<Option<StaticLocation>, String> {
         if view.kind != ViewKind::Place || view.ty != self.tcx.types.bool {
             return Ok(None);
         }
@@ -87,13 +160,11 @@ impl<'tcx> Engine<'tcx> {
         if !whole_mutable && !cell_payload {
             return Ok(None);
         }
-        // The declared initializer is construction evidence, not runtime state. Each read admits
-        // either valid boolean value, including after a write or a critical-section call.
-        Ok(Some(Value::Bool(self.fresh_abstraction(
-            Sort::Bool,
-            "mutable boolean static reads admit arbitrary valid values; startup and exclusion \
-             are unverified",
-        ))))
+        Ok(Some(StaticLocation {
+            definition: view.static_id,
+            offset: view.offset,
+            bytes: self.static_layout(view.ty)?.size.bytes(),
+        }))
     }
 
     fn boolean_cell_payload(

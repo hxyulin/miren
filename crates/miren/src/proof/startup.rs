@@ -1,13 +1,13 @@
 use super::*;
 use rustc_abi::Size;
-use startup_memory::StaticAtomicLocation;
+use startup_memory::StaticLocation;
 
-const MAX_STARTUP_ATOMICS: usize = 128;
+pub(super) const MAX_STARTUP_LOCATIONS: usize = 128;
 
 #[derive(Clone, Copy)]
 pub(super) enum AtomicStorage {
     Tracked(usize),
-    Startup(StaticAtomicLocation),
+    Startup(StaticLocation),
 }
 
 impl<'tcx> Engine<'tcx> {
@@ -26,7 +26,7 @@ impl<'tcx> Engine<'tcx> {
             expression,
             bits: width,
             ..
-        }) = state.memory.startup_atomics.get(&location)
+        }) = state.memory.startup_values.get(&location)
         {
             if bits != *width {
                 return Err("startup atomic history has an inconsistent width".into());
@@ -42,7 +42,7 @@ impl<'tcx> Engine<'tcx> {
         }
         if state
             .memory
-            .startup_atomics
+            .startup_values
             .keys()
             .any(|existing| location.overlaps(*existing))
         {
@@ -53,11 +53,11 @@ impl<'tcx> Engine<'tcx> {
             );
             return Ok((self.opaque_atomic_value(bits, signed), None));
         }
-        if state.memory.startup_atomics.len() >= MAX_STARTUP_ATOMICS {
+        if state.memory.startup_values.len() >= MAX_STARTUP_LOCATIONS {
             return Err("startup atomic history exceeds the 128-location budget".into());
         }
         let value = self.startup_atomic_initializer(location, bits, signed)?;
-        state.memory.startup_atomics.insert(location, value.clone());
+        state.memory.startup_values.insert(location, value.clone());
         self.record_model(
             location.definition,
             "fresh-startup static integer atomic; initializer and path-local updates",
@@ -80,28 +80,38 @@ impl<'tcx> Engine<'tcx> {
         match storage {
             AtomicStorage::Tracked(allocation) => state.memory[allocation] = Some(value),
             AtomicStorage::Startup(location) => {
-                state.memory.startup_atomics.insert(location, value);
+                state.memory.startup_values.insert(location, value);
             }
         }
     }
 
     fn startup_atomic_initializer(
         &self,
-        location: StaticAtomicLocation,
+        location: StaticLocation,
         bits: u32,
         signed: bool,
     ) -> Result<Value, String> {
+        if location.bytes != u64::from(bits / 8) {
+            return Err("startup scalar initializer has an inconsistent width".into());
+        }
+        let value = self.startup_scalar_initializer(location)?;
+        Ok(symbolic::integer(&self.terms, value, bits, signed))
+    }
+
+    pub(super) fn startup_scalar_initializer(
+        &self,
+        location: StaticLocation,
+    ) -> Result<u128, String> {
         let initializer = self
             .tcx
             .eval_static_initializer(location.definition)
             .map_err(|error| format!("startup static initializer evaluation failed: {error:?}"))?;
-        if location.bytes != u64::from(bits / 8)
-            || location
-                .offset
-                .checked_add(location.bytes)
-                .is_none_or(|end| end > initializer.inner().size().bytes())
+        if location
+            .offset
+            .checked_add(location.bytes)
+            .is_none_or(|end| end > initializer.inner().size().bytes())
         {
-            return Err("startup atomic initializer access exceeds its allocation".into());
+            return Err("startup scalar initializer access exceeds its allocation".into());
         }
         let range = rustc_middle::mir::interpret::AllocRange {
             start: Size::from_bytes(location.offset),
@@ -110,11 +120,11 @@ impl<'tcx> Engine<'tcx> {
         let scalar = initializer
             .inner()
             .read_scalar(&self.tcx, range, false)
-            .map_err(|error| format!("startup atomic initializer scalar read failed: {error:?}"))?;
+            .map_err(|error| format!("startup scalar initializer scalar read failed: {error:?}"))?;
         let value = scalar
             .to_bits(range.size)
             .discard_err()
-            .ok_or("startup atomic initializer cannot contain pointer provenance")?;
-        Ok(symbolic::integer(&self.terms, value, bits, signed))
+            .ok_or("startup scalar initializer cannot contain pointer provenance")?;
+        Ok(value)
     }
 }
