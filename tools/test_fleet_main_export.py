@@ -55,6 +55,48 @@ def sample(conditional=False):
 
 
 class MainExportTests(unittest.TestCase):
+    def test_entry_milestone_requires_valid_poll_records_and_exports_selected_evidence(self):
+        summary = sample()
+        name = main.FACTORY + "::{closure#0}"
+        entry = {"function": name, "instance": name + " []", "coroutine_poll": True,
+                 "source": {"file": "main.rs", "line": 1, "column": 1},
+                 "call_chain": [main.FACTORY, name]}
+        for unit in summary["units"]:
+            unit["roots"][0]["proof"]["body_entries"] = [copy.deepcopy(entry)]
+        main.annotate_evidence(summary)
+        summary["fresh_future_entry_milestone_reached"] = True
+        exporter.validate(summary)
+        root = summary["units"][0]["roots"][0]
+        compact = exporter.compact_root(root, entry["source"], "a" * 64)
+        self.assertTrue(compact["application_body_reached"])
+        self.assertEqual(compact["application_body_entries"], [entry])
+        self.assertEqual(compact["body_entry_count"], 1)
+        self.assertFalse(compact["body_entries_truncated"])
+        for mutation in [lambda s: s["units"][0]["roots"][0]["proof"].pop("body_entries"),
+                         lambda s: s["units"][0]["roots"][0]["proof"]["body_entries"][0].update(
+                             coroutine_poll=False),
+                         lambda s: s["units"][0]["roots"][0]["proof"]["body_entries"][0].update(
+                             call_chain=["wrong_root"]),
+                         lambda s: s["units"][0]["roots"][0]["proof"].update(
+                             body_entries_truncated=1),
+                         lambda s: s["units"][0]["roots"][0]["proof"].update(
+                             body_entries_truncated=True),
+                         lambda s: s["units"][0]["roots"][0]["proof"]["body_entries"][0].update(
+                             source={}),
+                         lambda s: s["units"][0]["roots"][0].update(
+                             application_body_reached=False)]:
+            changed = copy.deepcopy(summary)
+            mutation(changed)
+            with self.assertRaises(ValueError):
+                exporter.validate(changed)
+        old = sample()
+        self.assertFalse(exporter.compact_root(old["units"][0]["roots"][0],
+                                               entry["source"], "a" * 64)[
+                                                   "application_body_reached"])
+        old["fresh_future_entry_milestone_reached"] = True
+        with self.assertRaises(ValueError):
+            exporter.validate(old)
+
     def test_complete_collection_can_publish_unknown_without_claiming_milestone(self):
         for conditional in (False, True):
             summary = sample(conditional)

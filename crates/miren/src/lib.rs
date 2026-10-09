@@ -173,6 +173,10 @@ pub struct Proof {
     #[serde(default)]
     pub invariants: Vec<String>,
     pub analyzed_bodies: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub body_entries: Vec<BodyEntry>,
+    #[serde(default)]
+    pub body_entries_truncated: bool,
     pub obligations: Vec<Obligation>,
     #[serde(default)]
     pub trusted_calls: Vec<TrustedCall>,
@@ -180,6 +184,17 @@ pub struct Proof {
     pub matched_contracts: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub replay_inputs: Option<replay::ReplayArguments>,
+}
+
+/// Symbolic body entry after argument validation and a satisfiable path check.
+/// This is traversal evidence, not a native execution or a completed safety proof.
+#[derive(Debug, Deserialize, Serialize)]
+pub struct BodyEntry {
+    pub function: String,
+    pub instance: String,
+    pub coroutine_poll: bool,
+    pub source: Source,
+    pub call_chain: Vec<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]

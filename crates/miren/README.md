@@ -102,6 +102,17 @@ construction; `--async-entry` also polls its fresh future through Pending and Re
 Executor scheduling, cancellation and unbounded suspension require additional models or proofs.
 Startup entry assumptions are explicit and are not inherited by async entry analysis.
 
+Reports also retain up to 512 symbolic body entries after argument validation and a satisfiable
+start-block path. Each record identifies the concrete instance, compiler coroutine-poll kind,
+source and call chain. Constructor analysis alone supplies no poll-entry evidence. Truncation is
+explicit; these records establish neither native reachability nor completed panic freedom.
+
+In explicit startup mode, certified Copy/Freeze enum places can inspect their declared initializer
+tag through rustc's typed discriminant decoder, including niche pointer options and signed tags.
+The bounded read-only host snapshot preserves initialized bytes and provenance; it does not enable
+runtime payload reads. Overlapping histories, static writes and opaque boundaries still discard
+precision. Ordinary enum tags remain arbitrary legal observations.
+
 Contracts are metadata. Callee bodies and configured bounds are checked; annotations do not become
 unchecked verified summaries. Explicit trusted boundaries and startup domains remain listed as
 assumptions. Replay executes supported native inputs only with `--replay`, reports its independent

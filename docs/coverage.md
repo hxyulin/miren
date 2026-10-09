@@ -806,3 +806,20 @@ success compares observed old value with expected value; each weak operation add
 own unconstrained spurious-failure choice. Shared code does not merge pointer address provenance,
 owned integer history or startup assumptions. Regression cases distinguish independent weak choices
 from repeated strong zero-value writes on host/ARM at both compiler optimization levels.
+
+
+## Application entry traversal evidence
+
+Proof reports record symbolic body entry only after validating call arguments and finding a
+satisfiable start-block path. Compiler coroutine identity distinguishes application poll bodies
+from future constructors; inventory and analyzed-body lists do not establish entry. The 512-record
+budget reports truncation explicitly. Host/ARM O0/O2 cases preserve positive, negative and unknown
+poll outcomes, exclude constructors and rejected roots, and deserialize older reports conservatively.
+Reaching a body is separate from completing a proof or confirming a native execution.
+
+Explicit startup mode can additionally inspect an exactly certified Copy/Freeze static enum's
+initializer tag. Rustc decodes the typed layout, including niche `Option<NonNull>` and signed sparse
+tags, from a read-only host snapshot capped at 1 MiB. The copy supplies no runtime freeze property
+or pointer/payload access. Writes and opaque calls invalidate precision; wrong origins, uninitialized
+places and unsupported payload reads stay UNKNOWN. Compiler initializer mutations and independent
+native runs distinguish fresh None from occupied Some. Ordinary-root tag observations stay opaque.

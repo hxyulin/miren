@@ -1532,4 +1532,29 @@ at stack.rs:129. All twelve failures depend on the still-arbitrary initialized s
 discriminant; Links::new declares None. This is a missing enum-history model, not a confirmed boot
 panic. The existing integer-atomic startup premise enables this traversal; it is not a new default
 proof or an effect of boolean history. Local captures remain under
-`/tmp/miren-startup-bools-runtime-comparison`, with binary/report hashes and dirty-source provenance.
+`/tmp/miren-startup-bools-runtime-comparison`, with binary/report hashes and dirty-source
+provenance.
+
+
+## Stage 103: Conditional enum tags and symbolic body-entry evidence
+
+Startup enum discriminants now use rustc's exact typed initializer layout for certified Copy/Freeze
+places, including signed sparse tags and niche pointer options. A read-only host snapshot preserves
+initialization and provenance with a 1 MiB allocation cap; it grants neither runtime immutable
+storage nor payload access. Writes, overlapping histories and opaque effects discard precision.
+Host/ARM O0/O2 cases prove fresh tags conditionally, refute initializer mutations and retain UNKNOWN
+for uninitialized, unrelated or unsupported payload storage. Independent native runs confirm the
+original and mutated initializer outcomes. Ordinary enum observations retain their existing domain.
+
+Proof reports now record bounded symbolic body entry after argument validation and a satisfiable
+start-block path. Records retain concrete instance, compiler coroutine identity, source and call
+chain; constructors and rejected roots do not establish application poll entry. The 512-record cap
+has an explicit truncation flag. Old reports deserialize with no entry evidence. Traversal records
+never change proof status or establish native boot reachability.
+
+The main survey separately measures entry into every selected application coroutine from a fresh
+future. Missing records, constructors, another coroutine, truncated evidence or incomplete captures
+cannot satisfy this milestone. Existing supported-outcome milestones retain their original meaning.
+No executor scheduling or hardware instruction is skipped to manufacture a runtime-to-poll proof.
+Full workspace tests, lint, formatting, release builds, dependency checks, tool tests, documentation
+builds and manual hooks pass.

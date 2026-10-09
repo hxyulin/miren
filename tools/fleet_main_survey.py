@@ -88,6 +88,33 @@ def counterexample_evidence(proof):
             if obligation.get("status") == "refuted"]
 
 
+def valid_body_entry(entry):
+    if not isinstance(entry, dict):
+        return False
+    source, chain = entry.get("source"), entry.get("call_chain")
+    return (all(isinstance(entry.get(key), str) and entry[key]
+                for key in ("function", "instance"))
+            and type(entry.get("coroutine_poll")) is bool
+            and isinstance(source, dict) and isinstance(source.get("file"), str)
+            and bool(source["file"])
+            and all(type(source.get(key)) is int and source[key] > 0
+                    for key in ("line", "column"))
+            and isinstance(chain, list) and bool(chain)
+            and all(isinstance(name, str) and name for name in chain)
+            and chain[-1] == entry["function"])
+
+
+def application_body_reached(proof):
+    """Require a feasible entry into this root's coroutine poll, not its constructor."""
+    entries = proof.get("body_entries", [])
+    if (proof.get("async_entry") is not True or not isinstance(entries, list)
+            or proof.get("body_entries_truncated", False) is not False):
+        return False
+    return any(valid_body_entry(entry) and entry["coroutine_poll"]
+               and entry["function"] == FACTORY + "::{closure#0}"
+               and entry["call_chain"][0] == FACTORY for entry in entries)
+
+
 def annotate_evidence(result):
     result["milestone_scope"] = "async body analyzer outcomes under recorded root domains"
     result["boot_reachability"] = "unverified"
@@ -97,6 +124,10 @@ def annotate_evidence(result):
             root["boot_reachability"] = "unverified"
             root["counterexample_evidence"] = counterexample_evidence(root.get("proof", {})) \
                 if root.get("status") == "complete" else []
+            if root["scope"] == "async_body":
+                root["application_body_reached"] = (root.get("status") == "complete"
+                                                    and application_body_reached(
+                                                        root.get("proof", {})))
 
 
 def contract_selector(spec):
@@ -211,6 +242,12 @@ def checked_proof(unit, inventory, report, cwd, scope, limits, returncode,
     proof = proofs[0]["proof"]
     require(proof.get("status") in survey.STATUSES, "invalid proof status")
     require(proof.get("async_entry") is asynchronous, "proof scope mismatch")
+    entries = proof.get("body_entries", [])
+    require(isinstance(entries, list) and len(entries) <= 512
+            and all(valid_body_entry(entry) for entry in entries),
+            "invalid executed body entry evidence")
+    require(type(proof.get("body_entries_truncated", False)) is bool,
+            "invalid executed body entry truncation metadata")
     validate_proof_policy(proof, report, unit, name, config, allow_assumptions)
     obligations = proof.get("obligations")
     require(isinstance(obligations, list), "missing obligations")
@@ -427,6 +464,7 @@ def run(args):
     annotate_evidence(result)
     result["milestone_reached"] = milestone_reached(result)
     result["conditional_milestone_reached"] = conditional_milestone_reached(result)
+    result["fresh_future_entry_milestone_reached"] = fresh_future_entry_milestone_reached(result)
     result["counts"] = {scope: {status: sum(r.get("proof_status") == status
                                            for u in result["units"] for r in u["roots"]
                                            if r["scope"] == scope)
@@ -435,7 +473,9 @@ def run(args):
     print(json.dumps({"status": result["status"], "coverage_scope": result["coverage_scope"],
                       "units": len(result["units"]), "counts": result["counts"],
                       "milestone_reached": result["milestone_reached"],
-                      "conditional_milestone_reached": result["conditional_milestone_reached"]},
+                      "conditional_milestone_reached": result["conditional_milestone_reached"],
+                      "fresh_future_entry_milestone_reached":
+                          result["fresh_future_entry_milestone_reached"]},
                      sort_keys=True))
     return 0 if result["status"] == "complete" else 1
 
@@ -468,6 +508,28 @@ def conditional_milestone_reached(result):
         if (len(bodies) != 1 or bodies[0]["status"] != "complete"
                 or bodies[0]["proof_status"] not in {"proved", "proved_with_assumptions", "refuted"}
                 or type(bodies[0].get("conditional")) is not bool):
+            return False
+    return True
+
+
+def fresh_future_entry_milestone_reached(result):
+    """Entry coverage is independent of proof completion, but requires a complete capture."""
+    units, expected = result.get("units", []), result.get("expected_units", [])
+    sources = result.get("source_files_before")
+    if (result.get("status") != "complete" or result.get("errors")
+            or result.get("coverage_scope") != "all_embassy_binary_mains"
+            or not expected or len(set(expected)) != len(expected)
+            or len(units) != len(expected) or {u["id"] for u in units} != set(expected)
+            or not isinstance(sources, dict) or sources != result.get("source_files_after")):
+        return False
+    for unit in units:
+        artifacts = unit.get("artifact_hashes_before")
+        bodies = [root for root in unit["roots"] if root["scope"] == "async_body"]
+        if (unit.get("status") != "complete" or not isinstance(artifacts, dict)
+                or artifacts != unit.get("artifact_hashes_after")
+                or artifacts != unit.get("artifact_hashes_at_completion")
+                or len(bodies) != 1 or bodies[0].get("status") != "complete"
+                or not application_body_reached(bodies[0].get("proof", {}))):
             return False
     return True
 

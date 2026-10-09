@@ -854,6 +854,10 @@ updates. Boolean initializer reads check initialized bytes, provenance and the v
 this applies only to the previously supported whole mutable bool and UnsafeCell field paths.
 Nonboolean static stores, mixed or overlapping views and trusted boundaries discard precise history,
 including future first accesses. A later boolean write cannot restore invalidated history.
+Certified Copy/Freeze enum places also use checked typed initializer tags while the premise holds.
+Rustc decodes the exact enum layout from a bounded read-only host snapshot; this does not read a
+runtime payload or supply pointee provenance. Static enum writes discard precision rather than
+inventing retained payload state.
 Default roots retain arbitrary shared state. The mode does not verify reset or runtime
 initialization
 and cannot import startup facts into async entry analysis or cyclic induction.

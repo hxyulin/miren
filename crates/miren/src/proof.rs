@@ -203,6 +203,8 @@ pub fn verify(
             models: Vec::new(),
             invariants: Vec::new(),
             analyzed_bodies: Vec::new(),
+            body_entries: Vec::new(),
+            body_entries_truncated: false,
             obligations: Vec::new(),
             trusted_calls: Vec::new(),
             matched_contracts: Vec::new(),
@@ -959,6 +961,27 @@ impl<'tcx> Engine<'tcx> {
                 .retain(|condition| condition.constant() != Some(miren::smt::Constant::Bool(true)));
             if !self.feasible(&state.conditions)? {
                 continue;
+            }
+            if block == START_BLOCK {
+                let instance_name = format!("{} {:?}", self.tcx.def_path_str(id), instance.args);
+                if !self
+                    .proof
+                    .body_entries
+                    .iter()
+                    .any(|entry| entry.instance == instance_name)
+                {
+                    if self.proof.body_entries.len() < 512 {
+                        self.proof.body_entries.push(miren::BodyEntry {
+                            function: self.tcx.def_path_str(id),
+                            instance: instance_name,
+                            coroutine_poll: self.tcx.coroutine_kind(id).is_some(),
+                            source: super::source(self.tcx, body.span.source_callsite()),
+                            call_chain: stack.iter().map(|id| self.tcx.def_path_str(*id)).collect(),
+                        });
+                    } else {
+                        self.proof.body_entries_truncated = true;
+                    }
+                }
             }
             for statement in &body.basic_blocks[block].statements {
                 self.statement(id, body, &mut state, &statement.kind)

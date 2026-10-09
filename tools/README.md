@@ -143,6 +143,18 @@ initialization guards can fail for an arbitrary incoming `true` flag even when t
 initializer is `false`; establishing fresh boot state requires separate startup and interference
 evidence. Failed collections retain no active counterexample evidence.
 
+`fresh_future_entry_milestone_reached` separately records whether every expected application
+async main actually entered its coroutine poll from the selected fresh-future factory. Each
+async root includes `application_body_reached`, derived from the analyzer's feasible `body_entries`
+records for the pinned compiler's exact factory `::{closure#0}` poll with the factory as the
+call-chain root. Constructors, nested coroutines, inventory and `analyzed_bodies` cannot establish
+entry; older reports without these records and truncated traversal records remain false. Full scope,
+complete unit collection and unchanged source/artifact checkpoints are required. An UNKNOWN or
+REFUTED
+outcome can still record a reached application body. This entry milestone establishes neither
+panic freedom, runtime traversal to the first poll or hardware boot reachability. It adds no
+assumptions.
+
 An assumption profile is opt-in and applies only to `async_body`; task registration and runtime
 wrappers remain strict. Supply both flags:
 
@@ -190,7 +202,9 @@ inventory. It revalidates raw reports, proof policies, compiler completion, froz
 source fingerprints, dependency checkpoints and policy snapshot bytes. A strict/conditional pair
 must share captured survey, analyzer binaries, source revision, limits and unchanged input hashes.
 Partial or subset captures, stale evidence and unsupported milestone claims fail without replacing
-published evidence. Complete UNKNOWN results can be published with both milestones false.
+published evidence. Complete UNKNOWN results can be published with both outcome milestones false.
+The exporter retains the separate fresh-future entry milestone, each async root's validated poll
+entries, the total body-entry count and truncation metadata; missing legacy evidence stays false.
 
 The deterministic output preserves strict and conditional outcomes separately, blocker locations
 and call chains, actual assumptions, trusted calls and normalized per-unit contracts. It retains

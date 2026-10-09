@@ -83,6 +83,21 @@ fn check(
         assert!(proof.trusted_calls.is_empty());
         assert!(proof.entry_assumptions.is_empty());
         assert!(proof.replay_inputs.is_none());
+        assert!(!proof.body_entries_truncated);
+        if extra.contains(&"--startup")
+            || extra.contains(&"--induction")
+            || name.contains("::{closure#")
+        {
+            assert!(proof.body_entries.is_empty());
+        } else {
+            assert!(
+                proof.body_entries.iter().any(|entry| entry.coroutine_poll
+                    && entry.function.starts_with(&format!("{name}::"))
+                    && entry.call_chain.first().is_some_and(|root| root == name)),
+                "{name}: {:?}",
+                proof.body_entries
+            );
+        }
         if matches!(expected, ProofStatus::Proved | ProofStatus::Refuted) {
             assert!(
                 proof
@@ -126,6 +141,8 @@ fn selected_async_factories_check_every_reached_poll_separately_from_initializat
             for function in old_json["functions"].as_array_mut().unwrap() {
                 if let Some(proof) = function["proof"].as_object_mut() {
                     proof.remove("async_entry");
+                    proof.remove("body_entries");
+                    proof.remove("body_entries_truncated");
                 }
             }
             let old_report: Report = serde_json::from_value(old_json).unwrap();
@@ -135,6 +152,13 @@ fn selected_async_factories_check_every_reached_poll_separately_from_initializat
                     .iter()
                     .filter_map(|function| function.proof.as_ref())
                     .all(|proof| !proof.async_entry)
+            );
+            assert!(
+                old_report
+                    .functions
+                    .iter()
+                    .filter_map(|f| f.proof.as_ref())
+                    .all(|proof| proof.body_entries.is_empty() && !proof.body_entries_truncated)
             );
             let initialization = report
                 .functions
@@ -211,6 +235,12 @@ fn async_entries_reject_startup_induction_and_arbitrary_poll_state() {
         .unwrap();
     assert_eq!(factory.status, ProofStatus::Proved);
     assert!(!factory.async_entry);
+    assert!(
+        factory
+            .body_entries
+            .iter()
+            .all(|entry| !entry.coroutine_poll)
+    );
     assert!(
         !factory
             .analyzed_bodies

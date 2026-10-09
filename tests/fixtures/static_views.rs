@@ -772,8 +772,7 @@ enum OneTag {
 }
 
 static ONE_TAG: SyncUnsafeCell<OneTag> = SyncUnsafeCell::new(OneTag::Only(3));
-static UNINIT_TAG: SyncUnsafeCell<MaybeUninit<OneTag>> =
-    SyncUnsafeCell::new(MaybeUninit::uninit());
+static UNINIT_TAG: SyncUnsafeCell<MaybeUninit<OneTag>> = SyncUnsafeCell::new(MaybeUninit::uninit());
 static UNINIT_OPTION: SyncUnsafeCell<MaybeUninit<Option<u32>>> =
     SyncUnsafeCell::new(MaybeUninit::uninit());
 
@@ -830,7 +829,10 @@ fn valid_static_discriminants_replay_for_every_declared_variant() {
     }
     for value in [None, Some(11)] {
         set_optional_value(OPTIONAL_WORD.get(), value);
-        assert_eq!(a_static_variant_can_be_observed_without_loading_its_payload(), value.is_none());
+        assert_eq!(
+            a_static_variant_can_be_observed_without_loading_its_payload(),
+            value.is_none()
+        );
     }
     an_initialized_single_static_variant_is_known();
 }
@@ -848,9 +850,7 @@ fn set_optional_value(pointer: *mut Option<u32>, value: Option<u32>) {
 type PointerOption = Option<core::ptr::NonNull<[u8; 8]>>;
 
 #[custom_mir(dialect = "runtime", phase = "optimized")]
-const fn erase_pointer_option(
-    value: PointerOption,
-) -> SyncUnsafeCell<[MaybeUninit<usize>; 1]> {
+const fn erase_pointer_option(value: PointerOption) -> SyncUnsafeCell<[MaybeUninit<usize>; 1]> {
     mir! { { RET = CastTransmute(Move(value)); Return() } }
 }
 
@@ -887,8 +887,9 @@ impl Drop for TagWrapper {
     fn drop(&mut self) {}
 }
 
-static DROP_WRAPPER: SyncUnsafeCell<TagWrapper> =
-    SyncUnsafeCell::new(TagWrapper { tag: SparseTag::Cold });
+static DROP_WRAPPER: SyncUnsafeCell<TagWrapper> = SyncUnsafeCell::new(TagWrapper {
+    tag: SparseTag::Cold,
+});
 
 #[custom_mir(dialect = "runtime", phase = "optimized")]
 fn drop_static_wrapper(pointer: *mut TagWrapper) {
@@ -914,11 +915,9 @@ pub fn an_initialized_static_parent_has_an_observable_tag() {
     assert!(tag == -9 || tag == 41 || tag == 32760);
 }
 
-
 pub fn unrelated_equal_size_storage_does_not_certify_an_enum_tag() -> isize {
     one_tag(BYTE_WORD.get().cast())
 }
-
 
 #[custom_mir(dialect = "runtime", phase = "optimized")]
 fn retire_optional_word(pointer: *mut Option<u32>) {
@@ -968,8 +967,10 @@ struct TagPair {
     mirror: u32,
 }
 
-static TAG_PAIR: SyncUnsafeCell<TagPair> =
-    SyncUnsafeCell::new(TagPair { tag: SparseTag::Cold, mirror: 0 });
+static TAG_PAIR: SyncUnsafeCell<TagPair> = SyncUnsafeCell::new(TagPair {
+    tag: SparseTag::Cold,
+    mirror: 0,
+});
 
 #[custom_mir(dialect = "runtime", phase = "optimized")]
 fn retire_tag_pair(pointer: *mut TagPair) {
@@ -1004,7 +1005,13 @@ pub fn a_partial_store_does_not_restore_a_retired_static_parent() -> i16 {
 pub fn a_whole_store_restores_a_retired_static_parent() {
     let pointer = TAG_PAIR.get();
     retire_tag_pair(pointer);
-    replace_tag_pair(pointer, TagPair { tag: SparseTag::Warm, mirror: 4 });
+    replace_tag_pair(
+        pointer,
+        TagPair {
+            tag: SparseTag::Warm,
+            mirror: 4,
+        },
+    );
     let tag = tag_pair_tag(pointer);
     assert!(tag == -9 || tag == 41 || tag == 32760);
 }
@@ -1073,7 +1080,6 @@ fn matching_static_stores_reinitialize_native_values() {
     }
 }
 
-
 #[custom_mir(dialect = "runtime", phase = "optimized")]
 fn retire_one_tag(pointer: *mut OneTag) {
     mir! {
@@ -1105,4 +1111,39 @@ fn retire_zero_tag(pointer: *mut ZeroTag) {
 
 pub fn zero_sized_static_retirement_needs_typed_paths() {
     retire_zero_tag(ZERO_TAG.get());
+}
+
+pub fn startup_pointer_option_is_none() {
+    assert!(share_optional_pointer(OPTIONAL_POINTER.get().cast()).is_none());
+}
+
+pub fn startup_sparse_tag_is_cold() {
+    assert!(sparse_tag(SPARSE_TAG.get()) == -9);
+}
+
+pub fn startup_enum_boundary_discards_initializer() {
+    boundary();
+    a_static_variant_is_not_its_initializer();
+}
+
+pub fn startup_enum_store_cannot_restore_history() {
+    boundary();
+    set_optional_word(OPTIONAL_WORD.get());
+    assert!(optional_word_tag(OPTIONAL_WORD.get()) == 1);
+}
+
+static OCCUPIED_OPTION: SyncUnsafeCell<Option<u32>> = SyncUnsafeCell::new(Some(4));
+
+pub fn startup_occupied_enum_payload_is_not_available() -> u32 {
+    match share_optional_word(OCCUPIED_OPTION.get()) {
+        Some(value) => *value,
+        None => 0,
+    }
+}
+
+#[cfg(test)]
+pub fn native_startup_enum_initializer() {
+    a_static_variant_is_not_its_initializer();
+    startup_pointer_option_is_none();
+    startup_sparse_tag_is_cold();
 }

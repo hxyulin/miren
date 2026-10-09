@@ -365,6 +365,65 @@ impl<'tcx> Engine<'tcx> {
         if self.integer_type(ty.discriminant_ty(self.tcx)) != Some((bits, signed)) {
             return Err("static discriminant integer type mismatch".into());
         }
+        let location = startup_memory::StaticLocation {
+            definition: view.static_id,
+            offset: view.offset,
+            bytes: self.static_layout(ty)?.size.bytes(),
+        };
+        if self.startup
+            && !state.memory.startup_invalidated
+            && !state
+                .memory
+                .startup_values
+                .keys()
+                .any(|other| location.overlaps(*other))
+        {
+            let initializer =
+                self.tcx
+                    .eval_static_initializer(view.static_id)
+                    .map_err(|error| {
+                        format!("startup enum initializer evaluation failed: {error:?}")
+                    })?;
+            if location
+                .offset
+                .checked_add(location.bytes)
+                .is_none_or(|end| end > initializer.inner().size().bytes())
+            {
+                return Err("startup enum initializer exceeds its allocation".into());
+            }
+            // Snapshot only the declared initializer under the recorded fresh-entry premise.
+            // CTFE's read-only inspection rejects mutable allocations; this host copy grants
+            // neither immutable runtime storage nor access to its enum payload.
+            if initializer.inner().size().bytes() > 1_048_576 {
+                return Err("startup enum initializer exceeds the 1 MiB snapshot budget".into());
+            }
+            let mut snapshot = initializer.inner().clone();
+            snapshot.mutability = rustc_hir::Mutability::Not;
+            let initializer = self.tcx.mk_const_alloc(snapshot);
+            let value = rustc_middle::mir::ConstValue::Indirect {
+                alloc_id: self.tcx.reserve_and_set_memory_alloc(initializer),
+                offset: rustc_abi::Size::from_bytes(location.offset),
+            };
+            let (ecx, operand) = mk_eval_cx_for_const_val(
+                self.tcx.at(self.tcx.def_span(view.static_id)),
+                env,
+                value,
+                ty,
+            )
+            .ok_or("startup enum initializer layout unavailable")?;
+            let variant = ecx
+                .read_discriminant(&operand)
+                .report_err()
+                .map_err(|error| {
+                    format!("startup enum initializer discriminant unavailable: {error:?}")
+                })?;
+            return Ok(Some(symbolic::integer(
+                &self.terms,
+                def.discriminant_for_variant(self.tcx, variant).val,
+                bits,
+                signed,
+            )));
+        }
         let tag = Value::Int {
             expression: self.fresh_abstraction(
                 Sort::BitVec(bits),

@@ -220,6 +220,7 @@ class MainSurveyTests(unittest.TestCase):
                 self.assertEqual(len(result["units"][0]["roots"]), 3)
                 self.assertEqual(result["counts"]["async_body"]["proved"],
                                  1 if mode == "normal" else 0)
+                self.assertEqual(result["fresh_future_entry_milestone_reached"], mode == "normal")
 
     def test_milestone_requires_every_supported_body_and_complete_scope(self):
         value = {"status": "complete", "coverage_scope": "all_embassy_binary_mains",
@@ -237,6 +238,81 @@ class MainSurveyTests(unittest.TestCase):
             changed = copy.deepcopy(value)
             mutation(changed)
             self.assertFalse(main.milestone_reached(changed))
+
+    def body_entry(self):
+        name = main.FACTORY + "::{closure#0}"
+        return {"function": name, "instance": name + " []", "coroutine_poll": True,
+                "source": {"file": str(self.source), "line": 1, "column": 1},
+                "call_chain": [main.FACTORY, name]}
+
+    def test_application_entry_requires_poll_evidence_from_selected_factory(self):
+        proof = {"async_entry": True, "status": "unknown", "body_entries": [self.body_entry()]}
+        self.assertTrue(main.application_body_reached(proof))
+        mutations = [lambda p: p.pop("body_entries"),
+                     lambda p: p.update(async_entry=False),
+                     lambda p: p["body_entries"][0].update(function=main.FACTORY),
+                     lambda p: p["body_entries"][0].update(coroutine_poll=False),
+                     lambda p: p["body_entries"][0].update(function="other::{closure#0}"),
+                     lambda p: p["body_entries"][0].update(
+                         function=main.FACTORY + "::nested::{closure#0}"),
+                     lambda p: p.update(body_entries_truncated=True),
+                     lambda p: p["body_entries"][0].update(call_chain=["other"]),
+                     lambda p: p["body_entries"][0].update(source={}),
+                     lambda p: p["body_entries"][0].update(instance=""),
+                     lambda p: p.update(body_entries="constructor")]
+        for mutation in mutations:
+            changed = copy.deepcopy(proof)
+            mutation(changed)
+            self.assertFalse(main.application_body_reached(changed))
+        self.assertFalse(main.application_body_reached({
+            "async_entry": True, "analyzed_bodies": [main.FACTORY + "::{closure#0}"]}))
+        result = {"units": [{"roots": [{"scope": "async_body", "status": "complete",
+                                        "proof_status": "unknown", "proof": proof}]}]}
+        main.annotate_evidence(result)
+        self.assertTrue(result["units"][0]["roots"][0]["application_body_reached"])
+        result["units"][0]["roots"][0]["status"] = "failed"
+        main.annotate_evidence(result)
+        self.assertFalse(result["units"][0]["roots"][0]["application_body_reached"])
+
+    def test_fresh_future_entry_milestone_requires_complete_unchanged_capture(self):
+        unit = {"id": "main", "status": "complete", "artifact_hashes_before": {},
+                "artifact_hashes_after": {}, "artifact_hashes_at_completion": {}, "roots": [
+                    {"scope": "async_body", "status": "complete", "proof_status": "unknown",
+                     "proof": {"status": "unknown", "async_entry": True,
+                               "body_entries": [self.body_entry()]}}]}
+        value = {"status": "complete", "coverage_scope": "all_embassy_binary_mains",
+                 "expected_units": ["main"], "units": [unit], "errors": [],
+                 "source_files_before": {"main.rs": "hash"},
+                 "source_files_after": {"main.rs": "hash"}}
+        self.assertTrue(main.fresh_future_entry_milestone_reached(value))
+        self.assertFalse(main.milestone_reached(value))
+        mutations = [lambda v: v.update(status="partial"),
+                     lambda v: v.update(coverage_scope="selected_embassy_binary_mains"),
+                     lambda v: v.update(errors=["failed checkpoint"]),
+                     lambda v: v["units"].clear(),
+                     lambda v: v["units"].append(copy.deepcopy(v["units"][0])),
+                     lambda v: v["units"][0].update(status="partial"),
+                     lambda v: v.pop("source_files_before"),
+                     lambda v: v.update(source_files_after={}),
+                     lambda v: v["units"][0].pop("artifact_hashes_at_completion"),
+                     lambda v: v["units"][0].update(artifact_hashes_after={"changed": "hash"}),
+                     lambda v: v["units"][0]["roots"][0].update(status="failed"),
+                     lambda v: v["units"][0]["roots"][0]["proof"].pop("body_entries")]
+        for mutation in mutations:
+            changed = copy.deepcopy(value)
+            mutation(changed)
+            self.assertFalse(main.fresh_future_entry_milestone_reached(changed))
+
+    def test_malformed_body_entry_evidence_rejects_report(self):
+        report = self.report()
+        proof = report["functions"][0]["proof"]
+        proof["body_entries"] = [self.body_entry()]
+        self.checked(report)
+        for key, value in [("coroutine_poll", 1), ("source", {}), ("call_chain", [])]:
+            changed = copy.deepcopy(report)
+            changed["functions"][0]["proof"]["body_entries"][0][key] = value
+            with self.assertRaisesRegex(ValueError, "body entry evidence"):
+                self.checked(changed)
 
     def test_inventory_cannot_silently_drop_a_main(self):
         path, _, _ = self.prepare()
@@ -270,6 +346,7 @@ class MainSurveyTests(unittest.TestCase):
                 self.assertEqual(main.run(args), 1)
             result = json.loads((args.output / "summary.json").read_text())
             self.assertFalse(result["milestone_reached"])
+            self.assertFalse(result["fresh_future_entry_milestone_reached"])
             self.assertTrue(all(r["proof_status"] == "unknown"
                                 for r in result["units"][0]["roots"]))
 
@@ -296,6 +373,8 @@ class MainSurveyTests(unittest.TestCase):
             self.assertEqual(code, 0 if mode in ("normal", "unknown_conditional") else 1)
             self.assertFalse(result["milestone_reached"])
             self.assertEqual(result["conditional_milestone_reached"], mode == "normal")
+            self.assertEqual(result["fresh_future_entry_milestone_reached"],
+                             mode in ("normal", "unknown_conditional"))
             if mode in ("normal", "unknown_conditional"):
                 roots = result["units"][0]["roots"]
                 self.assertTrue(roots[0]["conditional"])
@@ -360,6 +439,11 @@ for function in report["functions"]:
     if function["name"] == name:
         function["proof"] = {"status": status, "async_entry": async_entry,
                              "obligations": [] if status == "proved" else [{"status": status}]}
+        if async_entry:
+            poll = name + "::{closure#0}"
+            function["proof"]["body_entries"] = [{"function": poll, "instance": poll + " []",
+                "coroutine_poll": True, "source": function["source"],
+                "call_chain": [name, poll]}]
         if mode == "wrong_scope":
             function["proof"]["async_entry"] = not async_entry
 report["analysis_limits"] = {key: int(args[args.index("--" + key.replace("_", "-")) + 1])

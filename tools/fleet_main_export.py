@@ -120,6 +120,17 @@ def validate(summary, conditional=False):
                     and proof.get("async_entry") is main_survey.SCOPES[scope][1],
                     "missing or inconsistent root proof")
             actual_conditional = main_survey.conditional_proof(proof)
+            entries = proof.get("body_entries", [])
+            require(isinstance(entries, list) and len(entries) <= 512
+                    and all(main_survey.valid_body_entry(entry) for entry in entries)
+                    and type(proof.get("body_entries_truncated", False)) is bool,
+                    "invalid executed body entry evidence")
+            if "application_body_reached" in root:
+                require(scope == "async_body"
+                        and type(root["application_body_reached"]) is bool
+                        and root["application_body_reached"]
+                            is main_survey.application_body_reached(proof),
+                        "application body entry label mismatch")
             if "analysis_domain" in root:
                 require(root["analysis_domain"] == main_survey.SCOPES[scope][2]
                         and root.get("boot_reachability") == "unverified"
@@ -157,6 +168,11 @@ def validate(summary, conditional=False):
                             main_survey.conditional_milestone_reached)):
         require(type(summary.get(key)) is bool and summary[key] is predicate(summary),
                 "unsupported milestone claim")
+    key = "fresh_future_entry_milestone_reached"
+    require(type(summary.get(key, False)) is bool
+            and summary.get(key, False)
+                is main_survey.fresh_future_entry_milestone_reached(summary),
+            "unsupported fresh-future entry milestone claim")
     return counts
 
 
@@ -240,6 +256,8 @@ def capture(path, conditional=False):
             "counts": counts, "allow_assumptions": conditional,
             "milestone_reached": summary["milestone_reached"],
             "conditional_milestone_reached": summary["conditional_milestone_reached"],
+            "fresh_future_entry_milestone_reached":
+                main_survey.fresh_future_entry_milestone_reached(summary),
             "contracts": summary.get("contracts"), "units": compact_units,
             "source_files_sha256": base_export.fingerprint(summary["source_files_before"]),
             "source_inputs_unchanged": True,
@@ -266,7 +284,7 @@ def compact_root(root, source, report_digest):
         compact["query_sha256"] = (base_export.fingerprint(obligation["query"])
                                    if obligation.get("query") is not None else None)
         blockers.append(compact)
-    return {"scope": root["scope"], "name": root["name"], "source": source,
+    result = {"scope": root["scope"], "name": root["name"], "source": source,
             "proof_status": root["proof_status"], "conditional": root["conditional"],
             "analysis_domain": main_survey.SCOPES[root["scope"]][2],
             "boot_reachability": "unverified",
@@ -275,7 +293,15 @@ def compact_root(root, source, report_digest):
             "entry_assumptions": proof.get("entry_assumptions", []),
             "trusted_calls": proof.get("trusted_calls", []),
             "matched_contracts": proof.get("matched_contracts", []),
+            "body_entry_count": len(proof.get("body_entries", [])),
+            "body_entries_truncated": proof.get("body_entries_truncated", False),
             "analyzed_body_count": len(proof.get("analyzed_bodies", [])), "blockers": blockers}
+    if root["scope"] == "async_body":
+        result["application_body_reached"] = main_survey.application_body_reached(proof)
+        result["application_body_entries"] = [entry for entry in proof.get("body_entries", [])
+            if main_survey.application_body_reached({"async_entry": proof.get("async_entry"),
+                                                    "body_entries": [entry]})]
+    return result
 
 
 def export(strict_path, conditional_path=None):

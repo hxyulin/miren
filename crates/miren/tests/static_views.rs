@@ -710,34 +710,135 @@ fn static_enum_tags_are_fresh_legal_observations_without_payload_or_initializer_
 }
 
 #[test]
-fn startup_does_not_assume_nonatomic_static_variants_are_unchanged() {
+fn startup_enum_tags_use_initializers_until_an_effect_invalidates_them() {
+    let entries = [
+        (
+            "a_static_variant_is_not_its_initializer",
+            ProofStatus::ProvedWithAssumptions,
+        ),
+        (
+            "separate_static_variant_reads_need_not_agree",
+            ProofStatus::ProvedWithAssumptions,
+        ),
+        (
+            "startup_pointer_option_is_none",
+            ProofStatus::ProvedWithAssumptions,
+        ),
+        (
+            "startup_sparse_tag_is_cold",
+            ProofStatus::ProvedWithAssumptions,
+        ),
+        (
+            "a_typed_static_store_does_not_freeze_the_variant",
+            ProofStatus::Refuted,
+        ),
+        (
+            "uninitialized_static_enum_tags_are_unknown",
+            ProofStatus::Unknown,
+        ),
+        (
+            "unrelated_equal_size_storage_does_not_certify_an_enum_tag",
+            ProofStatus::Unknown,
+        ),
+        (
+            "startup_occupied_enum_payload_is_not_available",
+            ProofStatus::Unknown,
+        ),
+    ];
     for target in [None, Some("thumbv7em-none-eabihf")] {
-        let report = verify_mode(
-            &fixture(),
-            &[(
-                "a_static_variant_is_not_its_initializer",
-                ProofStatus::Refuted,
-            )],
-            target,
-            false,
-            None,
-            true,
-        );
-        let proof = report
-            .functions
-            .iter()
-            .find(|function| function.name == "a_static_variant_is_not_its_initializer")
-            .unwrap()
-            .proof
-            .as_ref()
+        for optimized in [false, true] {
+            let report = verify_mode(&fixture(), &entries, target, optimized, None, true);
+            for proof in report.functions.iter().filter_map(|f| f.proof.as_ref()) {
+                assert_eq!(proof.entry_assumptions.len(), 2);
+            }
+        }
+    }
+}
+
+#[test]
+fn changing_an_enum_initializer_refutes_the_conditional_tag_proof() {
+    let directory = Directory::new();
+    let path = directory.0.join("mutant.rs");
+    let source = std::fs::read_to_string(fixture()).unwrap();
+    let original = "static OPTIONAL_WORD: SyncUnsafeCell<Option<u32>> = SyncUnsafeCell::new(None);";
+    assert!(source.contains(original));
+    std::fs::write(
+        &path,
+        source.replace(
+            original,
+            "static OPTIONAL_WORD: SyncUnsafeCell<Option<u32>> = SyncUnsafeCell::new(Some(4));",
+        ),
+    )
+    .unwrap();
+    for (fixture_path, success) in [(fixture(), true), (path.clone(), false)] {
+        let executable = directory.0.join("enum-native");
+        let native_source = directory.0.join("enum-native.rs");
+        std::fs::write(
+            &native_source,
+            format!(
+                "{}\n#[test] fn native_entry() {{ native_startup_enum_initializer(); }}\n",
+                std::fs::read_to_string(&fixture_path).unwrap()
+            ),
+        )
+        .unwrap();
+        let output = Command::new(Path::new(env!("MIREN_SYSROOT")).join("bin/rustc"))
+            .args(["--test", "--edition=2024"])
+            .arg(&native_source)
+            .arg("-o")
+            .arg(&executable)
+            .output()
             .unwrap();
-        assert_eq!(proof.entry_assumptions.len(), 2);
-        assert!(
-            proof
-                .obligations
-                .iter()
-                .any(|obligation| { !obligation.abstraction_reasons.is_empty() })
-        );
+        assert!(output.status.success(), "{output:?}");
+        let output = Command::new(&executable)
+            .args(["--exact", "native_entry"])
+            .output()
+            .unwrap();
+        assert!(String::from_utf8_lossy(&output.stdout).contains("running 1 test"));
+        assert_eq!(output.status.success(), success, "{output:?}");
+    }
+    for target in [None, Some("thumbv7em-none-eabihf")] {
+        for optimized in [false, true] {
+            verify_mode(
+                &path,
+                &[(
+                    "a_static_variant_is_not_its_initializer",
+                    ProofStatus::Refuted,
+                )],
+                target,
+                optimized,
+                None,
+                true,
+            );
+        }
+    }
+}
+
+#[test]
+fn startup_enum_tags_cannot_restore_initializers_after_opaque_calls() {
+    let specification = serde_json::json!({"schema_version":1,"functions":[{
+        "function":"static_views::boundary", "trusted":true,"no_panic":true,
+        "modifies":[], "reason":"Explicit enum history effect boundary"
+    }]});
+    for target in [None, Some("thumbv7em-none-eabihf")] {
+        for optimized in [false, true] {
+            verify_mode(
+                &fixture(),
+                &[
+                    (
+                        "startup_enum_boundary_discards_initializer",
+                        ProofStatus::Refuted,
+                    ),
+                    (
+                        "startup_enum_store_cannot_restore_history",
+                        ProofStatus::Refuted,
+                    ),
+                ],
+                target,
+                optimized,
+                Some(specification.clone()),
+                true,
+            );
+        }
     }
 }
 
