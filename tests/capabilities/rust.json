@@ -119,6 +119,22 @@
       "entry": "retained_prefix_index",
       "family": "reference_slice",
       "expected": "proved"
+    },
+    {
+      "entry": "raw_pointer_metadata",
+      "family": "raw_pointer",
+      "expected": "proved"
+    },
+    {
+      "entry": "wrong_raw_pointer_metadata",
+      "family": "raw_pointer",
+      "expected": "refuted"
+    },
+    {
+      "entry": "raw_reference_grant",
+      "family": "raw_pointer",
+      "expected": "unknown",
+      "unknown_reason": "raw memory access requires a verified temporal permission certificate"
     }
   ]
 }

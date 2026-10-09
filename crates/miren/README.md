@@ -147,12 +147,11 @@ known extent. Numeric pointer offsets, zero-sized strides, wrapping arithmetic a
 outside the separately documented static-view domains remain UNKNOWN. Retained references still
 undergo liveness and frame-escape checks.
 
-Compiler-identified `volatile_load` reads initialized retained whole scalar allocations with an
-exact registered compiler pointee type, allocation identity and live backing value. It preserves
-stored floating-point bits, including NaNs and signed zero. Numeric/MMIO and static addresses,
-incoming raw pointers, type punning, projected addresses and displaced cursors remain UNKNOWN;
-volatile reads grant no synchronization or floating-point environment model. Dead, uninitialized
-or externally invalidated backing cannot supply a value.
+Compiler-identified `volatile_load` checks exact compiler pointee type, allocation identity,
+liveness and initialized whole-scalar backing. Even matching storage returns UNKNOWN because
+these checks do not certify temporal access permission. Numeric/MMIO and static addresses,
+incoming raw pointers, type punning, projections and displaced cursors also remain UNKNOWN.
+No retained scalar value is exposed by an uncertified volatile read.
 
 Compiler-typed `u8` MIR repeats use one constant SMT array and a target-width length. Their byte
 count does not expand host storage, and the compiler checks the target array layout. Bounds checks
@@ -177,13 +176,17 @@ direct-tag enums with a compiler zero discriminant. Byte arrays remain compact. 
 MaybeUninit, pointers, niche/payload enums and restricted integer reconstruction remain UNKNOWN.
 This models the checked core operation; it does not make uninitialized storage readable.
 
-Compiler-typed shared byte slices can retain a tracked source allocation and length. Reads encode
-the live backing value using its recorded compiler type, field offsets and target endian order;
-supported integers, arrays and padding-free structs occupy at most 128 bytes. Bounds, liveness and
-frame-escape checks apply. Shared prefixes and borrowed-array conversions retain that backing
-reference; owned copies retain their copied values. Numeric origins, mutable raw slices, padding
-and raw subobject formation remain UNKNOWN. Raw byte access does not enable arbitrary pointer loads
-or writes.
+Compiler-typed const raw byte-slice pointers retain a source pointer and target-width length.
+Their snapshots preserve pointer metadata instead of converting it into byte values. Metadata
+formation and length queries grant no Rust reference rights and do not require the length to fit
+an allocation. Numeric source pointers may supply metadata, never storage rights. Mutable raw
+slice pointers remain unsupported.
+
+Creating a shared byte reference, reading raw byte storage, or converting a nonempty tracked raw
+pointer array into Rust references remains UNKNOWN without temporal permission evidence. Exact
+layout, initialization, liveness, bounds and disjointness checks remain active, but do not supply
+that missing certificate. This includes safe core `array::each_mut` bodies at their internal
+reference-array conversion; ordinary safe tracked references and slices remain supported.
 
 Shared non-Freeze root references retain incoming read-only storage identity, including nested
 fields such as a task spawner's executor reference. One interior/mutable root storage graph is
@@ -223,8 +226,9 @@ Arbitrary trait-object roots, unsupported upcasts and raw/boxed trait objects re
 
 Compiler-layout raw addresses of bounded struct/tuple fields and array elements retain allocation
 provenance, offsets and subobject extents. The exact initialized pointer-array to reference-array
-conversion used by each_mut requires live typed backing and disjoint mutable projections. Numeric
-origins, raw dereferences and unsupported reference-array selection remain UNKNOWN.
+conversion used by `each_mut` checks live typed backing and disjoint mutable projections, but
+nonempty conversions remain UNKNOWN without temporal access certification. Numeric origins,
+raw dereferences and unsupported reference-array selection also remain UNKNOWN.
 
 The [coverage guide](../../docs/coverage.md) is the maintained feature reference. The
 [proof guide](../../docs/proofs.md) explains the encoding and limitations, and the
@@ -520,8 +524,8 @@ gaps by category and exact reason, preserving all root names. Saved coverage gap
 absent optional category. Existing schema version and safety statuses are unchanged.
 
 The Rust capability baseline is independent of fleet and hardware contracts. Run
-`cargo test --locked -p miren --test rust_capabilities`; its shared manifest selects 23 cases across
-12 families on host/ARM at O0/O2, with positive/refuted/unknown and actual source-mutation controls.
+`cargo test --locked -p miren --test rust_capabilities`; its shared manifest selects 26 cases across
+13 families on host/ARM at O0/O2, with positive/refuted/unknown and actual source-mutation controls.
 The standalone [survey](../../tools/rust_capability_survey.py) retains full reports and provenance.
 See [the Rust roadmap](../../docs/rust-capabilities.md) for scope and intended model boundaries.
 Portable-atomic/static-cell integration fixtures use pristine versioned sources under

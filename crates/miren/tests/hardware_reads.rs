@@ -99,6 +99,13 @@ fn verify(
             "{target:?} O2={optimized} {name}: {:?}",
             proof.obligations
         );
+        if *name == "ram_read" {
+            assert!(proof.obligations.iter().any(|o| {
+                o.unknown_category == Some(miren::UnknownCategory::Semantics)
+                    && o.detail
+                        .contains("verified temporal permission certificate")
+            }));
+        }
         let actual = proof
             .entry_assumptions
             .iter()
@@ -121,7 +128,7 @@ fn verify(
 }
 #[test]
 fn independent_reads_execute_rmw_bodies_and_preserve_refusals() {
-    use ProofStatus::{Proved as P, ProvedWithAssumptions as C, Refuted as R, Unknown as U};
+    use ProofStatus::{ProvedWithAssumptions as C, Refuted as R, Unknown as U};
     let entries = [
         ("bit_identity", C, true),
         ("actual_checked_read", C, true),
@@ -143,7 +150,7 @@ fn independent_reads_execute_rmw_bodies_and_preserve_refusals() {
         ("misaligned", U, false),
         ("symbolic_address", U, false),
         ("guarded_address", C, true),
-        ("ram_read", P, false),
+        ("ram_read", U, false),
         ("unmodeled_dereference", U, false),
         ("read_then_dereference", U, true),
     ];
@@ -214,7 +221,7 @@ fn independent_reads_execute_rmw_bodies_and_preserve_refusals() {
         for target in [None, Some("thumbv7em-none-eabihf")] {
             verify(
                 &fixture(),
-                &[("bit_identity", U, false), ("ram_read", P, false)],
+                &[("bit_identity", U, false), ("ram_read", U, false)],
                 None,
                 target,
                 optimized,

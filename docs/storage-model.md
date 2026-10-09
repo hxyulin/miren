@@ -12,16 +12,17 @@ actual tracked references keep their allocation, capability and liveness checks.
 graphs are validated before accepting the projection. These snapshots cannot supply a raw address
 identity. Local allocation retirement and frame-escape checks remain active.
 
-Tracked address descriptors now also retain the compiler pointee type established at address
-formation. A shared byte slice retains that source pointer and length, and encodes the live backing
-value on reads. Compiler field offsets and target-endian integer encodings certify each readable
-byte of supported padding-free storage. Bounds and reference graphs are checked before reads;
-numeric address equality creates no provenance. Unsupported padding, mutable raw slices and raw
-subobject formation remain UNKNOWN.
+Tracked address descriptors retain the compiler pointee type established at address formation.
+A raw byte-slice pointer retains its source pointer and metadata; its snapshot preserves that
+descriptor rather than exposing backing bytes. Raw pointer metadata formation does not grant
+Rust reference rights or require a matching live byte extent.
 
-These checks do not yet certify temporal access permission across competing accesses. The
-[raw-access validity audit](rust-capabilities.md#open-access-validity-blocker) found old-pointer
-sequences that currently prove without that certificate. Liveness and retained mutability
+Compiler field offsets, target-endian integer encoding and initialized padding-free storage can
+establish spatial byte facts. They do not certify temporal access permission across competing
+accesses. The [raw-access validity audit](rust-capabilities.md#open-access-validity-blocker)
+found old-pointer sequences that previously proved without that certificate. Tracked volatile
+loads, raw byte views and nonempty tracked raw-pointer-to-reference arrays now return UNKNOWN
+before exposing values or reference rights. Liveness, disjointness and retained mutability
 must not be presented as a complete Rust reference-validity model.
 
 ## First migration stage: footprints and subobject certificates

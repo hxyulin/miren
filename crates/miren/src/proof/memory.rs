@@ -99,7 +99,9 @@ impl<'tcx> Engine<'tcx> {
             }
             Value::RawSlice { source, .. } => {
                 self.snapshot(source, memory, conditions, depth + 1)?;
-                self.raw_slice_snapshot(value, memory, conditions)
+                // This is a raw fat pointer, not a shared reference or a byte-value view.
+                // Actual dereferences/reference grants use the checked raw-access boundary.
+                Ok(value.clone())
             }
             Value::TrackedPointer { reference, .. } => {
                 self.snapshot(reference, memory, conditions, depth + 1)?;

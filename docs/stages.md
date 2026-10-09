@@ -2728,3 +2728,38 @@ Final standalone evidence: `/tmp/miren-stage135-capabilities-20261010`, with unc
 579 Rust tests, 67 Python tests, formatting, cargo lint, release builds, cargo deny,
 documentation build and manual hooks. Independent review approves the compiler/type gates,
 nonzero feasibility refusal, exact scan and valid native mutation controls.
+
+## Stage 136: refuse uncertified temporal raw-access permissions
+
+The raw-access audit exposed a missing certificate in tracked volatile reads, raw byte views
+and tracked raw-pointer arrays converted into Rust references. Exact layout, initialized live
+storage and spatial disjointness do not establish temporal access rights. These three boundaries
+now return Semantics UNKNOWN before supplying a value or reference. No model assumption or
+application rewrite fills the gap. The nonempty-array restriction also reaches safe core
+`array::each_mut`; zero-element arrays grant no handles and remain supported.
+
+Const raw byte-slice metadata formation is separated from byte access. Source address and
+length must have the target width and symbolic context; graph/liveness checks remain active.
+The raw descriptor is preserved through snapshots and actual core metadata bodies. A numeric
+source and arbitrary/excessive length can supply metadata but never a byte view or reference.
+Shared reference formation and raw byte dereferences retain their refusal boundaries. Mutable
+raw fat pointers remain unsupported.
+
+Host/ARM O0/O2 regressions require the missing-certificate diagnostic for all four old-pointer
+sequences and a nonempty raw reference array. Ordinary references, raw-address identity, empty
+reference arrays and raw length queries prove; wrong ordinary/metadata claims refute. Metadata
+and field-address mutations refute in all four configurations and fail native controls. Earlier
+volatile/byte mutation controls now require UNKNOWN rather than claim unsupported counterexamples;
+their valid native mutations still fail. Suspect access sequences are never executed natively.
+
+The capability manifest expands to 26 cases across 13 families, with 12 PROVED, 10 REFUTED and
+4 UNKNOWN per configuration. It includes raw metadata P/R and a safe reference-array grant U.
+Temporal token lineage and complete invalidation events remain future model work; this stage
+repairs the identified proof boundary rather than claiming full alias-model parity.
+
+Final standalone evidence: `/tmp/miren-stage136-capabilities-20261010`, with 48 PROVED,
+40 REFUTED and 16 UNKNOWN outcomes and no collection errors. Validation passes 581 Rust
+tests, 67 Python tests, formatting, cargo lint, release builds, cargo deny, documentation
+build and manual hooks. Independent review confirms that preserved raw metadata cannot
+bypass the byte/reference grant boundaries. Hardware-model and ordinary RAM controls both
+require the missing temporal-certificate diagnostic for tracked RAM volatile reads.

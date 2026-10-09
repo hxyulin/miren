@@ -791,14 +791,17 @@ Actual method bodies execute with retained storage, mutations and lifetimes. Arb
 remain UNKNOWN; the analyzer does not infer a closed set of implementations from the workspace.
 
 Compiler-layout raw field and array-element pointers retain their containing allocation and child
-extent. The exact each_mut reference-array conversion checks initialized typed live projections
-and disjoint mutable elements. Numeric origins, unions, incompatible anchors, forged permissions
-and unsupported symbolic reference-array selection remain UNKNOWN.
+extent. The exact `each_mut` reference-array conversion checks initialized typed live projections
+and disjoint mutable elements, but nonempty grants remain UNKNOWN without temporal permission
+certification. Numeric origins, unions, incompatible anchors, forged permissions and unsupported
+symbolic reference-array selection also remain UNKNOWN.
 
-Compiler-identified volatile scalar loads require exact typed, initialized, live whole allocation
-backing and a matching registered address. Values retain exact integer/float storage bits.
-Numeric MMIO, static payloads, projections, cursor offsets, punned or invalidated storage remain
-UNKNOWN. The model supplies no synchronization or device access guarantee.
+Compiler-identified volatile scalar loads check exact typed, initialized, live whole allocation
+backing and a matching registered address. Those spatial facts do not certify temporal access
+permission: tracked loads remain UNKNOWN before exposing retained values. Numeric MMIO, static
+payloads, projections, cursor offsets, punned or invalidated storage also remain UNKNOWN. The
+explicit hardware model has its separate conditional peripheral-access boundary and cannot
+silently authorize tracked Rust RAM.
 
 Arbitrary valid function-pointer input fields use bounded typed opaque witnesses. These witnesses
 retain the full compiler signature, including safety, ABI and bound regions, without a numeric
@@ -1073,3 +1076,15 @@ shapes and variable-length snapshots remain UNKNOWN.
 The independent Rust capability suite advances `retained_prefix_index` from UNKNOWN to PROVED
 across host/ARM O0/O2. Its current 23 cases yield 44 PROVED, 36 REFUTED and 12 UNKNOWN over the
 four configurations, with strict premises. No device or startup hypotheses are used.
+
+Stage 136 hardens tracked raw-access boundaries. Volatile scalar reads, byte views/references
+from raw pointers and nonempty raw-pointer-to-reference array conversions now require a temporal
+permission certificate and return Semantics UNKNOWN without one. Earlier spatial/type/liveness
+checks remain active. This supersedes earlier claims that those checks alone support the reads
+and `array::each_mut` reference grants. Ordinary tracked reference/slice operations and raw
+address formation, offsets and comparisons retain their separate support. Const raw byte-slice
+metadata formation and length queries preserve the raw descriptor and grant no access rights.
+
+The expanded core-only capability matrix has 26 cases and 13 families, expecting 48 PROVED,
+40 REFUTED and 16 UNKNOWN outcomes across host/ARM O0/O2. New cases exercise metadata P/R and
+a safe core reference grant U; its larger denominator is not a percentage gain.

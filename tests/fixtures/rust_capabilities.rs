@@ -177,6 +177,22 @@ pub fn open_slice(values: &[u16]) {
     }
 }
 
+pub fn raw_pointer_metadata(length: usize) {
+    let pointer = core::ptr::slice_from_raw_parts(core::ptr::null::<u8>(), length);
+    assert!(pointer.len() == length);
+}
+
+pub fn wrong_raw_pointer_metadata(length: usize) {
+    let pointer = core::ptr::slice_from_raw_parts(core::ptr::null::<u8>(), length);
+    assert!(pointer.len() != length);
+}
+
+pub fn raw_reference_grant() {
+    let mut values = [1_u16, 2];
+    let references = values.each_mut();
+    assert!(*references[0] == 1);
+}
+
 #[cfg(test)]
 mod native {
     use super::*;
@@ -185,6 +201,7 @@ mod native {
     #[test]
     fn positives() {
         integers(199);
+        raw_pointer_metadata(usize::MAX);
         enum_payload(Message::Pair(4, 9));
         array_index(3);
         reference_effects();

@@ -1,6 +1,6 @@
 #![forbid(unsafe_code)]
 
-use miren::{ProofStatus, Report};
+use miren::{ProofStatus, Report, UnknownCategory};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -30,11 +30,11 @@ fn fixture() -> PathBuf {
 
 fn verify(path: &Path, target: Option<&str>, optimized: bool) {
     let entries = [
-        ("retains_f32_bits", ProofStatus::Proved),
-        ("retains_f64_bits", ProofStatus::Proved),
-        ("retains_boolean_and_integer", ProofStatus::Proved),
-        ("special_float_bits", ProofStatus::Proved),
-        ("wrong_float_claim", ProofStatus::Refuted),
+        ("retains_f32_bits", ProofStatus::Unknown),
+        ("retains_f64_bits", ProofStatus::Unknown),
+        ("retains_boolean_and_integer", ProofStatus::Unknown),
+        ("special_float_bits", ProofStatus::Unknown),
+        ("wrong_float_claim", ProofStatus::Unknown),
         ("numeric_mmio_is_unknown", ProofStatus::Unknown),
         ("arbitrary_pointer_is_unknown", ProofStatus::Unknown),
         ("punned_type_is_unknown", ProofStatus::Unknown),
@@ -87,6 +87,20 @@ fn verify(path: &Path, target: Option<&str>, optimized: bool) {
         );
         assert!(proof.assumptions.is_empty());
         assert!(proof.trusted_calls.is_empty());
+        if matches!(
+            name,
+            "retains_f32_bits"
+                | "retains_f64_bits"
+                | "retains_boolean_and_integer"
+                | "special_float_bits"
+                | "wrong_float_claim"
+        ) {
+            assert!(proof.obligations.iter().any(|o| {
+                o.unknown_category == Some(UnknownCategory::Semantics)
+                    && o.detail
+                        .contains("verified temporal permission certificate")
+            }));
+        }
         if expected == ProofStatus::Refuted {
             assert!(
                 proof
@@ -122,7 +136,7 @@ fn native(path: &Path, name: &str) -> bool {
 }
 
 #[test]
-fn tracked_volatile_scalars_preserve_bits_and_reject_unsupported_storage() {
+fn tracked_volatile_scalars_require_temporal_permission_even_with_exact_storage() {
     for target in [None, Some("thumbv7em-none-eabihf")] {
         for optimized in [false, true] {
             verify(&fixture(), target, optimized);
@@ -133,7 +147,7 @@ fn tracked_volatile_scalars_preserve_bits_and_reject_unsupported_storage() {
 }
 
 #[test]
-fn changed_float_claim_fails_both_verification_and_native_execution() {
+fn changed_float_claim_remains_unknown_and_fails_valid_native_execution() {
     let directory = Directory::new();
     let mutated = directory.0.join("mutated.rs");
     let source = std::fs::read_to_string(fixture()).unwrap();
@@ -170,7 +184,7 @@ fn changed_float_claim_fails_both_verification_and_native_execution() {
             .as_ref()
             .unwrap()
             .status,
-        ProofStatus::Refuted
+        ProofStatus::Unknown
     );
 }
 

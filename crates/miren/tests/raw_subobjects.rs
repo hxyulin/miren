@@ -1,6 +1,6 @@
 #![forbid(unsafe_code)]
 
-use miren::{ProofStatus, Report};
+use miren::{ProofStatus, Report, UnknownCategory};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -77,7 +77,10 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
             "multiple_shared_inputs_have_no_subobject_origin" => {
                 Some("tracked allocation reference")
             }
-            "symbolic_mutation" => Some("non-scalar array index is not uniquely determined"),
+            "array_mutations"
+            | "nested_array_mutations"
+            | "zero_sized_subobjects"
+            | "symbolic_mutation" => Some("verified temporal permission certificate"),
             "duplicate_mutable_subobjects" => Some("overlapping or unproved-disjoint"),
             "numeric_addresses_cannot_become_references" => Some("fabricate allocation provenance"),
             "shared_subobjects_cannot_gain_write_permission" => Some("upgrade shared storage"),
@@ -95,6 +98,19 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
                 proof.obligations
             );
         }
+        if matches!(
+            *name,
+            "array_mutations"
+                | "nested_array_mutations"
+                | "zero_sized_subobjects"
+                | "symbolic_mutation"
+        ) {
+            assert!(proof.obligations.iter().any(|o| {
+                o.unknown_category == Some(UnknownCategory::Semantics)
+                    && o.detail
+                        .contains("verified temporal permission certificate")
+            }));
+        }
         if *expected == ProofStatus::Refuted {
             assert!(proof.obligations.iter().any(|o| o.model.is_some()));
         }
@@ -102,9 +118,9 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
 }
 
 #[test]
-fn typed_subobject_addresses_and_each_mut_on_host_and_arm() {
+fn typed_subobject_addresses_preserve_the_raw_reference_permission_boundary() {
     let entries = [
-        ("array_mutations", ProofStatus::Proved),
+        ("array_mutations", ProofStatus::Unknown),
         ("guarded_element_address", ProofStatus::Proved),
         ("unguarded_element_address", ProofStatus::Refuted),
         ("field_address", ProofStatus::Proved),
@@ -118,8 +134,8 @@ fn typed_subobject_addresses_and_each_mut_on_host_and_arm() {
             ProofStatus::Unknown,
         ),
         ("symbolic_mutation", ProofStatus::Unknown),
-        ("nested_array_mutations", ProofStatus::Proved),
-        ("zero_sized_subobjects", ProofStatus::Proved),
+        ("nested_array_mutations", ProofStatus::Unknown),
+        ("zero_sized_subobjects", ProofStatus::Unknown),
         ("subobject_one_past", ProofStatus::Proved),
         ("subobject_extent_is_not_the_parent", ProofStatus::Refuted),
         ("raw_subobject_reads_remain_unknown", ProofStatus::Unknown),
@@ -161,18 +177,22 @@ fn changing_a_subobject_claim_fails_static_and_native_checks() {
     let directory = Directory::new();
     let mutant = directory.0.join("mutant.rs");
     let source = std::fs::read_to_string(fixture()).unwrap();
-    let original = "assert!(values == [7, 11, 19]);";
+    let original = "assert!(field == parent + core::mem::offset_of!((u8, u32), 1));";
     assert!(source.contains(original));
     std::fs::write(
         &mutant,
-        source.replacen(original, "assert!(values == [7, 11, 20]);", 1),
+        source.replacen(
+            original,
+            "assert!(field == parent + core::mem::offset_of!((u8, u32), 1) + 1);",
+            1,
+        ),
     )
     .unwrap();
     for target in [None, Some("thumbv7em-none-eabihf")] {
         for optimized in [false, true] {
             verify(
                 &mutant,
-                &[("array_mutations", ProofStatus::Refuted)],
+                &[("field_address", ProofStatus::Refuted)],
                 target,
                 optimized,
             );

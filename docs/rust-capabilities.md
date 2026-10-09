@@ -11,14 +11,17 @@ execution at O0 and O2, positive/refuted/unknown controls, a source mutation tha
 structured UNKNOWN reporting, and passing repository checks. Completion establishes a repeatable
 baseline. It does not establish full Rust support or a completed memory-model refactor.
 
-The manifest contains 23 cases across 12 families. After the finite typed-slice stage, each
-build configuration expects 11 PROVED, 9 REFUTED and 3 UNKNOWN results. The initial stage-133
-baseline was 10 PROVED, 9 REFUTED and 4 UNKNOWN. Covered examples exercise arithmetic, enum payloads,
-array indexing, reference effects, concrete generics, closures, iterator callbacks, finite loops,
-destructors and fresh future polling. Open dispatch and incoming non-byte slices retain explicit
-unsupported frontiers. Indexed retained mutable integer/tuple prefixes now execute through checked
-projection snapshots with a uniquely determined length of at most 128 elements. An expected UNKNOWN must reach its
-specified diagnostic, rather than merely fail elsewhere.
+The manifest contains 26 cases across 13 families. Each build configuration expects 12 PROVED,
+10 REFUTED and 4 UNKNOWN results. Stage 133 originally had 23 cases with 10 PROVED, 9 REFUTED
+and 4 UNKNOWN; stage 134 closed its retained-prefix projection gap. Stage 136 adds raw-pointer
+metadata P/R controls and a safe core reference-array grant that remains UNKNOWN without a
+temporal permission certificate. These additions change the denominator, not a coverage percentage.
+Covered examples exercise arithmetic, enum payloads, array indexing, reference effects, concrete
+generics, closures, iterator callbacks, finite loops, destructors, fresh future polling and raw
+pointer metadata. Open dispatch and incoming non-byte slices retain explicit frontiers. Indexed
+retained mutable integer/tuple prefixes use checked projection snapshots with a uniquely determined
+length of at most 128. An expected UNKNOWN must reach its specified diagnostic rather than fail
+elsewhere.
 
 ```sh
 cargo test --locked -p miren --test rust_capabilities
@@ -79,18 +82,21 @@ understands volatile accesses while an STM32 package supplies the meaning of its
 
 ## Open access-validity blocker
 
-Tracked volatile reads and raw byte-slice views currently lack a certificate for temporal
-access permission. A live allocation, matching type, aligned address and retained writable
-flag do not establish that an old pointer remains valid after competing reference access.
+Tracked volatile reads, raw byte-slice views and nonempty raw-pointer-to-reference arrays lack
+an implemented certificate for temporal access permission. These boundaries now return UNKNOWN
+before exposing a value or reference. A live allocation, matching type, aligned address and
+retained writable flag do not establish that an old pointer remains valid after competing reference access.
 The [Rust pointer documentation](https://doc.rust-lang.org/std/ptr/index.html#safety)
 describes temporal permission and a limited reference-to-pointer access guarantee; precise
 aliasing rules are not fully settled. The audit is a missing-certificate finding, not a
 claim that every probed sequence is necessarily undefined behavior under every model.
 
-Four old-pointer access sequences currently report PROVED on host and ARM at O0/O2 without
-assumptions. Those results do not certify the omitted access condition. Preserve their
-reports at `/tmp/miren-raw-alias-validity-audit` while implementing conservative rejection
-or a justified access model. Do not use these results as evidence of full Rust parity.
+Four old-pointer access sequences previously reported PROVED on host and ARM at O0/O2 without
+assumptions. Their historical reports remain at `/tmp/miren-raw-alias-validity-audit`; stage-136
+regressions now require Semantics UNKNOWN for the missing access certificate. Fresh access and
+safe `array::each_mut` also remain UNKNOWN at the same boundary. Raw byte-pointer metadata
+formation and length queries remain supported without supplying reference or read rights.
+Do not use the historical results as evidence of full Rust parity.
 
 A future model needs path-local access tokens, derivation lineage and invalidation at
 actual MIR reads, writes, borrows and call boundaries. Re-registering the same address

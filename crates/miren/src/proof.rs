@@ -17,6 +17,8 @@ use std::collections::{BTreeMap, VecDeque};
 
 const MAX_INPUT_DEPTH: usize = 16;
 const MAX_INPUT_VALUES: usize = 512;
+const RAW_ACCESS_PERMISSION_GAP: &str =
+    "raw memory access requires a verified temporal permission certificate";
 
 mod aggregates;
 mod arm_interrupts;

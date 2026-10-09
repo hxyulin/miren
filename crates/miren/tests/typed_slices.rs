@@ -1,6 +1,6 @@
 #![forbid(unsafe_code)]
 
-use miren::{ProofStatus, Report};
+use miren::{ProofStatus, Report, UnknownCategory};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -73,13 +73,27 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
         );
         assert!(proof.trusted_calls.is_empty());
         let retained_failure = match *name {
-            "prefix_escape" | "borrowed_array_escape" => Some("frame-owned storage"),
-            "dead_prefix" | "dead_borrowed_array" => Some("dead or uninitialized storage"),
+            "wire_bytes"
+            | "integer_bytes"
+            | "wrong_integer_endian"
+            | "updates_are_visible"
+            | "wrong_wire_byte"
+            | "partial_slice"
+            | "wrong_partial_slice"
+            | "raw_subobject_slice"
+            | "prefix_and_borrowed_array_reads"
+            | "escaping_slice"
+            | "prefix_escape"
+            | "borrowed_array_escape"
+            | "dead_prefix"
+            | "dead_borrowed_array" => Some("verified temporal permission certificate"),
             _ => None,
         };
         if let Some(detail) = retained_failure {
             assert!(proof.obligations.iter().any(|obligation| {
-                obligation.status == ProofStatus::Unknown && obligation.detail.contains(detail)
+                obligation.status == ProofStatus::Unknown
+                    && obligation.unknown_category == Some(UnknownCategory::Semantics)
+                    && obligation.detail.contains(detail)
             }));
         }
         if *expected == ProofStatus::Refuted {
@@ -89,17 +103,17 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
 }
 
 #[test]
-fn compiler_typed_byte_slices_keep_layout_bounds_and_provenance() {
+fn compiler_typed_byte_slices_do_not_grant_uncertified_temporal_permission() {
     let entries = [
-        ("wire_bytes", ProofStatus::Proved),
-        ("integer_bytes", ProofStatus::Proved),
-        ("wrong_integer_endian", ProofStatus::Refuted),
-        ("updates_are_visible", ProofStatus::Proved),
-        ("wrong_wire_byte", ProofStatus::Refuted),
-        ("partial_slice", ProofStatus::Proved),
-        ("wrong_partial_slice", ProofStatus::Refuted),
+        ("wire_bytes", ProofStatus::Unknown),
+        ("integer_bytes", ProofStatus::Unknown),
+        ("wrong_integer_endian", ProofStatus::Unknown),
+        ("updates_are_visible", ProofStatus::Unknown),
+        ("wrong_wire_byte", ProofStatus::Unknown),
+        ("partial_slice", ProofStatus::Unknown),
+        ("wrong_partial_slice", ProofStatus::Unknown),
         ("mutable_slice", ProofStatus::Unknown),
-        ("raw_subobject_slice", ProofStatus::Proved),
+        ("raw_subobject_slice", ProofStatus::Unknown),
         (
             "multiple_shared_input_subobject_unknown",
             ProofStatus::Unknown,
@@ -112,7 +126,7 @@ fn compiler_typed_byte_slices_keep_layout_bounds_and_provenance() {
         ("borrowed_array_escape", ProofStatus::Unknown),
         ("dead_prefix", ProofStatus::Unknown),
         ("dead_borrowed_array", ProofStatus::Unknown),
-        ("prefix_and_borrowed_array_reads", ProofStatus::Proved),
+        ("prefix_and_borrowed_array_reads", ProofStatus::Unknown),
         ("dead_slice", ProofStatus::Unknown),
     ];
     for target in [None, Some("thumbv7em-none-eabihf")] {
@@ -123,7 +137,7 @@ fn compiler_typed_byte_slices_keep_layout_bounds_and_provenance() {
 }
 
 #[test]
-fn changing_field_storage_refutes_the_byte_claim() {
+fn changed_field_storage_remains_unknown_and_fails_valid_native_execution() {
     let directory = Directory::new();
     let path = directory.0.join("typed_slices.rs");
     let source = std::fs::read_to_string(fixture()).unwrap();
@@ -137,7 +151,7 @@ fn changing_field_storage_refutes_the_byte_claim() {
     for target in [None, Some("thumbv7em-none-eabihf")] {
         verify(
             &path,
-            &[("wire_bytes", ProofStatus::Refuted)],
+            &[("wire_bytes", ProofStatus::Unknown)],
             target,
             false,
         );
@@ -146,7 +160,7 @@ fn changing_field_storage_refutes_the_byte_claim() {
 }
 
 #[test]
-fn changing_compiler_field_order_refutes_the_byte_claim() {
+fn changed_field_order_remains_unknown_and_fails_valid_native_execution() {
     let directory = Directory::new();
     let path = directory.0.join("typed_slices.rs");
     let source = std::fs::read_to_string(fixture()).unwrap();
@@ -160,7 +174,7 @@ fn changing_compiler_field_order_refutes_the_byte_claim() {
     for target in [None, Some("thumbv7em-none-eabihf")] {
         verify(
             &path,
-            &[("wire_bytes", ProofStatus::Refuted)],
+            &[("wire_bytes", ProofStatus::Unknown)],
             target,
             false,
         );

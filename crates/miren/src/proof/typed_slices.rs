@@ -19,19 +19,44 @@ impl<'tcx> Engine<'tcx> {
         let [source, length]: [Value; 2] = values
             .try_into()
             .map_err(|_| "raw slice construction requires pointer and length")?;
-        let (_, bits, signed) = length.integer()?;
-        if signed || bits != u32::from(self.tcx.sess.target.pointer_width) {
+        let (metadata, bits, signed) = length.integer()?;
+        if signed
+            || bits != u32::from(self.tcx.sess.target.pointer_width)
+            || metadata.sort() != &Sort::BitVec(bits)
+            || !metadata.belongs_to(&self.terms)
+        {
             return Err("raw slice metadata requires target-width usize".into());
         }
+        let (Value::RawPointer {
+            address,
+            bits: width,
+        }
+        | Value::TrackedPointer {
+            address,
+            bits: width,
+            ..
+        }) = &source
+        else {
+            return Err("raw slice metadata requires a modeled thin pointer".into());
+        };
+        if *width != bits
+            || address.sort() != &Sort::BitVec(bits)
+            || !address.belongs_to(&self.terms)
+        {
+            return Err(
+                "raw slice source pointer target width or symbolic context mismatch".into(),
+            );
+        }
+        self.validate_tracked_value(&source, state)?;
         let slice = Value::RawSlice {
             source: Box::new(source),
             length: Box::new(length),
         };
-        // Bounds are checked by the byte projection before granting any read permission.
-        self.raw_slice_bytes(&slice, state)?;
+        // Raw fat-pointer formation records metadata only. It neither reads the source nor
+        // grants reference rights, and the length need not fit a live allocation.
         self.record_model(
             id,
-            "compiler-typed shared byte slice; retained tracked allocation",
+            "compiler-typed raw byte-slice pointer metadata; no Rust access rights",
         );
         Ok(slice)
     }
@@ -160,7 +185,10 @@ impl<'tcx> Engine<'tcx> {
                 length: length.clone(),
             },
             conditions,
-        )
+        )?;
+        // A byte encoding certifies initialized spatial storage, not permission to create
+        // or keep using a Rust reference through a raw pointer.
+        Err(self.categorized_error(UnknownCategory::Semantics, RAW_ACCESS_PERMISSION_GAP.into()))
     }
 
     fn encode_storage_bytes(

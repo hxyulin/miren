@@ -81,15 +81,8 @@ impl<'tcx> Engine<'tcx> {
                 "volatile load requires initialized retained scalar of its exact type".into(),
             );
         }
-        self.record_model(
-            instance.def_id(),
-            "volatile load of initialized compiler-typed \
-            retained whole scalar; preserves value and float bits, no MMIO or synchronization",
-        );
-        Ok(Some(vec![Return {
-            value,
-            conditions: state.conditions.clone(),
-            memory: state.memory.clone(),
-        }]))
+        // Layout, initialization and liveness do not certify temporal access permission.
+        // Do not expose the retained value until an access model supplies that certificate.
+        Err(self.categorized_error(UnknownCategory::Semantics, RAW_ACCESS_PERMISSION_GAP.into()))
     }
 }

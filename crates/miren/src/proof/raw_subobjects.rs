@@ -315,6 +315,12 @@ impl<'tcx> Engine<'tcx> {
             self.static_store_value(*pointee, &stored, state, 0, &mut 0)?;
             references.push(reference);
         }
+        if !references.is_empty() {
+            // Disjoint subobjects establish spatial separation only. Even a fresh pointer
+            // array needs temporal permission before it can grant Rust reference rights.
+            return Err(self
+                .categorized_error(UnknownCategory::Semantics, RAW_ACCESS_PERMISSION_GAP.into()));
+        }
         Ok(Some(Value::Elements(references.into())))
     }
 
