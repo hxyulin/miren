@@ -860,8 +860,11 @@ Nonboolean static stores, mixed or overlapping views and trusted boundaries disc
 including future first accesses. A later boolean write cannot restore invalidated history.
 Certified Copy/Freeze enum places also use checked typed initializer tags while the premise holds.
 Rustc decodes the exact enum layout from a bounded read-only host snapshot; this does not read a
-runtime payload or supply pointee provenance. Static enum writes discard precision rather than
-inventing retained payload state.
+runtime payload or supply pointee provenance. Exact certified Copy/Freeze enum stores with only
+bool, integer or float fields retain their validated symbolic values for subsequent tag observations.
+Every variant must meet this field restriction; pointer, callback and aggregate fields discard
+precision. Payload reads remain unsupported. Tags share the 128-location cache and overlap checks;
+publication, opaque calls and interrupt-mask writes invalidate history irreversibly.
 Default roots retain arbitrary shared state. The mode does not verify reset or runtime
 initialization
 and cannot import startup facts into async entry analysis or cyclic induction.

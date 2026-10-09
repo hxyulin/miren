@@ -514,7 +514,9 @@ separately from contracts. Cargo forwards the same options.
 
 Supported integer static atomics and certified boolean static payloads retain initial values and
 sequential updates through branches and calls. This includes whole mutable bool statics and exact
-UnsafeCell/Cell boolean fields. Certified static pointer atomic loads also retain null and numeric
+UnsafeCell/Cell boolean fields. Exact Copy/Freeze enum stores containing only primitive scalar
+fields retain subsequent tag observations, without enabling payload reads. Certified static pointer
+atomic loads also retain null and numeric
 initializer address bits; these do not authorize pointee reads. Pointer initializers with provenance
 remain UNKNOWN, and pointer stores or CAS discard history. Other typed static stores, mixed or
 overlapping views and trusted calls discard precision; unseen statics and later writes cannot

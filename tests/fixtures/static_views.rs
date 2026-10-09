@@ -1147,3 +1147,70 @@ pub fn native_startup_enum_initializer() {
     startup_pointer_option_is_none();
     startup_sparse_tag_is_cold();
 }
+
+pub fn startup_scalar_enum_stores_preserve_disjoint_initializers() {
+    set_optional_value(OPTIONAL_WORD.get(), Some(7));
+    assert!(optional_word_tag(OPTIONAL_WORD.get()) == 1);
+    assert!(sparse_tag(SPARSE_TAG.get()) == -9);
+    set_sparse_tag(SPARSE_TAG.get(), SparseTag::Warm);
+    assert!(sparse_tag(SPARSE_TAG.get()) == 41);
+    assert!(optional_word_tag(OPTIONAL_WORD.get()) == 1);
+}
+
+fn scalar_enum_branch(choice: bool) {
+    if choice {
+        set_optional_value(OPTIONAL_WORD.get(), Some(7));
+    } else {
+        set_optional_value(OPTIONAL_WORD.get(), None);
+    }
+    assert!((optional_word_tag(OPTIONAL_WORD.get()) == 1) == choice);
+}
+
+pub fn startup_enum_stores_keep_branch_local_tags() {
+    let atomic = core::sync::atomic::AtomicPtr::<u32>::new(core::ptr::null_mut());
+    scalar_enum_branch(atomic.load(Ordering::Relaxed).is_null());
+}
+
+pub fn startup_enum_stores_do_not_enable_payload_reads() -> u32 {
+    set_optional_value(OPTIONAL_WORD.get(), Some(7));
+    a_static_variant_does_not_allow_payload_reads()
+}
+
+pub fn startup_enum_replacements_cannot_reuse_the_initializer() {
+    set_optional_value(OPTIONAL_WORD.get(), Some(7));
+    assert!(optional_word_tag(OPTIONAL_WORD.get()) == 0);
+}
+
+#[cfg(test)]
+#[test]
+fn native_scalar_enum_store_history() {
+    set_sparse_tag(SPARSE_TAG.get(), SparseTag::Cold);
+    startup_scalar_enum_stores_preserve_disjoint_initializers();
+    scalar_enum_branch(false);
+    scalar_enum_branch(true);
+}
+
+static ENUM_PUBLICATION: core::sync::atomic::AtomicPtr<u32> =
+    core::sync::atomic::AtomicPtr::new(core::ptr::null_mut());
+
+pub fn pointer_publication_discards_scalar_enum_history() {
+    set_optional_value(OPTIONAL_WORD.get(), Some(7));
+    ENUM_PUBLICATION.store(core::ptr::null_mut(), Ordering::Release);
+    assert!(optional_word_tag(OPTIONAL_WORD.get()) == 1);
+}
+
+pub fn scalar_enum_stores_cannot_restore_published_history() {
+    ENUM_PUBLICATION.store(core::ptr::null_mut(), Ordering::Release);
+    set_optional_value(OPTIONAL_WORD.get(), Some(7));
+    assert!(optional_word_tag(OPTIONAL_WORD.get()) == 1);
+}
+
+#[custom_mir(dialect = "runtime", phase = "optimized")]
+fn clear_pointer_option(pointer: *mut PointerOption) {
+    mir! { { *pointer = None; Return() } }
+}
+
+pub fn pointer_bearing_enum_types_do_not_retain_startup_tags() {
+    clear_pointer_option(OPTIONAL_POINTER.get().cast());
+    assert!(sparse_tag(SPARSE_TAG.get()) == -9);
+}

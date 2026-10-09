@@ -372,6 +372,28 @@ impl<'tcx> Engine<'tcx> {
         };
         if self.startup
             && !state.memory.startup_invalidated
+            && let Some(stored) = state.memory.startup_values.get(&location)
+        {
+            if let Value::Adt { discriminant, .. } = stored {
+                self.static_store_value(ty, stored, state, 0, &mut 0)?;
+                return Ok(Some(symbolic::integer(
+                    &self.terms,
+                    *discriminant,
+                    bits,
+                    signed,
+                )));
+            }
+            if let Value::Enum { discriminant, .. } = stored {
+                self.static_store_value(ty, stored, state, 0, &mut 0)?;
+                let (_, width, sign) = discriminant.integer()?;
+                if width != bits || sign != signed {
+                    return Err("startup enum history has an inconsistent tag type".into());
+                }
+                return Ok(Some((**discriminant).clone()));
+            }
+        }
+        if self.startup
+            && !state.memory.startup_invalidated
             && !state
                 .memory
                 .startup_values
@@ -576,7 +598,9 @@ impl<'tcx> Engine<'tcx> {
                 self.static_store_value(view.ty, value, state, 0, &mut 0)?;
                 self.retain_static_store_references(value, state)?;
                 self.reinitialize_static_place(view, state);
-                if !self.store_startup_bool(view, value, state)? {
+                if !self.store_startup_bool(view, value, state)?
+                    && !self.store_startup_enum(view, value, state)?
+                {
                     state.memory.invalidate_startup();
                 }
                 // Ordinary shared payload reads stay opaque; startup is an explicit root domain.

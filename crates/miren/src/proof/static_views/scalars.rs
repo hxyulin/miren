@@ -1,4 +1,4 @@
-//! Certified boolean statics; ordinary reads are opaque, startup history is explicitly assumed.
+//! Certified static scalar history is conditional on the explicit startup domain.
 use super::*;
 use startup_memory::StaticLocation;
 
@@ -129,6 +129,72 @@ impl<'tcx> Engine<'tcx> {
             && state.memory.startup_values.len() >= startup::MAX_STARTUP_LOCATIONS
         {
             return Err("startup boolean history exceeds the 128-location budget".into());
+        }
+        state.memory.startup_values.insert(location, value.clone());
+        Ok(true)
+    }
+
+    pub(super) fn store_startup_enum(
+        &self,
+        view: StaticView<'tcx>,
+        value: &Value,
+        state: &mut State,
+    ) -> Result<bool, String> {
+        if !self.startup || view.kind != ViewKind::Place || view.ty != view.certified {
+            return Ok(false);
+        }
+        let ty::Adt(def, args) = view.ty.kind() else {
+            return Ok(false);
+        };
+        let env = ty::TypingEnv::fully_monomorphized();
+        if !def.is_enum()
+            || def.variants().is_empty()
+            || def.variants().len() > 64
+            || !view.ty.is_freeze(self.tcx, env)
+            || !self.tcx.type_is_copy_modulo_regions(env, view.ty)
+        {
+            return Ok(false);
+        }
+        // Scalar-only fields cannot publish addresses, callbacks or retained mutable storage.
+        // Validate every variant, so symbolic selections retain the same bounded domain.
+        for variant in def.variants() {
+            for field in &variant.fields {
+                let field_ty = self
+                    .tcx
+                    .try_normalize_erasing_regions(env, field.ty(self.tcx, args))
+                    .map_err(|error| {
+                        format!("startup enum field normalization failed: {error:?}")
+                    })?;
+                if !matches!(
+                    field_ty.kind(),
+                    ty::Bool | ty::Int(_) | ty::Uint(_) | ty::Float(_)
+                ) {
+                    return Ok(false);
+                }
+            }
+        }
+        if state.memory.startup_invalidated {
+            return Ok(true);
+        }
+        let location = StaticLocation {
+            definition: view.static_id,
+            offset: view.offset,
+            bytes: self.static_layout(view.ty)?.size.bytes(),
+        };
+        if location.bytes == 0 {
+            return Ok(false);
+        }
+        if state.memory.startup_values.iter().any(|(other, stored)| {
+            location.overlaps(*other)
+                && (*other != location || !matches!(stored, Value::Adt { .. } | Value::Enum { .. }))
+        }) {
+            state.memory.invalidate_startup();
+            return Ok(true);
+        }
+        if !state.memory.startup_values.contains_key(&location)
+            && state.memory.startup_values.len() >= startup::MAX_STARTUP_LOCATIONS
+        {
+            return Err("startup enum history exceeds the 128-location budget".into());
         }
         state.memory.startup_values.insert(location, value.clone());
         Ok(true)

@@ -109,9 +109,12 @@ explicit; these records establish neither native reachability nor completed pani
 
 In explicit startup mode, certified Copy/Freeze enum places can inspect their declared initializer
 tag through rustc's typed discriminant decoder, including niche pointer options and signed tags.
+Exact Copy/Freeze enum stores with only primitive scalar fields retain branch-local tags under that
+same premise. Pointer, callback and aggregate fields remain outside retained enum history. Reads
+still expose only tags; publication and opaque effects discard both known and unseen facts.
 The bounded read-only host snapshot preserves initialized bytes and provenance; it does not enable
-runtime payload reads. Overlapping histories, static writes and opaque boundaries still discard
-precision. Ordinary enum tags remain arbitrary legal observations.
+runtime payload reads. Overlapping histories, unsupported static writes and opaque boundaries still
+discard precision. Ordinary enum tags remain arbitrary legal observations.
 
 Contracts are metadata. Callee bodies and configured bounds are checked; annotations do not become
 unchecked verified summaries. Explicit trusted boundaries and startup domains remain listed as

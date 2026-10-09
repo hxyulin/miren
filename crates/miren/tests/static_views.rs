@@ -730,7 +730,7 @@ fn startup_enum_tags_use_initializers_until_an_effect_invalidates_them() {
         ),
         (
             "a_typed_static_store_does_not_freeze_the_variant",
-            ProofStatus::Refuted,
+            ProofStatus::ProvedWithAssumptions,
         ),
         (
             "uninitialized_static_enum_tags_are_unknown",
@@ -991,5 +991,107 @@ fn removing_a_matching_store_leaves_static_initialization_unknown() {
                 None,
             );
         }
+    }
+}
+
+#[test]
+fn startup_scalar_enum_stores_retain_only_conditional_tag_history() {
+    let entries = [
+        (
+            "startup_scalar_enum_stores_preserve_disjoint_initializers",
+            ProofStatus::ProvedWithAssumptions,
+        ),
+        (
+            "startup_enum_stores_keep_branch_local_tags",
+            ProofStatus::ProvedWithAssumptions,
+        ),
+        (
+            "startup_enum_stores_do_not_enable_payload_reads",
+            ProofStatus::Unknown,
+        ),
+        (
+            "startup_enum_replacements_cannot_reuse_the_initializer",
+            ProofStatus::Refuted,
+        ),
+        (
+            "pointer_publication_discards_scalar_enum_history",
+            ProofStatus::Refuted,
+        ),
+        (
+            "scalar_enum_stores_cannot_restore_published_history",
+            ProofStatus::Refuted,
+        ),
+        (
+            "pointer_bearing_enum_types_do_not_retain_startup_tags",
+            ProofStatus::Refuted,
+        ),
+    ];
+    for target in [None, Some("thumbv7em-none-eabihf")] {
+        for optimized in [false, true] {
+            verify_mode(&fixture(), &entries, target, optimized, None, true);
+            let ordinary: Vec<_> = entries
+                .iter()
+                .map(|(name, status)| {
+                    (
+                        *name,
+                        if *status == ProofStatus::ProvedWithAssumptions {
+                            ProofStatus::Refuted
+                        } else {
+                            *status
+                        },
+                    )
+                })
+                .collect();
+            verify(&fixture(), &ordinary, target, optimized, None);
+        }
+    }
+}
+
+#[test]
+fn mutating_a_scalar_enum_store_fails_symbolic_and_native_tag_checks() {
+    let directory = Directory::new();
+    let source = std::fs::read_to_string(fixture()).unwrap();
+    let original = "set_sparse_tag(SPARSE_TAG.get(), SparseTag::Warm);";
+    assert_eq!(source.matches(original).count(), 1);
+    let path = directory.0.join("mutant.rs");
+    std::fs::write(
+        &path,
+        source.replace(
+            original,
+            "set_sparse_tag(SPARSE_TAG.get(), SparseTag::Hot);",
+        ),
+    )
+    .unwrap();
+    for target in [None, Some("thumbv7em-none-eabihf")] {
+        for optimized in [false, true] {
+            verify_mode(
+                &path,
+                &[(
+                    "startup_scalar_enum_stores_preserve_disjoint_initializers",
+                    ProofStatus::Refuted,
+                )],
+                target,
+                optimized,
+                None,
+                true,
+            );
+        }
+    }
+    for (path, success) in [(fixture(), true), (path, false)] {
+        let executable = directory.0.join("native-enum-store");
+        let output = Command::new(Path::new(env!("MIREN_SYSROOT")).join("bin/rustc"))
+            .args(["--test", "--edition=2024"])
+            .arg(path)
+            .arg("-o")
+            .arg(&executable)
+            .output()
+            .unwrap();
+        assert!(output.status.success(), "{output:?}");
+        let output = Command::new(&executable)
+            .args(["--exact", "native_scalar_enum_store_history"])
+            .output()
+            .unwrap();
+        assert!(String::from_utf8_lossy(&output.stdout).contains("running 1 test"));
+        assert_eq!(output.status.success(), success, "{output:?}");
     }
 }

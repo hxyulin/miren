@@ -563,12 +563,12 @@ cross-check valid address relationships and the wrong-stride assertion. Numeric 
 strides, wrapping arithmetic, untracked reference snapshots, raw dereferences and frame escapes
 remain UNKNOWN. Offset validity refutations do not claim an observed runtime panic.
 
-Certified initialized static `Copy + Freeze` enum places support discriminant-only reads. Each read
-is a fresh logical tag constrained to compiler-declared variants, including signed sparse tags and
-pointer-bearing option tags. One saved observation stays consistent; separate storage reads need
-not agree. Exact typed stores preserve legal tag shape without retaining a variant. No non-atomic
-initializer value is assumed under `--startup`. Tag-dependent counterexamples report the abstraction
-and remain runtime unconfirmed. Host/ARM debug and optimized fixtures check legal domains, separate
+Certified initialized static `Copy + Freeze` enum places support discriminant-only reads. In ordinary
+analysis each read is a fresh logical tag constrained to compiler-declared variants, including signed
+sparse tags and pointer-bearing option tags. One saved observation stays consistent; separate storage
+reads need not agree. Ordinary typed stores preserve legal tag shape without retaining a variant.
+The explicit startup domain can retain checked initializer tags and supported scalar enum stores.
+Tag-dependent counterexamples report the abstraction and remain runtime unconfirmed. Host/ARM debug and optimized fixtures check legal domains, separate
 reads, payload-read barriers, invalidated epochs, unrelated casts, noncopy tags and static
 destructors.
 A declared-variant mutation fails symbolic checking and native replay. Uninitialized single-variant
@@ -824,3 +824,9 @@ tags, from a read-only host snapshot capped at 1 MiB. The copy supplies no runti
 or pointer/payload access. Writes and opaque calls invalidate precision; wrong origins, uninitialized
 places and unsupported payload reads stay UNKNOWN. Compiler initializer mutations and independent
 native runs distinguish fresh None from occupied Some. Ordinary-root tag observations stay opaque.
+
+Explicit startup analysis retains tags after exact certified Copy/Freeze enum stores whose variants
+contain only bool, integer or float fields. Stores preserve disjoint initializer facts and
+branch-local tag choices; they do not enable payload reads. Pointer-bearing enums, publication,
+opaque calls and interrupt-mask writes retain conservative invalidation. Ordinary reads remain
+arbitrary legal tags, and later writes cannot restore invalidated startup history.

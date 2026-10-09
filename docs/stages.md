@@ -1610,3 +1610,35 @@ Captures are `/tmp/miren-startup-pointer-main-{strict,reset}-20261009` and
 
 All 472 Rust workspace tests and 48 Python tests pass, as do formatting, workspace Clippy, release
 builds, dependency checks, documentation builds and manual hooks.
+
+## Stage 106: Conditional scalar enum store history
+
+Exact certified Copy/Freeze enum stores now preserve startup facts for subsequent tag observations
+when every variant contains only bool, integer or float fields. The stored value passes the existing
+typed shape and validity checks; tag reads validate it again. Whole enum footprints share the
+128-location history budget, and incompatible overlapping cached values invalidate precision.
+Branch-local stores and disjoint initializer reads retain their identities. Runtime payload reads
+remain unsupported, and ordinary-root tags remain arbitrary legal discriminants.
+
+All variants must meet the scalar restriction, even when storing None. Pointer, callback and
+aggregate payload types remain outside this domain. Publication, opaque calls, interrupt-mask writes
+and retirement keep their existing invalidation behavior; later enum writes cannot restore history.
+Host/ARM debug and optimized cases cover conditional proofs, refutations and unknown payload reads,
+branch isolation, disjoint locations and publication. Changing a stored sparse variant refutes the
+tag claim and fails native execution.
+
+The queue audit identifies callback/future stores followed by executor pointer publication before
+Cordyceps' `links.next.is_none()` guard. Publication ends the existing no-external-change premise.
+This stage does not silently reuse the declared None afterward or establish native boot reachability.
+Advancing that boundary requires justified publication/exclusion history or a separately recorded
+execution premise. Application code and assumption profiles remain unchanged.
+
+Both main profiles still reach all twelve fresh application futures, and all 72 root obligation
+arrays match stage 105 exactly. The diagnostic startup runtime probe still stops at the queue guard
+in all twelve wrappers; strict runtime obligations also remain unchanged. Captures are
+`/tmp/miren-enum-history-main-{strict,reset}-20261009` and
+`/tmp/miren-enum-history-runtime-comparison`.
+
+All 474 Rust workspace tests and 48 Python tests pass. Formatting, workspace Clippy, release builds,
+dependency checks, documentation builds and manual hooks pass; independent review found no required
+soundness fixes.
