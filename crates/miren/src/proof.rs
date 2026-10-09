@@ -31,6 +31,7 @@ mod external;
 mod floating_intrinsics;
 mod foreign_calls;
 mod function_pointers;
+mod hardware;
 mod induction;
 mod input_references;
 mod inputs;
@@ -249,6 +250,7 @@ pub fn verify(
 
 impl<'tcx> Engine<'tcx> {
     fn root(&mut self, id: DefId, async_entry: bool) -> Result<(), String> {
+        self.config.validate()?;
         let body = self.tcx.optimized_mir(id);
         if async_entry && (self.startup || self.induction) {
             return Err(
@@ -1887,6 +1889,11 @@ impl<'tcx> Engine<'tcx> {
                 let right = self.operand(id, body, state, &operands.1)?;
                 if *operation == BinOp::Offset {
                     let source = operands.0.ty(&body.local_decls, self.tcx);
+                    if let Some(value) =
+                        self.hardware_pointer_offset(id, source, &left, &right, state)?
+                    {
+                        return Ok(value);
+                    }
                     return self.tracked_pointer_offset(id, source, left, right, state);
                 }
                 let operation = match operation {

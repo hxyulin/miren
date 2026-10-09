@@ -411,3 +411,17 @@ Ordinary copied/moved mutable handles through shared storage remain unsupported.
 mutable-reference positions, including tuple/array/ADT fields, reject narrowed handles at
 ordinary ownership exposure and return boundaries. Shared reads and valid nested mutable
 reborrows keep their existing behavior.
+
+The public host model API exports `HardwareModel`, `HardwareDevice`, `MmioRegion` and
+`MmioWriteRegister`, with builders and validation. `ContractConfig::with_hardware` composes an
+explicit hardware policy with existing function summaries. The optional field is omitted when
+absent, preserving strict defaults and legacy schema-1 configuration. The
+[STM32 builder example](examples/stm32_model.rs) emits JSON using the same public API.
+
+The first backend admits bounded numeric byte-pointer transport and exact write-only unsigned
+u32 GPIO register stores, including compiler-certified transparent register values. Actual
+callbacks and Rust arithmetic execute. Configured device/pointer-width evidence must agree;
+physical validity and unmodeled hardware/Rust effects are assumptions. Numeric addresses never
+become retained Rust allocations, references or read permission. Each actual model use records
+its premise even on refuted/unknown roots. Unsupported operations remain UNKNOWN. See the
+[external model guide](../../docs/contracts.md#external-model-api) for limits and future state models.

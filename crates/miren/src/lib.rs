@@ -2,6 +2,7 @@
 
 pub mod cli;
 mod config;
+pub mod hardware;
 pub mod invocation;
 pub mod limits;
 pub mod project;
@@ -9,6 +10,7 @@ pub mod replay;
 pub mod smt;
 pub mod static_origins;
 pub use config::{ContractConfig, FunctionContract};
+pub use hardware::{HardwareDevice, HardwareModel, MmioRegion, MmioWriteRegister};
 pub use limits::AnalysisLimits;
 
 use serde::{Deserialize, Serialize};

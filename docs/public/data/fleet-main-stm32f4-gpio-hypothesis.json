@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "units": {
+    "bsp/rm-c/rm-c-bringup/bin/rm-c-bringup": {
+      "schema_version": 1,
+      "functions": [
+        {
+          "function": "embassy_stm32::init",
+          "trusted": true,
+          "no_panic": true,
+          "reason": "UNVERIFIED whole-initialization hypothesis for RM-C with exact STM32F407IG feature stm32f407ig: assume the board has a working 12 MHz HSE crystal oscillator and that the actual rm_c::init configuration is legal and establishes PLL SYSCLK/AHB 168 MHz, APB1 42 MHz, APB2 84 MHz and PLLQ USB 48 MHz. Assume physical MMIO addresses, widths and access conditions are valid and oscillator/PLL/power/clock ready polls terminate. This entire embassy_stm32::init call is assumed to be the single successful first HAL initialization with its singleton available; it terminates without panic and returns Rust-valid exclusively owned peripheral tokens with no conflicting owners or aliases at return. Its Rust singleton, clock and time-driver storage effects are opaque: modifies is omitted, so tracked Rust memory is conservatively invalidated. The summary cannot bypass unsupported return ownership/types or certify subsequent lifetime/alias transitions, concurrent hardware access, boot, task execution, scheduler behavior, interrupt delivery or SEV."
+        }
+      ],
+      "hardware": {
+        "schema_version": 1,
+        "device": "stm32f407ig",
+        "pointer_bits": 32,
+        "reason": "UNVERIFIED GPIO premise for stm32f407ig: the configured GPIOH region permits bounded byte address transport and its exact aligned u32 BSRR write without trapping or causing unmodeled tracked Rust storage mutations. No readback, pin-state observation, clock readiness, interrupt delivery, subsequent hardware behavior, SEV semantics or executor progress is assumed. Device build indicators are configuration evidence, not physical device certification. Existing Rust callback, lifetime and interference checks remain active.",
+        "regions": [
+          {
+            "name": "GPIOH",
+            "start": 1073880064,
+            "length": 32
+          }
+        ],
+        "write_registers": [
+          {
+            "name": "GPIOH_BSRR",
+            "address": 1073880088
+          }
+        ]
+      }
+    }
+  }
+}

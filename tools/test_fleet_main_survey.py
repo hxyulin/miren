@@ -119,6 +119,69 @@ class MainSurveyTests(unittest.TestCase):
                 main.checked_proof(self.unit, self.inventory, changed, self.directory,
                                    "async_body", survey.LIMITS, 0, config, True)
 
+    def hardware_config(self):
+        return main.normalized_contract_config({"schema_version": 1, "functions": [],
+            "hardware": {"schema_version": 1, "device": "stm32h723vg", "pointer_bits": 32,
+                "reason": "Explicit GPIO write test hypothesis",
+                "regions": [{"name": "GPIOC", "start": 0x58020800, "length": 32}],
+                "write_registers": [{"name": "GPIOC_BSRR", "address": 0x58020818}]}})
+
+    def test_hardware_policy_is_exact_and_keeps_startup_and_strict_scopes_separate(self):
+        config = self.hardware_config()
+        report = self.report(status="proved_with_assumptions")
+        report["contract_config"] = config
+        proof = report["functions"][0]["proof"]
+        proof.update(obligations=[],
+                     entry_assumptions=[main.hardware_assumption(config["hardware"])])
+        checked = main.checked_proof(self.unit, self.inventory, report, self.directory,
+                                     "async_body", survey.LIMITS, 0, config, True)
+        self.assertTrue(main.conditional_proof(checked))
+        with self.assertRaises(ValueError):
+            self.checked(report)
+        mutations = [lambda r: r["contract_config"]["hardware"].update(device="stm32f407ig"),
+                     lambda r: r["contract_config"]["hardware"].update(reason="different"),
+                     lambda r: r["functions"][0]["proof"].update(entry_assumptions=[]),
+                     lambda r: r["functions"][0]["proof"]["entry_assumptions"].append("startup"),
+                     lambda r: r["functions"][0]["proof"].update(invariants=["loop induction"])]
+        for mutation in mutations:
+            changed = copy.deepcopy(report)
+            mutation(changed)
+            with self.assertRaises(ValueError):
+                main.checked_proof(self.unit, self.inventory, changed, self.directory,
+                                   "async_body", survey.LIMITS, 0, config, True)
+        for status in ("refuted", "unknown"):
+            changed = copy.deepcopy(report)
+            changed["functions"][0]["proof"].update(status=status, obligations=[{"status": status}])
+            checked = main.checked_proof(self.unit, self.inventory, changed, self.directory,
+                                         "async_body", survey.LIMITS, 1, config, True)
+            self.assertTrue(main.conditional_proof(checked))
+
+    def test_hardware_policy_rejects_unbounded_or_ambiguous_register_permissions(self):
+        hardware = self.hardware_config()["hardware"]
+        mutations = [lambda h: h.update(schema_version=True),
+                     lambda h: h.update(device=[]), lambda h: h.update(pointer_bits=16),
+                     lambda h: h.update(pointer_bits=64),
+                     lambda h: h.update(reason=" "), lambda h: h.update(regions=[]),
+                     lambda h: h["regions"][0].update(start=-1),
+                     lambda h: h["regions"][0].update(start=0),
+                     lambda h: h["regions"][0].update(start=0x20000000),
+                     lambda h: h["regions"][0].update(start=0x60000000),
+                     lambda h: h["regions"][0].update(start=(1 << 32) - 8),
+                     lambda h: h["regions"][0].update(length=4097),
+                     lambda h: h["regions"].append(dict(h["regions"][0], name="overlap")),
+                     lambda h: h["write_registers"][0].update(address=0x58020819),
+                     lambda h: h["write_registers"][0].update(address=0x58020820),
+                     lambda h: h["write_registers"][0].update(read=True),
+                     lambda h: h["write_registers"].append(dict(h["write_registers"][0]))]
+        for mutation in mutations:
+            changed = copy.deepcopy(hardware)
+            mutation(changed)
+            with self.assertRaises(ValueError):
+                main.normalized_hardware_model(changed)
+        legacy = {"schema_version": 1, "functions": []}
+        self.assertEqual(main.normalized_contract_config(legacy), legacy)
+        self.assertEqual(main.normalized_contract_config(dict(legacy, hardware=None)), legacy)
+
     def test_configured_root_preconditions_are_conditional_even_with_proved_status(self):
         report = self.report()
         config = main.normalized_contract_config({"schema_version": 1, "functions": [{

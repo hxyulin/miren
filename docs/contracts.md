@@ -157,3 +157,62 @@ Trusted generic calls require an exact instance string, copied from the report's
 instance arguments, such as "[u8]". Matching uses the pinned compiler's representation and rejects
 overlapping selectors. Trait resolution must still identify an ordinary concrete function;
 dynamic dispatch and unsupported shims cannot be covered by a wildcard.
+
+## External model API
+
+Host integrations can build a `miren::ContractConfig` with public Rust types or write its JSON
+representation. Existing `FunctionContract` entries describe explicit function boundaries and
+Rust storage effects. The optional `hardware` field adds a versioned device model without replacing
+application source. It is absent from legacy configuration and disabled in strict runs.
+
+The first hardware schema supplies bounded byte-address transport and exact write-only u32
+register accesses for STM32H723VG or STM32F407IG. It is a conditional model, not an emulator.
+The current devices require a 32-bit compiler pointer domain. Build indicators must match the
+selected device; these indicators do
+not establish which physical chip exists. Register access, device validity and absence of
+unmodeled Rust storage effects remain explicit premises in the required reason.
+
+The public `HardwareModel`, `HardwareDevice`, `MmioRegion` and `MmioWriteRegister` types are
+serializable. `HardwareModel::new`, `with_region` and `with_write_register` build a policy;
+`ContractConfig::with_hardware` combines it with function contracts. Call `validate()` before
+serializing an in-memory model. The CLI validates loaded configuration again. For a working host
+integration, run the example
+[builder](https://github.com/hxyulin/miren/blob/main/crates/miren/examples/stm32_model.rs):
+
+```sh
+cargo run --locked -p miren --example stm32_model -- stm32h723vg > /tmp/h7-model.json
+```
+
+Its hardware section has this form; JSON addresses are decimal integers:
+
+```json
+{
+  "schema_version": 1,
+  "device": "stm32h723vg",
+  "pointer_bits": 32,
+  "reason": "UNVERIFIED GPIO access hypothesis with no unmodeled Rust storage effects",
+  "regions": [{"name": "GPIOC", "start": 1476528128, "length": 32}],
+  "write_registers": [{"name": "GPIOC_BSRR", "address": 1476528152}]
+}
+```
+
+The model allows 1..16 disjoint regions of 1..4096 bytes inside the STM32 peripheral address
+window and 1..64 uniquely named, aligned registers wholly inside those regions. Schema 1 admits
+only exact unsigned 32-bit writes, including compiler-certified transparent u32 register values.
+Admitted forward byte-address arithmetic must stay within a configured region without wrapping;
+admitting transport
+alone grants no register access. Numeric hardware addresses never become retained Rust allocations
+or references. Unmapped addresses, unsupported widths, reads and missing models stay UNKNOWN.
+Hardware stores retain the existing conservative publication/startup history invalidation.
+
+The interpreter executes the actual register write callback and its Rust assertions and arithmetic.
+Only the final permitted hardware store has assumed semantics. Every root that uses transport or a
+store records the exact device premise in `entry_assumptions`, even when it later refutes or stays
+unknown. Completed proofs require explicit `--allow-assumptions`; that flag does not accept
+REFUTED or UNKNOWN. Reports retain the complete model configuration and reached effect diagnostics.
+
+This is the initial integration boundary. Future peripheral models can extend the versioned
+operations and effects; Embassy state models need separate Rust initialization, publication and
+lifetime semantics. The existing `--startup` and `--startup-isolated` premises remain explicit and
+independent of hardware permission. No register value, hardware readiness, instruction behavior,
+executor progress or loop termination follows from this write model.

@@ -952,3 +952,15 @@ O0/O2 source controls confirm that bounds panic; constructor-shaped len<=16 cont
 The source initialization/update invariant excludes this witness, without a whole-program
 reachability proof. The normalized forged-MIR permission audit now remains UNKNOWN while
 valid shared reads and mutable reborrows prove. All 546 workspace Rust and 48 Python tests pass.
+
+Stage 127 adds a public, validated external hardware model API with a separate opt-in conditional
+backend. Exact STM32H723VG/STM32F407IG 32-bit policies admit bounded forward byte-address transport
+and exact write-only u32 registers, including compiler-certified transparent u32 values. Core
+pointer add checks its original unsigned count before conversion; subtraction, wrapping and
+negative transports remain unsupported. Actual callbacks execute, and hardware stores invalidate
+published/startup histories. Unmapped/readback/type/device/context/liveness failures remain UNKNOWN.
+
+New compiler controls prove conditional writes, refute callback mutations and reject unsupported
+accesses on ARM O0/O2. Host-width mismatch is UNKNOWN; native execution checks only actual Rust
+callbacks, never MMIO. All nine hardware-profile paths execute BSRR writes and reach unsupported
+PUPDR reads in the actual fleet replay. No strict proof gain or firmware boot guarantee follows.

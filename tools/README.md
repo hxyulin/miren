@@ -260,3 +260,29 @@ bodies and reject a polling proof in the function-only capture. Compact exports 
 and exact row indices for factories and unclassified legacy roots. Scope metadata changes no proof
 outcomes; missing legacy metadata is not inferred from source names. All-main polling captures
 remain separate.
+
+## External GPIO model policies
+
+The `fleet-main-stm32*-gpio-hypothesis.json` profiles compose the initialization policies above
+with the public hardware API. The combined policy admits exactly GPIOC BSRR on H723VG and GPIOH
+BSRR on F407IG, plus bounded forward byte-address transport in their 32-byte register regions.
+No register read is allowed. Use the combined file explicitly:
+
+```sh
+python3 tools/fleet_main_survey.py --survey /tmp/fleet-survey-002/summary.json \
+  --output /tmp/fleet-main-gpio-001 --allow-assumptions \
+  --assumptions-profile docs/public/data/fleet-main-stm32-gpio-hypothesis.json
+```
+
+Normalized hardware policies are retained alongside function contracts. The runner admits only
+that policy's exact namespaced hardware premise in `entry_assumptions`; startup and induction
+remain rejected. Strict runs reject any used hardware premise. Compact exports preserve the
+configuration, snapshot hashes and actual premise on UNKNOWN and REFUTED roots as well as proofs.
+Legacy profiles without hardware retain their previous normalized representation.
+
+The initial actual replay completes all twelve mains: nine use the exact modeled BSRR write and
+advance to GPIO PUPDR reads, which remain UNKNOWN; three retain earlier RTT refutations without
+using a hardware model. Registration remains twelve PROVED and ordinary runtime entry twelve
+REFUTED. This is conditional traversal progress, not nine new proofs or a supported-outcome
+milestone. Raw capture: `/tmp/miren-stage127-main-gpio-20261009`. The separate existing reset-only
+and initialization-only publications remain unchanged.

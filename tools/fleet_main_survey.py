@@ -31,8 +31,60 @@ def require(condition, message):
         raise ValueError(message)
 
 
+def normalized_hardware_model(value):
+    fields = {"schema_version", "device", "pointer_bits", "reason", "regions", "write_registers"}
+    require(isinstance(value, dict) and set(value) == fields, "invalid hardware model schema")
+    require(type(value["schema_version"]) is int and value["schema_version"] == 1,
+            "unsupported hardware model version")
+    require(isinstance(value["device"], str)
+            and value["device"] in {"stm32h723vg", "stm32f407ig"},
+            "unsupported hardware device")
+    bits = value["pointer_bits"]
+    require(type(bits) is int and bits == 32, "invalid hardware pointer width")
+    require(isinstance(value["reason"], str) and value["reason"].strip(),
+            "hardware model requires an explicit reason")
+    regions, registers = value["regions"], value["write_registers"]
+    require(isinstance(regions, list) and 1 <= len(regions) <= 16, "invalid hardware regions")
+    require(isinstance(registers, list) and 1 <= len(registers) <= 64,
+            "invalid hardware write registers")
+    names, extents = set(), []
+    for region in regions:
+        require(isinstance(region, dict) and set(region) == {"name", "start", "length"},
+                "invalid hardware region schema")
+        name, start, length = region["name"], region["start"], region["length"]
+        require(isinstance(name, str) and name.strip() == name and name and name not in names,
+                "invalid or duplicate hardware region name")
+        names.add(name)
+        require(type(start) is int and type(length) is int and start > 0
+                and 0x40000000 <= start and start + length <= 0x60000000
+                and 1 <= length <= 4096 and start + length <= (1 << bits),
+                "invalid hardware region extent")
+        require(all(start + length <= lo or start >= hi for lo, hi in extents),
+                "overlapping hardware regions")
+        extents.append((start, start + length))
+    names, addresses = set(), set()
+    for register in registers:
+        require(isinstance(register, dict) and set(register) == {"name", "address"},
+                "invalid hardware write register schema")
+        name, address = register["name"], register["address"]
+        require(isinstance(name, str) and name.strip() == name and name and name not in names,
+                "invalid or duplicate hardware register name")
+        names.add(name)
+        require(type(address) is int and address not in addresses and address % 4 == 0
+                and sum(lo <= address and address + 4 <= hi for lo, hi in extents) == 1,
+                "invalid hardware write register extent")
+        addresses.add(address)
+    return {key: value[key] for key in sorted(fields)}
+
+
+def hardware_assumption(model):
+    return (f"hardware-model:v1:device={model['device']};pointer_bits={model['pointer_bits']};"
+            f"reason={model['reason']}")
+
+
 def normalized_contract_config(value):
-    require(isinstance(value, dict) and set(value) == {"schema_version", "functions"}
+    require(isinstance(value, dict) and {"schema_version", "functions"} <= set(value)
+            and set(value) <= {"schema_version", "functions", "hardware"}
             and type(value["schema_version"]) is int and value["schema_version"] == 1,
             "invalid contract configuration schema")
     require(isinstance(value["functions"], list), "missing configured functions")
@@ -68,7 +120,10 @@ def normalized_contract_config(value):
             require(spec["no_panic"] and spec["reason"] and spec["reason"].strip(),
                     "trusted contracts require no_panic and a reason")
         functions.append(spec)
-    return {"schema_version": 1, "functions": functions}
+    result = {"schema_version": 1, "functions": functions}
+    if value.get("hardware") is not None:
+        result["hardware"] = normalized_hardware_model(value["hardware"])
+    return result
 
 
 def conditional_proof(proof):
@@ -138,8 +193,7 @@ def validate_proof_policy(proof, report, unit, name, config, allow_assumptions):
     require(all(isinstance(proof.get(key, []), list) for key in
                 ("assumptions", "entry_assumptions", "trusted_calls", "invariants")),
             "invalid proof policy metadata")
-    require(not proof.get("entry_assumptions") and not proof.get("invariants"),
-            "unexpected startup assumptions or induction")
+    require(not proof.get("invariants"), "unexpected induction")
     if not allow_assumptions:
         require(not conditional_proof(proof), "unexpected assumptions or trusted calls")
         require(report.get("contract_config") is None, "unexpected contract configuration")
@@ -147,6 +201,10 @@ def validate_proof_policy(proof, report, unit, name, config, allow_assumptions):
     require(config is not None, "missing explicit contract configuration")
     normalized_contract_config(report.get("contract_config"))
     require(report.get("contract_config") == config, "contract configuration mismatch")
+    hardware = config.get("hardware")
+    entries = proof.get("entry_assumptions", [])
+    require(entries == [] or (hardware is not None and entries == [hardware_assumption(hardware)]),
+            "unexpected startup or hardware assumptions")
     matched = proof.get("matched_contracts", [])
     require(isinstance(matched, list)
             and all(selector in {contract_selector(s) for s in config["functions"]}
@@ -171,7 +229,8 @@ def validate_proof_policy(proof, report, unit, name, config, allow_assumptions):
                 and (spec["instance"] is None or spec["instance"] == call["instance"]),
                 "unauthorized trusted call instance")
     if proof["status"] == "proved_with_assumptions":
-        require(bool(assumptions or trusted), "conditional proof has no recorded assumptions")
+        require(bool(assumptions or trusted or entries),
+                "conditional proof has no recorded assumptions")
 
 
 def captured_environment(provenance, inventory):

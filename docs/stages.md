@@ -2417,3 +2417,37 @@ and unsupported ownership gates. All 546 Rust workspace tests and 48 Python test
 formatting, cargo lint, release builds, cargo deny, documentation build and manual hooks pass.
 The profile uses existing analyzer behavior; strict defaults and the published reset-only main
 capture remain unchanged.
+
+## Stage 127: Public external model API and exact conditional GPIO writes
+
+Public HardwareModel/HardwareDevice/MmioRegion/MmioWriteRegister DTOs and builders compose with
+ContractConfig. Optional hardware policies serialize only when present; both file and in-memory
+validation enforce versions, device32-bit domain, bounded disjoint peripheral regions and exact
+aligned u32 write registers. A host builder example emits H7/F4 policies through the same API.
+
+The interpreter admits proven nonwrapping forward numeric byte transports without granting Rust
+allocation/reference rights. Original unsigned core add/byte_add counts are checked before
+conversion; subtraction/wrapping/negative transports are refused. Actual intrinsic stores require
+exact primitive or certified transparent full-range u32 types. Rust callbacks execute. Each used
+model records its exact device premise, including later UNKNOWN/REFUTED roots. External writes
+conservatively invalidate existing publication/startup histories. There is no readback model,
+SEV instruction model, scheduler guarantee, opaque success or firmware rewrite.
+
+Two public API unit tests and two compiler integration tests cover conditional proof, mutation
+refutation/native failure, unsupported accesses/device/layout/counts, missing policy, host-width
+mismatch and interference invalidation. Three Python policy/export tests preserve exact opt-in
+assumptions and reject policy changes or startup/induction leakage. Independent review approves
+the final boundaries. Full validation expects 550 Rust and 51 Python tests.
+
+The combined actual twelve-main replay completes all 36 scopes with no collection errors:
+nine bodies execute modeled BSRR writes then remain conditional UNKNOWN at PUPDR reads;
+three retain earlier unconditional RTT refutations. Registration remains twelve PROVED and
+ordinary runtime entry twelve REFUTED. Every fresh application body remains entered. This
+conditional traversal progress adds no completed main proof. Capture:
+`/tmp/miren-stage127-main-gpio-20261009`; previous profiles/publications stay separate.
+
+All 550 Rust workspace tests and 51 Python tests pass, along with formatting, cargo lint, release
+builds, cargo deny, documentation builds and manual hooks. The separate strict twelve-main
+capture matches all 36 prior stage125 obligation arrays exactly, without assumptions:
+`/tmp/miren-stage127-main-strict-20261009`. Model builder JSON normalizes identically through the
+Rust API and Python policy validator for both devices.

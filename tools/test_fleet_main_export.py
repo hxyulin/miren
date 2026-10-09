@@ -104,6 +104,31 @@ class MainExportTests(unittest.TestCase):
             self.assertFalse(summary["milestone_reached"])
             self.assertFalse(summary["conditional_milestone_reached"])
 
+    def test_hardware_unknown_keeps_its_conditional_premise_in_compact_evidence(self):
+        summary = sample(True)
+        unit = summary["units"][0]
+        model = main.normalized_hardware_model({"schema_version": 1, "device": "stm32h723vg",
+            "pointer_bits": 32, "reason": "Explicit hardware test hypothesis",
+            "regions": [{"name": "GPIOC", "start": 0x58020800, "length": 32}],
+            "write_registers": [{"name": "BSRR", "address": 0x58020818}]})
+        unit.update(contract_config={"schema_version": 1, "functions": [], "hardware": model},
+                    contract_snapshot="/private/hardware.json", contract_sha256="f" * 64,
+                    contract_sha256_at_completion="f" * 64)
+        root = unit["roots"][0]
+        premise = main.hardware_assumption(model)
+        root["proof"]["entry_assumptions"] = [premise]
+        root["conditional"] = True
+        main.annotate_evidence(summary)
+        exporter.validate(summary, True)
+        compact = exporter.compact_root(root, {"file": "main.rs", "line": 1, "column": 1},
+                                        "a" * 64)
+        self.assertEqual(compact["entry_assumptions"], [premise])
+        self.assertTrue(compact["conditional"])
+        self.assertEqual(compact["proof_status"], "unknown")
+        root["conditional"] = False
+        with self.assertRaises(ValueError):
+            exporter.validate(summary, True)
+
     def test_domain_labels_cannot_claim_boot_confirmation(self):
         summary = sample()
         main.annotate_evidence(summary)

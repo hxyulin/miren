@@ -3,11 +3,13 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 use std::path::Path;
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct ContractConfig {
     pub schema_version: u32,
     pub functions: Vec<FunctionContract>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hardware: Option<crate::HardwareModel>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -34,17 +36,40 @@ pub struct FunctionContract {
     pub reason: Option<String>,
 }
 
+impl Default for ContractConfig {
+    fn default() -> Self {
+        Self {
+            schema_version: 1,
+            functions: Vec::new(),
+            hardware: None,
+        }
+    }
+}
+
 impl ContractConfig {
+    pub fn with_hardware(mut self, hardware: crate::HardwareModel) -> Self {
+        self.hardware = Some(hardware);
+        self
+    }
+
     pub fn read(path: &Path) -> Result<Self, String> {
         let bytes = std::fs::read(path)
             .map_err(|error| format!("contracts {}: {error}", path.display()))?;
         let config: Self = serde_json::from_slice(&bytes)
             .map_err(|error| format!("contracts {}: {error}", path.display()))?;
-        if config.schema_version != 1 {
+        config.validate()?;
+        Ok(config)
+    }
+
+    pub fn validate(&self) -> Result<(), String> {
+        if self.schema_version != 1 {
             return Err("contract configuration needs schema_version 1".to_owned());
         }
         let mut selectors = BTreeSet::new();
-        for function in &config.functions {
+        if let Some(hardware) = &self.hardware {
+            hardware.validate()?;
+        }
+        for function in &self.functions {
             if !function.function.contains("::")
                 || function.function.trim() != function.function
                 || function.function.contains('*')
@@ -104,7 +129,7 @@ impl ContractConfig {
                 );
             }
         }
-        Ok(config)
+        Ok(())
     }
 }
 
