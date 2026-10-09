@@ -398,9 +398,14 @@ Checked mutable ranges over finite arrays of primitive integers and tuples of in
 retain their original allocation and projection through mutable slice iterators. Compiler
 receiver/output element types, integer widths/signs and tuple fields must match the stored
 values. Each element read/write proves the region and index bounds before translating its
-address; exhausted consumers still validate the original backing. Whole non-byte slice
-snapshots, whole-view assignment, arbitrary incoming non-byte slices, nested views and
-reference/interior-mutable payloads remain unsupported. Existing resource limits are unchanged.
+address; exhausted consumers still validate the original backing. Retained slice projections
+can materialize integer/tuple snapshots with a uniquely proven length of at most 128 elements.
+Nested slices and element/tuple-field writes retain the original allocation and update its
+actual elements; shared reborrows narrow write permissions. Scalar reads may select a symbolic
+offset, while tuple selection and writes require a uniquely determined element. Variable-length
+snapshots, whole-view assignment, arbitrary incoming non-byte slices and reference/interior-mutable
+payloads remain unsupported. Snapshot budget exhaustion records `resource_limit`; oversized
+backing allocations do not by themselves prevent a bounded small view.
 
 Concrete core `Iterator::find` executes its predicate in order, preserves each callback's
 memory effects and returns the original first matching item. The predicate receives a shared
@@ -506,7 +511,7 @@ UNKNOWN obligations optionally record `unknown_category`: `semantics`,
 `unclassified`. These are diagnostic causes, never assumptions or proof outcomes. Explicit
 producer tags currently cover solver decisions, query/step/depth/time budgets, retained-body
 absence, uninitialized static payload-reference refusal, incoming function-pointer/trait-object
-and non-byte slice frontiers, finite non-byte prefix projections, and Cortex-M event/wait
+and non-byte slice frontiers, finite slice snapshot ambiguity/budgets, and Cortex-M event/wait
 instructions.
 Other propagated string errors remain `unclassified`; the transitional reporter does not infer
 causes from keywords. PROVED and REFUTED obligations omit the field. Legacy reports lacking it

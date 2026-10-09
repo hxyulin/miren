@@ -53,7 +53,7 @@ fn verify(path: &Path, target: Option<&str>, optimized: bool, mutated: bool) {
         ("bounds_failure", ProofStatus::Refuted),
         ("overflow_failure", ProofStatus::Refuted),
         ("wrong_late_effect", ProofStatus::Refuted),
-        ("whole_view_snapshot_is_unknown", ProofStatus::Unknown),
+        ("whole_view_snapshot", ProofStatus::Proved),
         ("floating_elements_are_unknown", ProofStatus::Unknown),
         ("dead_backing_is_unknown", ProofStatus::Unknown),
         ("exhausted_dead_source_is_unknown", ProofStatus::Unknown),

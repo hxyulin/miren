@@ -2673,3 +2673,29 @@ Final standalone evidence: `/tmp/miren-rust-capabilities-final-20261010`, with u
 analyzer binaries and input hashes, exact compiler configurations, no collection errors and no
 trusted premises. Final validation passes 575 Rust tests, 67 Python tests, formatting, cargo lint,
 release builds, cargo deny, documentation build and manual hooks.
+
+
+## Stage 134: checked finite typed slice projections
+
+Retained integer and nonempty tuple slices now use the ordinary memory projection layer for
+bounded snapshots. Compiler target-width terms, compatible initialized values and complete
+region bounds are validated before translating indices. Materialization requires a solver-proven
+unique length of at most 128; no feasible candidate is selected as a new premise. Existing
+references retain allocation identity and access rights, and nested projected writes reach the
+original backing. Whole-slice assignment remains unsupported.
+
+Host/ARM O0/O2 controls exercise indexed/nested tuple writes, returned views, shared reborrows,
+empty and fixed-length symbolic views, callback order and bounds failures. Variable lengths,
+ambiguous tuple offsets/writes, floating shapes, oversized snapshots, escaped/dead parents and
+shared writes remain UNKNOWN. The actual increment-helper mutation refutes and fails native
+execution; invalid custom MIR controls are never executed natively.
+
+The core-only capability baseline improves to 11 PROVED, 9 REFUTED and 3 UNKNOWN per build
+configuration. This closes its retained-prefix projection gap without hardware assumptions or a
+new value representation. Existing finite-prefix iterator behavior remains supported, and the
+old whole-view-length fixture now proves through ordinary projection semantics.
+
+Final standalone evidence: `/tmp/miren-stage134-capabilities-20261010`, with 44 PROVED,
+36 REFUTED and 12 UNKNOWN outcomes and no collection errors. Validation passes 577 Rust
+tests, 67 Python tests, formatting, cargo lint, release builds, cargo deny, documentation
+build and manual hooks.

@@ -4,6 +4,7 @@ use symbolic::MemoryProjection;
 
 const MAX_ALLOCATIONS: usize = 512;
 const MAX_BYTE_VIEW_WRITES: u128 = 128;
+const MAX_FINITE_VIEW_ELEMENTS: usize = 128;
 
 impl<'tcx> Engine<'tcx> {
     pub(super) fn byte_subslice(
@@ -344,12 +345,122 @@ impl<'tcx> Engine<'tcx> {
                 }
                 Ok(Value::Elements(chunks.into()))
             }
-            (MemoryProjection::Slice { .. }, Value::Elements(_)) => Err(self.categorized_error(
-                UnknownCategory::Semantics,
-                "unsupported memory projection".into(),
-            )),
+            (MemoryProjection::Slice { offset, length }, Value::Elements(elements)) => {
+                self.finite_element_view(&elements, offset, length, conditions)
+            }
             _ => Err("unsupported memory projection".to_owned()),
         }
+    }
+
+    fn finite_element_view(
+        &self,
+        elements: &[Value],
+        offset: &Value,
+        length: &Value,
+        conditions: &[Term],
+    ) -> Result<Value, String> {
+        let bits = u32::from(self.tcx.sess.target.pointer_width);
+        for bound in [offset, length] {
+            let (expression, width, signed) = bound.integer()?;
+            if width != bits
+                || signed
+                || expression.sort() != &symbolic::Sort::BitVec(bits)
+                || !expression.belongs_to(&self.terms)
+            {
+                return Err("finite element view requires exact target usize terms".into());
+            }
+        }
+        if !elements
+            .iter()
+            .all(|element| self.finite_view_element(element, 0))
+        {
+            return Err("finite element view requires initialized integer or tuple storage".into());
+        }
+        let storage = Value::Elements(elements.to_vec().into());
+        if !self.finite_element_region(&storage, offset, length, conditions)? {
+            return Err("finite element view lacks typed storage".into());
+        }
+        let count = self.finite_view_length(length, elements.len(), conditions)?;
+        let mut view = Vec::with_capacity(count);
+        for position in 0..count {
+            let index = symbolic::binary(
+                &self.terms,
+                "add",
+                offset.clone(),
+                symbolic::integer(&self.terms, position as u128, bits, false),
+            )?;
+            view.push(self.fixed_element(elements, &index, conditions)?);
+        }
+        Ok(Value::Elements(view.into()))
+    }
+
+    fn finite_view_element(&self, value: &Value, depth: usize) -> bool {
+        if depth >= 16 {
+            return false;
+        }
+        if let Value::Int {
+            expression, bits, ..
+        } = value
+        {
+            return matches!(bits, 8 | 16 | 32 | 64 | 128)
+                && expression.sort() == &symbolic::Sort::BitVec(*bits)
+                && expression.belongs_to(&self.terms);
+        }
+        if let Value::Tuple(fields) = value {
+            return !fields.is_empty()
+                && fields
+                    .iter()
+                    .all(|field| self.finite_view_element(field, depth + 1));
+        }
+        false
+    }
+
+    fn finite_view_length(
+        &self,
+        length: &Value,
+        capacity: usize,
+        conditions: &[Term],
+    ) -> Result<usize, String> {
+        let (expression, bits, _) = length.integer()?;
+        if let Some(symbolic::Constant::BitVec { value, .. }) = symbolic::constant(&expression) {
+            if value > MAX_FINITE_VIEW_ELEMENTS as u128 {
+                return Err(self.categorized_error(
+                    UnknownCategory::ResourceLimit,
+                    "finite element snapshot exceeds 128-element budget".into(),
+                ));
+            }
+            return usize::try_from(value)
+                .map_err(|_| "finite element snapshot length exceeds host usize".into());
+        }
+        let within_budget = symbolic::binary(
+            &self.terms,
+            "le",
+            length.clone(),
+            symbolic::integer(&self.terms, MAX_FINITE_VIEW_ELEMENTS as u128, bits, false),
+        )?
+        .boolean()?;
+        if self.feasible(&[conditions.to_vec(), vec![symbolic::not(&within_budget)]].concat())? {
+            return Err(self.categorized_error(
+                UnknownCategory::ResourceLimit,
+                "finite element snapshot exceeds 128-element budget".into(),
+            ));
+        }
+        for count in 0..=capacity.min(MAX_FINITE_VIEW_ELEMENTS) {
+            let equal = symbolic::binary(
+                &self.terms,
+                "eq",
+                length.clone(),
+                symbolic::integer(&self.terms, count as u128, bits, false),
+            )?
+            .boolean()?;
+            if !self.feasible(&[conditions.to_vec(), vec![symbolic::not(&equal)]].concat())? {
+                return Ok(count);
+            }
+        }
+        Err(self.categorized_error(
+            UnknownCategory::Semantics,
+            "finite element snapshot length is not uniquely determined within its budget".into(),
+        ))
     }
 
     pub(super) fn memory_bounds(

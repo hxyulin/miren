@@ -118,8 +118,7 @@
     {
       "entry": "retained_prefix_index",
       "family": "reference_slice",
-      "expected": "unknown",
-      "unknown_reason": "unsupported memory projection"
+      "expected": "proved"
     }
   ]
 }

@@ -11,11 +11,13 @@ execution at O0 and O2, positive/refuted/unknown controls, a source mutation tha
 structured UNKNOWN reporting, and passing repository checks. Completion establishes a repeatable
 baseline. It does not establish full Rust support or a completed memory-model refactor.
 
-The initial manifest contains 23 cases across 12 families. Each build configuration expects
-10 PROVED, 9 REFUTED and 4 UNKNOWN results. Covered examples exercise arithmetic, enum payloads,
+The manifest contains 23 cases across 12 families. After the finite typed-slice stage, each
+build configuration expects 11 PROVED, 9 REFUTED and 3 UNKNOWN results. The initial stage-133
+baseline was 10 PROVED, 9 REFUTED and 4 UNKNOWN. Covered examples exercise arithmetic, enum payloads,
 array indexing, reference effects, concrete generics, closures, iterator callbacks, finite loops,
-destructors and fresh future polling. Open dispatch, incoming non-byte slices and indexed mutable
-non-byte prefixes retain explicit unsupported frontiers. An expected UNKNOWN must reach its
+destructors and fresh future polling. Open dispatch and incoming non-byte slices retain explicit
+unsupported frontiers. Indexed retained mutable integer/tuple prefixes now execute through checked
+projection snapshots with a uniquely determined length of at most 128 elements. An expected UNKNOWN must reach its
 specified diagnostic, rather than merely fail elsewhere.
 
 ```sh

@@ -60,7 +60,7 @@ pub fn wrong_late_effect() {
     assert!(entries[1].1 == 0);
 }
 
-pub fn whole_view_snapshot_is_unknown() {
+pub fn whole_view_snapshot() {
     let mut entries = [(1_u16, 0_u32); 4];
     let region = &mut entries[..2];
     assert!(region.len() == 2);

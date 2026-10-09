@@ -1061,3 +1061,15 @@ The fresh strict fleet survey records 32 units and 2336 roots: 1107 PROVED, 237 
 become REFUTED; 13 PROVED and 24 REFUTED become UNKNOWN at that validity boundary. New refutations
 also use arbitrary static-state witnesses, with boot reachability unverified. Final evidence:
 `/tmp/miren-fleet-pass20-final-20261010`. All 570 Rust and 57 Python tests pass.
+
+
+Stage 134 adds checked snapshot projections for retained finite integer/tuple slices. Bounds are
+proved before absolute index arithmetic; lengths must be uniquely determined and at most 128.
+References keep the original allocation, projection chain and permissions, so nested indexed
+writes affect the backing storage. Dead parents, including empty views, remain unavailable.
+Whole-slice assignment, arbitrary incoming non-byte slices, ambiguous writes, unsupported element
+shapes and variable-length snapshots remain UNKNOWN.
+
+The independent Rust capability suite advances `retained_prefix_index` from UNKNOWN to PROVED
+across host/ARM O0/O2. Its current 23 cases yield 44 PROVED, 36 REFUTED and 12 UNKNOWN over the
+four configurations, with strict premises. No device or startup hypotheses are used.
