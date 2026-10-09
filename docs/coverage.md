@@ -22,7 +22,7 @@ program: resource limits and undecided queries remain separate sources of UNKNOW
 | Fixed non-byte arrays | At most 256 input elements; large eligible subtrees use bounded lazy descriptors; evaluated constants and generated owned repeats support up to 128 | Larger arrays fail as UNKNOWN |
 | Array indexing | Symbolic bounded integer/bool/float selection, start/end pattern offsets and uniquely determined composite indices | An ambiguous tuple/struct/enum index remains UNKNOWN |
 | Fixed-array equality | Primitive numeric equality and actual custom/nested comparisons; ordered short-circuit effects | At most 128 elements per array; general slice equality and inlined pointer-based comparisons remain gaps |
-| Enums | Local/dependency inputs with symbolic tags/payloads; constructed variants and core Option/Result/ControlFlow | At most 64 input variants, all payloads modeled; enum/struct slices remain unsupported |
+| Enums | Local/dependency inputs with symbolic tags/payloads; constructed variants and core Option/Result/ControlFlow | At most 256 fieldless or 64 payload input variants, all payloads modeled; enum/struct slices remain unsupported |
 | Mutable storage | Disjoint mutable root references, projected writes, tracked aggregate/capture references and incoming-storage returns | Reference fields in root pointees, general aliasing and partial initialization remain UNKNOWN |
 | Typed static stores | Certified UnsafeCell payload places accept supported typed moves, known callbacks and fresh constructed futures; stored references retain escape evidence | Shared reads remain opaque; no last-write, initialization-protocol or exclusivity facts; arbitrary writes, general unions, resumed futures and static future polling remain UNKNOWN |
 | Interior mutation | Scalar Cell aliases/calls; distinct owned integer atomic allocations retain new/load/store/add/sub/swap/CAS history; fences check orderings | Root/static atomics and local atomics after trusted publication remain arbitrary per access; thin pointer loads/CAS support observed address relations; pointer histories, thread execution, RefCell and general pointer destinations remain gaps |
@@ -417,7 +417,7 @@ inside those bodies still remain UNKNOWN. Primitive integer endian encoding and 
 exact compiler identities, signatures and byte order.
 
 Root arrays allow 256 non-byte elements with eager values or bounded lazy descriptors, and enums
-allow 64 variants. Integer compiler patterns and Unicode char validity constrain the input domain.
+allow 256 fieldless or 64 payload variants. Integer compiler patterns and Unicode char validity constrain the input domain.
 The exact core NonZero getter reads the modeled scalar; other struct invariants are not inferred.
 Exhausted budgets and unresolved input types remain UNKNOWN.
 

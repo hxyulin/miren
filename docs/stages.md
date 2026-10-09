@@ -1286,3 +1286,11 @@ calling the selected Rust entry, but reset/hardware/exclusion reachability remai
 Survey and compact evidence explicitly distinguish solver abstractions from native and boot
 confirmation. Safe local lifecycle fixtures prove fresh initialization and refute repeated or
 arbitrary-state initialization, with native checks and failing initializer mutations.
+
+## Stage 82: bounded larger fieldless enum inputs
+
+Fieldless input enums support at most 256 compiler-declared variants, including sparse signed
+and negative discriminants. Exact validity constraints preserve the allowed variant domain.
+Payload enums retain the 64-variant cap and all enums retain the 512-value root budget.
+Host/ARM debug/optimized fixtures cover valid ranges, refuted bounds, native guard mutations,
+256/257 boundaries, oversized payload enums and exhausted multi-argument budgets.

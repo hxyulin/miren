@@ -5,6 +5,7 @@ const MAX_ARRAY_BYTES: u64 = 128;
 const MAX_ARRAY_ELEMENTS: usize = 16;
 const MAX_INPUT_ELEMENTS: usize = 256;
 const MAX_ENUM_VARIANTS: usize = 64;
+const MAX_FIELDLESS_ENUM_VARIANTS: usize = 256;
 
 impl<'tcx> Engine<'tcx> {
     pub(super) fn enum_input(
@@ -16,8 +17,17 @@ impl<'tcx> Engine<'tcx> {
         let ty::Adt(def, args) = ty.kind() else {
             return Err("expected an enum type".to_owned());
         };
-        if def.variants().is_empty() || def.variants().len() > MAX_ENUM_VARIANTS {
-            return Err("enum inputs need between 1 and 64 variants".to_owned());
+        let fieldless = def
+            .variants()
+            .iter()
+            .all(|variant| variant.fields.is_empty());
+        let maximum = if fieldless {
+            MAX_FIELDLESS_ENUM_VARIANTS
+        } else {
+            MAX_ENUM_VARIANTS
+        };
+        if def.variants().is_empty() || def.variants().len() > maximum {
+            return Err(format!("enum inputs need between 1 and {maximum} variants"));
         }
         let (bits, signed) = self
             .integer_type(ty.discriminant_ty(self.tcx))

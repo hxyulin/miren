@@ -26,7 +26,7 @@ fn larger_root_domains_preserve_bounds_scalar_validity_and_unknown_limits() {
             ProofStatus::Proved,
         ),
         ("too_many_elements", ProofStatus::Unknown),
-        ("too_many_variants", ProofStatus::Unknown),
+        ("too_many_variants", ProofStatus::Proved),
     ];
     for target in [None, Some("thumbv7em-none-eabihf")] {
         let mut command = Command::new(env!("CARGO_BIN_EXE_miren"));

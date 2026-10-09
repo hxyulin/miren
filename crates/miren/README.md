@@ -166,6 +166,10 @@ Checked dependency origins can certify uninitialized MaybeUninit containers thro
 cell constructors. Certification grants no initialized payload or read history. Only the exact
 bool-to-u8 scalar encoding needed by portable atomics is added to construction checking.
 
+Fieldless enum inputs admit at most 256 compiler-declared variants, including sparse signed tags.
+Payload enums remain limited to 64 variants. Exact discriminant validity constraints and the
+512-value root budget remain active; no undeclared variant becomes an input.
+
 The [coverage guide](../../docs/coverage.md) is the maintained feature reference. The
 [proof guide](../../docs/proofs.md) explains the encoding and limitations, and the
 [development guide](../../docs/development.md) lists required checks.
