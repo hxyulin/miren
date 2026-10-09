@@ -284,3 +284,10 @@ its footprint and still requires matching reinitialization. Opaque calls invalid
 Supported local/static pointer atomic operations retain actual values; uncertain provenance joins
 retain address bits only. This grants no MMIO validity or hardware instruction support, and cannot
 be selected for async roots or induction. Ordinary and `--startup` domains remain separate.
+
+Isolated pointer weak-CAS retry cycles use a bounded exploration policy after at least one real
+return has passed escape and postcondition checks. A fourth visit on that retry path records
+UNKNOWN and discards only the unfinished frontier. Checked returns can continue into the caller,
+but the incomplete obligation remains. Each weak operation still has a fresh spurious failure; no
+eventual success or retry fairness is assumed. Ordinary loops and other entry domains keep their
+existing exploration.

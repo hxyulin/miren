@@ -908,3 +908,12 @@ preserving actual constructor and store values. Strong CAS compares exact old ad
 weak CAS adds a fresh possible spurious failure. Symbolic updates across different pointer origins
 retain an address-bit choice without pointee provenance. Returned observations retain only already
 established rights. Publishing a frame-owned reference does not bypass frame-escape checks.
+
+Isolated pointer weak-CAS cycles retain checked return states while bounding unfinished retries.
+After three modeled attempts on a branch, a revisit is truncated only if a real return has already
+passed frame-escape checks, postconditions and return-value retirement. The exact callee and call
+chain receive an UNKNOWN obligation before another feasibility query is built. Existing returns
+retain their conditions and memory when propagated to the caller. This supplies no fabricated
+return, eventual-success assumption or loop proof. A later reached panic may refute the entry; a
+completed continuation still leaves the unfinished retry obligation UNKNOWN. Global analysis limits
+and ordinary/startup loop exploration remain unchanged.

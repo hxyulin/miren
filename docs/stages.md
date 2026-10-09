@@ -1676,3 +1676,31 @@ All 490 Rust workspace tests and 48 Python tests pass. Formatting, workspace Cli
 dependency checks, documentation builds and manual hooks pass. Review corrected an invalidated local
 pointer store that could otherwise leave stale backing while reporting success; it now remains
 UNKNOWN, with a regression. No application code or hardware assumption profile changes.
+
+## Stage 108: Checked returns beyond unfinished weak-CAS retries
+
+Isolated execution now carries branch-local retry counts for compiler-validated pointer weak-CAS
+calls in cyclic MIR blocks. After three attempts, revisiting that call block can discard an
+unfinished retry frontier only when the current function already has a checked real return. The
+frontier records UNKNOWN at its actual callee, source and current call chain before further query
+construction. Existing completed return conditions and memory flow into the caller unchanged.
+No global budget is reset, and missing returns never become success. Other entry domains and
+ordinary finite loops retain their existing execution.
+
+Host/ARM and debug/optimized compiler tests cover caller continuation, a reachable panic, unsupported
+pointer access, no-return loops, independent spurious failures and frame escape. A failing actual
+postcondition stops continuation; changing the real return value refutes the caller assertion and
+fails native execution. The exploration policy provides no retry fairness or loop proof.
+
+All twelve isolated runtime wrappers now continue through checked queue returns to Pender::pend.
+Each retains the unfinished weak-CAS obligation and stops next at foreign Rust signature matching;
+none reaches SEV or establishes runtime boot. All twelve ordinary runtime obligation arrays match
+the prior baseline exactly. Capture: `/tmp/miren-retry-runtime-comparison`.
+
+Strict and reset-profile fresh-future replays remain complete at twelve application entries. All
+72 root obligation arrays match stage 107 exactly. Captures are
+`/tmp/miren-retry-main-{strict,reset}-20261009`; diagnostic captures precede the stage commit.
+
+All 494 Rust workspace tests and 48 Python tests pass. Formatting, workspace Clippy, release builds,
+dependency checks, documentation builds and manual hooks pass. No application code or hardware
+assumption profile changes.

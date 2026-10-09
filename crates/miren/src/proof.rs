@@ -52,6 +52,7 @@ mod pointer_handles;
 mod pointer_validity;
 mod reference_graph;
 mod replay_inputs;
+mod retry_frontiers;
 mod slice_equality;
 mod startup;
 mod startup_memory;
@@ -959,9 +960,16 @@ impl<'tcx> Engine<'tcx> {
         for (local, argument) in body.args_iter().zip(arguments) {
             state.locals[local.as_usize()] = Some(argument);
         }
-        let mut queue = VecDeque::from([(START_BLOCK, state)]);
+        let mut queue = VecDeque::from([(START_BLOCK, state, retry_frontiers::Path::default())]);
         let mut returns = Vec::new();
-        while let Some((block, mut state)) = queue.pop_front() {
+        while let Some((block, mut state, mut retry_path)) = queue.pop_front() {
+            if self.isolated_startup && !returns.is_empty() && retry_path.exhausted(block) {
+                self.record_retry_frontier(
+                    id,
+                    body.basic_blocks[block].terminator().source_info.span,
+                );
+                continue;
+            }
             self.steps += 1;
             if self.steps > self.limits.max_steps {
                 return Err("symbolic execution step limit reached".to_owned());
@@ -1005,7 +1013,9 @@ impl<'tcx> Engine<'tcx> {
             }
             let terminator = body.basic_blocks[block].terminator();
             match &terminator.kind {
-                TerminatorKind::Goto { target } => queue.push_back((*target, state)),
+                TerminatorKind::Goto { target } => {
+                    queue.push_back((*target, state, retry_path.clone()))
+                }
                 TerminatorKind::SwitchInt { discr, targets } => {
                     let value = self.operand(id, body, &state, discr)?;
                     let mut excluded = Vec::new();
@@ -1027,11 +1037,11 @@ impl<'tcx> Engine<'tcx> {
                         };
                         let mut branch = state.clone();
                         branch.conditions.push(condition.clone());
-                        queue.push_back((target, branch));
+                        queue.push_back((target, branch, retry_path.clone()));
                         excluded.push(symbolic::not(&condition));
                     }
                     state.conditions.extend(excluded);
-                    queue.push_back((targets.otherwise(), state));
+                    queue.push_back((targets.otherwise(), state, retry_path.clone()));
                 }
                 TerminatorKind::Assert {
                     cond,
@@ -1057,7 +1067,7 @@ impl<'tcx> Engine<'tcx> {
                         )?;
                         state.conditions.push(safe);
                     }
-                    queue.push_back((*target, state));
+                    queue.push_back((*target, state, retry_path.clone()));
                 }
                 TerminatorKind::Return => {
                     let value = if body.return_ty().is_unit() {
@@ -1230,7 +1240,7 @@ impl<'tcx> Engine<'tcx> {
                             let mut continuation =
                                 state.continuation(result.conditions, result.memory);
                             self.write(&mut continuation, *destination, result.value)?;
-                            queue.push_back((target, continuation));
+                            queue.push_back((target, continuation, retry_path.clone()));
                         }
                         continue;
                     }
@@ -1249,7 +1259,7 @@ impl<'tcx> Engine<'tcx> {
                             let mut continuation =
                                 state.continuation(result.conditions, result.memory);
                             self.write(&mut continuation, *destination, result.value)?;
-                            queue.push_back((target, continuation));
+                            queue.push_back((target, continuation, retry_path.clone()));
                         }
                         continue;
                     }
@@ -1267,7 +1277,7 @@ impl<'tcx> Engine<'tcx> {
                             let mut continuation =
                                 state.continuation(result.conditions, result.memory);
                             self.write(&mut continuation, *destination, result.value)?;
-                            queue.push_back((target, continuation));
+                            queue.push_back((target, continuation, retry_path.clone()));
                         }
                         continue;
                     }
@@ -1279,10 +1289,16 @@ impl<'tcx> Engine<'tcx> {
                             (id, terminator.source_info.span),
                         )?
                     {
+                        if self.tcx.item_name(callee)
+                            == rustc_span::Symbol::intern("compare_exchange_weak")
+                            && retry_frontiers::cyclic_block(body, block)
+                        {
+                            retry_path.note(block);
+                        }
                         self.write(&mut state, *destination, value)?;
                         let target =
                             target.ok_or("isolated pointer atomic call has no return edge")?;
-                        queue.push_back((target, state));
+                        queue.push_back((target, state, retry_path.clone()));
                         continue;
                     }
                     let modeled_values =
@@ -1297,7 +1313,7 @@ impl<'tcx> Engine<'tcx> {
                     {
                         self.write(&mut state, *destination, value)?;
                         let target = target.ok_or("interior call has no return edge")?;
-                        queue.push_back((target, state));
+                        queue.push_back((target, state, retry_path.clone()));
                         continue;
                     }
                     if !configured
@@ -1315,7 +1331,7 @@ impl<'tcx> Engine<'tcx> {
                             let mut continuation =
                                 state.continuation(result.conditions, result.memory);
                             self.write(&mut continuation, *destination, result.value)?;
-                            queue.push_back((target, continuation));
+                            queue.push_back((target, continuation, retry_path.clone()));
                         }
                         continue;
                     }
@@ -1331,7 +1347,7 @@ impl<'tcx> Engine<'tcx> {
                     {
                         self.write(&mut state, *destination, value)?;
                         let target = target.ok_or("modeled call has no return edge")?;
-                        queue.push_back((target, state));
+                        queue.push_back((target, state, retry_path.clone()));
                         continue;
                     }
                     if matches!(instance.def, ty::InstanceKind::Item(_))
@@ -1365,7 +1381,7 @@ impl<'tcx> Engine<'tcx> {
                     for result in results {
                         let mut continuation = state.continuation(result.conditions, result.memory);
                         self.write(&mut continuation, *destination, result.value)?;
-                        queue.push_back((target, continuation));
+                        queue.push_back((target, continuation, retry_path.clone()));
                     }
                 }
                 TerminatorKind::Drop { place, target, .. } => {
@@ -1376,7 +1392,7 @@ impl<'tcx> Engine<'tcx> {
                     } else if let Ok(value) = dropped
                         && self.drop_static_place(&value, ty, &mut state)?
                     {
-                        queue.push_back((*target, state));
+                        queue.push_back((*target, state, retry_path.clone()));
                         continue;
                     }
                     if ty.needs_drop(self.tcx, ty::TypingEnv::fully_monomorphized())
@@ -1403,15 +1419,15 @@ impl<'tcx> Engine<'tcx> {
                                 }
                                 continuation.locals[place.local.as_usize()] = None;
                             }
-                            queue.push_back((*target, continuation));
+                            queue.push_back((*target, continuation, retry_path.clone()));
                         }
                         continue;
                     }
-                    queue.push_back((*target, state));
+                    queue.push_back((*target, state, retry_path.clone()));
                 }
                 TerminatorKind::InlineAsm { .. } => {
                     let target = self.arm_interrupt_asm(id, body, &mut state, &terminator.kind)?;
-                    queue.push_back((target, state));
+                    queue.push_back((target, state, retry_path.clone()));
                 }
                 TerminatorKind::Unreachable => {
                     return Err("reachable MIR unreachable terminator".to_owned());
