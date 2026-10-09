@@ -111,6 +111,9 @@ impl<'tcx> Engine<'tcx> {
             self.record_model(callee, "slice length");
             let receiver = receiver.materialize()?;
             return match &receiver {
+                Value::ScalarSlice { .. } => Ok(Some(
+                    self.scalar_slice_length(&receiver, &state.conditions)?,
+                )),
                 Value::Bytes { length, .. } => Ok(Some((**length).clone())),
                 Value::Elements(elements) => Ok(Some(symbolic::integer(
                     &self.terms,

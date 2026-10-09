@@ -114,6 +114,16 @@
     {
       "entry": "open_slice",
       "family": "unbounded_slice",
+      "expected": "refuted"
+    },
+    {
+      "entry": "open_slice_read_correlation",
+      "family": "unbounded_slice",
+      "expected": "proved"
+    },
+    {
+      "entry": "open_aggregate_slice",
+      "family": "unbounded_slice",
       "expected": "unknown",
       "unknown_reason": "only read-only byte slices and byte arrays are modeled",
       "unknown_category": "semantics"

@@ -861,6 +861,7 @@ impl<'tcx> Engine<'tcx> {
             | Value::Bool(_)
             | Value::Int { .. }
             | Value::Float { .. }
+            | Value::ScalarSlice { .. }
             | Value::Bytes { .. }
             | Value::Reference { .. }
             | Value::StaticSlice { .. }

@@ -28,6 +28,14 @@ pub enum MemoryProjection {
     },
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ScalarSliceElement {
+    Bool,
+    Integer { bits: u32, signed: bool },
+    Float { bits: u32 },
+    Char,
+}
+
 #[derive(Clone, Debug)]
 pub enum Value {
     Uninitialized,
@@ -71,6 +79,12 @@ pub enum Value {
         raw_bits: Option<Term>,
     },
     Bytes {
+        length: Box<Value>,
+        data: Term,
+    },
+    ScalarSlice {
+        id: usize,
+        element: ScalarSliceElement,
         length: Box<Value>,
         data: Term,
     },
@@ -166,7 +180,8 @@ impl Value {
                     size.checked_add(value.owned_repeat_size()?)
                         .filter(|size| *size <= MAX_REPEAT_VALUES)
                 }),
-            Self::MaybeUninit { .. }
+            Self::ScalarSlice { .. }
+            | Self::MaybeUninit { .. }
             | Self::Cell { .. }
             | Self::Atomic { .. }
             | Self::LocalAtomic { .. }
@@ -216,7 +231,8 @@ impl Value {
             | Self::Unit
             | Self::Elements(_)
             | Self::Adt { .. } => Some(1),
-            Self::MaybeUninit { .. }
+            Self::ScalarSlice { .. }
+            | Self::MaybeUninit { .. }
             | Self::Cell { .. }
             | Self::Atomic { .. }
             | Self::LocalAtomic { .. }
@@ -271,7 +287,8 @@ impl Value {
             | Self::Bytes { .. }
             | Self::RawPointer { .. }
             | Self::Unit => self.owned_repeat_size(),
-            Self::MaybeUninit { .. }
+            Self::ScalarSlice { .. }
+            | Self::MaybeUninit { .. }
             | Self::Cell { .. }
             | Self::Atomic { .. }
             | Self::LocalAtomic { .. }
@@ -314,6 +331,7 @@ impl Value {
             | Self::Int { .. }
             | Self::Float { .. }
             | Self::Bytes { .. }
+            | Self::ScalarSlice { .. }
             | Self::MetadataPointer(_)
             | Self::StaticText
             | Self::FormatArguments
@@ -355,6 +373,7 @@ impl Value {
             | Self::Int { .. }
             | Self::Float { .. }
             | Self::Bytes { .. }
+            | Self::ScalarSlice { .. }
             | Self::Cell { .. }
             | Self::Atomic { .. }
             | Self::Reference { .. }

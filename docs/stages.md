@@ -2985,3 +2985,50 @@ Validation passes 598 Rust tests, 68 Python tests, formatting, cargo lint, relea
 cargo deny, documentation build and manual hooks. Compiler controls cover host/ARM O0/O2,
 actual helper mutations and valid native execution. Independent review approves the exact
 remainder derivation, guard normalization and unchanged missing-body/access boundaries.
+
+
+## Stage 143: arbitrary read-only primitive slice inputs
+
+Exact primitive shared slices now retain caller-owned storage under the existing single immutable
+incoming-root certificate. One symbolic target-usize length and a typed symbolic array preserve
+arbitrary valid input lengths and repeated-read correlation. The target allocation byte extent
+bounds length; no finite element-count cap or zero-content premise is introduced. Original compiler
+element identities are interned separately from width/sign metadata, so same-layout primitive
+types do not silently substitute for each other. Sort, context, layout and typed carrier metadata
+are validated at root, operand, argument, store and return boundaries.
+
+Boolean and integer observations preserve their full logical domains; floating observations retain
+input storage bits, including NaNs and signed zero. Character observations use the surjective
+Unicode encoding from stage 140. The raw seed is neither physical storage nor a native character
+witness. Byte interpretation and native replay cannot expose it as a valid stored character.
+
+Checked indexing, metadata and exact core Range/RangeTo/RangeFrom/RangeFull indexing validate the
+retained source and preserve its allocation/projection chain. Range order and end bounds create
+actual panic-safety obligations before constructing the successful view. The range model requires
+exact core trait/lang-item identities, primitive readonly signatures, range value metadata and
+available selected bodies. Missing bodies and unsupported consumers never become success.
+Copied and empty views do not renew dead storage. Mutable or competing borrowed roots, raw access,
+refined/composite or zero-sized incoming elements, whole-slice equality and unrestricted iteration
+retain separate UNKNOWN boundaries. Existing byte input policy and finite projection budgets remain
+unchanged.
+
+The capability baseline preserves the original nonempty-word-slice zero assertion and advances
+it to REFUTED. Guarded repeated-read correlation proves, while aggregate slice elements remain
+UNKNOWN at their actual type frontier. The manifest now has 46 cases across 17 families,
+expecting 19 PROVED, 17 REFUTED and 10 UNKNOWN per configuration. An older floating-slice pattern
+control also proves with its actual unchanged body; its obsolete unsupported name is removed.
+
+Dedicated host/ARM O0/O2 controls cover 24 roots: 12 PROVED, 5 REFUTED and 7 UNKNOWN per build.
+They include Unicode validity, floating raw bits, target extent, arbitrary inputs above 128
+items, nested ranges, empty views, helper returns and bounds failures. Unknown controls require
+matching cause and diagnostic on the same obligation. Actual helper index 0-to-1 mutation refutes
+in all four profiles; valid native [3,7] controls fail at O0/O2 with an in-bounds changed read.
+Invalid custom lifetime and reinterpretation controls are not executed natively. Metadata units
+check malformed sorts/contexts and retired backing even for empty copied handles. Independent
+review approves the input domain, typed metadata, range semantics and preserved access boundaries.
+
+Final standalone evidence: `/tmp/miren-stage143-capabilities-20261010`, with 76 PROVED,
+68 REFUTED and 40 UNKNOWN outcomes, unchanged frozen inputs/binaries and no collection errors.
+Validation passes 602 Rust tests, 68 Python tests, formatting, cargo lint, release builds,
+cargo deny, documentation build and manual hooks. The affected preexisting regression suites
+also pass; no application source, environment premise or raw-access permission is added.

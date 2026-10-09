@@ -139,6 +139,7 @@ impl<'tcx> Engine<'tcx> {
             | Value::TrackedPointer { .. }
             | Value::StaticSlice { .. }
             | Value::StaticView { .. }
+            | Value::ScalarSlice { .. }
             | Value::MaybeUninit { .. }
             | Value::Uninitialized
             | Value::TraitObject { .. }
@@ -388,6 +389,7 @@ impl<'tcx> Engine<'tcx> {
                         | Value::TrackedPointer { .. }
                         | Value::StaticSlice { .. }
                         | Value::StaticView { .. }
+                        | Value::ScalarSlice { .. }
                         | Value::MaybeUninit { .. }
                         | Value::Uninitialized
                         | Value::TraitObject { .. }
@@ -604,6 +606,7 @@ pub(super) fn same_shape(expected: Option<&Value>, actual: Option<&Value>) -> Re
             | Value::TrackedPointer { .. }
             | Value::StaticSlice { .. }
             | Value::StaticView { .. }
+            | Value::ScalarSlice { .. }
             | Value::MaybeUninit { .. }
             | Value::Uninitialized
             | Value::TraitObject { .. }
@@ -665,6 +668,7 @@ pub(super) fn static_projection(value: Value, part: &MemoryProjection) -> Result
             | Value::TrackedPointer { .. }
             | Value::StaticSlice { .. }
             | Value::StaticView { .. }
+            | Value::ScalarSlice { .. }
             | Value::MaybeUninit { .. }
             | Value::Uninitialized
             | Value::TraitObject { .. }

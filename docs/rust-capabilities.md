@@ -11,8 +11,8 @@ execution at O0 and O2, positive/refuted/unknown controls, a source mutation tha
 structured UNKNOWN reporting, and passing repository checks. Completion establishes a repeatable
 baseline. It does not establish full Rust support or a completed memory-model refactor.
 
-The manifest contains 44 cases across 17 families. Each build configuration expects 18 PROVED,
-16 REFUTED and 10 UNKNOWN results. Stage 133 originally had 23 cases with 10 PROVED, 9 REFUTED
+The manifest contains 46 cases across 17 families. Each build configuration expects 19 PROVED,
+17 REFUTED and 10 UNKNOWN results. Stage 133 originally had 23 cases with 10 PROVED, 9 REFUTED
 and 4 UNKNOWN; stage 134 closed its retained-prefix projection gap. Stage 136 adds raw-pointer
 metadata P/R controls and a safe core reference-array grant that remains UNKNOWN without a
 temporal permission certificate. Stage 137 adds tuple-array P/R and unsupported symbolic-write
@@ -21,17 +21,22 @@ Stage 139 extends that family with bounded whole-array initialization P/R/U cont
 adds checked character conversion P/R and invalid character formation U controls. Stage 141 adds
 owned initialized character payload P/R and uninitialized character extraction U controls.
 Stage 142 adds floating remainder P/R and a missing external remainder body U control.
+Stage 143 advances the original incoming word-slice assertion to REFUTED and adds read-correlation
+P and aggregate-slice U controls.
 These additions change the denominator, not a coverage percentage.
 Covered examples exercise arithmetic, enum payloads, array indexing, reference effects, concrete
 generics, closures, iterator callbacks, finite loops, destructors, fresh future polling and raw
-pointer metadata and typed initialization wrappers. Open dispatch and incoming non-byte slices
-retain explicit frontiers. Indexed retained mutable integer/tuple prefixes use checked projection
-snapshots with a uniquely determined length of at most 128. Bounded tuple reads can select symbolic
-offsets while preserving field correlation; symbolic composite writes still require a unique
-location. Pure tuple choices are bounded to depth 16 and 512 total candidate nodes, validate exact
-sorts/contexts and restore no identity or reference rights. Existing immutable incoming
-shared-reference snapshots can supply values in this domain. Retained handles, ADTs and Drop-bearing
-identities remain excluded.
+pointer metadata and typed initialization wrappers. Open dispatch and unsupported slice element
+shapes retain explicit frontiers. Exact primitive shared slices use an arbitrary-length logical
+array behind the existing single immutable caller-root certificate. Their length domain follows the
+actual target byte extent; it has no 128-element input cap. Mutable and competing incoming
+references retain conservative boundaries. Indexed retained mutable integer/tuple prefixes use
+checked projection snapshots with a uniquely determined length of at most 128. Bounded tuple reads
+can select symbolic offsets while preserving field correlation; symbolic composite writes still
+require a unique location. Pure tuple choices are bounded to depth 16 and 512 total candidate nodes,
+validate exact sorts/contexts and restore no identity or reference rights. Existing immutable
+incoming shared-reference snapshots can supply values in this domain. Retained handles, ADTs and
+Drop-bearing identities remain excluded.
 An expected UNKNOWN must reach its specified diagnostic rather than fail elsewhere.
 The manifest also records its expected producer category on that same obligation; a missing body
 cannot satisfy a semantic frontier or silently acquire a semantic success result.

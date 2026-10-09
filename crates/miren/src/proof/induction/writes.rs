@@ -66,6 +66,7 @@ impl<'tcx> Engine<'tcx> {
                 | Value::TrackedPointer { .. }
                 | Value::StaticSlice { .. }
                 | Value::StaticView { .. }
+                | Value::ScalarSlice { .. }
                 | Value::MaybeUninit { .. }
                 | Value::Uninitialized
                 | Value::TraitObject { .. }
@@ -102,6 +103,7 @@ impl<'tcx> Engine<'tcx> {
                 | Value::TrackedPointer { .. }
                 | Value::StaticSlice { .. }
                 | Value::StaticView { .. }
+                | Value::ScalarSlice { .. }
                 | Value::MaybeUninit { .. }
                 | Value::Uninitialized
                 | Value::TraitObject { .. }
@@ -191,6 +193,7 @@ fn scalar_update(
             | Value::TrackedPointer { .. }
             | Value::StaticSlice { .. }
             | Value::StaticView { .. }
+            | Value::ScalarSlice { .. }
             | Value::MaybeUninit { .. }
             | Value::Uninitialized
             | Value::TraitObject { .. }

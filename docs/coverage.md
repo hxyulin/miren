@@ -17,6 +17,7 @@ program: resource limits and undecided queries remain separate sources of UNKNOW
 | Integers and bool | Symbolic target-width values, signed comparisons, exact bit-vector operations and population counts | Raw memory access remains unsupported; Unicode char and integer pattern domains are modeled |
 | Floating point | f32/f64 arithmetic, remainder, casts and IEEE bits | Wider formats; NaN bits |
 | Bytes | Shared byte slices and fixed arrays; symbolic contents and valid-reference length bounds | Disjoint mutable byte-slice roots support guarded writes; general aliases remain unsupported |
+| Primitive slices | Arbitrary input, checked reads/ranges | One shared root; no raw/write rights |
 | Tuples | Nested values, shared references, field projections and numeric contract fields such as `value.1.0` | Destructured argument names with projected debug bindings are not contract bindings |
 | Structs | Nested local/dependency structs, concrete generic fields and supported shared-reference fields | Unions, reference fields in mutable root pointees and unresolved generics remain unsupported |
 | Fixed non-byte arrays | At most 256 input elements; large eligible subtrees use bounded lazy descriptors; scalar constants up to 256; composite constants and generated owned repeats up to 128 | Larger arrays fail as UNKNOWN |
@@ -1160,3 +1161,19 @@ may use exact encoding equality when both actual terms are same-format bit-to-fl
 zero and NaN comparisons retain numeric semantics. Independent SMT checks validate this rewrite.
 Missing external bodies, wider formats and unfinished solver queries remain UNKNOWN. The baseline
 has 44 cases in 17 families, expecting 72 PROVED, 64 REFUTED and 40 UNKNOWN across four builds.
+
+
+Stage 143 extends ordinary execution with arbitrary read-only primitive slice inputs. Admission
+requires an exact compiler primitive element type and the existing single immutable incoming-root
+certificate. A symbolic target-usize length is bounded by the actual nonzero element byte extent,
+not by a finite element-count budget. Typed array observations retain repeated-index correlation;
+Boolean values use logical elements, integers preserve their width/sign and floats preserve input
+storage bits. Character observations use the valid Unicode domain encoding from stage 140. Its
+underlying seed is not physical character storage and cannot authorize byte reinterpretation.
+
+The descriptor grants no allocation or raw/mutation rights. Checked indexing and subviews must
+retain their original reference source, prove bounds before offset arithmetic and validate the
+parent lifetime before metadata or empty paths. Original pattern, aggregate, reference-bearing,
+zero-sized and mutable input domains retain UNKNOWN boundaries. Unrestricted equality, iteration
+and induction require their own supported consumers. The existing finite retained integer/tuple
+projection budgets remain separate from this arbitrary input domain.

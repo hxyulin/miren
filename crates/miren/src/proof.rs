@@ -62,6 +62,7 @@ mod pointer_validity;
 mod reference_graph;
 mod replay_inputs;
 mod retry_frontiers;
+mod scalar_slices;
 mod slice_equality;
 mod startup;
 mod startup_memory;
@@ -125,6 +126,7 @@ struct Engine<'tcx> {
     function_pointers: std::cell::RefCell<Vec<function_pointers::Target<'tcx>>>,
     static_addresses: std::collections::HashMap<DefId, Term>,
     maybe_uninit_types: Vec<Ty<'tcx>>,
+    scalar_slice_types: Vec<Ty<'tcx>>,
     tracked_addresses: Vec<(tracked_pointers::AddressLocation<'tcx>, Term)>,
     steps: usize,
     call_chain: Vec<DefId>,
@@ -191,6 +193,7 @@ pub fn verify(
         static_addresses: std::collections::HashMap::new(),
         tracked_addresses: Vec::new(),
         maybe_uninit_types: Vec::new(),
+        scalar_slice_types: Vec::new(),
         steps: 0,
         call_chain: Vec::new(),
         failed_call_chain: None,
@@ -364,7 +367,14 @@ impl<'tcx> Engine<'tcx> {
                 let ty::Ref(_, _, _) = ty.kind() else {
                     return Err("immutable root storage requires a shared reference".into());
                 };
-                let value = self.argument(id, ty, &mut conditions)?;
+                let value = if let ty::Ref(_, pointee, _) = ty.kind()
+                    && let ty::Slice(element) = pointee.kind()
+                    && *element != self.tcx.types.u8
+                {
+                    self.scalar_slice_input(*element, &mut conditions)?
+                } else {
+                    self.argument(id, ty, &mut conditions)?
+                };
                 let allocation = memory.len();
                 memory.push(Some(value));
                 self.record_model(
@@ -391,6 +401,12 @@ impl<'tcx> Engine<'tcx> {
         }
         for (local, value) in body.args_iter().zip(&arguments) {
             self.validate_maybe_uninit_value(body.local_decls[local].ty, value, &conditions)?;
+            self.validate_scalar_slice_value(
+                body.local_decls[local].ty,
+                value,
+                &memory,
+                &conditions,
+            )?;
         }
         let snapshots = self.snapshots(&arguments, &memory, &conditions)?;
         let instance = ty::Instance::new_raw(id, ty::GenericArgs::identity_for_item(self.tcx, id));
@@ -446,6 +462,16 @@ impl<'tcx> Engine<'tcx> {
             Value::RawPointer { address, .. } => format!(
                 "raw address {}; no pointee provenance",
                 address.smt(self.limits.max_query_bytes)?
+            ),
+            Value::ScalarSlice {
+                element,
+                length,
+                data,
+                ..
+            } => format!(
+                "readonly {element:?} slice len={}, seed={} (observation seed, not physical bits)",
+                length.integer()?.0.smt(self.limits.max_query_bytes)?,
+                data.smt(self.limits.max_query_bytes)?
             ),
             Value::Bytes { length, data } => format!(
                 "len={}, data={}",
@@ -1006,6 +1032,14 @@ impl<'tcx> Engine<'tcx> {
         if arguments.len() != body.arg_count {
             return Err("call arguments do not match the MIR body".to_owned());
         }
+        for (local, value) in body.args_iter().zip(&arguments) {
+            self.validate_scalar_slice_value(
+                body.local_decls[local].ty,
+                value,
+                &memory,
+                &conditions,
+            )?;
+        }
         let snapshots = self.snapshots(&arguments, &memory, &conditions)?;
         let contracts = self.configured_contracts(instance)?;
         let binds_contract_names = contracts
@@ -1162,6 +1196,12 @@ impl<'tcx> Engine<'tcx> {
                         self.local(&state, 0)?
                     };
                     self.validate_maybe_uninit_value(body.return_ty(), &value, &state.conditions)?;
+                    self.validate_scalar_slice_value(
+                        body.return_ty(),
+                        &value,
+                        &state.memory,
+                        &state.conditions,
+                    )?;
                     if self.restricted_scalar_target(body.return_ty()) {
                         self.prove_scalar_target(body.return_ty(), &value, &state.conditions)?;
                     }
@@ -1563,6 +1603,12 @@ impl<'tcx> Engine<'tcx> {
                     &value,
                     &state.conditions,
                 )?;
+                self.validate_scalar_slice_value(
+                    place.ty(&body.local_decls, self.tcx).ty,
+                    &value,
+                    &state.memory,
+                    &state.conditions,
+                )?;
                 if self.restricted_scalar_target(place.ty(&body.local_decls, self.tcx).ty) {
                     self.prove_scalar_target(
                         place.ty(&body.local_decls, self.tcx).ty,
@@ -1650,7 +1696,8 @@ impl<'tcx> Engine<'tcx> {
             }
             (
                 ProjectionElem::Deref,
-                value @ (Value::Bytes { .. }
+                value @ (Value::ScalarSlice { .. }
+                | Value::Bytes { .. }
                 | Value::Adt { .. }
                 | Value::Enum { .. }
                 | Value::MaybeUninit { .. }
@@ -1716,6 +1763,10 @@ impl<'tcx> Engine<'tcx> {
                 }
                 value.clone()
             }
+            (ProjectionElem::Index(index), value @ Value::ScalarSlice { .. }) => {
+                let index = self.local(state, index.as_usize())?;
+                self.scalar_slice_select(&value, &index, &state.conditions)?
+            }
             (ProjectionElem::Index(index), Value::Bytes { data, length }) => {
                 let index = self.local(state, index.as_usize())?;
                 let (expression, bits, signed) = index.integer()?;
@@ -1746,16 +1797,20 @@ impl<'tcx> Engine<'tcx> {
                 let selected = self.fixed_element(&elements, &index, &state.conditions)?;
                 self.static_view_projection(&selected, ProjectionElem::Deref, state)?
             }
-            (ProjectionElem::Subslice { from, to, from_end }, value @ Value::Bytes { .. }) => {
-                self.byte_subslice(value, from, to, from_end, &state.conditions)?
-            }
+            (
+                ProjectionElem::Subslice { from, to, from_end },
+                value @ (Value::ScalarSlice { .. } | Value::Bytes { .. }),
+            ) => self.byte_subslice(value, from, to, from_end, &state.conditions)?,
             (
                 ProjectionElem::ConstantIndex {
                     offset,
                     min_length,
                     from_end,
                 },
-                value @ (Value::Bytes { .. } | Value::Elements(_) | Value::StaticSlice { .. }),
+                value @ (Value::ScalarSlice { .. }
+                | Value::Bytes { .. }
+                | Value::Elements(_)
+                | Value::StaticSlice { .. }),
             ) => self.constant_element(state, value, offset, min_length, from_end)?,
             _ => return Err(format!("unsupported place projection {projection:?}")),
         };
@@ -1775,6 +1830,12 @@ impl<'tcx> Engine<'tcx> {
                 self.validate_maybe_uninit_value(
                     place.ty(&body.local_decls, self.tcx).ty,
                     &value,
+                    &state.conditions,
+                )?;
+                self.validate_scalar_slice_value(
+                    place.ty(&body.local_decls, self.tcx).ty,
+                    &value,
+                    &state.memory,
                     &state.conditions,
                 )?;
                 self.validate_mutable_handle_rights(
@@ -1924,6 +1985,9 @@ impl<'tcx> Engine<'tcx> {
             Rvalue::RawPtr(rustc_middle::mir::RawPtrKind::FakeForPtrMetadata, place) => {
                 let value = self.place(state, *place)?;
                 let length = match value {
+                    value @ Value::ScalarSlice { .. } => {
+                        self.scalar_slice_length(&value, &state.conditions)?
+                    }
                     Value::Bytes { length, .. } => *length,
                     Value::Elements(elements) => symbolic::integer(
                         &self.terms,
@@ -2132,6 +2196,9 @@ impl<'tcx> Engine<'tcx> {
                     }),
                     (UnOp::PtrMetadata, Value::RawSlice { length, .. }) => Ok(*length),
                     (UnOp::PtrMetadata, Value::MetadataPointer(length)) => Ok(*length),
+                    (UnOp::PtrMetadata, value @ Value::ScalarSlice { .. }) => {
+                        self.scalar_slice_length(&value, &state.conditions)
+                    }
                     (UnOp::PtrMetadata, Value::Bytes { length, .. }) => Ok(*length),
                     (UnOp::PtrMetadata, Value::Elements(elements)) => Ok(symbolic::integer(
                         &self.terms,

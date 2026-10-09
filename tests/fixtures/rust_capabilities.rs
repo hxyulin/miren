@@ -176,6 +176,20 @@ pub fn open_slice(values: &[u16]) {
     }
 }
 
+pub fn open_slice_read_correlation(values: &[u16], index: usize) {
+    if index < values.len() {
+        let first = values[index];
+        let second = values[index];
+        assert!(first == second);
+    }
+}
+
+pub fn open_aggregate_slice(values: &[(u16, u16)]) {
+    if !values.is_empty() {
+        assert!(values[0].0 == 0);
+    }
+}
+
 pub fn raw_pointer_metadata(length: usize) {
     let pointer = core::ptr::slice_from_raw_parts(core::ptr::null::<u8>(), length);
     assert!(pointer.len() == length);
@@ -314,6 +328,9 @@ mod native {
     #[test]
     fn positives() {
         integers(199);
+        open_slice_read_correlation(&[], 0);
+        open_slice_read_correlation(&[0, 1, u16::MAX], 2);
+        open_slice_read_correlation(&[u16::MAX; 129], 128);
         float_remainder(false);
         float_remainder(true);
         raw_pointer_metadata(usize::MAX);

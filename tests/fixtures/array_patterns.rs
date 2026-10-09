@@ -21,7 +21,7 @@ pub fn bad_slice(bytes: &[u8]) {
     }
 }
 
-pub fn unsupported_slice(values: &[f32]) -> f32 {
+pub fn float_slice_pattern(values: &[f32]) -> f32 {
     if let [first, ..] = values {
         *first
     } else {

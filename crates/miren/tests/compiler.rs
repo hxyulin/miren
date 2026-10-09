@@ -3076,7 +3076,7 @@ fn array_patterns_preserve_minimum_lengths_and_start_and_end_offsets_on_host_and
         ("array", ProofStatus::Proved),
         ("slice", ProofStatus::Proved),
         ("bad_slice", ProofStatus::Refuted),
-        ("unsupported_slice", ProofStatus::Unknown),
+        ("float_slice_pattern", ProofStatus::Proved),
     ];
     for target in [None, Some("thumbv7em-none-eabihf")] {
         let args = target

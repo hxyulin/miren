@@ -94,6 +94,7 @@ fn validate(
             Err("tuple array choice primitive has an invalid width, sort or context".into())
         }
         Value::Uninitialized
+        | Value::ScalarSlice { .. }
         | Value::MaybeUninit { .. }
         | Value::StaticSlice { .. }
         | Value::StaticView { .. }

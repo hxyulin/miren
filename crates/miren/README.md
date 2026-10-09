@@ -607,3 +607,15 @@ and missing-body refusals still apply. Equality between actual floating bit conv
 nonzero constant can use exact bit equality; its unique encoding justifies the rewrite without a
 path premise. Comparisons against zero, infinity, and NaN retain their floating semantics.
 Fast/algebraic remainder intrinsics are not included.
+
+A single incoming immutable slice of exact primitive Bool, integer, f32/f64 or Char elements can
+retain caller-owned storage under the existing immutable root certificate. Its arbitrary length
+is bounded by the target's valid allocation extent, without a finite element-count cap. Checked
+indexing, metadata and exact core Range/RangeTo/RangeFrom/RangeFull indexing preserve that source
+and compose element projections; copied handles do not renew dead storage. Primitive values use
+logical SMT arrays, with floating storage bits preserved. Char observations encode every valid
+Unicode scalar; their unrestricted seed is not physical storage or a native Char witness. Exact
+compiler element identities, layout, array sorts and contexts are checked at typed boundaries.
+Competing borrowed roots, mutable slices, refined or composite elements, raw access, whole-slice
+comparison and unbounded iteration retain their existing unsupported frontiers. Byte slice
+representations and their input policy remain unchanged.

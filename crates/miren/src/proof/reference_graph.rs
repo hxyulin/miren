@@ -32,6 +32,9 @@ impl<'tcx> Engine<'tcx> {
         visited: &mut Vec<usize>,
     ) -> Result<(), String> {
         match value {
+            Value::ScalarSlice { length, .. } => {
+                Self::validate_reference_graph(length, state, incoming, visited)
+            }
             Value::MaybeUninit { payload, .. } => {
                 if let Some(payload) = payload {
                     Self::validate_reference_graph(payload, state, incoming, visited)?;

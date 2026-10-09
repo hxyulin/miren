@@ -120,6 +120,15 @@ impl<'tcx> Engine<'tcx> {
                 return Err("dynamic size requires a sized type or modeled slice metadata".into());
             };
             let length = match value.materialize()? {
+                storage @ Value::ScalarSlice { .. } => {
+                    self.validate_scalar_slice_value(
+                        ty,
+                        &storage,
+                        &state.memory,
+                        &state.conditions,
+                    )?;
+                    self.scalar_slice_length(&storage, &state.conditions)?
+                }
                 Value::Bytes { length, .. } => *length,
                 Value::Elements(elements) => {
                     symbolic::integer(&self.terms, elements.len() as u128, bits, false)

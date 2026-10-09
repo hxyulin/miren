@@ -101,6 +101,11 @@ impl<'tcx> Engine<'tcx> {
             return Ok(None);
         }
         self.hardware_pointer_call_guard(instance, raw_values, state)?;
+        if let Some(results) =
+            self.readonly_scalar_slice_range(instance, raw_values, state, site)?
+        {
+            return Ok(Some(results));
+        }
         if let Some(results) = self.mutable_slice_range(instance, raw_values, state, site)? {
             return Ok(Some(results));
         }

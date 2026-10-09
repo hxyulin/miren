@@ -615,6 +615,7 @@ fn contains_wrapper(value: &Value) -> bool {
             | Value::Bool(_)
             | Value::Int { .. }
             | Value::Float { .. }
+            | Value::ScalarSlice { .. }
             | Value::Bytes { .. }
             | Value::Cell { .. }
             | Value::Atomic { .. }

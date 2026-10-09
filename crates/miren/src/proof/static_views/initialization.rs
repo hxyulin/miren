@@ -89,6 +89,9 @@ impl Engine<'_> {
             return Ok(());
         }
         match value {
+            Value::ScalarSlice { length, .. } => {
+                self.validate_static_initialization_graph(length, state, visited)
+            }
             Value::MaybeUninit { id, payload } => {
                 self.maybe_uninit_payload_type(*id)?;
                 if let Some(payload) = payload {

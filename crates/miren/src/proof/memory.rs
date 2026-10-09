@@ -15,14 +15,16 @@ impl<'tcx> Engine<'tcx> {
         from_end: bool,
         conditions: &[Term],
     ) -> Result<Value, String> {
-        let Value::Bytes { length, .. } = &value else {
-            return Err("byte subslice requires modeled byte storage".to_owned());
+        let capacity = match &value {
+            Value::Bytes { length, .. } => (**length).clone(),
+            Value::ScalarSlice { .. } => self.scalar_slice_length(&value, conditions)?,
+            _ => return Err("subslice requires modeled readonly storage".into()),
         };
         let bits = u32::from(self.tcx.sess.target.pointer_width);
         let offset = symbolic::integer(&self.terms, u128::from(from), bits, false);
         let to = symbolic::integer(&self.terms, u128::from(to), bits, false);
         let end = if from_end {
-            symbolic::binary(&self.terms, "sub", (**length).clone(), to)?
+            symbolic::binary(&self.terms, "sub", capacity, to)?
         } else {
             to
         };
@@ -71,6 +73,10 @@ impl<'tcx> Engine<'tcx> {
             return Err("memory snapshot nesting limit reached".to_owned());
         }
         match value {
+            Value::ScalarSlice { .. } => {
+                self.scalar_slice_length(value, conditions)?;
+                Ok(value.clone())
+            }
             Value::MaybeUninit { id, payload } => {
                 self.maybe_uninit_payload_type(*id)?;
                 Ok(Value::MaybeUninit {
@@ -291,6 +297,12 @@ impl<'tcx> Engine<'tcx> {
                     return Err("memory downcast lacks a proven variant check".to_owned());
                 }
                 Ok(value.clone())
+            }
+            (MemoryProjection::Index(index), value @ Value::ScalarSlice { .. }) => {
+                self.scalar_slice_select(&value, index, conditions)
+            }
+            (MemoryProjection::Slice { offset, length }, value @ Value::ScalarSlice { .. }) => {
+                self.scalar_slice_region(&value, offset, length, conditions)
             }
             (MemoryProjection::Index(index), Value::Elements(elements)) => {
                 self.fixed_element(&elements, index, conditions)
@@ -554,6 +566,9 @@ impl<'tcx> Engine<'tcx> {
                     let offset = symbolic::integer(&self.terms, u128::from(offset), width, false);
                     let index = if from_end {
                         let length = match &value {
+                            Value::ScalarSlice { .. } => {
+                                self.scalar_slice_length(&value, &state.conditions)?
+                            }
                             Value::Bytes { length, .. } => (**length).clone(),
                             Value::Elements(elements) => {
                                 symbolic::integer(&self.terms, elements.len() as u128, width, false)
@@ -783,6 +798,19 @@ impl<'tcx> Engine<'tcx> {
             return Ok(Value::DebugReference {
                 source,
                 place: false,
+            });
+        }
+        if matches!(value, Value::ScalarSlice { .. }) {
+            if mutable {
+                return Err("scalar slice mutation is unsupported".into());
+            }
+            let (allocation, projection, _) = self.memory_path(state, place)?;
+            let allocation =
+                allocation.ok_or("scalar slice borrowing requires retained caller storage")?;
+            return Ok(Value::Reference {
+                allocation,
+                projection,
+                mutable: false,
             });
         }
         if matches!(value, Value::StaticSlice { .. }) {
@@ -1148,6 +1176,9 @@ impl<'tcx> Engine<'tcx> {
             self.validate_static_initialization_graph(&value, state, &mut Vec::new())?;
         }
         match value {
+            Value::ScalarSlice { .. } => {
+                Err("scalar slice returns require retained caller provenance".into())
+            }
             Value::StaticSlice { .. } => {
                 self.validate_tracked_value(&value, state)?;
                 Ok(value)
