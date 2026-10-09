@@ -134,6 +134,30 @@ class MainSurveyTests(unittest.TestCase):
             main.checked_proof(self.unit, self.inventory, report, self.directory,
                                "async_body", survey.LIMITS, 0, config, True)
 
+    def test_counterexamples_keep_domain_and_abstraction_evidence_separate_from_boot(self):
+        proof = {"status": "refuted", "obligations": [
+            {"status": "refuted", "function": "initialize", "source": {"line": 7},
+             "abstraction_reasons": ["arbitrary shared bool"]},
+            {"status": "refuted", "function": "twice", "abstraction_reasons": []},
+            {"status": "proved"}]}
+        result = {"units": [{"roots": [
+            {"scope": "async_body", "status": "complete", "proof_status": "refuted",
+             "proof": proof},
+            {"scope": "runtime_entry", "status": "failed", "proof_status": "unknown",
+             "proof": proof}]}]}
+        main.annotate_evidence(result)
+        root = result["units"][0]["roots"][0]
+        self.assertEqual(root["proof_status"], "refuted")
+        self.assertEqual(root["boot_reachability"], "unverified")
+        self.assertEqual([e["classification"] for e in root["counterexample_evidence"]],
+                         ["abstract_model_counterexample", "solver_counterexample"])
+        self.assertTrue(all(e["boot_reachability"] == "unverified"
+                            and e["native_confirmation"] == "not_collected"
+                            for e in root["counterexample_evidence"]))
+        self.assertEqual(result["units"][0]["roots"][1]["counterexample_evidence"], [])
+        self.assertIn("no executor scheduling", root["analysis_domain"])
+        self.assertEqual(result["boot_reachability"], "unverified")
+
     def test_environment_drops_ambient_policies_and_rejects_captured_policies(self):
         with patch.dict(os.environ, {"MIREN_STARTUP": "1", "CARGO_FAKE": "x", "OUT_DIR": "x"}):
             environment = main.captured_environment(

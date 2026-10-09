@@ -69,6 +69,13 @@ admit arbitrary valid state, including inside certified core cells; initializer 
 critical sections establish no startup or stable-state history. Counterexamples carry the explicit
 abstraction reason and are not confirmed boot-time failures.
 
+The [initialization audit](/data/fleet-initialization-audit-current.json) checks actual source
+sites and compiler counterexamples. It finds one board-init call per main, plus a distinct RTT
+initialization in three mains. The counterexamples require flags to be true despite their declared
+false initializers. These are not confirmed firmware defects: the runtime reset data/BSS path and
+its hardware prerequisites are outside the selected Rust root domain. Safe local lifecycle tests
+prove fresh initialization and refute a second call, with native mutation checks.
+
 This milestone establishes a supported failure path in each selected body domain. It does not
 establish complete traversal or safety of every main path, executor startup, scheduling, waking,
 interrupt handling, cancellation, returned-output drops or persistent-loop induction. The eight

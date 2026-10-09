@@ -134,6 +134,14 @@ malformed reports, configuration changes, timeouts and process failures become f
 collections. A partial collection exits one. A complete collection exits zero even if roots remain
 UNKNOWN. `milestone_reached` requires complete coverage of every expected async body with an
 unconditional PROVED or REFUTED result; outcomes of the other scopes cannot substitute for it.
+This milestone describes analyzer outcomes under the recorded root domains, rather than verified
+firmware boot behavior. Each root includes `analysis_domain`, `boot_reachability: unverified` and
+`counterexample_evidence`. A refuted obligation with recorded abstractions is labeled
+`abstract_model_counterexample`; other refuted obligations are `solver_counterexample`.
+Neither label confirms a native panic or a reachable reset-to-main execution. Mutable-static
+initialization guards can fail for an arbitrary incoming `true` flag even when their declared
+initializer is `false`; establishing fresh boot state requires separate startup and interference
+evidence. Failed collections retain no active counterexample evidence.
 
 An assumption profile is opt-in and applies only to `async_body`; task registration and runtime
 wrappers remain strict. Supply both flags:

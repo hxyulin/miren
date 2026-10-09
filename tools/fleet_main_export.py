@@ -120,6 +120,12 @@ def validate(summary, conditional=False):
                     and proof.get("async_entry") is main_survey.SCOPES[scope][1],
                     "missing or inconsistent root proof")
             actual_conditional = main_survey.conditional_proof(proof)
+            if "analysis_domain" in root:
+                require(root["analysis_domain"] == main_survey.SCOPES[scope][2]
+                        and root.get("boot_reachability") == "unverified"
+                        and root.get("counterexample_evidence") ==
+                            main_survey.counterexample_evidence(proof),
+                        "counterexample evidence/domain label mismatch")
             require(type(root.get("conditional")) is bool
                     and root["conditional"] is actual_conditional,
                     "conditional label mismatch")
@@ -262,6 +268,9 @@ def compact_root(root, source, report_digest):
         blockers.append(compact)
     return {"scope": root["scope"], "name": root["name"], "source": source,
             "proof_status": root["proof_status"], "conditional": root["conditional"],
+            "analysis_domain": main_survey.SCOPES[root["scope"]][2],
+            "boot_reachability": "unverified",
+            "counterexample_evidence": main_survey.counterexample_evidence(proof),
             "report_sha256": report_digest, "assumptions": proof.get("assumptions", []),
             "entry_assumptions": proof.get("entry_assumptions", []),
             "trusted_calls": proof.get("trusted_calls", []),

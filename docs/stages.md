@@ -1276,3 +1276,13 @@ conditional milestone is reached. The unconditional milestone remains false. Eac
 arbitrary boolean state with startup/exclusion unverified; no boot-time failure is claimed.
 Both runs have 12 PROVED registration roots and 12 REFUTED runtime roots under separate atomic
 abstractions. Deterministic compact exports preserve scope, assumptions and input fingerprints.
+
+## Stage 81: initialization counterexample domain audit
+
+The twelve main counterexamples use already-initialized arbitrary shared boolean state. Source
+inspection finds one board-init call per main and distinct RTT initialization in three mains;
+no duplicate boot initialization is demonstrated. Rust runtime reset initializes data/BSS before
+calling the selected Rust entry, but reset/hardware/exclusion reachability remains unverified.
+Survey and compact evidence explicitly distinguish solver abstractions from native and boot
+confirmation. Safe local lifecycle fixtures prove fresh initialization and refute repeated or
+arbitrary-state initialization, with native checks and failing initializer mutations.

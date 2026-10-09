@@ -62,6 +62,18 @@ class MainExportTests(unittest.TestCase):
             self.assertFalse(summary["milestone_reached"])
             self.assertFalse(summary["conditional_milestone_reached"])
 
+    def test_domain_labels_cannot_claim_boot_confirmation(self):
+        summary = sample()
+        main.annotate_evidence(summary)
+        exporter.validate(summary)
+        for key, value in (("analysis_domain", "boot execution"),
+                           ("boot_reachability", "verified"),
+                           ("counterexample_evidence", [{"native_confirmation": "confirmed"}])):
+            changed = copy.deepcopy(summary)
+            changed["units"][0]["roots"][0][key] = value
+            with self.assertRaises(ValueError):
+                exporter.validate(changed)
+
     def test_mutations_cannot_launder_missing_or_unsupported_evidence(self):
         mutations = [lambda s: s.update(schema_version=True),
                      lambda s: s.update(status="partial"),

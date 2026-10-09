@@ -14,7 +14,8 @@ import fleet_survey_export as exporter
 FACTORY = "____embassy_main_task::____embassy_main_task_inner_function"
 SCOPES = {
     "async_body": (FACTORY, True,
-                   "Fresh future construction and reached polls; no executor scheduling, "
+                   "Fresh future construction and reached polls with arbitrary valid shared state; "
+                   "no executor scheduling, "
                    "startup history, cancellation, output drops or infinite-loop induction."),
     "task_registration": ("__embassy_main", False,
                           "Task registration from arbitrary root inputs; no deferred polls "
@@ -74,6 +75,28 @@ def conditional_proof(proof):
     return bool(proof.get("assumptions") or proof.get("trusted_calls")
                 or proof.get("entry_assumptions")
                 or proof.get("status") == "proved_with_assumptions")
+
+
+def counterexample_evidence(proof):
+    """Describe solver evidence without upgrading it to boot or native reachability."""
+    return [{"classification": "abstract_model_counterexample" if obligation.get(
+                "abstraction_reasons") else "solver_counterexample",
+             "abstraction_reasons": obligation.get("abstraction_reasons", []),
+             "function": obligation.get("function"), "source": obligation.get("source"),
+             "boot_reachability": "unverified", "native_confirmation": "not_collected"}
+            for obligation in proof.get("obligations", [])
+            if obligation.get("status") == "refuted"]
+
+
+def annotate_evidence(result):
+    result["milestone_scope"] = "async body analyzer outcomes under recorded root domains"
+    result["boot_reachability"] = "unverified"
+    for unit in result["units"]:
+        for root in unit["roots"]:
+            root["analysis_domain"] = SCOPES[root["scope"]][2]
+            root["boot_reachability"] = "unverified"
+            root["counterexample_evidence"] = counterexample_evidence(root.get("proof", {})) \
+                if root.get("status") == "complete" else []
 
 
 def contract_selector(spec):
@@ -401,6 +424,7 @@ def run(args):
             entry["status"] = "partial"
             for item in entry["roots"]:
                 invalidate(item, "; ".join(result["errors"]))
+    annotate_evidence(result)
     result["milestone_reached"] = milestone_reached(result)
     result["conditional_milestone_reached"] = conditional_milestone_reached(result)
     result["counts"] = {scope: {status: sum(r.get("proof_status") == status
