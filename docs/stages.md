@@ -1939,3 +1939,28 @@ soundness fixes. All 72 strict/reset main obligation arrays remain identical to 
 twelve isolated wrappers retain both unfinished weak-CAS retries and unsupported SEV, with their
 actual __pender call chains. Captures: `/tmp/miren-stage115-main-{strict,reset}-20261009` and
 `/tmp/miren-stage115/runtime`. No application or assumption changes.
+
+## Stage 116: Exact modular add/sub cancellation
+
+Shared SMT folding recognizes subtraction of an identical retained term from a two-operand
+bit-vector addition and returns the other addend. Both operand orders work at every accepted
+width. Context, width and arity checks precede simplification; cancellation does not cross extension
+nodes, identify unrelated symbols or infer path conditions. The identity is valid modulo the
+bit-vector width even when addition wraps, while Rust overflow and byte-region checks stay active.
+
+Two term tests cover all widths from 1 through 256, constant and symbolic retained addends, both
+orders, repeated terms and Z3 equivalence at width boundaries. Distinct terms, mixed widths,
+foreign contexts and extension controls preserve their conservative behavior. The existing guarded
+byte-copy fixture now proves on host/ARM O0/O2; genuinely variable lengths stay UNKNOWN and unguarded
+bounds failures stay REFUTED. One new compiler mutation test widens the actual range guard and
+fails both proof and native execution. No assumptions or firmware changes.
+
+All 34 focused SMT and byte-view integration tests pass, including the actual guard-widening
+mutation on host/ARM at O0/O2 and native execution. Formatting and workspace Clippy pass.
+
+All 520 Rust workspace tests and 48 Python tests pass. Formatting, workspace Clippy, release builds,
+dependency checks, documentation builds and manual hooks pass. Independent review found no required
+soundness fixes. All 72 strict/reset main obligation arrays remain identical to stage 115, and
+twelve isolated wrappers retain their unfinished weak-CAS retries and unsupported SEV boundaries.
+Captures: `/tmp/miren-stage116-main-{strict,reset}-20261009` and `/tmp/miren-stage116/runtime`.
+No application or assumption changes.

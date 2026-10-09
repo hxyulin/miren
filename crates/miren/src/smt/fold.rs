@@ -10,6 +10,17 @@ pub(super) fn simplify(context: &Context, op: Op, args: &[Term], sort: &Sort) ->
             | Kind::Symbol(_)
             | Kind::Apply(_, _) => None,
         },
+        (Op::BvSub, [sum, subtrahend]) => {
+            if let Kind::Apply(Op::BvAdd, addends) = &sum.node.kind {
+                if &addends[0] == subtrahend {
+                    return Some(addends[1].clone());
+                }
+                if &addends[1] == subtrahend {
+                    return Some(addends[0].clone());
+                }
+            }
+            bit_vector(context, op, args, sort)
+        }
         (Op::Equal, [left, right]) if left == right => Some(context.boolean(true)),
         (Op::Equal, [left, right]) if left.sort() == &Sort::Bool => {
             for (constant, value) in [(left, right), (right, left)] {

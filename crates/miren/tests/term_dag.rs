@@ -491,3 +491,94 @@ fn the_printer_shares_repeated_terms_without_capturing_symbols_or_growing_expone
         Some(Constant::BitVec(0))
     );
 }
+
+#[test]
+fn modular_add_sub_cancellation_retains_the_exact_other_term_at_every_width() {
+    let mut queries = Vec::new();
+    for bits in 1..=256 {
+        let context = Context::default();
+        let offset = context.symbol(0, Sort::BitVec(bits)).unwrap();
+        let variable = context.symbol(1, Sort::BitVec(bits)).unwrap();
+        let one = context.bit_vector(1, bits).unwrap();
+        for retained in [one, variable] {
+            for operands in [
+                [offset.clone(), retained.clone()],
+                [retained.clone(), offset.clone()],
+            ] {
+                let sum = context.apply(Op::BvAdd, &operands).unwrap();
+                let result = context.apply(Op::BvSub, &[sum, offset.clone()]).unwrap();
+                assert_eq!(result, retained);
+                if [1, 8, 32, 64, 128, 256].contains(&bits) {
+                    queries.push(format!(
+                        "(declare-const v0 (_ BitVec {bits}))\n\
+                         (declare-const v1 (_ BitVec {bits}))\n\
+                         (assert (not (= {} (bvsub (bvadd {} {}) v0))))",
+                        result.smt(100).unwrap(),
+                        operands[0].smt(100).unwrap(),
+                        operands[1].smt(100).unwrap(),
+                    ));
+                }
+            }
+        }
+        let doubled = context
+            .apply(Op::BvAdd, &[offset.clone(), offset.clone()])
+            .unwrap();
+        assert_eq!(
+            context
+                .apply(Op::BvSub, &[doubled, offset.clone()])
+                .unwrap(),
+            offset
+        );
+    }
+    assert!(solve(&queries).iter().all(|answer| answer == "unsat"));
+}
+
+#[test]
+fn add_sub_cancellation_does_not_identify_distinct_terms_or_cross_extensions() {
+    let context = Context::default();
+    let offset = context.symbol(0, Sort::BitVec(8)).unwrap();
+    let other = context.symbol(1, Sort::BitVec(8)).unwrap();
+    let one = context.bit_vector(1, 8).unwrap();
+    let sum = context.apply(Op::BvAdd, &[offset.clone(), one]).unwrap();
+    let unrelated = context.apply(Op::BvSub, &[sum.clone(), other]).unwrap();
+    assert_eq!(
+        unrelated.smt(100).unwrap(),
+        "(bvsub (bvadd v0 (_ bv1 8)) v1)"
+    );
+    let extended_sum = context.apply(Op::ZeroExtend(8), &[sum]).unwrap();
+    let extended_offset = context
+        .apply(Op::ZeroExtend(8), std::slice::from_ref(&offset))
+        .unwrap();
+    let result = context
+        .apply(Op::BvSub, &[extended_sum, extended_offset])
+        .unwrap();
+    assert!(result.constant().is_none());
+    let sign_extended = context
+        .apply(Op::SignExtend(8), std::slice::from_ref(&offset))
+        .unwrap();
+    let zero_extended = context
+        .apply(Op::ZeroExtend(8), std::slice::from_ref(&offset))
+        .unwrap();
+    let wide_one = context.bit_vector(1, 16).unwrap();
+    let wide_sum = context
+        .apply(Op::BvAdd, &[sign_extended, wide_one])
+        .unwrap();
+    assert!(
+        context
+            .apply(Op::BvSub, &[wide_sum, zero_extended])
+            .unwrap()
+            .constant()
+            .is_none()
+    );
+    assert!(
+        context
+            .apply(
+                Op::BvSub,
+                &[context.bit_vector(1, 16).unwrap(), offset.clone()]
+            )
+            .is_err()
+    );
+    let foreign = Context::default().symbol(0, Sort::BitVec(8)).unwrap();
+    let local_sum = context.apply(Op::BvAdd, &[offset.clone(), offset]).unwrap();
+    assert!(context.apply(Op::BvSub, &[local_sum, foreign]).is_err());
+}

@@ -244,10 +244,12 @@ Non-byte ranges and missing writable provenance remain UNKNOWN.
 
 Byte-view writes count generated SMT array stores against a 128-write budget. Fixed short copies
 can update larger compact byte allocations while preserving all other bytes. Symbolic copy lengths
-still require capacity-many stores and remain UNKNOWN when that bound exceeds the budget, including
-guarded ranges whose lengths do not simplify to constants. Region bounds, equal copy lengths,
+still require capacity-many stores and remain UNKNOWN when that bound exceeds the budget. Exact
+modular cancellation keeps `(offset + length) - offset` at the retained length term, including
+fixed-size copies with symbolic offsets. Region bounds, equal copy lengths,
 writable provenance and allocation liveness remain checked. Typed-byte encoding and expanded-value
-limits are unchanged.
+limits are unchanged. Same-term cancellation applies at the exact bit-vector width and does not
+remove Rust overflow checks or memory-region obligations.
 
 Compiler inventories record whether each function directly returns a coroutine. Fleet surveys
 separate those future-construction roots from function-body roots; explicit async polling remains

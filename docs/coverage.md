@@ -409,7 +409,10 @@ mutable string-reference storage remain UNKNOWN.
 
 Fixed byte-view updates permit larger destination allocations when the generated update contains
 at most 128 array stores. A symbolic length retains the conservative full-capacity update bound.
-The separate 128-byte typed-encoding and chunk-model bounds are unchanged. Host/ARM O0/O2 controls
+Exact same-term modular add/sub cancellation preserves fixed lengths with symbolic offsets;
+Rust overflow, region bounds and equal copy lengths remain checked. Truly variable lengths retain
+the conservative store bound. The separate typed-encoding and chunk-model budgets are unchanged.
+Host/ARM O0/O2 controls
 cover 136-, 256- and 4,096-byte backing storage, nested views, guarded offsets, empty end ranges,
 exact-budget copies, preserved neighbors, refuted value/bounds failures and unsupported oversized,
 symbolic-length or retired-storage writes. A copy-source mutation fails native execution and proof.

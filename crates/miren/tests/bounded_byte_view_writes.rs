@@ -111,7 +111,7 @@ fn fixed_writes_use_store_count_instead_of_allocation_capacity() {
         ("fixed_packet_header", ProofStatus::Proved),
         ("empty_end_range", ProofStatus::Proved),
         ("fixed_middle_preserves_neighbors", ProofStatus::Proved),
-        ("guarded_offset", ProofStatus::Unknown),
+        ("guarded_offset", ProofStatus::Proved),
         ("nested_region", ProofStatus::Proved),
         ("large_compact_allocation", ProofStatus::Proved),
         ("exact_write_budget", ProofStatus::Proved),
@@ -142,6 +142,28 @@ fn copy_source_mutation_is_refuted_and_fails_native_execution() {
             verify(
                 &path,
                 &[("fixed_packet_header", ProofStatus::Refuted)],
+                target,
+                optimized,
+                None,
+            );
+        }
+    }
+    assert!(!native_tests(&path, &directory));
+}
+
+#[test]
+fn widened_offset_guard_still_refutes_the_actual_out_of_bounds_copy() {
+    let source = std::fs::read_to_string(fixture()).unwrap();
+    let mutation = source.replacen("offset <= 132", "offset <= 133", 1);
+    assert_ne!(source, mutation);
+    let directory = Directory::new();
+    let path = directory.0.join("mutant.rs");
+    std::fs::write(&path, mutation).unwrap();
+    for target in [None, Some("thumbv7em-none-eabihf")] {
+        for optimized in [false, true] {
+            verify(
+                &path,
+                &[("guarded_offset", ProofStatus::Refuted)],
                 target,
                 optimized,
                 None,
