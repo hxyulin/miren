@@ -37,7 +37,7 @@ pub fn pointer_offsets_remain_unknown(value: u32) -> usize {
     (&raw const value).wrapping_add(1) as usize
 }
 
-pub fn snapshots_cannot_supply_allocation_identity(value: &u32) -> usize {
+pub fn incoming_reference_allocation_identity(value: &u32) -> usize {
     (&raw const *value) as usize
 }
 
@@ -64,6 +64,10 @@ mod tests {
         for value in [0, 1, u32::MAX] {
             raw_reborrows_retain_identity(value);
             mutable_reborrows_retain_identity(value);
+            assert_eq!(
+                incoming_reference_allocation_identity(&value),
+                &value as *const u32 as usize,
+            );
         }
     }
 
@@ -72,4 +76,10 @@ mod tests {
     fn the_independent_bounds_failure_replays() {
         address_creation_does_not_hide_a_bounds_failure(2);
     }
+}
+
+
+pub fn multiple_shared_references_have_no_allocation_identity(value: &u32, other: &u32) -> usize {
+    let _ = other;
+    (&raw const *value) as usize
 }

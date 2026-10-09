@@ -2084,3 +2084,69 @@ refutation. Capture: `/tmp/miren-stage119/replay`. All 72 strict/reset main obli
 stage 118 exactly; twelve isolated runtime wrappers retain unfinished weak-CAS retries and
 unsupported SEV. Captures: `/tmp/miren-stage119-main-{strict,reset}-20261009` and
 `/tmp/miren-stage119/runtime`. No application or hardware assumption changes.
+
+## Stage 120: Incoming immutable storage lifetime
+
+Exactly one eligible top-level incoming shared `Freeze` reference retains its pointee in
+caller-owned environment memory before root execution. Valid incoming Rust borrow semantics supply
+in-call liveness; a copied immutable snapshot supplies no lifetime evidence. The allocation belongs
+to neither the reference local nor a callee frame. Returned and projected reborrows preserve the
+actual allocation and read-only capability. Root reference-local `StorageDead` therefore leaves
+caller storage live, while actual frame-owned and dead backing remain subject to existing guards.
+
+Eligibility inspects every root argument and all normalized compiler fields and enum variants,
+within depth 16, 512 type nodes and 256 fixed-array elements. Primitive scalars, plain arrays,
+tuples, structs and enums qualify. Reachable references, raw pointers, interior mutation, unions,
+function pointers, unsized slices and competing borrowed/pointer-bearing arguments cannot acquire
+this new identity. Plain owned scalar aggregates may coexist. Ineligible roots retain their
+existing snapshot/interior domains; original input construction and depth budgets stay unchanged.
+No entry assumptions or hardware facts are added.
+
+Shared byte borrowing keeps an actual tracked allocation path before the existing byte snapshot
+shortcut. Snapshot-only values receive no invented allocation. Atomic and static shortcuts remain
+unchanged. Unchecked iterator cursor, bounds, alias and liveness checks, frame escape checks and
+opaque memory invalidation remain active. Opaque effects cannot revive invalidated storage, and
+shared incoming references grant no ordinary write rights. The model establishes caller storage
+through the analyzed call, not an unbounded post-return lifetime.
+
+Compiler fixtures cover shared/projected/byte zip, actual returned views, reference-local
+`StorageDead`, address identity and nested motor/Option feedback field views. Wrong claims refute;
+competing shared/mutable/interior/raw-pointer inputs, owned nested references/pointers, shared
+writes and dead root/callee backing stay UNKNOWN. Host/ARM O0/O2 controls report no entry
+assumptions or trusted calls. Changing the actual zipped payload assignment refutes and fails
+native execution.
+A separate labeled fixture-only trusted summary omits memory effects; reading its retained incoming
+byte view stays UNKNOWN with dead-storage evidence and exactly one reported trusted call. This
+regression adds no application assumptions.
+
+Source inspection finds plain scalar/array fields in dr16 Raw and scalar/Option motor fields in
+Can1Bus. A similarly shaped feedback-view fixture proves; actual fleet outcomes are left to
+post-validation replays. Missing bodies, hardware boundaries and remaining budget/iterator
+restrictions stay unsupported. No firmware files are changed.
+
+All 75 binary tests and 60 affected integration tests across fourteen suites pass, including
+reference lifetime, unchecked/owned iterator, byte, atomic, lazy-input and term regressions.
+Formatting, workspace Clippy and diff checks pass. Independent review found no required soundness
+fixes. No application or assumption changes.
+
+Four earlier UNKNOWN fixture expectations now follow actual retained provenance. Single incoming
+scalar references support raw address creation and zero offset, and an incoming array reference
+supports its checked element address. Three stale snapshot names become incoming-reference names.
+The raw byte-subobject fixture also proves because its real caller-frame Wire allocation stays live
+through the helper and assertion; it has no incoming arguments and no escaping reference. Each
+suite adds a multiple-shared-input UNKNOWN counterpart, preserving snapshot-only provenance
+coverage. Existing native tests check the three returned address identities and execute the live
+byte-subobject assertion. All thirteen tests across these four suites and the new immutable suite
+pass, including existing raw-read, dead-backing, alias, extent and mutation controls. No additional
+implementation changes are needed.
+
+Full workspace execution passes all 523 tests outside the four affected provenance suites; all
+eleven updated tests in those suites pass on targeted replay, completing 534 passing Rust cases.
+All 48 Python tests, formatting, Clippy, release builds, dependency checks, documentation builds
+and manual hooks pass. Actual dr16::Dr16::from_raw and hardware::Can1Bus::velocities now PROVE
+without entry assumptions or trusted calls, with 32 and 16 checked obligations respectively.
+KeyTracker::state and both UI helpers retain their proofs; encode retains its audited bounds
+refutation. Captures: `/tmp/miren-stage120/replay/{devices,sentry}`. All 72 strict/reset main
+obligation arrays match stage 119 exactly; twelve isolated runtime wrappers still record unfinished
+weak-CAS retry frontiers and unsupported SEV. Captures:
+`/tmp/miren-stage120-main-{strict,reset}-20261009` and `/tmp/miren-stage120/runtime`.

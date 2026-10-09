@@ -355,3 +355,14 @@ SMT array reads skip intervening stores only when the read and stored keys are s
 bit vectors with unequal values. Traversal is iterative, preserves the latest matching write and
 constant-array default, and stops at symbolic keys. This exact read-over-write simplification adds
 no memory rights or assumptions; compiler bounds and storage-lifetime checks still apply.
+
+A single top-level incoming shared reference to bounded `Freeze` storage retains caller-owned
+allocation identity for the duration of root analysis. Pointees may contain plain scalars, fixed
+arrays, tuples, structs and enums, with no reachable references, raw pointers or interior mutation.
+Plain owned arguments may coexist; competing borrowed or pointer-bearing inputs retain the prior
+snapshot domain. This restriction governs the new retention capability. Existing input budgets,
+mutable/interior/static models and unchecked iterator liveness checks remain active. Returned and
+reborrowed views preserve the actual allocation; retiring a reference local does not retire caller
+storage. Opaque memory effects still invalidate backing, and shared references grant no write
+rights.
+The model uses valid incoming Rust borrows and adds no entry assumptions or hardware facts.

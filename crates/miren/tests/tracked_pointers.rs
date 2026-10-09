@@ -95,7 +95,11 @@ fn raw_addresses_retain_provenance_without_enabling_reads_on_host_and_arm() {
         ),
         ("pointer_offsets_remain_unknown", ProofStatus::Unknown),
         (
-            "snapshots_cannot_supply_allocation_identity",
+            "incoming_reference_allocation_identity",
+            ProofStatus::Proved,
+        ),
+        (
+            "multiple_shared_references_have_no_allocation_identity",
             ProofStatus::Unknown,
         ),
         ("a_frame_pointer_cannot_escape", ProofStatus::Unknown),

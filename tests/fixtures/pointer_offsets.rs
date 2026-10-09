@@ -46,7 +46,7 @@ pub fn numeric_origin(pointer: usize) -> usize {
     synthetic::offset(pointer as *const u32, 0) as usize
 }
 
-pub fn unknown_reference(value: &u32) -> usize {
+pub fn incoming_reference_offset(value: &u32) -> usize {
     synthetic::offset(&raw const *value, 0) as usize
 }
 
@@ -110,6 +110,13 @@ mod tests {
         stride_relationship();
         for value in [0, 1, u32::MAX] {
             scalar_one_past(value);
+            assert_eq!(incoming_reference_offset(&value), &value as *const u32 as usize);
         }
     }
+}
+
+
+pub fn multiple_shared_references_have_no_offset_origin(value: &u32, other: &u32) -> usize {
+    let _ = other;
+    synthetic::offset(&raw const *value, 0) as usize
 }

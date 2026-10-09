@@ -37,7 +37,7 @@ pub fn frame_element_escape() -> *const u32 {
     &raw const values[1]
 }
 
-pub fn snapshots_have_no_raw_subobject_provenance(values: &[u32; 2]) -> *const u32 {
+pub fn incoming_reference_subobject_provenance(values: &[u32; 2]) -> *const u32 {
     &raw const values[0]
 }
 
@@ -139,9 +139,21 @@ mod tests {
         nested_array_mutations([[1, 2], [3, 4]]);
         zero_sized_subobjects();
         subobject_one_past([3, 5]);
+        for values in [[0, 0], [3, 5], [u32::MAX, 1]] {
+            assert_eq!(incoming_reference_subobject_provenance(&values), values.as_ptr());
+        }
         for index in 0..3 {
             guarded_element_address(&mut [3, 5, 7], index);
             symbolic_mutation([3, 5, 7], index);
         }
     }
+}
+
+
+pub fn multiple_shared_inputs_have_no_subobject_origin(
+    values: &[u32; 2],
+    other: &[u32; 2],
+) -> *const u32 {
+    let _ = other;
+    &raw const values[0]
 }

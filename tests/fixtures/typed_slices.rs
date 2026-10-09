@@ -278,7 +278,16 @@ mod tests {
             integer_bytes(value);
         }
         partial_slice();
+        raw_subobject_slice();
         updates_are_visible();
         prefix_and_borrowed_array_reads();
     }
+}
+
+
+pub fn multiple_shared_input_subobject_unknown(wire: &Wire, other: &Wire) {
+    let _ = other;
+    let pointer = (&raw const wire.second).cast::<u8>();
+    let bytes = shared(core::ptr::slice_from_raw_parts(pointer, 2));
+    assert!(bytes.len() == 2);
 }

@@ -304,6 +304,7 @@ impl<'tcx> Engine<'tcx> {
                 "multiple mutable root pointees cannot contain interior mutation".to_owned(),
             );
         }
+        let immutable_input = self.immutable_root_input(body)?;
         let mut interior_root = false;
         for local in body.args_iter() {
             let ty = body.local_decls[local].ty;
@@ -344,6 +345,24 @@ impl<'tcx> Engine<'tcx> {
                 interior_root = true;
                 memory.push(Some(value));
                 arguments.push(Value::Cell { allocation: 0 });
+            } else if immutable_input == Some(local) {
+                let ty::Ref(_, _, _) = ty.kind() else {
+                    return Err("immutable root storage requires a shared reference".into());
+                };
+                let value = self.argument(id, ty, &mut conditions)?;
+                let allocation = memory.len();
+                memory.push(Some(value));
+                self.record_model(
+                    id,
+                    "single incoming immutable Rust borrow; caller-owned live storage",
+                );
+                // A valid incoming Rust borrow stays live in the caller's environment.
+                // It is not owned by the reference local or any analyzed callee frame.
+                arguments.push(Value::Reference {
+                    allocation,
+                    projection: Vec::new(),
+                    mutable: false,
+                });
             } else {
                 let value = self.argument(id, ty, &mut conditions)?;
                 let prior_allocations = memory.len();

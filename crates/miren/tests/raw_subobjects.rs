@@ -74,7 +74,9 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
         assert!(proof.trusted_calls.is_empty());
         let boundary = match *name {
             "frame_element_escape" => Some("frame-owned storage cannot escape"),
-            "snapshots_have_no_raw_subobject_provenance" => Some("tracked allocation reference"),
+            "multiple_shared_inputs_have_no_subobject_origin" => {
+                Some("tracked allocation reference")
+            }
             "symbolic_mutation" => Some("non-scalar array index is not uniquely determined"),
             "duplicate_mutable_subobjects" => Some("overlapping or unproved-disjoint"),
             "numeric_addresses_cannot_become_references" => Some("fabricate allocation provenance"),
@@ -108,7 +110,11 @@ fn typed_subobject_addresses_and_each_mut_on_host_and_arm() {
         ("field_address", ProofStatus::Proved),
         ("frame_element_escape", ProofStatus::Unknown),
         (
-            "snapshots_have_no_raw_subobject_provenance",
+            "incoming_reference_subobject_provenance",
+            ProofStatus::Proved,
+        ),
+        (
+            "multiple_shared_inputs_have_no_subobject_origin",
             ProofStatus::Unknown,
         ),
         ("symbolic_mutation", ProofStatus::Unknown),

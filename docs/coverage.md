@@ -892,3 +892,11 @@ same-sort literal bit-vector keys proven unequal by their exact values. Exact ke
 the newest matching payload; constant-array bases retain their default. A symbolic key remains a
 barrier, including stores with conditional payloads. Context and key-sort checks run before folding;
 no solver answer, pointer origin, bounds obligation or storage-lifetime check is bypassed.
+
+One eligible incoming shared `Freeze` reference can retain live caller-owned storage through
+projected, returned and reborrowed views, including byte-array iterator backing. Eligibility checks
+all root arguments and reachable compiler field types; competing or nested references, raw pointers
+and interior mutation do not acquire this new identity. Existing snapshot domains remain available.
+Root-local `StorageDead` preserves caller storage, while actual dead local/callee backing and opaque
+invalidation stay UNKNOWN. Shared writes remain unsupported. Host/ARM O0/O2 and failing native
+iterator mutations cover the model without application assumptions.

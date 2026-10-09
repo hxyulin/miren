@@ -99,7 +99,11 @@ fn compiler_typed_byte_slices_keep_layout_bounds_and_provenance() {
         ("partial_slice", ProofStatus::Proved),
         ("wrong_partial_slice", ProofStatus::Refuted),
         ("mutable_slice", ProofStatus::Unknown),
-        ("raw_subobject_slice", ProofStatus::Unknown),
+        ("raw_subobject_slice", ProofStatus::Proved),
+        (
+            "multiple_shared_input_subobject_unknown",
+            ProofStatus::Unknown,
+        ),
         ("numeric_slice", ProofStatus::Unknown),
         ("padded_storage", ProofStatus::Unknown),
         ("outside_storage", ProofStatus::Unknown),

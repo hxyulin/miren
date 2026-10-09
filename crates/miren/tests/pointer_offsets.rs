@@ -98,7 +98,11 @@ fn bounded_offsets_preserve_provenance_on_host_and_arm() {
         ("negative_out_of_bounds", ProofStatus::Refuted),
         ("scaled_offset_overflow", ProofStatus::Refuted),
         ("numeric_origin", ProofStatus::Unknown),
-        ("unknown_reference", ProofStatus::Unknown),
+        ("incoming_reference_offset", ProofStatus::Proved),
+        (
+            "multiple_shared_references_have_no_offset_origin",
+            ProofStatus::Unknown,
+        ),
         ("zero_sized_stride", ProofStatus::Unknown),
         ("one_past_read", ProofStatus::Unknown),
         ("offset_frame_escape", ProofStatus::Unknown),

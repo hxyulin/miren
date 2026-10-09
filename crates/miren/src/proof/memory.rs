@@ -518,6 +518,16 @@ impl<'tcx> Engine<'tcx> {
             )
         {
             self.validate_tracked_value(&value, state)?;
+            if matches!(value, Value::Bytes { .. }) {
+                let (allocation, projection, _) = self.memory_path(state, place)?;
+                if let Some(allocation) = allocation {
+                    return Ok(Value::Reference {
+                        allocation,
+                        projection,
+                        mutable: false,
+                    });
+                }
+            }
             return Ok(value);
         }
         if mutable && matches!(value, Value::StaticText) {

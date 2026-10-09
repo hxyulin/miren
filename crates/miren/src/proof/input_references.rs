@@ -1,6 +1,85 @@
 use super::*;
+use rustc_middle::mir::Local;
 
 impl<'tcx> Engine<'tcx> {
+    pub(super) fn immutable_root_input(&self, body: &Body<'tcx>) -> Result<Option<Local>, String> {
+        let mut candidate = None;
+        let mut nodes = 0;
+        for local in body.args_iter() {
+            let ty = body.local_decls[local].ty;
+            if let ty::Ref(_, pointee, mutability) = ty.kind()
+                && !mutability.is_mut()
+                && pointee.is_freeze(self.tcx, ty::TypingEnv::fully_monomorphized())
+                && self.plain_root_storage(*pointee, 0, &mut nodes)?
+            {
+                if candidate.replace(local).is_some() {
+                    return Ok(None);
+                }
+            } else if !self.plain_root_storage(ty, 0, &mut nodes)? {
+                // Existing snapshot domains remain available, but competing or nested
+                // references and raw pointers cannot acquire new allocation identity.
+                return Ok(None);
+            }
+        }
+        Ok(candidate)
+    }
+
+    fn plain_root_storage(
+        &self,
+        ty: Ty<'tcx>,
+        depth: usize,
+        nodes: &mut usize,
+    ) -> Result<bool, String> {
+        if depth >= 16
+            || *nodes >= MAX_INPUT_VALUES
+            || !ty.is_freeze(self.tcx, ty::TypingEnv::fully_monomorphized())
+        {
+            return Ok(false);
+        }
+        *nodes += 1;
+        match ty.kind() {
+            ty::Bool | ty::Char | ty::Int(_) | ty::Uint(_) | ty::Float(_) => Ok(true),
+            ty::Pat(base, _) => self.plain_root_storage(*base, depth + 1, nodes),
+            ty::Tuple(fields) => {
+                for field in fields.iter() {
+                    if !self.plain_root_storage(field, depth + 1, nodes)? {
+                        return Ok(false);
+                    }
+                }
+                Ok(true)
+            }
+            ty::Array(element, count) => {
+                if count
+                    .try_to_target_usize(self.tcx)
+                    .is_none_or(|count| count > 256)
+                {
+                    return Ok(false);
+                }
+                self.plain_root_storage(*element, depth + 1, nodes)
+            }
+            ty::Adt(def, args) if !def.is_union() => {
+                for variant in def.variants() {
+                    for field in &variant.fields {
+                        let field = self
+                            .tcx
+                            .try_normalize_erasing_regions(
+                                ty::TypingEnv::fully_monomorphized(),
+                                field.ty(self.tcx, args),
+                            )
+                            .map_err(|error| {
+                                format!("immutable input field normalization failed: {error:?}")
+                            })?;
+                        if !self.plain_root_storage(field, depth + 1, nodes)? {
+                            return Ok(false);
+                        }
+                    }
+                }
+                Ok(true)
+            }
+            _ => Ok(false),
+        }
+    }
+
     fn input_has_shared_storage(&self, ty: Ty<'tcx>, depth: usize) -> Result<bool, String> {
         if depth >= 16 {
             return Err("shared input type nesting exceeds the depth budget".into());
