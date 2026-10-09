@@ -233,3 +233,8 @@ remain UNKNOWN. This is a bounded adapter model, not a general raw-pointer inter
 Constructor evidence uses shared compiler-body validation, return-type binding and certificate
 finalization. Scalar-only and closed aggregate checking retain separate argument/cache policies;
 U32 carriers and exact `Atomic<usize>` constructors retain their separate layout requirements.
+
+Integer and pointer compare-exchange share ordering validation and the success formula. Each weak
+operation creates a fresh possible spurious failure. Receiver certification, primitive value types
+and storage updates remain specific to each model. Pointer equality supplies no shared-state
+history.

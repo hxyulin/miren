@@ -177,6 +177,11 @@ fn relaxing_a_guarded_fence_or_changing_local_storage_never_proves() {
 #[test]
 fn cas_preserves_result_relations_ordering_checks_and_spurious_failures() {
     let entries = [
+        (
+            "repeated_weak_cas_choices_are_independent",
+            ProofStatus::Refuted,
+        ),
+        ("repeated_strong_cas_choices_agree", ProofStatus::Proved),
         ("strong_cas", ProofStatus::Proved),
         ("weak_cas", ProofStatus::Proved),
         ("guarded_cas_ordering", ProofStatus::Proved),

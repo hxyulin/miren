@@ -247,3 +247,17 @@ fn cas_result_relations_replay_for_every_small_initial_value() {
     }
     signed_cas();
 }
+
+pub fn repeated_weak_cas_choices_are_independent() {
+    let count = AtomicU32::new(0);
+    let first = count.compare_exchange_weak(0, 0, Ordering::Relaxed, Ordering::Relaxed);
+    let second = count.compare_exchange_weak(0, 0, Ordering::Relaxed, Ordering::Relaxed);
+    assert!(first.is_ok() == second.is_ok());
+}
+
+pub fn repeated_strong_cas_choices_agree() {
+    let count = AtomicU32::new(0);
+    let first = count.compare_exchange(0, 0, Ordering::Relaxed, Ordering::Relaxed);
+    let second = count.compare_exchange(0, 0, Ordering::Relaxed, Ordering::Relaxed);
+    assert!(first.is_ok() == second.is_ok());
+}

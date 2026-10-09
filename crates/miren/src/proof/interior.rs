@@ -456,14 +456,7 @@ impl<'tcx> Engine<'tcx> {
                 return Err("compare_exchange modeled value type mismatch".into());
             }
         }
-        let success_safe = self.atomic_order(
-            success,
-            *success_ty,
-            &["Relaxed", "Acquire", "Release", "AcqRel", "SeqCst"],
-        )?;
-        let failure_safe =
-            self.atomic_order(failure, *failure_ty, &["Relaxed", "Acquire", "SeqCst"])?;
-        let safe = self.terms.apply(Op::And, &[success_safe, failure_safe])?;
+        let safe = self.compare_exchange_orderings(success, *success_ty, failure, *failure_ty)?;
         self.require(
             site.0,
             site.1,
@@ -490,13 +483,7 @@ impl<'tcx> Engine<'tcx> {
         let equal =
             symbolic::binary(&self.terms, "eq", old.clone(), expected.clone())?.boolean()?;
         let weak = self.tcx.item_name(instance.def_id()).as_str() == "compare_exchange_weak";
-        let succeeds = if weak {
-            let no_spurious_failure = self
-                .fresh_abstraction(Sort::Bool, "weak compare-exchange permits spurious failure");
-            self.terms.apply(Op::And, &[equal, no_spurious_failure])?
-        } else {
-            equal
-        };
+        let succeeds = self.compare_exchange_success(equal, weak)?;
         if let Some(allocation) = allocation {
             let old_term = old.integer()?.0;
             let replacement_term = replacement.integer()?.0;
@@ -553,6 +540,32 @@ impl<'tcx> Engine<'tcx> {
             variants,
             is_option: false,
         })
+    }
+
+    pub(super) fn compare_exchange_orderings(
+        &self,
+        success: &Value,
+        success_ty: Ty<'tcx>,
+        failure: &Value,
+        failure_ty: Ty<'tcx>,
+    ) -> Result<Term, String> {
+        let success = self.atomic_order(
+            success,
+            success_ty,
+            &["Relaxed", "Acquire", "Release", "AcqRel", "SeqCst"],
+        )?;
+        let failure = self.atomic_order(failure, failure_ty, &["Relaxed", "Acquire", "SeqCst"])?;
+        self.terms.apply(Op::And, &[success, failure])
+    }
+
+    pub(super) fn compare_exchange_success(&self, equal: Term, weak: bool) -> Result<Term, String> {
+        if !weak {
+            return Ok(equal);
+        }
+        // Each weak operation has its own permitted spurious failure, without retained history.
+        let not_spurious =
+            self.fresh_abstraction(Sort::Bool, "weak compare-exchange permits spurious failure");
+        self.terms.apply(Op::And, &[equal, not_spurious])
     }
 
     pub(super) fn atomic_order(

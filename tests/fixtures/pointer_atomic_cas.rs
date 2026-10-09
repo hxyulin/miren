@@ -189,3 +189,39 @@ pub fn newly_created_atomics_after_pointer_publication_are_fresh() {
     let fresh = core::sync::atomic::AtomicU8::new(9);
     assert!(fresh.load(Ordering::Relaxed) == 9);
 }
+
+pub fn repeated_weak_cas_choices_are_independent() {
+    let expected = core::ptr::null_mut();
+    let first =
+        LINK.compare_exchange_weak(expected, expected, Ordering::Relaxed, Ordering::Relaxed);
+    let second =
+        LINK.compare_exchange_weak(expected, expected, Ordering::Relaxed, Ordering::Relaxed);
+    let (first_ok, first_old) = match first {
+        Ok(old) => (true, old),
+        Err(old) => (false, old),
+    };
+    let (second_ok, second_old) = match second {
+        Ok(old) => (true, old),
+        Err(old) => (false, old),
+    };
+    if first_old == expected && second_old == expected {
+        assert!(first_ok == second_ok);
+    }
+}
+
+pub fn repeated_strong_cas_choices_agree() {
+    let expected = core::ptr::null_mut();
+    let first = LINK.compare_exchange(expected, expected, Ordering::Relaxed, Ordering::Relaxed);
+    let second = LINK.compare_exchange(expected, expected, Ordering::Relaxed, Ordering::Relaxed);
+    let (first_ok, first_old) = match first {
+        Ok(old) => (true, old),
+        Err(old) => (false, old),
+    };
+    let (second_ok, second_old) = match second {
+        Ok(old) => (true, old),
+        Err(old) => (false, old),
+    };
+    if first_old == expected && second_old == expected {
+        assert!(first_ok == second_ok);
+    }
+}

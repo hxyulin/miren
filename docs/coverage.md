@@ -791,3 +791,9 @@ remains UNKNOWN; metadata queries retain their existing behavior. Bare snapshots
 unknown or duplicate indices and unsupported induction histories remain UNKNOWN. Host/ARM tests
 and safe native mutations exercise float zip adapters, shared reads and cursor offsets. Synthetic
 invalid custom MIR cases are checked only by the analyzer, without native undefined behavior.
+
+Integer and pointer CAS share the same ordering checks and strong/weak success condition. Strong
+success compares observed old value with expected value; each weak operation additionally has its
+own unconstrained spurious-failure choice. Shared code does not merge pointer address provenance,
+owned integer history or startup assumptions. Regression cases distinguish independent weak choices
+from repeated strong zero-value writes on host/ARM at both compiler optimization levels.

@@ -49,14 +49,7 @@ impl<'tcx> Engine<'tcx> {
         let [receiver, expected, replacement, success, failure] = values else {
             return Err("pointer compare-exchange needs receiver, pointers and orderings".into());
         };
-        let success_safe = self.atomic_order(
-            success,
-            *success_ty,
-            &["Relaxed", "Acquire", "Release", "AcqRel", "SeqCst"],
-        )?;
-        let failure_safe =
-            self.atomic_order(failure, *failure_ty, &["Relaxed", "Acquire", "SeqCst"])?;
-        let safe = self.terms.apply(Op::And, &[success_safe, failure_safe])?;
+        let safe = self.compare_exchange_orderings(success, *success_ty, failure, *failure_ty)?;
         self.require(
             site.0,
             site.1,
@@ -109,13 +102,7 @@ impl<'tcx> Engine<'tcx> {
         let equal =
             symbolic::binary(&self.terms, "eq", old.clone(), expected.clone())?.boolean()?;
         let weak = name.as_str() == "compare_exchange_weak";
-        let succeeds = if weak {
-            let not_spurious = self
-                .fresh_abstraction(Sort::Bool, "weak compare-exchange permits spurious failure");
-            self.terms.apply(Op::And, &[equal, not_spurious])?
-        } else {
-            equal
-        };
+        let succeeds = self.compare_exchange_success(equal, weak)?;
         let variants = vec![
             self.constructed(result_ty, 0, vec![old.clone()])?,
             self.constructed(result_ty, 1, vec![old])?,

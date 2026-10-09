@@ -110,6 +110,11 @@ fn native_tests(path: &Path, directory: &Directory) -> bool {
 fn pointer_cas_checks_address_relations_ordering_and_storage_without_inventing_history() {
     let entries = [
         (
+            "repeated_weak_cas_choices_are_independent",
+            ProofStatus::Refuted,
+        ),
+        ("repeated_strong_cas_choices_agree", ProofStatus::Proved),
+        (
             "pointer_publication_invalidates_owned_atomic_history",
             ProofStatus::Refuted,
         ),

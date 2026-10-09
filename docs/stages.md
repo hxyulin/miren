@@ -1476,3 +1476,11 @@ flow matcher is shared while U32 carrier and exact `Atomic<usize>` identity/layo
 separate. Argument origin admission, context caches and language acceptance stay in their callers.
 Focused host/ARM regressions pass; frozen/refactored fixture metadata and certificates are byte
 identical. This removes duplicate checks without introducing new construction grants.
+
+## Stage 100: Shared compare-exchange semantics
+
+Integer and pointer CAS share success/failure ordering validation and strong/weak success formulas.
+Each weak call still creates a distinct spurious-failure symbol. Primitive receiver/value checks,
+integer owned/startup updates and pointer publication invalidation retain their original order and
+separate models. Host/ARM regression cases refute equality of two independent weak choices and prove
+matching strong-choice properties; existing negative, UNKNOWN and native mutation cases remain.
