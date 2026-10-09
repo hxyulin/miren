@@ -259,8 +259,13 @@ inventories remain UNKNOWN. No new pointer identities, contracts or entry assump
 
 The NonZero getter model requires the actual core inherent method, its instantiated diagnostic
 owner and the exact safe primitive signature. User functions or local trait methods named get
-execute their retained bodies; a missing body stays UNKNOWN. Constructor and niche-transmute
-support is unchanged.
+execute their retained bodies; a missing body stays UNKNOWN.
+
+Actual core NonZero constructors support the primitive integer to `Option<NonZero<T>>` transmute
+when compiler identity, scalar layout and the exact zero-only niche agree. The original integer
+selects None at zero and supplies Some's payload otherwise; no nonzero assumption excludes None.
+Different primitive types, wrappers and pointer niches remain UNKNOWN. A missing constructor body
+stays UNKNOWN, and Some payload access still requires a proven variant check.
 
 Compiler inventories record whether each function directly returns a coroutine. Fleet surveys
 separate those future-construction roots from function-body roots; explicit async polling remains

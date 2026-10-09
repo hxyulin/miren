@@ -43,6 +43,7 @@ mod library;
 mod membership;
 mod memory;
 mod mutable_slice_ranges;
+mod nonzero_options;
 mod opaque_function_inputs;
 mod owned_iterators;
 mod pointer_atomic_cas;
@@ -2038,6 +2039,15 @@ impl<'tcx> Engine<'tcx> {
             Rvalue::Cast(CastKind::Transmute, operand, target) => {
                 let source = operand.ty(&body.local_decls, self.tcx);
                 let value = self.operand(id, body, state, operand)?;
+                if let Some(value) =
+                    self.integer_nonzero_option_transmute(source, *target, &value)?
+                {
+                    self.record_model(
+                        id,
+                        "compiler-certified zero niche; exact optional NonZero integer",
+                    );
+                    return Ok(value);
+                }
                 if let Some(value) =
                     self.tracked_reference_array_transmute(source, *target, &value, state)?
                 {

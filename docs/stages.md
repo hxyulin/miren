@@ -2185,3 +2185,40 @@ All 92 outcomes agree with actual return/panic bodies, native controls pass, and
 receives a library model or trusted call. No additional defect was found in this bounded audit.
 Evidence: `/tmp/miren-model-dispatch-audit/audit.md` and `validation.json`. Constructor/niche
 dispatch is excluded from this audit and remains unsupported here.
+
+## Stage 122: Exact optional NonZero integer representation
+
+The actual core NonZero::new body lowers to an integer-to-Option transmute. Support now requires
+the exact Option lang item, core NonZero diagnostic identity and the same primitive integer type.
+Compiler layouts must certify matching width, signedness, size and alignment; initialized full
+integer validity; nonzero-only inner validity; zero field offsets; and exactly the None-at-zero,
+Some-untagged niche with the canonical variant and field shapes. No constructor-name shortcut,
+body fabrication or entry assumption is added.
+
+The original integer expression supplies the two-layer core NonZero payload and selects the
+actual semantic None/Some discriminants. No nonzero constraint removes the None case. Existing
+variant projection checks require a proven Some branch before accessing its payload. Different
+primitive types, non-core wrappers, pointer/bool niches and missing metadata retain conservative
+outcomes; missing bodies remain UNKNOWN.
+
+Two integration tests cover every signed/unsigned primitive family and target pointer width on
+host/ARM at O0/O2, including zero, negative values, wrong claims, unwrap refutations and forged
+layout/projection controls. Reports establish that actual core constructor bodies execute. A real
+None-branch mutation refutes and fails native execution. Before application, 75 binary tests and
+19 integration tests across six suites passed (94 total), alongside formatting and affected Clippy.
+Both new integration tests pass in the applied checkout. Formatting, affected Clippy and diff
+checks pass. Full required checks and actual coverage replays follow.
+
+All 539 Rust workspace tests and 48 Python tests are accounted for by the full run plus the
+three-test contract-work replay. The full run passed 536 tests outside that suite; its stale
+forward-transmute diagnostic expectation was updated to the next unsupported reverse
+NonZero-to-integer transmute. guarded_power remains UNKNOWN, and the suite's status, native
+and mutation controls pass. Formatting, Clippy, release builds, dependency checks, documentation
+builds and manual hooks pass.
+
+The actual dm_mc02::nominal_bit_timing now PROVES without assumptions. Dr16, KeyTracker,
+Can1Bus and both UI proofs remain intact; encode retains its audited bounds refutation.
+Captures: `/tmp/miren-stage122/replay`. All 72 strict/reset main obligation arrays match stage 121
+exactly; twelve isolated runtime wrappers still record both startup premises, unfinished
+weak-CAS retry frontiers and unsupported SEV. Captures:
+`/tmp/miren-stage122-main-{strict,reset}-20261009` and `/tmp/miren-stage122/runtime`.

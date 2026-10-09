@@ -416,7 +416,15 @@ NonZero getters validate compiler identity before applying the scalar model. Act
 get lookalikes retain their return values and panics, including a dependency getter without MIR
 remaining UNKNOWN. Host/ARM O0/O2 regressions cover unsigned, signed and pointer-width core getters,
 wrong claims and actual-body mutations that fail native execution. Recognition does not add a
-NonZero constructor or new assumptions.
+NonZero constructor or new assumptions in that getter model.
+
+Actual core NonZero constructor bodies now execute their primitive integer to `Option<NonZero<T>>`
+transmute when compiler types, scalar validity ranges, sizes, alignments and the exact zero-only
+niche agree. The semantic discriminant and payload retain the original input expression, so None
+remains reachable at zero and Some access requires a proven variant check. Host/ARM O0/O2 cases
+cover all primitive integer families, zero, negative values and unwrap failures. Different integer
+types, wrappers, pointer/bool niches and an unchecked Some projection remain UNKNOWN. A mutated
+None-branch claim refutes and fails native execution. Missing constructor bodies remain UNKNOWN.
 
 ## Mutable byte regions and valid bounded roots
 
