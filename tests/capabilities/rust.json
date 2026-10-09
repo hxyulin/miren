@@ -282,9 +282,7 @@
     {
       "entry": "unbounded_scalar_contains",
       "family": "scalar_slice_comparison",
-      "expected": "unknown",
-      "unknown_reason": "scalar membership needs a proven length at most 128",
-      "unknown_category": "resource_limit"
+      "expected": "proved"
     },
     {
       "entry": "scalar_slice_capture",
@@ -299,6 +297,23 @@
     {
       "entry": "scalar_slice_capture_missing_body",
       "family": "scalar_slice_capture",
+      "expected": "unknown",
+      "unknown_reason": "no compiler-exported Rust definition matches the foreign symbol",
+      "unknown_category": "missing_compiler_evidence"
+    },
+    {
+      "entry": "scalar_slice_full_member",
+      "family": "scalar_slice_full_predicate",
+      "expected": "proved"
+    },
+    {
+      "entry": "scalar_slice_full_wrong_claim",
+      "family": "scalar_slice_full_predicate",
+      "expected": "refuted"
+    },
+    {
+      "entry": "scalar_slice_full_missing_body",
+      "family": "scalar_slice_full_predicate",
       "expected": "unknown",
       "unknown_reason": "no compiler-exported Rust definition matches the foreign symbol",
       "unknown_category": "missing_compiler_evidence"

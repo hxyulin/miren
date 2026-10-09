@@ -248,6 +248,103 @@ impl<'tcx> Engine<'tcx> {
         decode_scalar_element(&self.terms, *element, selected)
     }
 
+    /// Pure logical observation after the consumer has certified the original source and
+    /// allocation extent under free path conditions. This grants no checked memory access;
+    /// an open logical binder must never be passed to memory_bounds or feasibility here.
+    pub(super) fn scalar_slice_logical_item(
+        &self,
+        value: &Value,
+        original: Ty<'tcx>,
+        index: &Term,
+    ) -> Result<Value, String> {
+        let Value::ScalarSlice {
+            id,
+            element,
+            length,
+            data,
+        } = value
+        else {
+            return Err(
+                "logical scalar observation requires a certified readonly descriptor".into(),
+            );
+        };
+        if self.scalar_slice_types.get(*id) != Some(&original)
+            || self.scalar_slice_element(original)? != Some(*element)
+        {
+            return Err(
+                "logical scalar observation differs from its original compiler type".into(),
+            );
+        }
+        let bits = u32::from(self.tcx.sess.target.pointer_width);
+        validate_slice_terms(&self.terms, bits, *element, length, data)?;
+        if index.sort() != &Sort::BitVec(bits) || !index.belongs_to(&self.terms) {
+            return Err(
+                "logical scalar observation requires a target-usize index in its context".into(),
+            );
+        }
+        let selected = self
+            .terms
+            .apply(Op::Select, &[data.clone(), index.clone()])?;
+        decode_scalar_element(&self.terms, *element, selected)
+    }
+
+    pub(super) fn validate_scalar_slice_needle(
+        &self,
+        original: Ty<'tcx>,
+        needle: &Value,
+        conditions: &[Term],
+    ) -> Result<(), String> {
+        let element = self
+            .scalar_slice_element(original)?
+            .ok_or("scalar slice comparison requires an exact primitive compiler type")?;
+        let valid = match element {
+            ScalarSliceElement::Bool => match needle {
+                Value::Bool(term) => term.sort() == &Sort::Bool && term.belongs_to(&self.terms),
+                _ => false,
+            },
+            ScalarSliceElement::Integer { bits, signed } => match needle {
+                Value::Int {
+                    expression,
+                    bits: actual_bits,
+                    signed: actual_signed,
+                } => {
+                    bits == *actual_bits
+                        && signed == *actual_signed
+                        && expression.sort() == &Sort::BitVec(bits)
+                        && expression.belongs_to(&self.terms)
+                }
+                _ => false,
+            },
+            ScalarSliceElement::Char => {
+                self.prove_char_value(needle, conditions)?;
+                true
+            }
+            ScalarSliceElement::Float { bits } => match needle {
+                Value::Float {
+                    expression,
+                    bits: actual_bits,
+                    ..
+                } => {
+                    let (exponent, significand) = if bits == 32 { (8, 24) } else { (11, 53) };
+                    bits == *actual_bits
+                        && expression.sort()
+                            == &Sort::Float {
+                                exponent,
+                                significand,
+                            }
+                        && expression.belongs_to(&self.terms)
+                }
+                _ => false,
+            },
+        };
+        if !valid {
+            return Err(
+                "scalar slice comparison needle differs from its exact primitive type".into(),
+            );
+        }
+        Ok(())
+    }
+
     pub(super) fn scalar_slice_region(
         &self,
         value: &Value,

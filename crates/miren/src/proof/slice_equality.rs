@@ -90,6 +90,38 @@ impl<'tcx> Engine<'tcx> {
             return Ok(Some(returns));
         }
         let (length, bits, _) = left_length.integer()?;
+        if matches!(
+            (&left, &right),
+            (Value::ScalarSlice { .. }, Value::ScalarSlice { .. })
+        ) {
+            if left_element != right_element || self.scalar_slice_element(left_element)?.is_none() {
+                return Err(
+                    "full-domain slice equality requires identical primitive compiler types".into(),
+                );
+            }
+            // Both source extents were certified under free conditions before length mismatch.
+            let index = self.fresh(Sort::BitVec(bits));
+            let left_item = self.scalar_slice_logical_item(&left, left_element, &index)?;
+            let right_item = self.scalar_slice_logical_item(&right, right_element, &index)?;
+            let item = symbolic::binary(&self.terms, "eq", left_item, right_item)?.boolean()?;
+            let inside = self
+                .terms
+                .apply(Op::BvUnsignedLt, &[index.clone(), length])?;
+            let predicate = self.terms.apply(Op::Or, &[symbolic::not(&inside), item])?;
+            let equal = self
+                .terms
+                .quantify(miren::smt::Quantifier::Forall, &index, &predicate)?;
+            self.record_model(
+                callee,
+                "full-domain primitive scalar slice equality; scoped universal numeric equality",
+            );
+            returns.push(Return {
+                value: Value::Bool(if negate { symbolic::not(&equal) } else { equal }),
+                conditions,
+                memory: state.memory.clone(),
+            });
+            return Ok(Some(returns));
+        }
         let limit = self
             .terms
             .bit_vector(MAX_SLICE_EQUALITY_ELEMENTS as u128, bits)?;

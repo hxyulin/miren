@@ -106,6 +106,34 @@ impl<'tcx> Engine<'tcx> {
             (second, first)
         };
         let slice = slice.materialize()?;
+        if matches!(slice, Value::ScalarSlice { .. }) {
+            // Source and needle validity are established under the original free conditions.
+            let length = self.scalar_slice_length(&slice, &state.conditions)?;
+            self.validate_scalar_slice_needle(*element, needle, &state.conditions)?;
+            let (length, bits, _) = length.integer()?;
+            let index = self.fresh(Sort::BitVec(bits));
+            let item = self.scalar_slice_logical_item(&slice, *element, &index)?;
+            let equal = symbolic::binary(&self.terms, "eq", item, needle.clone())?.boolean()?;
+            let inside = self
+                .terms
+                .apply(Op::BvUnsignedLt, &[index.clone(), length])?;
+            let predicate = self.terms.apply(Op::And, &[inside, equal])?;
+            let member = self
+                .terms
+                .quantify(miren::smt::Quantifier::Exists, &index, &predicate)?;
+            self.record_model(
+                callee,
+                concat!(
+                    "full-domain primitive scalar slice membership; ",
+                    "scoped existential numeric equality"
+                ),
+            );
+            return Ok(Some(vec![Return {
+                value: Value::Bool(member),
+                conditions: state.conditions.clone(),
+                memory: state.memory.clone(),
+            }]));
+        }
         if !(element.is_bool()
             || self.integer_type(*element).is_some()
             || self.float_type(*element).is_some())
@@ -180,41 +208,7 @@ impl<'tcx> Engine<'tcx> {
                     member = self.terms.apply(Op::Or, &[member, equal])?;
                 }
             }
-            Value::ScalarSlice { .. } => {
-                let length = self.scalar_slice_length(&slice, &state.conditions)?;
-                let (length_term, bits, _) = length.integer()?;
-                let limit = self
-                    .terms
-                    .bit_vector(MAX_MEMBERSHIP_ELEMENTS as u128, bits)?;
-                let outside = self
-                    .terms
-                    .apply(Op::BvUnsignedGt, &[length_term.clone(), limit])?;
-                if self.feasible(&[state.conditions.clone(), vec![outside]].concat())? {
-                    return Err(self.categorized_error(
-                        UnknownCategory::ResourceLimit,
-                        "scalar membership needs a proven length at most 128".into(),
-                    ));
-                }
-                let count = match symbolic::constant(&length_term) {
-                    Some(symbolic::Constant::BitVec { value, .. }) => value as usize,
-                    _ => MAX_MEMBERSHIP_ELEMENTS,
-                };
-                for index in 0..count {
-                    let index = self.iterator_index(index as u128);
-                    let inside = self
-                        .terms
-                        .apply(Op::BvUnsignedLt, &[index.integer()?.0, length_term.clone()])?;
-                    let conditions = [state.conditions.clone(), vec![inside.clone()]].concat();
-                    if !self.feasible(&conditions)? {
-                        continue;
-                    }
-                    let item = self.scalar_slice_select(&slice, &index, &conditions)?;
-                    let equal =
-                        symbolic::binary(&self.terms, "eq", item, needle.clone())?.boolean()?;
-                    let equal = self.terms.apply(Op::And, &[inside, equal])?;
-                    member = self.terms.apply(Op::Or, &[member, equal])?;
-                }
-            }
+            Value::ScalarSlice { .. } => unreachable!("certified scalar membership handled above"),
             Value::Input(_)
             | Value::Bool(_)
             | Value::Int { .. }

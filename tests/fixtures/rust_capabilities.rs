@@ -392,6 +392,29 @@ pub fn scalar_slice_capture_missing_body(values: &[u16], index: usize) -> u16 {
     }
 }
 
+pub fn scalar_slice_full_member(values: &[u16], index: usize) {
+    if index < values.len() {
+        assert!(values.contains(&values[index]));
+        assert!(values[index..] == values[index..]);
+    }
+}
+
+pub fn scalar_slice_full_wrong_claim(values: &[u16]) {
+    if values.len() > 128 {
+        assert!(values.contains(&0));
+    }
+}
+
+#[cfg(not(test))]
+unsafe extern "Rust" {
+    fn opaque_full_scalar_predicate(value: bool) -> bool;
+}
+
+#[cfg(not(test))]
+pub fn scalar_slice_full_missing_body(values: &[u16], needle: u16) -> bool {
+    unsafe { opaque_full_scalar_predicate(values.contains(&needle)) }
+}
+
 #[cfg(test)]
 mod native {
     use super::*;
@@ -400,6 +423,10 @@ mod native {
     #[test]
     fn positives() {
         integers(199);
+        scalar_slice_full_member(&[], usize::MAX);
+        scalar_slice_full_member(&[3, 7], 1);
+        scalar_slice_full_member(&[7; 129], 128);
+        scalar_slice_full_member(&[7; 257], 256);
         scalar_slice_capture(&[], usize::MAX);
         scalar_slice_capture(&[0, 1, u16::MAX], 2);
         scalar_slice_capture(&[u16::MAX; 129], 128);
@@ -457,6 +484,12 @@ mod native {
     #[should_panic]
     fn scalar_contains_negative_control() {
         bounded_scalar_contains_wrong_claim(&[3, 7]);
+    }
+
+    #[test]
+    #[should_panic]
+    fn full_scalar_contains_negative_control() {
+        scalar_slice_full_wrong_claim(&[7; 129]);
     }
 
     #[test]

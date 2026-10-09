@@ -3170,3 +3170,32 @@ Merged validation passes 624 Rust tests and 68 Python tests, formatting, cargo l
 builds, cargo deny, documentation build and manual hooks. Long independent SMT reference
 literals are wrapped without changing their bytes; all nine scoped-term integration controls
 and all 37 solver units pass again after that formatting change.
+
+## Stage 148: full-length read-only primitive slice predicates
+
+The existing primitive scalar slice consumers now construct scoped predicates after validating
+the original tracked sources, exact compiler types, initialized allocation extents and selected
+core bodies under free path conditions. Membership uses an existential guarded index; equal-length
+equality uses a universal guarded index, and inequality negates that exact result. A pure logical
+observer reuses numeric Float and decoded valid Char observations. It asks no feasibility or memory
+bounds question using an unclosed logical binder. No runtime length cap, environment premise, raw
+access right or larger proof budget is introduced. Finite/custom and byte consumers retain their
+previous policies, including actual custom comparison bodies and effects.
+
+Dedicated compiler controls exercise 28 roots per host/ARM O0/O2 build: 16 PROVED, 6 REFUTED and
+6 UNKNOWN. They include selected membership, arbitrary suffixes, equal-length differing subviews,
+IEEE NaNs and signed zero, decoded Unicode, long and empty inputs, original backing retirement,
+custom panic effects and missing bodies. Actual helper needle-value mutation refutes every profile
+and fails valid native O0/O2 tests on 129-element inputs. Saved full counterexample queries for long
+zero-membership and Float self-equality independently recheck SAT; concrete native witnesses remain
+separate from arbitrary quantified-array model reconstruction.
+
+The 17 unchanged prior comparison fixture roots now yield 12 PROVED, 2 REFUTED and 3 UNKNOWN per
+profile, including both original unrestricted membership and equality functions. The shared
+manifest advances its original unrestricted membership control and adds a full-predicate family:
+58 cases across 21 families, expecting 24 PROVED, 21 REFUTED and 13 UNKNOWN per configuration.
+Merged validation passes 626 Rust tests and 68 Python tests, formatting, cargo lint, release
+builds, cargo deny, documentation build and manual hooks. Frozen standalone evidence at
+`/tmp/miren-stage148-merged-capabilities-20261010` records 96 PROVED, 84 REFUTED and 52 UNKNOWN,
+with unchanged inputs/binaries and no collection errors. Independent final review approves the
+source certificates, exact numeric predicates and retained failure/model evidence.

@@ -636,15 +636,15 @@ iterator rights are added. Floating reads retain storage bits and Char reads dec
 Whole-slice callbacks still require complete execution or a separate loop proof; step exhaustion
 returns ResourceLimit UNKNOWN rather than narrowing the admitted input length.
 
-Primitive readonly scalar slice membership and equality support a proven comparison length of at
-most 128 elements. This is a work limit on the actual call path, not an input length cap. Equality
-checks lengths first; different lengths require no scan. A bounded subview can compare even when
-its original input exceeds the work limit. Both models validate the original tracked references
-before empty or mismatching-length returns and select elements only under proven in-bounds paths.
-Floating comparisons use numeric equality, including NaN inequality and signed-zero equality;
-Char comparisons use valid decoded scalar values. Custom finite element comparisons still execute
-actual `PartialEq` bodies and retain their effects. Unbounded scalar scans remain `UNKNOWN` with a
-resource-limit diagnostic. The models add no alias roots, assumptions, or raw-access rights.
+Supported read-only primitive scalar-slice membership and equality cover every valid input
+length with scoped logical predicates. Membership uses an existential guarded index; equal-length
+slice equality uses universal guarded numeric comparisons. Descriptor, source, original element
+type, allocation extent and available compiler body checks precede even empty or mismatching-length
+returns. Floating NaN and signed-zero behavior and decoded Char equality are preserved. Logical
+selection creates no borrow, alias roots, assumptions or raw access rights. Byte, finite-counterpart
+and custom comparisons retain their existing comparison work bounds. Custom finite comparisons
+execute actual `PartialEq` bodies and retain their effects. Solver limits, unresolved results and
+budget exhaustion in iterative consumers remain explicit `UNKNOWN`.
 
 Concrete synchronous closures can carry supported read-only scalar slices and initialized pure
 `MaybeUninit` values through their exact compiler capture types. Shared capture metadata checks

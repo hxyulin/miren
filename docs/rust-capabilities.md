@@ -11,8 +11,8 @@ execution at O0 and O2, positive/refuted/unknown controls, a source mutation tha
 structured UNKNOWN reporting, and passing repository checks. Completion establishes a repeatable
 baseline. It does not establish full Rust support or a completed memory-model refactor.
 
-The manifest contains 55 cases across 20 families. Each build configuration expects 22 PROVED,
-20 REFUTED and 13 UNKNOWN results. Stage 133 originally had 23 cases with 10 PROVED, 9 REFUTED
+The manifest contains 58 cases across 21 families. Each build configuration expects 24 PROVED,
+21 REFUTED and 13 UNKNOWN results. Stage 133 originally had 23 cases with 10 PROVED, 9 REFUTED
 and 4 UNKNOWN; stage 134 closed its retained-prefix projection gap. Stage 136 adds raw-pointer
 metadata P/R controls and a safe core reference-array grant that remains UNKNOWN without a
 temporal permission certificate. Stage 137 adds tuple-array P/R and unsupported symbolic-write
@@ -32,6 +32,10 @@ not summarize its body or permit a borrowed local to escape.
 Stage 147 adds scoped universal and existential SMT terms, lexical free-symbol metadata and
 solver/printer controls. It adds no Rust consumer or baseline case; full-sequence models require
 a separate semantic implementation.
+Stage 148 advances the unchanged unrestricted scalar membership root to PROVED and adds full-length
+predicate P/R and missing invoked body U controls. Primitive scalar descriptors use scoped
+existential membership and universal equal-length comparison after source/type/extent validation.
+Byte and finite/custom comparison policies retain their separate work bounds and actual effects.
 These additions change the denominator, not a coverage percentage.
 Covered examples exercise arithmetic, enum payloads, array indexing, reference effects, concrete
 generics, closures, iterator callbacks, finite loops, destructors, fresh future polling and raw

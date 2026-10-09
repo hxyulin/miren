@@ -86,21 +86,23 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
                 model.contains("bounded primitive slice membership")
                     || model.contains("bounded primitive slice equality")
                     || model.contains("slice equality; length check before element comparisons")
+                    || model.contains("full-domain primitive scalar slice membership")
+                    || model.contains("full-domain primitive scalar slice equality")
             }));
+        }
+        let full_domain = match *name {
+            "unbounded_contains" => Some("full-domain primitive scalar slice membership"),
+            "unbounded_equality" => Some("full-domain primitive scalar slice equality"),
+            _ => None,
+        };
+        if let Some(model) = full_domain {
+            assert!(proof.models.iter().any(|actual| actual.contains(model)));
         }
         if *expected == ProofStatus::Unknown {
             let (category, reason) = match *name {
                 "analyzer_only::missing_custom_body" => (
                     UnknownCategory::MissingCompilerEvidence,
                     "no compiler-exported Rust definition matches the foreign symbol",
-                ),
-                "unbounded_contains" => (
-                    UnknownCategory::ResourceLimit,
-                    "scalar membership needs a proven length at most 128",
-                ),
-                "unbounded_equality" => (
-                    UnknownCategory::ResourceLimit,
-                    "slice equality needs a proven length at most 128",
                 ),
                 "analyzer_only::dead_empty_source" | "analyzer_only::dead_mismatch_source" => (
                     UnknownCategory::Unclassified,
@@ -161,8 +163,8 @@ fn bounded_comparisons_preserve_numeric_semantics_and_source_validity() {
         ("wrong_membership", ProofStatus::Refuted),
         ("wrong_float_reflexivity", ProofStatus::Refuted),
         ("analyzer_only::missing_custom_body", ProofStatus::Unknown),
-        ("unbounded_contains", ProofStatus::Unknown),
-        ("unbounded_equality", ProofStatus::Unknown),
+        ("unbounded_contains", ProofStatus::Proved),
+        ("unbounded_equality", ProofStatus::Proved),
         ("analyzer_only::dead_empty_source", ProofStatus::Unknown),
         ("analyzer_only::dead_mismatch_source", ProofStatus::Unknown),
     ];

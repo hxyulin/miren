@@ -1206,3 +1206,13 @@ Aggregate capture carriers validate their compiler field and variant metadata. C
 borrow conversion and drop execution. This does not supply an async closure state model, new raw
 rights, mutable slice roots or unbounded loop summaries. The 55-case/20-family shared baseline
 expects 88 PROVED, 80 REFUTED and 52 UNKNOWN outcomes across host/ARM O0/O2.
+
+Stage 147 adds explicitly scoped SMT predicates with lexical free symbols and safe shared printing.
+Its representation foundation changes no Rust consumer or input domain. Stage 148 uses it for
+full-length read-only primitive scalar membership and equality, retaining original source, type,
+lifetime and body-availability checks. Guarded logical observations preserve decoded Char and
+numeric Float equality; they create no raw-access rights. Equal-length differing views and long
+inputs have P/R controls, and missing bodies and retired sources retain their conservative causes.
+The unchanged unrestricted scalar membership and equality functions now prove in all four compiler
+profiles. Byte and finite/custom policies remain distinct. The 58-case/21-family shared baseline
+expects 96 PROVED, 84 REFUTED and 52 UNKNOWN outcomes across host/ARM O0/O2.
