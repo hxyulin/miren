@@ -2335,3 +2335,13 @@ bounds panic and covering valid lengths, UTF-8 and feed controls. Source branch 
 LineReader::NEW preserves len<=80, so this is an audited arbitrary root-input refutation, not a
 confirmed firmware-entry defect. No assumption or application rewrite. Audit:
 `/tmp/miren-stage123-run-audit/audit.md`; raw capture: `/tmp/miren-fleet-pass17-20261009`.
+
+## Fleet publication 18: Preserve outcomes after guarded bit-operation refactor
+
+The complete clean frozen 6d83034 collection retains every pass 17 outcome: 1,120 PROVED,
+257 REFUTED and 959 UNKNOWN, with no assumptions. Source declarations remain 525 PROVED,
+233 REFUTED and 261 UNKNOWN. No proof/refutation regressions, roots added/removed or incompatible
+analysis configurations occur. Stage 124 compiler improvements introduce no observed fleet gain.
+All 243 firmware fingerprints and four artifact checkpoints per unit remain unchanged; export
+repeats byte-for-byte. The audited run bounds witness and separately frozen main evidence remain
+preserved. Raw capture: `/tmp/miren-fleet-pass18-20261009`.

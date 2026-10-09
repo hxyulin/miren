@@ -2,7 +2,7 @@
 
 ## Current repeatable measurement
 
-The seventeenth 2026-10-09 pass collected all 2,336 roots from all 32 ARM library/binary units in
+The eighteenth 2026-10-09 pass collected all 2,336 roots from all 32 ARM library/binary units in
 fleet-2027: 1,120 PROVED, 257 REFUTED and 959 UNKNOWN, with no assumptions. All units completed
 collection. Counts describe selected root domains, not line coverage or whole-firmware safety.
 
@@ -16,7 +16,7 @@ publication from complete raw collections; inventories, solver reports and logs 
 - Firmware revision: `26377371e38ed3234f972bcdf6b2f9f4d26a7f02`;
   all 243 source-input fingerprints stayed equal. The existing untracked `rust-project.json`
   remains.
-- Full-survey analyzer: `b6d154e`, JSON schema 9; clean working tree, frozen binaries.
+- Full-survey analyzer: `6d83034`, JSON schema 9; clean working tree, frozen binaries.
 - Compiler: nightly-2026-09-22; Z3 4.15.4.
 - Target: `thumbv7em-none-eabihf`; dev profile, Cargo default features and locked dependencies.
 - Panic abort, enabled overflow checks and root/dependency MIR optimization zero in all 32 units.
@@ -25,15 +25,16 @@ publication from complete raw collections; inventories, solver reports and logs 
 - No project proof configuration, startup assumptions, trusted contracts, induction
   or native replay.
 
-Compared with the sixteenth pass, Bench::watching moves UNKNOWN to PROVED without assumptions.
-Bounded compiler-certified enum descriptors retain every variant and independent payload symbols.
-run moves UNKNOWN to REFUTED at Line::as_str: the selected Typed::Line has length 88 for an 80-byte
-buffer. The saved query and native O0/O2 controls confirm that bounds panic. LineReader::NEW and
-feed preserve length at most 80, so the witness is outside that constructor history; application
-entry reachability remains unverified. The local audit is `/tmp/miren-stage123-run-audit/audit.md`.
-All previous 1,119 proofs and 256 refutations retain their outcomes. There are no added/removed
-roots, incompatible configurations or resource-limit outcome regressions. Earlier software proofs
-remain intact.
+Compared with the seventeenth pass, all 2,336 root outcomes remain unchanged. This collection
+includes shared core NonZero layout certification, guarded leading-zero counting and unchecked
+left-shift validation; these additions demonstrate compiler-fixture progress without a fleet
+outcome gain. All previous 1,120 proofs and 257 refutations remain intact, with no added/removed
+roots, incompatible configurations or resource-limit outcome regressions.
+
+The audited run refutation remains at Line::as_str: selected Typed::Line length 88 exceeds its
+80-byte buffer. Saved SMT and native O0/O2 controls confirm that panic. LineReader::NEW and feed
+preserve length at most 80, so the witness is outside that constructor history; application entry
+reachability remains unverified. Local audit: `/tmp/miren-stage123-run-audit/audit.md`.
 
 Compiler return-type metadata now separates direct future construction from function bodies:
 
@@ -47,7 +48,7 @@ function bodies and fifteen concern future construction. A function-body label c
 a generated wrapper; it does not imply execution of a wrapped task. Explicit task polling remains
 separate from this function-only collection.
 
-Nineteen source and 455 generated UNKNOWN diagnostics changed only compiler display. Ten source
+Nineteen source and 455 generated UNKNOWN diagnostics changed only compiler display. Four source
 UNKNOWN grouping changes retain UNKNOWN outcomes. Raw diagnostics
 stay separate from display normalization and proof outcomes.
 
@@ -68,7 +69,7 @@ not hermetic capture of arbitrary custom build environment variables.
 
 The separate [all-main evidence](/data/fleet-embassy-main-current.json) covers every one of the
 12 binary mains in three scopes. Its refreshed analyzer is `03e66a2`; the full fleet measurement
-above remains frozen at `b6d154e`. Both use the same captured fleet artifacts and default limits.
+above remains frozen at `6d83034`. Both use the same captured fleet artifacts and default limits.
 Factory construction alone does not
 execute the async body; `--async-entry` constructs a fresh future and follows its reached polls.
 
