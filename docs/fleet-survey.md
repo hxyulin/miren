@@ -2,12 +2,12 @@
 
 ## Current repeatable measurement
 
-The fourth 2026-10-09 pass collected all 2,336 roots from all 32 ARM library/binary units in
-fleet-2027: 1,075 PROVED, 251 REFUTED and 1,010 UNKNOWN, with no assumptions. All units completed
+The fifth 2026-10-09 pass collected all 2,336 roots from all 32 ARM library/binary units in
+fleet-2027: 1,084 PROVED, 251 REFUTED and 1,001 UNKNOWN, with no assumptions. All units completed
 collection. Counts describe selected root domains, not line coverage or whole-firmware safety.
 
-The source-function heuristic identifies 1,019 declarations: 492 PROVED, 227 REFUTED and
-300 UNKNOWN. Refutations concern arbitrary supported root state and remain runtime unconfirmed.
+The source-function heuristic identifies 1,019 declarations: 501 PROVED, 227 REFUTED and
+291 UNKNOWN. Refutations concern arbitrary supported root state and remain runtime unconfirmed.
 
 The [current JSON summary](/data/fleet-survey-current.json) records every root, first blocker,
 compilation unit and input-integrity evidence. The deterministic exporter recreates this compact
@@ -16,7 +16,7 @@ publication from complete raw collections; inventories, solver reports and logs 
 - Firmware revision: `26377371e38ed3234f972bcdf6b2f9f4d26a7f02`;
   all 243 source-input fingerprints stayed equal. The existing untracked `rust-project.json`
   remains.
-- Full-survey analyzer: `d94334c`, JSON schema 9; clean working tree, frozen binaries.
+- Full-survey analyzer: `fe25949`, JSON schema 9; clean working tree, frozen binaries.
 - Compiler: nightly-2026-09-22; Z3 4.15.4.
 - Target: `thumbv7em-none-eabihf`; dev profile, Cargo default features and locked dependencies.
 - Panic abort, enabled overflow checks and root/dependency MIR optimization zero in all 32 units.
@@ -25,16 +25,23 @@ publication from complete raw collections; inventories, solver reports and logs 
 - No project proof configuration, startup assumptions, trusted contracts, induction
   or native replay.
 
-Compared with the third pass, all 12 generated `__embassy_main` registration wrappers now prove.
-They retain the incoming spawner executor reference without inventing executor startup history.
-`rm_c::init` now refutes at the peripheral singleton check under arbitrary valid boolean state.
-All previous 1,063 proofs and 250 refutations retain their outcomes; no roots were added or removed.
-The recorded analysis configurations remain compatible.
+Compared with the fourth pass, nine source functions gained proofs: gimbal-axis and shooter-loader
+constructors on four chassis boards, plus sentry chassis wheels. Eight cleared compiler-layout
+`each_mut` raw subobject addresses; one cleared a concrete trait-reference coercion. All previous
+1,075 proofs and 251 refutations retain their outcomes. No roots were added or removed, and the
+recorded analysis configurations remain compatible.
 
-Foreign Rust calls now execute unique signature-matched compiler exports. Exact Cortex-M interrupt
-assembly preserves arbitrary reads and invalidates shared history; it grants no critical-section
-exclusion. Large zero-sized peripheral shapes and checked uninitialized containers have bounded
-models. Unsupported payload reads, numeric MMIO and device effects remain distinct gaps.
+Another 20 source functions clear their first blocker but remain UNKNOWN: sixteen IRQ functions
+progress beyond the previous enum limit to unsupported RawWaker function pointers or the nesting
+budget; two attitude helpers reach the root time budget; two VMC computations reach solver unknown.
+Nineteen additional diagnostic changes only reflect compiler crate hashes and trait-projection
+ordering. They do not represent newly supported operations.
+
+Concrete trait dispatch now retains compiler-selected implementations at reference coercions.
+Arbitrary trait-object root inputs still have no known implementation. Fieldless enum inputs admit
+up to 256 actual variants, while payload enums keep the 64-variant cap. Checked raw subobjects and
+reference arrays retain allocation, layout, type and disjointness evidence. Volatile scalar reads
+preserve initialized tracked Rust values and float bits; numeric MMIO remains unsupported.
 
 Source, dependency artifacts, origin sidecars and generated build inputs stayed unchanged at every
 recorded checkpoint for every unit. These checks establish input integrity during collection, not
@@ -43,10 +50,9 @@ hermetic capture of arbitrary custom build environment variables.
 ## Progress through Embassy main
 
 The separate [all-main evidence](/data/fleet-embassy-main-current.json) covers every one of the
-12 binary mains in three scopes. Its final analyzer is `7257e00`, including certified core boolean
-cell payloads added after the full survey. It uses the same captured fleet artifacts and default
-limits. Factory construction alone does not execute the async body; `--async-entry` constructs a
-fresh future and follows its reached polls.
+12 binary mains in three scopes. Its final analyzer is `fe25949`, matching the full survey.
+It uses the same captured fleet artifacts and default limits. Factory construction alone does not
+execute the async body; `--async-entry` constructs a fresh future and follows its reached polls.
 
 | Scope | Strict Rust run | Explicit reset-cause hypothesis |
 | --- | --- | --- |
@@ -83,6 +89,12 @@ strict UNKNOWN bodies still require a Rust-supported reset boundary or a separat
 conditional hardware model to progress past numeric MMIO.
 
 ## Earlier repeatable measurements
+
+The fourth 2026-10-09 pass at analyzer `d94334c` collected 2,336 roots: 1,075 PROVED,
+251 REFUTED and 1,010 UNKNOWN. Its source subset had 492 proofs, 227 refutations and 300 unknowns.
+All twelve generated registration wrappers gained proofs, and `rm_c::init` refuted under arbitrary
+singleton state. Separate main captures at `7257e00` included certified core boolean cells and
+reached the conditional milestone under the same eight reset-cause assumptions.
 
 The third 2026-10-09 pass at analyzer `efe9d66` collected 2,336 roots: 1,063 PROVED,
 250 REFUTED and 1,023 UNKNOWN. Its source subset had 492 proofs, 226 refutations and 301 unknowns.

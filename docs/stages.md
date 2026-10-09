@@ -1320,3 +1320,21 @@ including NaNs and signed zero. Numeric, static, punned, projected, offset, dead
 origins remain UNKNOWN. This grants no MMIO validity, synchronization or hardware effects.
 Host/ARM compiler fixtures check positive, refuted and unknown cases with native mutations and
 invalidating effects.
+
+## Stage 86: Fifth fleet measurement and refreshed main evidence
+
+The frozen clean `fe25949` analyzer collects all 2,336 roots in 32 units with no assumptions:
+1,084 PROVED, 251 REFUTED and 1,001 UNKNOWN. The 1,019 source-function heuristic roots comprise
+501 proofs, 227 refutations and 291 unknowns. Nine constructor roots gain proofs; every prior
+proof and refutation is preserved. Twenty source roots clear their first blocker but remain
+UNKNOWN. Compiler diagnostic identity changes are distinguished from substantive progress.
+
+Fresh all-main captures use the same analyzer and default limits. Strict bodies remain four
+REFUTED and eight UNKNOWN; the exact recorded reset-only profile gives twelve REFUTED with
+one trusted reset call on each of eight DM mains. Registration remains twelve PROVED and runtime
+entry twelve REFUTED. Explicit domain and counterexample labels retain unverified boot reachability
+and absent native confirmation. Source and all four artifact checkpoints remain unchanged.
+
+The full implementation passes 446 Rust tests, 41 Python tool tests, formatting, Clippy, release
+builds, dependency checks, documentation builds and manual hooks. Compact exports validate both
+complete captures before publication; fleet application sources remain untouched.
