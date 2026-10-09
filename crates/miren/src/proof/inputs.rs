@@ -179,7 +179,7 @@ impl<'tcx> Engine<'tcx> {
         nodes: &mut usize,
         cache: &mut std::collections::HashMap<Ty<'tcx>, std::rc::Rc<symbolic::input::InputShape>>,
     ) -> Result<Option<std::rc::Rc<symbolic::input::InputShape>>, String> {
-        use symbolic::input::{InputKind, InputShape};
+        use symbolic::input::{InputKind, InputShape, InputVariant};
         if depth >= MAX_INPUT_DEPTH {
             return Ok(None);
         }
@@ -243,6 +243,62 @@ impl<'tcx> Engine<'tcx> {
                     }
                 }
             }
+            ty::Adt(def, args) if def.is_enum() => {
+                let fieldless = def
+                    .variants()
+                    .iter()
+                    .all(|variant| variant.fields.is_empty());
+                let maximum = if fieldless {
+                    aggregates::MAX_FIELDLESS_ENUM_VARIANTS
+                } else {
+                    aggregates::MAX_ENUM_VARIANTS
+                };
+                if def.variants().is_empty() || def.variants().len() > maximum {
+                    return Ok(None);
+                }
+                let Some((bits, signed)) = self.integer_type(ty.discriminant_ty(self.tcx)) else {
+                    return Ok(None);
+                };
+                let mut variants = Vec::new();
+                for (index, variant) in def.variants().iter_enumerated() {
+                    if *nodes >= MAX_INPUT_VALUES {
+                        return Ok(None);
+                    }
+                    *nodes += 1;
+                    let mut fields = Vec::new();
+                    for field in &variant.fields {
+                        if *nodes >= MAX_INPUT_VALUES {
+                            return Ok(None);
+                        }
+                        *nodes += 1;
+                        let field_ty = self
+                            .tcx
+                            .try_normalize_erasing_regions(
+                                ty::TypingEnv::fully_monomorphized(),
+                                field.ty(self.tcx, args),
+                            )
+                            .map_err(|error| {
+                                format!("lazy enum field normalization failed: {error:?}")
+                            })?;
+                        let Some(shape) = self.lazy_shape(field_ty, depth + 2, nodes, cache)?
+                        else {
+                            return Ok(None);
+                        };
+                        fields.push((field.name.as_str().to_owned(), shape));
+                    }
+                    variants.push(InputVariant {
+                        discriminant: def.discriminant_for_variant(self.tcx, index).val,
+                        fields,
+                    });
+                }
+                InputKind::Enum {
+                    name: self.tcx.def_path_str(def.did()),
+                    bits,
+                    signed,
+                    is_option: self.tcx.lang_items().get(LangItem::Option) == Some(def.did()),
+                    variants,
+                }
+            }
             ty::Adt(def, args) if def.is_struct() => {
                 if self
                     .tcx
@@ -295,6 +351,17 @@ impl<'tcx> Engine<'tcx> {
                         .ok_or("lazy input symbol range overflow")
                 })?
             }
+            InputKind::Enum { variants, .. } => {
+                variants.iter().try_fold(1_u32, |sum, variant| {
+                    let sum = sum
+                        .checked_add(1)
+                        .ok_or("lazy input symbol range overflow")?;
+                    variant.fields.iter().try_fold(sum, |sum, (_, field)| {
+                        sum.checked_add(field.slots)
+                            .ok_or("lazy input symbol range overflow")
+                    })
+                })?
+            }
             InputKind::Array { element, count } => element
                 .slots
                 .checked_mul(*count as u32)
@@ -314,6 +381,14 @@ impl<'tcx> Engine<'tcx> {
             InputKind::Struct { fields, .. } => {
                 1 + fields
                     .iter()
+                    .map(|(_, field)| field.height)
+                    .max()
+                    .unwrap_or(0)
+            }
+            InputKind::Enum { variants, .. } => {
+                2 + variants
+                    .iter()
+                    .flat_map(|variant| &variant.fields)
                     .map(|(_, field)| field.height)
                     .max()
                     .unwrap_or(0)

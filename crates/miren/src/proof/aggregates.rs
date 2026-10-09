@@ -4,8 +4,8 @@ use rustc_index::IndexVec;
 const MAX_ARRAY_BYTES: u64 = 128;
 const MAX_ARRAY_ELEMENTS: usize = 16;
 const MAX_INPUT_ELEMENTS: usize = 256;
-const MAX_ENUM_VARIANTS: usize = 64;
-const MAX_FIELDLESS_ENUM_VARIANTS: usize = 256;
+pub(super) const MAX_ENUM_VARIANTS: usize = 64;
+pub(super) const MAX_FIELDLESS_ENUM_VARIANTS: usize = 256;
 
 impl<'tcx> Engine<'tcx> {
     pub(super) fn enum_input(

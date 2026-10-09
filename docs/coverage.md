@@ -426,6 +426,13 @@ cover all primitive integer families, zero, negative values and unwrap failures.
 types, wrappers, pointer/bool niches and an unchecked Some projection remain UNKNOWN. A mutated
 None-branch claim refutes and fails native execution. Missing constructor bodies remain UNKNOWN.
 
+Repeated eligible enum input shapes can share bounded descriptors rather than eagerly expanding
+every array occurrence. Compiler variant identity, field names, exact signed tags and Option
+metadata are retained. Selector mapping covers every actual variant and prevents invalid tags;
+individual variant payloads and array occurrences have independent symbol slots. Direct large enum
+roots use an already reserved variant wrapper slot for the selector, separate from the Boolean
+context seed. Existing budgets and unsupported payload boundaries remain unchanged.
+
 ## Mutable byte regions and valid bounded roots
 
 Fixed byte-view updates permit larger destination allocations when the generated update contains

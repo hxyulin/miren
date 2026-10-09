@@ -2236,3 +2236,43 @@ All 243 firmware input fingerprints and four artifact checkpoints per unit remai
 The exporter repeats byte-for-byte; raw diagnostics remain separate from normalized display
 changes. The separately frozen 03e66a2 main evidence is preserved. Raw capture:
 `/tmp/miren-fleet-pass15-20261009`; deterministic publication compares against pass 13.
+
+## Stage 123: Bounded lazy enum inputs
+
+Lazy input shapes include compiler-certified Freeze enums whose complete payload graph already has
+supported lazy shapes. Tags use a full-domain unsigned selector mapped through exact compiler
+discriminants. Every variant stays possible and no invalid tag is introduced, including sparse
+signed representations. Complete names, ordinal positions, fields and Option metadata remain
+available to the ordinary interpreter. Payload symbols are independent across variants and repeated
+array occurrences; repeated access to one occurrence retains its identity.
+
+Shared enum caps stay at 64 payload or 256 fieldless variants. Descriptor nodes remain bounded by
+512, depth by 16 and reserved symbols by 262144. Every variant reserves its wrapper slot before
+payload slots. The first unused wrapper slot holds the selector, preserving the Boolean root context
+seed even for direct large enum inputs. Unions, references, pointers, interior mutation and
+restricted payload shapes retain eager/UNKNOWN fallback. No entry assumptions, application edits or
+constructor shortcuts.
+
+One binary test checks exact selector/payload symbol ranges and repeat materialization. Two compiler
+tests cover host/ARM O0/O2 positive/refuted/unknown outcomes, direct root enum payloads, signed
+sparse tag reachability, same-occurrence identity, independent occurrences, immutable copies with
+late mutation and refusal/budget controls. Payload/fieldless variant caps remain UNKNOWN past
+64/256, as do reserved-symbol exhaustion and unsupported nested payloads. Changing the actual
+observed Boolean field refutes and fails native execution. All 76 binary and 15 affected compiler
+integration tests pass in the isolated preparation checkout; formatting and Clippy pass.
+
+Pass 14 and completed pass 15 record eight source roots stopped by eager Bench.motors expansion. The
+primary replay is bench::Bench::watching, bench.rs:554, whose body returns only self.watching; its
+call chain contains only that root. Bench source uses plain integer/float/byte-array records, Option
+and driver enums; source inspection finds no unsupported reference, NonZero, raw pointer, union or
+interior payload. Compiler descriptor eligibility and actual fleet outcome still require root-owned
+replay. Other roots can encounter later formatting, alias or solver boundaries.
+
+All 542 Rust workspace tests and 48 Python tests pass. Formatting, Clippy, release builds,
+dependency checks, documentation builds and manual hooks pass. Actual bench::Bench::watching
+now PROVES with its real compiler input shape, executing the method body with no assumptions or
+trusted calls. Dr16, KeyTracker, Can1Bus, nominal_bit_timing and both UI proofs remain intact;
+encode retains its audited bounds refutation. Captures: `/tmp/miren-stage123/replay`.
+All 72 strict/reset main obligation arrays match stage 122 exactly. Twelve isolated runtime
+wrappers retain both startup premises, unfinished weak-CAS retry frontiers and unsupported SEV.
+Captures: `/tmp/miren-stage123-main-{strict,reset}-20261009` and `/tmp/miren-stage123/runtime`.

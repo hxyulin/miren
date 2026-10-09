@@ -9,6 +9,12 @@ pub struct InputShape {
 }
 
 #[derive(Clone, Debug)]
+pub struct InputVariant {
+    pub discriminant: u128,
+    pub fields: Vec<(String, Rc<InputShape>)>,
+}
+
+#[derive(Clone, Debug)]
 pub enum InputKind {
     Bool,
     Integer {
@@ -30,6 +36,13 @@ pub enum InputKind {
     Struct {
         name: String,
         fields: Vec<(String, Rc<InputShape>)>,
+    },
+    Enum {
+        name: String,
+        bits: u32,
+        signed: bool,
+        is_option: bool,
+        variants: Vec<InputVariant>,
     },
     Array {
         element: Rc<InputShape>,
@@ -58,9 +71,10 @@ impl InputValue {
             | InputKind::Unit
             | InputKind::FunctionPointer { .. }
             | InputKind::Bytes { .. } => child.materialize(),
-            InputKind::Tuple(_) | InputKind::Struct { .. } | InputKind::Array { .. } => {
-                Ok(Value::Input(child))
-            }
+            InputKind::Tuple(_)
+            | InputKind::Struct { .. }
+            | InputKind::Enum { .. }
+            | InputKind::Array { .. } => Ok(Value::Input(child)),
         }
     }
 
@@ -132,6 +146,58 @@ impl InputValue {
                     fields: fields.into(),
                 })
             }
+            InputKind::Enum {
+                name,
+                bits,
+                signed,
+                is_option,
+                variants,
+            } => {
+                let tags = variants
+                    .iter()
+                    .map(|variant| super::integer(context, variant.discriminant, *bits, *signed))
+                    .collect::<Vec<_>>();
+                let selector = Value::Int {
+                    // Root descriptors reserve self.start as the Boolean context seed.
+                    // The first variant wrapper's otherwise unused slot holds the selector.
+                    expression: context.symbol(start, Sort::BitVec(*bits))?,
+                    bits: *bits,
+                    signed: false,
+                };
+                let discriminant = super::select_element(context, &tags, &selector)?;
+                let variants = variants
+                    .iter()
+                    .enumerate()
+                    .map(|(position, variant)| {
+                        start = start
+                            .checked_add(1)
+                            .ok_or("lazy input symbol range overflow")?;
+                        let fields = variant
+                            .fields
+                            .iter()
+                            .map(|(name, shape)| {
+                                let value = self.child(shape, start)?;
+                                start = start
+                                    .checked_add(shape.slots)
+                                    .ok_or("lazy input symbol range overflow")?;
+                                Ok((name.clone(), value))
+                            })
+                            .collect::<Result<Vec<_>, String>>()?;
+                        Ok(Value::Adt {
+                            name: name.clone(),
+                            variant: position,
+                            is_option: *is_option,
+                            discriminant: variant.discriminant,
+                            fields: fields.into(),
+                        })
+                    })
+                    .collect::<Result<Vec<_>, String>>()?;
+                Ok(Value::Enum {
+                    discriminant: Box::new(discriminant),
+                    variants,
+                    is_option: *is_option,
+                })
+            }
             InputKind::Array { element, count } => {
                 let elements = (0..*count)
                     .map(|_| {
@@ -155,5 +221,83 @@ impl Value {
             Self::Input(input) => input.materialize(),
             value => Ok(value.clone()),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::symbolic::Context;
+
+    #[test]
+    fn enum_array_occurrences_and_variant_payloads_keep_disjoint_symbols() {
+        let scalar = Rc::new(InputShape {
+            kind: InputKind::Integer {
+                bits: 16,
+                signed: false,
+            },
+            slots: 1,
+            height: 1,
+        });
+        let element = Rc::new(InputShape {
+            kind: InputKind::Enum {
+                name: "Cases".into(),
+                bits: 16,
+                signed: true,
+                is_option: false,
+                variants: vec![
+                    InputVariant {
+                        discriminant: u128::MAX,
+                        fields: vec![("0".into(), scalar.clone())],
+                    },
+                    InputVariant {
+                        discriminant: 300,
+                        fields: vec![("0".into(), scalar)],
+                    },
+                ],
+            },
+            slots: 5,
+            height: 3,
+        });
+        let shape = Rc::new(InputShape {
+            kind: InputKind::Array { element, count: 2 },
+            slots: 11,
+            height: 4,
+        });
+        let context = Context::default();
+        let input = InputValue {
+            shape,
+            start: 0,
+            seed: context.symbol(0, Sort::Bool).unwrap(),
+        };
+        let Value::Elements(elements) = input.materialize().unwrap() else {
+            panic!("expected lazy input array");
+        };
+        let mut identifiers = Vec::new();
+        for element in &elements {
+            let Value::Enum {
+                discriminant,
+                variants,
+                ..
+            } = element.materialize().unwrap()
+            else {
+                panic!("expected lazy enum occurrence");
+            };
+            let selector = discriminant.integer().unwrap().0.symbols();
+            assert_eq!(selector.len(), 1);
+            identifiers.extend(selector);
+            for variant in variants {
+                let Value::Adt { fields, .. } = variant else {
+                    panic!("expected enum payload variant");
+                };
+                identifiers.extend(fields[0].1.integer().unwrap().0.symbols());
+            }
+        }
+        assert_eq!(identifiers, [2, 3, 5, 7, 8, 10]);
+        let mut distinct = identifiers.clone();
+        distinct.sort_unstable();
+        distinct.dedup();
+        assert_eq!(distinct.len(), identifiers.len());
+        assert!(input.materialize().is_ok());
     }
 }

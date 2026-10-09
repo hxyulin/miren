@@ -267,6 +267,13 @@ selects None at zero and supplies Some's payload otherwise; no nonzero assumptio
 Different primitive types, wrappers and pointer niches remain UNKNOWN. A missing constructor body
 stays UNKNOWN, and Some payload access still requires a proven variant check.
 
+Lazy input descriptors include bounded compiler-certified Freeze enums with supported payload
+shapes. A full-domain unsigned selector maps to exact valid compiler tags, including sparse signed
+tags; no enum-validity assumptions are added. Variant payload and array-occurrence symbol ranges
+remain disjoint. The 64 payload / 256 fieldless variant caps, 512 descriptor nodes, depth 16 and
+262144 reserved-symbol slots remain enforced. Reference, pointer, interior, union and restricted
+payloads keep their existing eager or UNKNOWN fallback.
+
 Compiler inventories record whether each function directly returns a coroutine. Fleet surveys
 separate those future-construction roots from function-body roots; explicit async polling remains
 a separate capture. Older inventories without this metadata remain unclassified.
