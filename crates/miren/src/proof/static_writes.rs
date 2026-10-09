@@ -23,7 +23,10 @@ impl<'tcx> Engine<'tcx> {
             Value::RawSlice {
                 source: reference, ..
             }
-            | Value::TrackedPointer { reference, .. } => {
+            | Value::TrackedPointer { reference, .. }
+            | Value::TraitObject {
+                source: reference, ..
+            } => {
                 Self::collect_static_store_references(reference, roots)?;
             }
             Value::Reference { .. } => {

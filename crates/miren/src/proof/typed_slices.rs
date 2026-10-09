@@ -70,6 +70,7 @@ impl<'tcx> Engine<'tcx> {
                 | Value::Tuple(_)
                 | Value::Elements(_)
                 | Value::Uninitialized
+                | Value::TraitObject { .. }
                 | Value::DebugReference { .. }
                 | Value::FunctionPointer { .. }
                 | Value::Function

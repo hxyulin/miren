@@ -114,12 +114,12 @@ pub fn dynamic_formatting_remains_unknown(value: u8) {
     let _ = write!(&mut Sink, "{object:?}");
 }
 
-pub fn display_coercions_remain_unknown(value: u8) {
+pub fn display_coercions_retain_concrete_type(value: u8) {
     let object: &dyn core::fmt::Display = &value;
     let _ = object;
 }
 
-pub fn mutable_debug_coercions_remain_unknown(value: u8) {
+pub fn mutable_debug_coercions_retain_concrete_type(value: u8) {
     let mut local = value;
     let object: &mut dyn Debug = &mut local;
     let _ = object;

@@ -170,6 +170,10 @@ Fieldless enum inputs admit at most 256 compiler-declared variants, including sp
 Payload enums remain limited to 64 variants. Exact discriminant validity constraints and the
 512-value root budget remain active; no undeclared variant becomes an input.
 
+Concrete reference coercions to trait objects retain the compiler type and vtable witness.
+Virtual calls execute the exact resolved implementation with the original storage and permissions.
+Arbitrary trait-object roots, unsupported upcasts and raw/boxed trait objects remain UNKNOWN.
+
 The [coverage guide](../../docs/coverage.md) is the maintained feature reference. The
 [proof guide](../../docs/proofs.md) explains the encoding and limitations, and the
 [development guide](../../docs/development.md) lists required checks.

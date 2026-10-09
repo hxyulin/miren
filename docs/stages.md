@@ -1294,3 +1294,11 @@ and negative discriminants. Exact validity constraints preserve the allowed vari
 Payload enums retain the 64-variant cap and all enums retain the 512-value root budget.
 Host/ARM debug/optimized fixtures cover valid ranges, refuted bounds, native guard mutations,
 256/257 boundaries, oversized payload enums and exhausted multi-argument budgets.
+
+## Stage 83: concrete compiler trait-object dispatch
+
+Concrete reference unsizing retains a compiler-certified type/vtable witness. Exact Virtual
+method slots resolve to the actual implementation, preserving reference permissions, mutation,
+liveness and effects. Arbitrary dyn roots remain UNKNOWN rather than enumerating implementations.
+Host/ARM debug/optimized tests cover associated types, inherited slots, mutable updates, native
+implementation mutations, rejected forged coercions and dead/frame-escaping backing.

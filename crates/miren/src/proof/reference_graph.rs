@@ -73,6 +73,7 @@ impl<'tcx> Engine<'tcx> {
             Value::RawSlice { source, .. }
             | Value::SliceIterator { source, .. }
             | Value::MetadataPointer(source)
+            | Value::TraitObject { source, .. }
             | Value::DebugReference { source, .. } => {
                 Self::validate_reference_graph(source, state, incoming, visited)
             }
@@ -169,6 +170,25 @@ mod tests {
             assert!(error.contains("frame-owned"));
             Engine::validate_reference_graph(value, &live, Some(1), &mut Vec::new()).unwrap();
         }
+    }
+
+    #[test]
+    fn trait_objects_retain_dead_and_frame_owned_reference_checks() {
+        let object = Value::TraitObject {
+            source: Box::new(reference(0, true)),
+            id: 0,
+            place: false,
+        };
+        let dead = state(vec![None]);
+        let live = state(vec![Some(Value::Unit)]);
+        let error =
+            Engine::validate_reference_graph(&object, &dead, None, &mut Vec::new()).unwrap_err();
+        assert!(error.contains("dead or uninitialized"));
+        let error =
+            Engine::validate_reference_graph(&object, &live, Some(0), &mut Vec::new()).unwrap_err();
+        assert!(error.contains("frame-owned"));
+        Engine::validate_reference_graph(&object, &live, Some(1), &mut Vec::new()).unwrap();
+        assert!(object.contains_mutable());
     }
 
     #[test]

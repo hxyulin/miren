@@ -131,6 +131,9 @@ impl Engine<'_> {
                 source: reference, ..
             }
             | Value::MetadataPointer(reference)
+            | Value::TraitObject {
+                source: reference, ..
+            }
             | Value::DebugReference {
                 source: reference, ..
             } => self.validate_static_initialization_graph(reference, state, visited),

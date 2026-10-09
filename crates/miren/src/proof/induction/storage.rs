@@ -135,6 +135,7 @@ impl<'tcx> Engine<'tcx> {
             | Value::StaticSlice { .. }
             | Value::StaticView { .. }
             | Value::Uninitialized
+            | Value::TraitObject { .. }
             | Value::DebugReference { .. }
             | Value::FunctionPointer { .. }
             | Value::Function) => {
@@ -382,6 +383,7 @@ impl<'tcx> Engine<'tcx> {
                         | Value::StaticSlice { .. }
                         | Value::StaticView { .. }
                         | Value::Uninitialized
+                        | Value::TraitObject { .. }
                         | Value::DebugReference { .. }
                         | Value::FunctionPointer { .. }
                         | Value::Function
@@ -590,6 +592,7 @@ pub(super) fn same_shape(expected: Option<&Value>, actual: Option<&Value>) -> Re
             | Value::StaticSlice { .. }
             | Value::StaticView { .. }
             | Value::Uninitialized
+            | Value::TraitObject { .. }
             | Value::DebugReference { .. }
             | Value::FunctionPointer { .. }
             | Value::Function
@@ -649,6 +652,7 @@ pub(super) fn static_projection(value: Value, part: &MemoryProjection) -> Result
             | Value::StaticSlice { .. }
             | Value::StaticView { .. }
             | Value::Uninitialized
+            | Value::TraitObject { .. }
             | Value::DebugReference { .. }
             | Value::FunctionPointer { .. }
             | Value::Function

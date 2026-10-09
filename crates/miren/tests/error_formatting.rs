@@ -137,14 +137,17 @@ fn result_failure_paths_refute_and_opaque_debug_references_preserve_their_bounda
             ProofStatus::Refuted,
         ),
         ("dynamic_formatting_remains_unknown", ProofStatus::Unknown),
-        ("display_coercions_remain_unknown", ProofStatus::Unknown),
         (
-            "mutable_debug_coercions_remain_unknown",
-            ProofStatus::Unknown,
+            "display_coercions_retain_concrete_type",
+            ProofStatus::Proved,
+        ),
+        (
+            "mutable_debug_coercions_retain_concrete_type",
+            ProofStatus::Proved,
         ),
         (
             "similarly_named_traits_are_not_core_debug",
-            ProofStatus::Unknown,
+            ProofStatus::Proved,
         ),
         (
             "similarly_named_helpers_are_not_panic_boundaries",

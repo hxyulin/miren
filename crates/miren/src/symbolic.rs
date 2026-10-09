@@ -102,6 +102,11 @@ pub enum Value {
     Tuple(Vec<Value>),
     Elements(Vec<Value>),
     MetadataPointer(Box<Value>),
+    TraitObject {
+        source: Box<Value>,
+        id: usize,
+        place: bool,
+    },
     DebugReference {
         source: Box<Value>,
         place: bool,
@@ -161,6 +166,7 @@ impl Value {
             | Self::StaticSlice { .. }
             | Self::StaticView { .. }
             | Self::Uninitialized
+            | Self::TraitObject { .. }
             | Self::DebugReference { .. }
             | Self::FunctionPointer { .. }
             | Self::Function => None,
@@ -211,6 +217,7 @@ impl Value {
             | Self::StaticSlice { .. }
             | Self::StaticView { .. }
             | Self::Uninitialized
+            | Self::TraitObject { .. }
             | Self::DebugReference { .. }
             | Self::FunctionPointer { .. }
             | Self::Function => None,
@@ -247,7 +254,9 @@ impl Value {
             | Self::FunctionPointer { .. }
             | Self::Function
             | Self::Unit => false,
-            Self::DebugReference { source, .. } => source.contains_mutable(),
+            Self::TraitObject { source, .. } | Self::DebugReference { source, .. } => {
+                source.contains_mutable()
+            }
             Self::TrackedPointer { reference, .. } => reference.contains_mutable(),
             Self::RawSlice { source, .. } => source.contains_mutable(),
         }
@@ -264,6 +273,7 @@ impl Value {
             }
             Self::SliceIterator { source, .. }
             | Self::MetadataPointer(source)
+            | Self::TraitObject { source, .. }
             | Self::DebugReference { source, .. } => source.contains_local_atomic(),
             Self::TrackedPointer { reference, .. } => reference.contains_local_atomic(),
             Self::RawSlice { source, .. } => source.contains_local_atomic(),

@@ -717,3 +717,7 @@ Certified bool payloads inside core UnsafeCell, including `Cell<bool>`, use the 
 model. A bounded compiler struct/tuple field path must match the exact declared storage type and
 byte offset. Unions and MaybeUninit paths remain unsupported; reads grant no initialization,
 startup, exclusion or stable shared-state evidence.
+
+Concrete trait-object unsizing preserves a compiler Unsize certificate and exact vtable slot.
+Actual method bodies execute with retained storage, mutations and lifetimes. Arbitrary dyn roots
+remain UNKNOWN; the analyzer does not infer a closed set of implementations from the workspace.

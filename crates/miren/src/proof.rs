@@ -59,6 +59,7 @@ mod storage_locations;
 use startup::AtomicStorage;
 use startup_memory::Memory;
 mod tracked_pointers;
+mod trait_objects;
 mod typed_slices;
 mod zero_sized_inputs;
 mod zeroed_storage;
@@ -109,6 +110,7 @@ struct Engine<'tcx> {
     steps: usize,
     call_chain: Vec<DefId>,
     failed_call_chain: Option<Vec<DefId>>,
+    trait_objects: Vec<trait_objects::TraitObject<'tcx>>,
     input_depth: usize,
     input_values: usize,
     input_shapes: std::collections::HashMap<Ty<'tcx>, std::rc::Rc<symbolic::input::InputShape>>,
@@ -169,6 +171,7 @@ pub fn verify(
         steps: 0,
         call_chain: Vec::new(),
         failed_call_chain: None,
+        trait_objects: Vec::new(),
         input_depth: 0,
         input_values: 0,
         input_shapes: std::collections::HashMap::new(),
@@ -445,6 +448,7 @@ impl<'tcx> Engine<'tcx> {
             | Value::StaticSlice { .. }
             | Value::StaticView { .. }
             | Value::Uninitialized
+            | Value::TraitObject { .. }
             | Value::DebugReference { .. }
             | Value::FunctionPointer { .. }
             | Value::Function => {
@@ -1172,6 +1176,7 @@ impl<'tcx> Engine<'tcx> {
                     } else {
                         instance
                     };
+                    let instance = self.resolve_trait_object_call(instance, &mut values, &state)?;
                     let callee = instance.def_id();
                     if let Some(results) = self.trusted_call(
                         instance,
@@ -1451,6 +1456,18 @@ impl<'tcx> Engine<'tcx> {
                 source,
                 place: true,
             },
+            (
+                ProjectionElem::Deref,
+                Value::TraitObject {
+                    source,
+                    id,
+                    place: false,
+                },
+            ) => Value::TraitObject {
+                source,
+                id,
+                place: true,
+            },
             (ProjectionElem::Deref, value @ Value::RawSlice { .. }) => {
                 self.raw_slice_bytes(&value, state)?
             }
@@ -1588,6 +1605,9 @@ impl<'tcx> Engine<'tcx> {
                 }
                 if matches!(value, Value::DebugReference { place: true, .. }) {
                     return Err("opaque Debug payload reads remain unsupported".into());
+                }
+                if matches!(value, Value::TraitObject { place: true, .. }) {
+                    return Err("owned unsized trait payload reads remain unsupported".into());
                 }
                 self.static_view_operand(value, state)
             }
@@ -2021,6 +2041,17 @@ impl<'tcx> Engine<'tcx> {
                         operand.ty(&body.local_decls, self.tcx),
                         *target,
                     );
+                }
+                let value = self.operand(id, body, state, operand)?;
+                if let Some(value) = self.trait_object_coercion(
+                    *kind,
+                    operand.ty(&body.local_decls, self.tcx),
+                    *target,
+                    value,
+                    state,
+                )? {
+                    self.record_model(id, "concrete compiler vtable dispatch");
+                    return Ok(value);
                 }
                 let ty::Ref(_, element, mutability) = target.kind() else {
                     return Err("unsupported pointer coercion".to_owned());

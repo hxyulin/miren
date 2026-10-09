@@ -263,6 +263,7 @@ impl<'tcx> Engine<'tcx> {
             | Value::StaticSlice { .. }
             | Value::StaticView { .. }
             | Value::Uninitialized
+            | Value::TraitObject { .. }
             | Value::DebugReference { .. }
             | Value::FunctionPointer { .. }
             | Value::Function

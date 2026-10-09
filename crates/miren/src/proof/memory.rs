@@ -91,7 +91,7 @@ impl<'tcx> Engine<'tcx> {
                 ) if (*width, *sign) == (*bits, *signed) => Ok(value.clone()),
                 _ => Err("local atomic snapshot points to unavailable backing".into()),
             },
-            Value::DebugReference { source, .. } => {
+            Value::TraitObject { source, .. } | Value::DebugReference { source, .. } => {
                 self.snapshot(source, memory, conditions, depth + 1)?;
                 Ok(value.clone())
             }
@@ -334,7 +334,7 @@ impl<'tcx> Engine<'tcx> {
         }
     }
 
-    fn memory_bounds(
+    pub(super) fn memory_bounds(
         &self,
         index: &Value,
         length: &Value,
@@ -482,6 +482,14 @@ impl<'tcx> Engine<'tcx> {
         mutable: bool,
     ) -> Result<Value, String> {
         let value = self.place(state, place)?;
+        if let Value::TraitObject {
+            source,
+            id,
+            place: true,
+        } = &value
+        {
+            return self.borrow_trait_object(source, *id, mutable, state);
+        }
         if let Value::DebugReference {
             source,
             place: true,
@@ -834,6 +842,7 @@ impl<'tcx> Engine<'tcx> {
             Value::Reference { .. }
                 | Value::RawSlice { .. }
                 | Value::TrackedPointer { .. }
+                | Value::TraitObject { .. }
                 | Value::DebugReference { .. }
         ) {
             self.validate_static_initialization_graph(&value, state, &mut Vec::new())?;
@@ -844,10 +853,14 @@ impl<'tcx> Engine<'tcx> {
                 Ok(value)
             }
             Value::StaticView { .. } => self.static_view_operand(value, state),
+            Value::TraitObject { place: true, .. } => {
+                Err("trait-object payload cannot escape as an owned value".into())
+            }
             Value::DebugReference { place: true, .. } => {
                 Err("opaque Debug data cannot escape as an owned value".into())
             }
             Value::RawSlice { .. }
+            | Value::TraitObject { place: false, .. }
             | Value::DebugReference { place: false, .. }
             | Value::TrackedPointer { .. } => {
                 Self::validate_reference_graph(&value, state, Some(incoming), &mut Vec::new())?;
