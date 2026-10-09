@@ -1467,3 +1467,12 @@ and twelve conditional refutations under the byte-exact eight-call reset-only po
 All 464 Rust tests, 44 Python tool tests, formatting, Clippy, release builds, dependency checks,
 documentation builds and manual hooks pass. Both compact exporters validate the complete captures
 before publication. Fleet application code remains untouched.
+
+## Stage 99: Shared constructor evidence validation
+
+Both conservative constructor languages share body availability, monomorphized MIR loading,
+128-block/512-local caps, constant return binding and certificate finalization. The scalar transmute
+flow matcher is shared while U32 carrier and exact `Atomic<usize>` identity/layout policies remain
+separate. Argument origin admission, context caches and language acceptance stay in their callers.
+Focused host/ARM regressions pass; frozen/refactored fixture metadata and certificates are byte
+identical. This removes duplicate checks without introducing new construction grants.

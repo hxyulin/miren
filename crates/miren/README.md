@@ -229,3 +229,7 @@ Core unchecked slice iterator access requires retained live backing and proven i
 Mutable access also records distinct issued indices and rejects later conflicting ordinary access.
 Bare value snapshots do not grant unchecked liveness; unsupported backing and uncertain bounds
 remain UNKNOWN. This is a bounded adapter model, not a general raw-pointer interpreter.
+
+Constructor evidence uses shared compiler-body validation, return-type binding and certificate
+finalization. Scalar-only and closed aggregate checking retain separate argument/cache policies;
+U32 carriers and exact `Atomic<usize>` constructors retain their separate layout requirements.

@@ -137,6 +137,73 @@ fn identity(tcx: TyCtxt<'_>, instance: ty::Instance<'_>) -> String {
     identity
 }
 
+// Both construction languages bind exactly the same compiler body and limits. Their
+// parameter policies and cache ordering stay in the callers.
+fn construction_body<'tcx>(tcx: TyCtxt<'tcx>, instance: ty::Instance<'tcx>) -> Option<Body<'tcx>> {
+    let id = instance.def_id();
+    // Local trait declarations have a DefId but no body. Check actual body availability
+    // before requesting MIR for local or dependency declarations.
+    if !tcx.is_mir_available(id)
+        || !id.is_local()
+            && !matches!(
+                tcx.def_kind(id),
+                DefKind::Fn
+                    | DefKind::AssocFn
+                    | DefKind::Const
+                    | DefKind::AssocConst
+                    | DefKind::AnonConst
+            )
+        || tcx.intrinsic(id).is_some()
+        || !matches!(instance.def, ty::InstanceKind::Item(_))
+    {
+        return None;
+    }
+    let body = instance
+        .try_instantiate_mir_and_normalize_erasing_regions(
+            tcx,
+            ty::TypingEnv::fully_monomorphized(),
+            ty::EarlyBinder::bind(tcx, tcx.mir_for_ctfe(id).clone()),
+        )
+        .ok()?;
+    (body.basic_blocks.len() <= 128 && body.local_decls.len() <= 512).then_some(body)
+}
+
+fn check_constant_return_type<'tcx>(
+    tcx: TyCtxt<'tcx>,
+    instance: ty::Instance<'tcx>,
+    body: &Body<'tcx>,
+) -> Option<()> {
+    let id = instance.def_id();
+    if matches!(
+        tcx.def_kind(id),
+        DefKind::Const | DefKind::AssocConst | DefKind::AnonConst
+    ) && normalized_constructor_type(tcx, tcx.type_of(id).instantiate(tcx, instance.args))?
+        != body.return_ty()
+    {
+        return None;
+    }
+    Some(())
+}
+
+fn finish_construction<'tcx>(
+    instance: ty::Instance<'tcx>,
+    definition: String,
+    body: &Body<'_>,
+    kind: OriginKind,
+    calls: Vec<String>,
+    active: &mut HashSet<ty::Instance<'tcx>>,
+    construction: &mut Vec<Construction>,
+) -> OriginKind {
+    construction.push(Construction {
+        definition,
+        kind,
+        mir_sha256: digest(format!("{body:?}").as_bytes()),
+        calls,
+    });
+    active.remove(&instance);
+    kind
+}
+
 fn check_construction<'tcx>(
     tcx: TyCtxt<'tcx>,
     instance: ty::Instance<'tcx>,
@@ -150,59 +217,19 @@ fn check_construction<'tcx>(
     if active.len() + construction.len() >= 64 || !active.insert(instance) {
         return None;
     }
+    let body = construction_body(tcx, instance)?;
     let id = instance.def_id();
-    // Local trait declarations have a DefId but no body. The compiler availability query
-    // checks actual local body owners before any mir_for_ctfe request.
-    if !tcx.is_mir_available(id) {
-        return None;
-    }
-    if !id.is_local()
-        && !matches!(
-            tcx.def_kind(id),
-            DefKind::Fn
-                | DefKind::AssocFn
-                | DefKind::Const
-                | DefKind::AssocConst
-                | DefKind::AnonConst
-        )
-    {
-        return None;
-    }
-    if tcx.intrinsic(id).is_some() || !matches!(instance.def, ty::InstanceKind::Item(_)) {
-        return None;
-    }
-    let body = instance
-        .try_instantiate_mir_and_normalize_erasing_regions(
-            tcx,
-            ty::TypingEnv::fully_monomorphized(),
-            ty::EarlyBinder::bind(tcx, tcx.mir_for_ctfe(id).clone()),
-        )
-        .ok()?;
-    if body.basic_blocks.len() > 128 || body.local_decls.len() > 512 {
-        return None;
-    }
-    if matches!(
-        tcx.def_kind(id),
-        DefKind::Const | DefKind::AssocConst | DefKind::AnonConst
-    ) && tcx
-        .try_normalize_erasing_regions(
-            ty::TypingEnv::fully_monomorphized(),
-            tcx.type_of(id).instantiate(tcx, instance.args),
-        )
-        .ok()?
-        != body.return_ty()
-    {
-        return None;
-    }
+    check_constant_return_type(tcx, instance, &body)?;
     if uninitialized_constructor(tcx, id, &body) || cell_constructor(tcx, id, &body) {
-        construction.push(Construction {
-            definition: key,
-            kind: OriginKind::Declared,
-            mir_sha256: digest(format!("{body:?}").as_bytes()),
-            calls: Vec::new(),
-        });
-        active.remove(&instance);
-        return Some(OriginKind::Declared);
+        return Some(finish_construction(
+            instance,
+            key,
+            &body,
+            OriginKind::Declared,
+            Vec::new(),
+            active,
+            construction,
+        ));
     }
     // Parameters carry only scalar values; aggregate arguments could hide an earlier origin.
     if body.args_iter().any(|local| {
@@ -214,14 +241,15 @@ fn check_construction<'tcx>(
         return None;
     }
     if primitive_transmute(tcx, &body) {
-        construction.push(Construction {
-            definition: key,
-            kind: OriginKind::U32,
-            mir_sha256: digest(format!("{body:?}").as_bytes()),
-            calls: Vec::new(),
-        });
-        active.remove(&instance);
-        return Some(OriginKind::U32);
+        return Some(finish_construction(
+            instance,
+            key,
+            &body,
+            OriginKind::U32,
+            Vec::new(),
+            active,
+            construction,
+        ));
     }
     let mut checker = ConstructionChecker {
         tcx,
@@ -271,14 +299,15 @@ fn check_construction<'tcx>(
         return None;
     }
     let kind = kind?;
-    active.remove(&instance);
-    construction.push(Construction {
-        definition: key,
+    Some(finish_construction(
+        instance,
+        key,
+        &body,
         kind,
-        mir_sha256: digest(format!("{body:?}").as_bytes()),
         calls,
-    });
-    Some(kind)
+        active,
+        construction,
+    ))
 }
 
 fn uninitialized_constructor<'tcx>(
@@ -449,58 +478,7 @@ fn cell_constructor<'tcx>(
 }
 
 fn primitive_transmute<'tcx>(tcx: TyCtxt<'tcx>, body: &Body<'tcx>) -> bool {
-    if body.arg_count != 1
-        || body.basic_blocks.len() != 1
-        || body.local_decls[Local::from_usize(1)].ty != tcx.types.u32
-    {
-        return false;
-    }
-    let block = &body.basic_blocks[START_BLOCK];
-    if !matches!(block.terminator().kind, TerminatorKind::Return) {
-        return false;
-    }
-    let mut derived = vec![false; body.local_decls.len()];
-    derived[1] = true;
-    let mut target = None;
-    for statement in &block.statements {
-        match &statement.kind {
-            StatementKind::StorageLive(_)
-            | StatementKind::StorageDead(_)
-            | StatementKind::Nop
-            | StatementKind::ConstEvalCounter => {}
-            StatementKind::Assign(assignment) => {
-                let (destination, value) = assignment.as_ref();
-                if !destination.projection.is_empty() {
-                    return false;
-                }
-                match value {
-                    Rvalue::Use(Operand::Move(source) | Operand::Copy(source), _)
-                        if source.projection.is_empty()
-                            && derived[source.local.as_usize()]
-                            && body.local_decls[destination.local].ty == tcx.types.u32 =>
-                    {
-                        derived[destination.local.as_usize()] = true;
-                    }
-                    Rvalue::Cast(
-                        CastKind::Transmute,
-                        Operand::Move(source) | Operand::Copy(source),
-                        ty,
-                    ) if destination.local == RETURN_PLACE
-                        && source.projection.is_empty()
-                        && derived[source.local.as_usize()]
-                        && *ty == body.return_ty() =>
-                    {
-                        if target.replace(*ty).is_some() {
-                            return false;
-                        }
-                    }
-                    _ => return false,
-                }
-            }
-            _ => return false,
-        }
-    }
-    let Some(target) = target else {
+    let Some(target) = scalar_transmute_target(body, tcx.types.u32) else {
         return false;
     };
     if matches!(target.kind(), ty::Adt(def, _) if def.is_union()) {
@@ -514,6 +492,64 @@ fn primitive_transmute<'tcx>(tcx: TyCtxt<'tcx>, body: &Body<'tcx>) -> bool {
         return false;
     };
     source_layout.size == target_layout.size && source_layout.align.abi <= target_layout.align.abi
+}
+
+fn scalar_transmute_target<'tcx>(
+    body: &Body<'tcx>,
+    source_ty: ty::Ty<'tcx>,
+) -> Option<ty::Ty<'tcx>> {
+    if body.arg_count != 1
+        || body.basic_blocks.len() != 1
+        || body.local_decls[Local::from_usize(1)].ty != source_ty
+    {
+        return None;
+    }
+    let block = &body.basic_blocks[START_BLOCK];
+    if !matches!(block.terminator().kind, TerminatorKind::Return) {
+        return None;
+    }
+    let mut derived = vec![false; body.local_decls.len()];
+    derived[1] = true;
+    let mut target = None;
+    for statement in &block.statements {
+        match &statement.kind {
+            StatementKind::StorageLive(_)
+            | StatementKind::StorageDead(_)
+            | StatementKind::Nop
+            | StatementKind::ConstEvalCounter => {}
+            StatementKind::Assign(assignment) => {
+                let (destination, value) = assignment.as_ref();
+                if !destination.projection.is_empty() {
+                    return None;
+                }
+                match value {
+                    Rvalue::Use(Operand::Move(source) | Operand::Copy(source), _)
+                        if source.projection.is_empty()
+                            && derived[source.local.as_usize()]
+                            && body.local_decls[destination.local].ty == source_ty =>
+                    {
+                        derived[destination.local.as_usize()] = true;
+                    }
+                    Rvalue::Cast(
+                        CastKind::Transmute,
+                        Operand::Move(source) | Operand::Copy(source),
+                        ty,
+                    ) if destination.local == RETURN_PLACE
+                        && source.projection.is_empty()
+                        && derived[source.local.as_usize()]
+                        && *ty == body.return_ty() =>
+                    {
+                        if target.replace(*ty).is_some() {
+                            return None;
+                        }
+                    }
+                    _ => return None,
+                }
+            }
+            _ => return None,
+        }
+    }
+    target
 }
 
 struct ConstructionChecker<'a, 'tcx> {
@@ -683,34 +719,9 @@ fn check_closed_construction<'tcx>(
     active: &mut HashSet<ty::Instance<'tcx>>,
     construction: &mut Vec<Construction>,
 ) -> Option<OriginKind> {
+    let body = construction_body(tcx, instance)?;
     let id = instance.def_id();
-    if !tcx.is_mir_available(id) {
-        return None;
-    }
-    if tcx.intrinsic(id).is_some()
-        || !matches!(instance.def, ty::InstanceKind::Item(_))
-        || !id.is_local()
-            && !matches!(
-                tcx.def_kind(id),
-                DefKind::Fn
-                    | DefKind::AssocFn
-                    | DefKind::Const
-                    | DefKind::AssocConst
-                    | DefKind::AnonConst
-            )
-    {
-        return None;
-    }
-    let body = instance
-        .try_instantiate_mir_and_normalize_erasing_regions(
-            tcx,
-            ty::TypingEnv::fully_monomorphized(),
-            ty::EarlyBinder::bind(tcx, tcx.mir_for_ctfe(id).clone()),
-        )
-        .ok()?;
-    if body.basic_blocks.len() > 128
-        || body.local_decls.len() > 512
-        || body.arg_count != arguments.len()
+    if body.arg_count != arguments.len()
         || body
             .args_iter()
             .any(|local| !constructor_type(body.local_decls[local].ty))
@@ -720,14 +731,7 @@ fn check_closed_construction<'tcx>(
     for (local, argument) in body.args_iter().zip(arguments) {
         declared_constructor_origin(tcx, body.local_decls[local].ty, *argument)?;
     }
-    if matches!(
-        tcx.def_kind(id),
-        DefKind::Const | DefKind::AssocConst | DefKind::AnonConst
-    ) && normalized_constructor_type(tcx, tcx.type_of(id).instantiate(tcx, instance.args))?
-        != body.return_ty()
-    {
-        return None;
-    }
+    check_constant_return_type(tcx, instance, &body)?;
     if matches!(tcx.def_kind(id), DefKind::Fn | DefKind::AssocFn) {
         let signature = tcx.fn_sig(id).instantiate(tcx, instance.args).skip_binder();
         if signature.c_variadic()
@@ -774,14 +778,15 @@ fn check_closed_construction<'tcx>(
         }
         checker.run()?
     };
-    active.remove(&instance);
-    construction.push(Construction {
-        definition: key,
+    Some(finish_construction(
+        instance,
+        key,
+        &body,
         kind,
-        mir_sha256: digest(format!("{body:?}").as_bytes()),
         calls,
-    });
-    Some(kind)
+        active,
+        construction,
+    ))
 }
 
 // Unlike the general U32 carrier recognizer, this certifies only core's typed Atomic<usize>
@@ -806,49 +811,8 @@ fn atomic_usize_constructor<'tcx>(
     {
         return false;
     }
-    let block = &body.basic_blocks[START_BLOCK];
-    if !matches!(block.terminator().kind, TerminatorKind::Return) {
+    if scalar_transmute_target(body, tcx.types.usize) != Some(body.return_ty()) {
         return false;
-    }
-    let mut derived = vec![false; body.local_decls.len()];
-    derived[1] = true;
-    let mut returned = false;
-    for statement in &block.statements {
-        match &statement.kind {
-            StatementKind::StorageLive(_)
-            | StatementKind::StorageDead(_)
-            | StatementKind::Nop
-            | StatementKind::ConstEvalCounter => {}
-            StatementKind::Assign(assignment) => {
-                let (destination, value) = assignment.as_ref();
-                if !destination.projection.is_empty() {
-                    return false;
-                }
-                match value {
-                    Rvalue::Use(Operand::Move(source) | Operand::Copy(source), _)
-                        if source.projection.is_empty()
-                            && derived[source.local.as_usize()]
-                            && body.local_decls[destination.local].ty == tcx.types.usize =>
-                    {
-                        derived[destination.local.as_usize()] = true;
-                    }
-                    Rvalue::Cast(
-                        CastKind::Transmute,
-                        Operand::Move(source) | Operand::Copy(source),
-                        target,
-                    ) if destination.local == RETURN_PLACE
-                        && source.projection.is_empty()
-                        && derived[source.local.as_usize()]
-                        && *target == body.return_ty()
-                        && !returned =>
-                    {
-                        returned = true;
-                    }
-                    _ => return false,
-                }
-            }
-            _ => return false,
-        }
     }
     let env = ty::TypingEnv::fully_monomorphized();
     let Ok(source) = tcx.layout_of(env.as_query_input(tcx.types.usize)) else {
@@ -857,7 +821,7 @@ fn atomic_usize_constructor<'tcx>(
     let Ok(target) = tcx.layout_of(env.as_query_input(body.return_ty())) else {
         return false;
     };
-    returned && source.size == target.size && source.align.abi == target.align.abi
+    source.size == target.size && source.align.abi == target.align.abi
 }
 
 fn closed_identity(
