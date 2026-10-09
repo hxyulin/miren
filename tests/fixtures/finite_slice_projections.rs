@@ -222,6 +222,8 @@ mod native {
         empty_at_end();
         constrained_symbolic_length(2);
         symbolic_scalar_offset(1);
+        ambiguous_tuple_offset(0);
+        ambiguous_tuple_offset(1);
         callback_order();
         bounded_large_backing(&mut [0; 129]);
     }

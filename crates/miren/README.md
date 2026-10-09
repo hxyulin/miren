@@ -524,8 +524,8 @@ gaps by category and exact reason, preserving all root names. Saved coverage gap
 absent optional category. Existing schema version and safety statuses are unchanged.
 
 The Rust capability baseline is independent of fleet and hardware contracts. Run
-`cargo test --locked -p miren --test rust_capabilities`; its shared manifest selects 26 cases across
-13 families on host/ARM at O0/O2, with positive/refuted/unknown and actual source-mutation controls.
+`cargo test --locked -p miren --test rust_capabilities`; its shared manifest selects 29 cases across
+14 families on host/ARM at O0/O2, with positive/refuted/unknown and actual source-mutation controls.
 The standalone [survey](../../tools/rust_capability_survey.py) retains full reports and provenance.
 See [the Rust roadmap](../../docs/rust-capabilities.md) for scope and intended model boundaries.
 Portable-atomic/static-cell integration fixtures use pristine versioned sources under
@@ -537,3 +537,20 @@ only when existing path conditions prove its operand nonzero. A feasible zero op
 unfinished nonzero proof remains UNKNOWN; the model adds no nonzero premise. Safe
 `NonZero::trailing_zeros` follows its actual core body, preserving primitive width, signedness
 and the exact `u32` count. Local lookalike functions execute their bodies rather than this model.
+
+Fixed arrays support bounded symbolic selection of primitive tuple values, including nested bool,
+integer, float and unit fields. Every field follows the same index, preserving correlations after
+existing bounds proofs. Selection validates exact leaf shapes, widths, sorts and term contexts,
+with a 16-level and 512-node budget. Retained references, identity-bearing values, ADTs and symbolic
+composite writes remain outside this capability. Existing incoming shared-reference snapshots may
+already contain primitive values; selecting those values restores no reference identity, liveness
+or access rights. Float selection preserves available raw bits, including signed zero and NaNs.
+
+The same value-selection domain handles bounded tuple reads through checked finite slice
+snapshots. A symbolic offset can select correlated values after the region is proved in bounds.
+Symbolic composite writes still require a uniquely determined location and report a Semantics
+UNKNOWN otherwise; read support does not grant additional write or reference rights.
+
+The conditional tuple domain does not replace existing unique-index or singleton selection
+of retained handles. Those paths keep their prior behavior; only pure values obtain new
+conditional field selections.

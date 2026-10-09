@@ -997,7 +997,10 @@ impl<'tcx> Engine<'tcx> {
                         return self.write_projection(element, rest, value, conditions);
                     }
                 }
-                Err("array write index is not uniquely determined".to_owned())
+                Err(self.categorized_error(
+                    UnknownCategory::Semantics,
+                    "array write index is not uniquely determined".into(),
+                ))
             }
             (MemoryProjection::Index(index), Value::Bytes { data, .. }) if rest.is_empty() => {
                 let (expression, width, signed) = value.integer()?;

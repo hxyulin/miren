@@ -5,6 +5,7 @@ mod floating;
 pub mod input;
 #[cfg(test)]
 mod tests;
+mod tuple_choices;
 pub use adt_fields::AdtFields;
 pub use elements::Elements;
 pub use floating::{float, float_cast, float_from_bits, float_negate};
@@ -644,6 +645,9 @@ pub fn select_element(
     elements: &[Value],
     index: &Value,
 ) -> Result<Value, String> {
+    if let Some(value) = tuple_choices::tuple_choice(context, elements, index)? {
+        return Ok(value);
+    }
     if let Some(value) = fieldless_choices::fieldless_enum_choice(context, elements, index)? {
         return Ok(value);
     }

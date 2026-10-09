@@ -193,6 +193,29 @@ pub fn raw_reference_grant() {
     assert!(*references[0] == 1);
 }
 
+pub fn tuple_array_choice(index: usize) {
+    let values = [(3_u32, 7_u32), (5, 11), (9, 19)];
+    if index < values.len() {
+        let selected = values[index];
+        assert!(selected.1 == selected.0 * 2 + 1);
+    }
+}
+
+pub fn tuple_array_wrong_claim(index: usize) {
+    let values = [(3_u32, 7_u32), (5, 11)];
+    if index < values.len() {
+        assert!(values[index].1 == 7);
+    }
+}
+
+pub fn tuple_array_symbolic_write(index: usize) {
+    let mut values = [(3_u32, 7_u32), (5, 11)];
+    if index < values.len() {
+        values[index] = (9, 19);
+        assert!(values[index].1 == 19);
+    }
+}
+
 #[cfg(test)]
 mod native {
     use super::*;
@@ -202,6 +225,9 @@ mod native {
     fn positives() {
         integers(199);
         raw_pointer_metadata(usize::MAX);
+        for index in 0..3 {
+            tuple_array_choice(index);
+        }
         enum_payload(Message::Pair(4, 9));
         array_index(3);
         reference_effects();

@@ -2763,3 +2763,33 @@ tests, 67 Python tests, formatting, cargo lint, release builds, cargo deny, docu
 build and manual hooks. Independent review confirms that preserved raw metadata cannot
 bypass the byte/reference grant boundaries. Hardware-model and ordinary RAM controls both
 require the missing temporal-certificate diagnostic for tracked RAM volatile reads.
+
+## Stage 137: correlated immutable tuple-value selection
+
+The symbolic array selector now accepts bounded pure tuple/unit trees with bool, exact-width
+integer and f32/f64 leaves. Every term must have its declared sort and active symbolic context;
+candidate shapes, widths and signedness must match. One index equality is reused across every
+field, preserving correlations and available float raw bits. Candidate trees are bounded to
+depth 16 and 512 total nodes. The existing fixed-element caller proves index bounds before
+accepting the selection. No feasible candidate or new premise chooses the result.
+
+This domain also handles checked finite-slice snapshots, closing their ambiguous tuple-read
+offset gap. Symbolic composite writes still require a uniquely entailed index and explicitly
+report Semantics UNKNOWN otherwise. No write or reference capability is added. Retained
+reference/address/ADT/Drop identities remain excluded. Existing incoming immutable shared-reference
+snapshots can be selected as values, but acquire no allocation, liveness or access rights.
+
+Host/ARM O0/O2 controls cover correlated nested tuples, incoming values/snapshots, exact signed-zero
+and NaN payload bits, wrong claims and missing bounds. Retained reference/ADT/Drop and symbolic
+write cases remain UNKNOWN. Native valid controls pass at O0/O2, including both finite-slice
+offsets. An actual array-data mutation breaks field correlation, refutes in all four compiler
+configurations and fails native execution. Unit controls reject forged types, contexts, shapes,
+index capacities and oversized/deep trees, and prevent conditional identity-handle choices.
+Existing unique/singleton retained-value selection keeps its prior behavior. The safe baseline
+expands to 29 cases across 14 families, with 13 PROVED, 11 REFUTED and 5 UNKNOWN per configuration.
+
+Final standalone evidence: `/tmp/miren-stage137-capabilities-final-20261010`, with 52 PROVED,
+44 REFUTED and 20 UNKNOWN outcomes and no collection errors. Validation passes 584 Rust
+tests, 67 Python tests, formatting, cargo lint, release builds, cargo deny, documentation
+build and manual hooks. Independent review verifies bounds, field correlation, exact
+float payload bits and the exclusion of new identity/reference/write rights.

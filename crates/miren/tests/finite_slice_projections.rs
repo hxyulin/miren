@@ -53,11 +53,7 @@ fn cases() -> Vec<Case> {
             ProofStatus::Unknown,
             Some("not uniquely determined"),
         ),
-        (
-            "ambiguous_tuple_offset",
-            ProofStatus::Unknown,
-            Some("not uniquely determined"),
-        ),
+        ("ambiguous_tuple_offset", ProofStatus::Proved, None),
         (
             "ambiguous_write",
             ProofStatus::Unknown,

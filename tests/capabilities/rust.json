@@ -135,6 +135,22 @@
       "family": "raw_pointer",
       "expected": "unknown",
       "unknown_reason": "raw memory access requires a verified temporal permission certificate"
+    },
+    {
+      "entry": "tuple_array_choice",
+      "family": "tuple_array",
+      "expected": "proved"
+    },
+    {
+      "entry": "tuple_array_wrong_claim",
+      "family": "tuple_array",
+      "expected": "refuted"
+    },
+    {
+      "entry": "tuple_array_symbolic_write",
+      "family": "tuple_array",
+      "expected": "unknown",
+      "unknown_reason": "array write index is not uniquely determined"
     }
   ]
 }

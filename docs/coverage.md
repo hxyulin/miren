@@ -1088,3 +1088,12 @@ metadata formation and length queries preserve the raw descriptor and grant no a
 The expanded core-only capability matrix has 26 cases and 13 families, expecting 48 PROVED,
 40 REFUTED and 16 UNKNOWN outcomes across host/ARM O0/O2. New cases exercise metadata P/R and
 a safe core reference grant U; its larger denominator is not a percentage gain.
+
+Stage 137 selects correlated immutable tuple values from bounded fixed arrays and checked
+finite-slice snapshots at symbolic indices. Bool, primitive integer/float and unit leaves have
+exact matching shapes, widths, sorts and symbolic contexts; one index predicate selects every
+field. Known float raw bits survive selection, including payload NaNs and signed zero. Candidate
+trees are limited to depth 16 and 512 nodes. Existing incoming shared-reference snapshots supply
+values without restoring identity or reference rights. Retained handles, ADTs and Drop-bearing
+values remain excluded; symbolic composite writes still require a unique location. The expanded
+29-case/14-family baseline expects 52 PROVED, 44 REFUTED and 20 UNKNOWN outcomes across four builds.
