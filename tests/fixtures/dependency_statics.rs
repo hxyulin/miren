@@ -37,3 +37,35 @@ pub static SITE: Site = Site::new();
 pub fn site() -> &'static Site {
     &SITE
 }
+
+pub struct ChannelState(pub AtomicU32);
+
+impl ChannelState {
+    pub const NEW: Self = Self(AtomicU32::new(7));
+}
+
+pub static STATES: [ChannelState; 16] = [ChannelState::NEW; 16];
+
+#[inline(always)]
+pub fn channel() -> &'static ChannelState {
+    &STATES[11]
+}
+
+pub struct AggregateParameter(pub ChannelState);
+
+const fn wrap(value: ChannelState) -> AggregateParameter {
+    AggregateParameter(value)
+}
+
+pub static AGGREGATE_PARAMETER: AggregateParameter = wrap(ChannelState::NEW);
+
+#[inline(always)]
+pub fn aggregate_parameter() -> &'static AggregateParameter {
+    &AGGREGATE_PARAMETER
+}
+
+#[cfg(test)]
+#[test]
+fn nested_constructor_native() {
+    assert_eq!(channel().0.load(core::sync::atomic::Ordering::Relaxed), 7);
+}

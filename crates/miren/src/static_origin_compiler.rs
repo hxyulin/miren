@@ -144,7 +144,14 @@ fn check_construction<'tcx>(
     let id = instance.def_id();
     if !id.is_local()
         && (!tcx.is_mir_available(id)
-            || !matches!(tcx.def_kind(id), DefKind::Fn | DefKind::AssocFn))
+            || !matches!(
+                tcx.def_kind(id),
+                DefKind::Fn
+                    | DefKind::AssocFn
+                    | DefKind::Const
+                    | DefKind::AssocConst
+                    | DefKind::AnonConst
+            ))
     {
         return None;
     }
@@ -159,6 +166,19 @@ fn check_construction<'tcx>(
         )
         .ok()?;
     if body.basic_blocks.len() > 128 || body.local_decls.len() > 512 {
+        return None;
+    }
+    if matches!(
+        tcx.def_kind(id),
+        DefKind::Const | DefKind::AssocConst | DefKind::AnonConst
+    ) && tcx
+        .try_normalize_erasing_regions(
+            ty::TypingEnv::fully_monomorphized(),
+            tcx.type_of(id).instantiate(tcx, instance.args),
+        )
+        .ok()?
+        != body.return_ty()
+    {
         return None;
     }
     if uninitialized_constructor(tcx, id, &body) || cell_constructor(tcx, id, &body) {
@@ -195,6 +215,7 @@ fn check_construction<'tcx>(
         body: &body,
         valid: true,
         calls: Vec::new(),
+        constants: Vec::new(),
         return_assignments: 0,
     };
     checker.visit_body(&body);
@@ -213,6 +234,21 @@ fn check_construction<'tcx>(
         {
             return None;
         }
+    }
+    for (constant, expected) in &checker.constants {
+        if tcx
+            .try_normalize_erasing_regions(
+                ty::TypingEnv::fully_monomorphized(),
+                tcx.type_of(constant.def_id())
+                    .instantiate(tcx, constant.args),
+            )
+            .ok()?
+            != *expected
+        {
+            return None;
+        }
+        check_construction(tcx, *constant, active, construction)?;
+        calls.push(identity(tcx, *constant));
     }
     if checker.return_assignments > 0
         && kind
@@ -472,6 +508,7 @@ struct ConstructionChecker<'a, 'tcx> {
     body: &'a Body<'tcx>,
     valid: bool,
     calls: Vec<(ty::Instance<'tcx>, bool)>,
+    constants: Vec<(ty::Instance<'tcx>, ty::Ty<'tcx>)>,
     return_assignments: usize,
 }
 
@@ -535,11 +572,33 @@ impl<'tcx> Visitor<'tcx> for ConstructionChecker<'_, 'tcx> {
     }
 
     fn visit_const_operand(&mut self, constant: &ConstOperand<'tcx>, location: Location) {
-        // An evaluated aggregate or pointer may have erased a transmute construction history.
-        self.valid &= matches!(
+        // An evaluated aggregate or pointer may have erased construction history. Only a
+        // compiler-owned unevaluated constant definition can supply a nested origin DAG.
+        if matches!(
             constant.const_.ty().kind(),
             ty::Bool | ty::Char | ty::Int(_) | ty::Uint(_) | ty::Float(_) | ty::FnDef(..)
-        ) || constant.const_.ty().is_unit();
+        ) || constant.const_.ty().is_unit()
+        {
+            self.super_const_operand(constant, location);
+            return;
+        }
+        let Const::Unevaluated(value, ty) = constant.const_ else {
+            self.valid = false;
+            return;
+        };
+        if value.promoted.is_some()
+            || !matches!(
+                self.tcx.def_kind(value.def),
+                DefKind::Const | DefKind::AssocConst | DefKind::AnonConst
+            )
+            || !matches!(ty.kind(), ty::Adt(def, _) if !def.is_union())
+                && !matches!(ty.kind(), ty::Tuple(_) | ty::Array(_, _))
+        {
+            self.valid = false;
+            return;
+        }
+        self.constants
+            .push((ty::Instance::new_raw(value.def, value.args), ty));
         self.super_const_operand(constant, location);
     }
 

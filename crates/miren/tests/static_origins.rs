@@ -215,8 +215,96 @@ fn compiler_origins_unlock_atomic_dependencies_and_fail_closed_on_bad_evidence()
                     .entry_assumptions
                     .is_empty()
             );
+            let nested = "dependency_nested_constant";
+            let nested_report =
+                verify_entry(&artifact, &directory, target, optimized, nested, false);
+            assert_eq!(
+                status_entry(&nested_report, nested),
+                ProofStatus::Proved,
+                "{nested_report:?}"
+            );
+            let aggregate_parameter = "dependency_aggregate_parameter";
+            assert_eq!(
+                status_entry(
+                    &verify_entry(
+                        &artifact,
+                        &directory,
+                        target,
+                        optimized,
+                        aggregate_parameter,
+                        false,
+                    ),
+                    aggregate_parameter,
+                ),
+                ProofStatus::Unknown
+            );
+            let nested_expected = "dependency_nested_constant_expected";
+            let nested_arbitrary = verify_entry(
+                &artifact,
+                &directory,
+                target,
+                optimized,
+                nested_expected,
+                false,
+            );
+            assert_eq!(
+                status_entry(&nested_arbitrary, nested_expected),
+                ProofStatus::Refuted
+            );
+            let nested_startup = verify_entry(
+                &artifact,
+                &directory,
+                target,
+                optimized,
+                nested_expected,
+                true,
+            );
+            assert_eq!(
+                status_entry(&nested_startup, nested_expected),
+                ProofStatus::ProvedWithAssumptions
+            );
             let evidence = std::fs::read(sidecar(&artifact)).unwrap();
+            let mut missing_dependency: Evidence = serde_json::from_slice(&evidence).unwrap();
+            // Every nested constructor/constant edge must have a corresponding compiler node.
+            for origin in &mut missing_dependency.origins {
+                if let Some(dependency) = origin.construction.first().map(|node| &node.definition)
+                    && *dependency != origin.static_id
+                {
+                    origin.construction.remove(0);
+                }
+            }
+            missing_dependency.seal().unwrap();
+            std::fs::write(
+                sidecar(&artifact),
+                serde_json::to_vec(&missing_dependency).unwrap(),
+            )
+            .unwrap();
+            assert_eq!(
+                status_entry(
+                    &verify_entry(&artifact, &directory, target, optimized, nested, false),
+                    nested
+                ),
+                ProofStatus::Unknown
+            );
+            let mut obsolete: Evidence = serde_json::from_slice(&evidence).unwrap();
+            obsolete.schema = SCHEMA - 1;
+            obsolete.seal().unwrap();
+            std::fs::write(sidecar(&artifact), serde_json::to_vec(&obsolete).unwrap()).unwrap();
+            assert_eq!(
+                status_entry(
+                    &verify_entry(&artifact, &directory, target, optimized, nested, false),
+                    nested
+                ),
+                ProofStatus::Unknown
+            );
             std::fs::remove_file(sidecar(&artifact)).unwrap();
+            assert_eq!(
+                status_entry(
+                    &verify_entry(&artifact, &directory, target, optimized, nested, false),
+                    nested
+                ),
+                ProofStatus::Unknown
+            );
             assert_eq!(
                 status(&verify(&artifact, &directory, target, optimized)),
                 ProofStatus::Unknown
@@ -244,6 +332,18 @@ fn compiler_origins_unlock_atomic_dependencies_and_fail_closed_on_bad_evidence()
             compile_dependency(&artifact, &mutation, target, optimized);
             let bad_claim = verify_entry(&artifact, &directory, target, optimized, expected, true);
             assert_eq!(status_entry(&bad_claim, expected), ProofStatus::Refuted);
+            let bad_nested = verify_entry(
+                &artifact,
+                &directory,
+                target,
+                optimized,
+                nested_expected,
+                true,
+            );
+            assert_eq!(
+                status_entry(&bad_nested, nested_expected),
+                ProofStatus::Refuted
+            );
             std::fs::write(sidecar(&artifact), &evidence).unwrap();
             assert_eq!(
                 status(&verify(&artifact, &directory, target, optimized)),
@@ -260,6 +360,13 @@ fn compiler_origins_unlock_atomic_dependencies_and_fail_closed_on_bad_evidence()
             compile_dependency(&artifact, &mutation, target, optimized);
             assert_eq!(
                 status(&verify(&artifact, &directory, target, optimized)),
+                ProofStatus::Unknown
+            );
+            assert_eq!(
+                status_entry(
+                    &verify_entry(&artifact, &directory, target, optimized, nested, false),
+                    nested
+                ),
                 ProofStatus::Unknown
             );
         }
@@ -398,4 +505,33 @@ fn wrapper_filters_repeated_artifact_notification_when_evidence_write_fails_afte
     let events = artifact_events(&output);
     assert!(events.is_empty(), "{events:?}");
     assert!(String::from_utf8_lossy(&output.stderr).contains("miren static origin producer:"));
+}
+
+#[test]
+fn nested_constant_constructor_mutation_fails_natively() {
+    let directory = Directory::new();
+    let original = std::fs::read_to_string(fixture("dependency_statics.rs")).unwrap();
+    for (source, succeeds) in [
+        (original.clone(), true),
+        (
+            original.replace("AtomicU32::new(7)", "AtomicU32::new(8)"),
+            false,
+        ),
+    ] {
+        let input = directory.0.join("native.rs");
+        let binary = directory.0.join("native");
+        std::fs::write(&input, source).unwrap();
+        let output = Command::new(Path::new(env!("MIREN_SYSROOT")).join("bin/rustc"))
+            .args(["--test", "--edition=2024"])
+            .arg(&input)
+            .arg("-o")
+            .arg(&binary)
+            .output()
+            .unwrap();
+        assert!(output.status.success(), "{output:?}");
+        assert_eq!(
+            Command::new(&binary).output().unwrap().status.success(),
+            succeeds
+        );
+    }
 }

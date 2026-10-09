@@ -212,3 +212,6 @@ a separate capture. Older inventories without this metadata remain unclassified.
 Initialized scalar constant arrays support up to 256 exact bool, integer or f32/f64 elements.
 Composite arrays retain the 128-element cap, with the existing total and depth budgets. Every
 constant element is decoded and validated; indices require bounds checks and float bits survive.
+Dependency origin schema 2 includes exact typed associated-constant construction edges. Retained
+builds use a new cache generation so prior certificates are not reused. Construction certificates
+establish origin metadata, without granting initialized payload reads or startup history.

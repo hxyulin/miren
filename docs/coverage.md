@@ -765,3 +765,8 @@ Scalar constant tables contain at most 256 bool, integer or f32/f64 elements, in
 float bits. Composite arrays keep the 128-element cap; total visits remain 2,048 and depth sixteen.
 Host/ARM and native tests check bounded lookup, bad indices, data and guard mutations, NaN payloads,
 signed zero, uninitialized storage, composite limits and 257-element scalar rejection.
+Origin schema 2 certifies unevaluated aggregate constant items and associated constants only
+through available monomorphized compiler MIR with exact operand and return types. Construction
+DAG edges bind every referenced definition; missing edges, obsolete schemas and unsupported
+operations remain UNKNOWN. This certifies construction provenance, not runtime values, verified
+callee behavior, initialization history or synchronization.

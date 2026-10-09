@@ -1409,3 +1409,12 @@ Every value remains typed, initialized and within the existing 2,048-visit/sixte
 Nested CRC-shaped tables preserve symbolic bounds and raw float encodings. Host/ARM and native
 mutations check data, guards, NaN payloads and signed zero; unsupported initialization, 257 scalars
 and oversized composites remain UNKNOWN. Older scalar-cap fixtures now test the correct boundary.
+
+## Stage 94: Typed associated-constant storage origins
+
+Schema 2 construction evidence recursively certifies exact monomorphized aggregate constant
+items and associated constants from available compiler MIR. The bounded DAG includes every
+constant dependency and exact operand/body types. Missing edges, obsolete certificates and
+unsupported operations remain UNKNOWN. Retained-origin cache generation four prevents prior
+certificate reuse. This grants provenance metadata without payload reads or startup history.
+Aggregate constructor parameters still need checked callsite dataflow in the following stage.
