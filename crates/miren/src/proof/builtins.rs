@@ -111,6 +111,12 @@ impl<'tcx> Engine<'tcx> {
             self.record_model(callee, "slice length");
             let receiver = receiver.materialize()?;
             return match &receiver {
+                Value::CompositeSlice { .. } => {
+                    self.instantiated_body(instance)?;
+                    Ok(Some(
+                        self.composite_slice_length(&receiver, &state.conditions)?,
+                    ))
+                }
                 Value::ScalarSlice { .. } => Ok(Some(
                     self.scalar_slice_length(&receiver, &state.conditions)?,
                 )),

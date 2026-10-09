@@ -60,13 +60,21 @@ impl<'tcx> Engine<'tcx> {
             (signature.inputs()[1], raw_right),
         ] {
             self.validate_tracked_value(value, state)?;
-            self.validate_scalar_slice_value(expected, value, &state.memory, &state.conditions)?;
+            self.validate_readonly_slice_value(expected, value, &state.memory, &state.conditions)?;
         }
         let [left, right] = values else {
             return Err("slice equality requires two modeled arguments".into());
         };
         let left = left.materialize()?;
         let right = right.materialize()?;
+        if matches!(left, Value::CompositeSlice { .. })
+            || matches!(right, Value::CompositeSlice { .. })
+        {
+            return Err(self.categorized_error(
+                UnknownCategory::Semantics,
+                "whole composite slice equality is unsupported".into(),
+            ));
+        }
         let left_length = self.equality_slice_length(&left, &state.conditions)?;
         let right_length = self.equality_slice_length(&right, &state.conditions)?;
         let same_length =
@@ -196,6 +204,7 @@ impl<'tcx> Engine<'tcx> {
 
     fn equality_slice_length(&self, source: &Value, conditions: &[Term]) -> Result<Value, String> {
         match source {
+            Value::CompositeSlice { .. } => Err("composite equality is unsupported".into()),
             Value::ScalarSlice { .. } => self.scalar_slice_length(source, conditions),
             Value::Bytes { length, .. } => Ok((**length).clone()),
             Value::Elements(fields) => Ok(self.iterator_index(fields.len() as u128)),
@@ -238,6 +247,7 @@ impl<'tcx> Engine<'tcx> {
         conditions: &[Term],
     ) -> Result<Value, String> {
         match value {
+            Value::CompositeSlice { .. } => Err("composite equality is unsupported".into()),
             Value::ScalarSlice { .. } => {
                 self.scalar_slice_select(value, &self.iterator_index(index as u128), conditions)
             }

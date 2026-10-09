@@ -138,6 +138,12 @@ impl<'tcx> Engine<'tcx> {
             } else {
                 let snapshot = self.snapshot(source, &state.memory, &state.conditions, 0)?;
                 match snapshot {
+                    Value::CompositeSlice { .. } => {
+                        return Err(self.categorized_error(
+                            UnknownCategory::Semantics,
+                            "readonly composite slice iteration is unsupported".into(),
+                        ));
+                    }
                     Value::ScalarSlice { .. } if !mutable => {
                         self.instantiated_body(instance)?;
                         (

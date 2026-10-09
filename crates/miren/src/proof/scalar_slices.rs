@@ -3,7 +3,7 @@ use super::*;
 
 use symbolic::ScalarSliceElement;
 
-fn scalar_slice_sort(element: ScalarSliceElement) -> Result<Sort, String> {
+pub(super) fn scalar_slice_sort(element: ScalarSliceElement) -> Result<Sort, String> {
     match element {
         ScalarSliceElement::Bool => Ok(Sort::Bool),
         ScalarSliceElement::Integer { bits, .. } if matches!(bits, 8 | 16 | 32 | 64 | 128) => {
@@ -63,7 +63,7 @@ fn validate_cursor_terms(
     Ok(())
 }
 
-fn decode_scalar_element(
+pub(super) fn decode_scalar_element(
     context: &Context,
     element: ScalarSliceElement,
     selected: Term,
@@ -389,20 +389,20 @@ impl<'tcx> Engine<'tcx> {
                 .apply(Op::ArrayOffset, &[data.clone(), offset.integer()?.0])?,
         })
     }
-    pub(super) fn validate_scalar_slice_value(
+    pub(super) fn validate_readonly_slice_value(
         &self,
         expected: Ty<'tcx>,
         value: &Value,
         memory: &[Option<Value>],
         conditions: &[Term],
     ) -> Result<(), String> {
-        if !contains_scalar_slice(value, memory, &mut Vec::new()) {
+        if !contains_readonly_slice(value, memory, &mut Vec::new()) {
             return Ok(());
         }
-        self.scalar_slice_typed_depth(expected, value, memory, conditions, 0)
+        self.readonly_slice_typed_depth(expected, value, memory, conditions, 0)
     }
 
-    fn scalar_slice_typed_depth(
+    fn readonly_slice_typed_depth(
         &self,
         expected: Ty<'tcx>,
         value: &Value,
@@ -410,13 +410,31 @@ impl<'tcx> Engine<'tcx> {
         conditions: &[Term],
         depth: usize,
     ) -> Result<(), String> {
-        if !contains_scalar_slice(value, memory, &mut Vec::new()) {
+        if !contains_readonly_slice(value, memory, &mut Vec::new()) {
             return Ok(());
         }
         if depth >= 32 {
             return Err("scalar slice typed carrier nesting limit reached".into());
         }
         match value {
+            Value::CompositeSlice { id, .. } => {
+                let ty::Slice(ty) = expected.kind() else {
+                    return Err(
+                        "composite descriptor requires its exact compiler slice type".into(),
+                    );
+                };
+                if self
+                    .composite_slice_types
+                    .get(*id)
+                    .map(|descriptor| descriptor.ty)
+                    != Some(*ty)
+                {
+                    return Err(
+                        "composite descriptor differs from its original compiler type".into(),
+                    );
+                }
+                self.composite_slice_length(value, conditions)?;
+            }
             Value::ScalarSlice { id, element, .. } => {
                 let ty::Slice(ty) = expected.kind() else {
                     return Err(
@@ -440,11 +458,14 @@ impl<'tcx> Engine<'tcx> {
                     );
                 };
                 let stored = self.reference_value(value, memory, conditions)?;
-                if matches!(stored, Value::ScalarSlice { .. }) && (*mutable || permission.is_mut())
+                if matches!(
+                    stored,
+                    Value::ScalarSlice { .. } | Value::CompositeSlice { .. }
+                ) && (*mutable || permission.is_mut())
                 {
                     return Err("readonly scalar slice cannot supply a mutable reference".into());
                 }
-                self.scalar_slice_typed_depth(*pointee, &stored, memory, conditions, depth + 1)?;
+                self.readonly_slice_typed_depth(*pointee, &stored, memory, conditions, depth + 1)?;
             }
             Value::Tuple(values) => {
                 if let ty::Tuple(types) = expected.kind() {
@@ -452,7 +473,7 @@ impl<'tcx> Engine<'tcx> {
                         return Err("scalar slice tuple carrier arity mismatch".into());
                     }
                     for (ty, value) in types.iter().zip(values) {
-                        self.scalar_slice_typed_depth(ty, value, memory, conditions, depth + 1)?;
+                        self.readonly_slice_typed_depth(ty, value, memory, conditions, depth + 1)?;
                     }
                 } else {
                     return Err("scalar slice tuple carrier requires compiler tuple type".into());
@@ -464,7 +485,7 @@ impl<'tcx> Engine<'tcx> {
                         return Err("scalar slice array carrier count mismatch".into());
                     }
                     for value in values {
-                        self.scalar_slice_typed_depth(*ty, value, memory, conditions, depth + 1)?;
+                        self.readonly_slice_typed_depth(*ty, value, memory, conditions, depth + 1)?;
                     }
                 } else {
                     return Err("scalar slice element carrier requires compiler array type".into());
@@ -475,7 +496,7 @@ impl<'tcx> Engine<'tcx> {
                     .closure_capture_types(expected, value)?
                     .ok_or("closure carrier compiler type is missing")?;
                 for (ty, (_, capture)) in types.iter().zip(fields) {
-                    self.scalar_slice_typed_depth(ty, capture, memory, conditions, depth + 1)?;
+                    self.readonly_slice_typed_depth(ty, capture, memory, conditions, depth + 1)?;
                 }
             }
             Value::Adt {
@@ -515,7 +536,7 @@ impl<'tcx> Engine<'tcx> {
                             return Err("scalar slice carrier field identity mismatch".into());
                         }
                         let ty = field.ty(self.tcx, args).skip_norm_wip();
-                        self.scalar_slice_typed_depth(ty, value, memory, conditions, depth + 1)?;
+                        self.readonly_slice_typed_depth(ty, value, memory, conditions, depth + 1)?;
                     }
                 } else {
                     return Err("scalar slice ADT carrier requires compiler ADT type".into());
@@ -547,7 +568,7 @@ impl<'tcx> Engine<'tcx> {
                     if !matches!(variant, Value::Adt { variant, .. } if *variant == index) {
                         return Err("scalar slice enum carrier variant order mismatch".into());
                     }
-                    self.scalar_slice_typed_depth(
+                    self.readonly_slice_typed_depth(
                         expected,
                         variant,
                         memory,
@@ -566,7 +587,7 @@ impl<'tcx> Engine<'tcx> {
                 let stored = self.reference_value(source, memory, conditions)?;
                 // The discovery walk visits whole allocations; a projected finite source
                 // may share its parent with an unrelated scalar-slice field.
-                if !contains_scalar_slice(&stored, memory, &mut Vec::new()) {
+                if !contains_readonly_slice(&stored, memory, &mut Vec::new()) {
                     return Ok(());
                 }
                 let ty::Adt(def, args) = expected.kind() else {
@@ -588,7 +609,7 @@ impl<'tcx> Engine<'tcx> {
                     .types()
                     .next()
                     .ok_or("scalar slice cursor lacks its compiler element argument")?;
-                self.scalar_slice_typed_depth(
+                self.readonly_slice_typed_depth(
                     Ty::new_slice(self.tcx, element),
                     &stored,
                     memory,
@@ -639,7 +660,7 @@ impl<'tcx> Engine<'tcx> {
         Ok(())
     }
 
-    pub(super) fn readonly_scalar_slice_range(
+    pub(super) fn readonly_slice_range(
         &mut self,
         instance: ty::Instance<'tcx>,
         raw_values: &[Value],
@@ -703,7 +724,10 @@ impl<'tcx> Engine<'tcx> {
             ty::Ref(_, output, permission) => *output == *slice && !permission.is_mut(),
             _ => false,
         };
-        if permission.is_mut() || self.scalar_slice_element(*element)?.is_none() || !output_matches
+        if permission.is_mut()
+            || (self.scalar_slice_element(*element)?.is_none()
+                && self.composite_slice_shape(*element)?.is_none())
+            || !output_matches
         {
             return Ok(None);
         }
@@ -719,10 +743,13 @@ impl<'tcx> Engine<'tcx> {
             return Ok(None);
         };
         let storage = self.reference_value(reference, &state.memory, &state.conditions)?;
-        if !matches!(storage, Value::ScalarSlice { .. }) {
+        if !matches!(
+            storage,
+            Value::ScalarSlice { .. } | Value::CompositeSlice { .. }
+        ) {
             return Ok(None);
         }
-        self.validate_scalar_slice_value(
+        self.validate_readonly_slice_value(
             *receiver_ty,
             reference,
             &state.memory,
@@ -744,7 +771,12 @@ impl<'tcx> Engine<'tcx> {
         {
             return Err("readonly scalar range requires exact compiler range storage".into());
         }
-        let capacity = self.scalar_slice_length(&storage, &state.conditions)?;
+        let capacity = match &storage {
+            Value::CompositeSlice { .. } => {
+                self.composite_slice_length(&storage, &state.conditions)?
+            }
+            _ => self.scalar_slice_length(&storage, &state.conditions)?,
+        };
         let start = if matches!(kind, 0 | 2) {
             range.field("start")?
         } else {
@@ -799,13 +831,13 @@ impl<'tcx> Engine<'tcx> {
     }
 }
 
-fn contains_scalar_slice(
+fn contains_readonly_slice(
     value: &Value,
     memory: &[Option<Value>],
     visited: &mut Vec<usize>,
 ) -> bool {
     match value {
-        Value::ScalarSlice { .. } => true,
+        Value::ScalarSlice { .. } | Value::CompositeSlice { .. } => true,
         Value::Reference { allocation, .. }
         | Value::Cell { allocation }
         | Value::LocalAtomic { allocation, .. } => {
@@ -816,35 +848,35 @@ fn contains_scalar_slice(
             memory
                 .get(*allocation)
                 .and_then(Option::as_ref)
-                .is_some_and(|value| contains_scalar_slice(value, memory, visited))
+                .is_some_and(|value| contains_readonly_slice(value, memory, visited))
         }
         Value::Adt { fields, .. } => fields
             .iter()
-            .any(|(_, value)| contains_scalar_slice(value, memory, visited)),
+            .any(|(_, value)| contains_readonly_slice(value, memory, visited)),
         Value::Enum { variants, .. } | Value::Tuple(variants) => variants
             .iter()
-            .any(|value| contains_scalar_slice(value, memory, visited)),
+            .any(|value| contains_readonly_slice(value, memory, visited)),
         Value::Elements(values) => values
             .iter()
-            .any(|value| contains_scalar_slice(value, memory, visited)),
+            .any(|value| contains_readonly_slice(value, memory, visited)),
         Value::MaybeUninit { payload, .. } => payload
             .as_ref()
-            .is_some_and(|value| contains_scalar_slice(value, memory, visited)),
+            .is_some_and(|value| contains_readonly_slice(value, memory, visited)),
         Value::TrackedPointer { reference, .. } => {
-            contains_scalar_slice(reference, memory, visited)
+            contains_readonly_slice(reference, memory, visited)
         }
         Value::RawSlice { source, .. }
         | Value::SliceIterator { source, .. }
         | Value::MetadataPointer(source)
         | Value::TraitObject { source, .. }
-        | Value::DebugReference { source, .. } => contains_scalar_slice(source, memory, visited),
+        | Value::DebugReference { source, .. } => contains_readonly_slice(source, memory, visited),
         Value::StaticSlice {
             source, elements, ..
         } => {
-            contains_scalar_slice(source, memory, visited)
+            contains_readonly_slice(source, memory, visited)
                 || elements
                     .iter()
-                    .any(|value| contains_scalar_slice(value, memory, visited))
+                    .any(|value| contains_readonly_slice(value, memory, visited))
         }
         Value::Input(_)
         | Value::Bool(_)

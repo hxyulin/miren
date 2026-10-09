@@ -1089,6 +1089,7 @@ fn flatten_value(value: &Value, result: &mut Vec<Term>) -> Result<(), String> {
         | Value::TrackedPointer { .. }
         | Value::StaticSlice { .. }
         | Value::StaticView { .. }
+        | Value::CompositeSlice { .. }
         | Value::ScalarSlice { .. }
         | Value::MaybeUninit { .. }
         | Value::Uninitialized

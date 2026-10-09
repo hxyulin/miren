@@ -57,9 +57,9 @@ fn pure_retained_slice_storage(value: &Value, depth: usize) -> bool {
         Value::Elements(fields) => fields
             .iter()
             .all(|value| pure_retained_slice_storage(value, depth + 1)),
-        Value::Bytes { length, .. } | Value::ScalarSlice { length, .. } => {
-            pure_retained_slice_storage(length, depth + 1)
-        }
+        Value::Bytes { length, .. }
+        | Value::ScalarSlice { length, .. }
+        | Value::CompositeSlice { length, .. } => pure_retained_slice_storage(length, depth + 1),
         Value::Uninitialized
         | Value::MaybeUninit { .. }
         | Value::StaticSlice { .. }

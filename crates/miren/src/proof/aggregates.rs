@@ -348,6 +348,9 @@ impl<'tcx> Engine<'tcx> {
         let bits = u32::from(self.tcx.sess.target.pointer_width);
         let length = match &value {
             Value::ScalarSlice { .. } => self.scalar_slice_length(&value, &state.conditions)?,
+            Value::CompositeSlice { .. } => {
+                self.composite_slice_length(&value, &state.conditions)?
+            }
             Value::Bytes { length, .. } => length.as_ref().clone(),
             Value::Elements(elements) => {
                 symbolic::integer(&self.terms, elements.len() as u128, bits, false)
@@ -381,6 +384,9 @@ impl<'tcx> Engine<'tcx> {
             offset
         };
         match value {
+            value @ Value::CompositeSlice { .. } => {
+                self.composite_slice_select(&value, &index, &state.conditions)
+            }
             value @ Value::ScalarSlice { .. } => {
                 self.scalar_slice_select(&value, &index, &state.conditions)
             }

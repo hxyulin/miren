@@ -124,9 +124,7 @@
     {
       "entry": "open_aggregate_slice",
       "family": "unbounded_slice",
-      "expected": "unknown",
-      "unknown_reason": "only read-only byte slices and byte arrays are modeled",
-      "unknown_category": "semantics"
+      "expected": "refuted"
     },
     {
       "entry": "retained_prefix_index",
@@ -317,6 +315,23 @@
       "expected": "unknown",
       "unknown_reason": "no compiler-exported Rust definition matches the foreign symbol",
       "unknown_category": "missing_compiler_evidence"
+    },
+    {
+      "entry": "composite_slice_views",
+      "family": "composite_slice",
+      "expected": "proved"
+    },
+    {
+      "entry": "composite_slice_wrong_field",
+      "family": "composite_slice",
+      "expected": "refuted"
+    },
+    {
+      "entry": "composite_slice_iteration",
+      "family": "composite_slice",
+      "expected": "unknown",
+      "unknown_reason": "readonly composite slice iteration is unsupported",
+      "unknown_category": "semantics"
     }
   ]
 }

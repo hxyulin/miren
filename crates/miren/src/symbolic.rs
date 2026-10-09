@@ -82,6 +82,11 @@ pub enum Value {
         length: Box<Value>,
         data: Term,
     },
+    CompositeSlice {
+        id: usize,
+        length: Box<Value>,
+        leaves: Vec<Term>,
+    },
     ScalarSlice {
         id: usize,
         element: ScalarSliceElement,
@@ -180,7 +185,8 @@ impl Value {
                     size.checked_add(value.owned_repeat_size()?)
                         .filter(|size| *size <= MAX_REPEAT_VALUES)
                 }),
-            Self::ScalarSlice { .. }
+            Self::CompositeSlice { .. }
+            | Self::ScalarSlice { .. }
             | Self::MaybeUninit { .. }
             | Self::Cell { .. }
             | Self::Atomic { .. }
@@ -231,7 +237,8 @@ impl Value {
             | Self::Unit
             | Self::Elements(_)
             | Self::Adt { .. } => Some(1),
-            Self::ScalarSlice { .. }
+            Self::CompositeSlice { .. }
+            | Self::ScalarSlice { .. }
             | Self::MaybeUninit { .. }
             | Self::Cell { .. }
             | Self::Atomic { .. }
@@ -287,7 +294,8 @@ impl Value {
             | Self::Bytes { .. }
             | Self::RawPointer { .. }
             | Self::Unit => self.owned_repeat_size(),
-            Self::ScalarSlice { .. }
+            Self::CompositeSlice { .. }
+            | Self::ScalarSlice { .. }
             | Self::MaybeUninit { .. }
             | Self::Cell { .. }
             | Self::Atomic { .. }
@@ -331,6 +339,7 @@ impl Value {
             | Self::Int { .. }
             | Self::Float { .. }
             | Self::Bytes { .. }
+            | Self::CompositeSlice { .. }
             | Self::ScalarSlice { .. }
             | Self::MetadataPointer(_)
             | Self::StaticText
@@ -373,6 +382,7 @@ impl Value {
             | Self::Int { .. }
             | Self::Float { .. }
             | Self::Bytes { .. }
+            | Self::CompositeSlice { .. }
             | Self::ScalarSlice { .. }
             | Self::Cell { .. }
             | Self::Atomic { .. }

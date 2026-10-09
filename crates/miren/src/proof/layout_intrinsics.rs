@@ -121,7 +121,7 @@ impl<'tcx> Engine<'tcx> {
             };
             let length = match value.materialize()? {
                 storage @ Value::ScalarSlice { .. } => {
-                    self.validate_scalar_slice_value(
+                    self.validate_readonly_slice_value(
                         ty,
                         &storage,
                         &state.memory,

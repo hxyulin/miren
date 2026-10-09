@@ -3199,3 +3199,42 @@ builds, cargo deny, documentation build and manual hooks. Frozen standalone evid
 `/tmp/miren-stage148-merged-capabilities-20261010` records 96 PROVED, 84 REFUTED and 52 UNKNOWN,
 with unchanged inputs/binaries and no collection errors. Independent final review approves the
 source certificates, exact numeric predicates and retained failure/model evidence.
+
+
+## Stage 149: arbitrary read-only tuple and array slice inputs
+
+A compiler descriptor certifies exact pure tuple and fixed-array primitive element shapes,
+Copy/Freeze/no-drop properties and actual nonzero layout stride. Independent logical arrays retain
+each expanded primitive field occurrence. Checked indexing reconstructs all fields at the same
+index; subviews offset every field together after source, lifetime and bounds validation. Float
+storage bits and decoded valid Char observations retain their existing meanings. Owned copies
+and caller-backed projected borrows gain no mutation, raw access or physical padding rights.
+Shared read-only slice validation is reused by both primitive and composite descriptors.
+
+Runtime length has only the actual valid allocation extent bound. Type shapes retain the existing
+16-level, 512-node and 128-element fixed-array limits; zero-length arrays still certify their
+original element type. Fully zero-sized whole elements and refined, reference-bearing or
+identity-bearing leaves remain unsupported. Selected ordinary core models require concrete bodies;
+compiler metadata intrinsics retain their separate execution path. Whole composite membership,
+equality and iteration refuse explicitly. Dynamic choice between whole nested aggregate arrays
+remains a separate bounded-value completeness gap.
+
+The dedicated 32-root matrix yields 11 PROVED, 5 REFUTED and 16 UNKNOWN per host/ARM O0/O2 build.
+It checks field independence, repeated-index correlation, nested arrays, Float bits, Unicode,
+views, actual helpers, owned-copy mutation, caller borrows and 129-element inputs. Unsupported
+input shapes, oversized type arrays, read-only mutation attempts, retired backing, missing bodies
+and deferred consumers retain their recorded categories and reasons. Actual helper field mutation
+refutes all four profiles and fails valid native O0/O2 executions. The original iterator aggregate
+input remains UNKNOWN at its now-reached composite iterator boundary. Malformed descriptor units
+check contexts, sorts, lengths, leaf inventories and same-typed field independence.
+
+The unchanged original aggregate-slice false claim advances from UNKNOWN to REFUTED. The shared
+manifest adds checked composite views P/R and deferred iteration U controls: 61 cases across
+22 families, expecting 25 PROVED, 23 REFUTED and 13 UNKNOWN per configuration.
+
+Final isolated and merged validation each passes 630 Rust tests and 68 Python tests, formatting,
+cargo lint, release builds, cargo deny, documentation build and manual hooks. Frozen evidence at
+`/tmp/miren-stage149-capabilities-20261010` and
+`/tmp/miren-stage149-merged-capabilities-20261010` each records 100 PROVED, 92 REFUTED and
+52 UNKNOWN, with unchanged frozen inputs/binaries and no collection errors. Independent source
+and focused-evidence review approves the descriptor, source/type/body gates and mutation controls.

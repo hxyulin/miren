@@ -18,6 +18,7 @@ impl<'tcx> Engine<'tcx> {
         let capacity = match &value {
             Value::Bytes { length, .. } => (**length).clone(),
             Value::ScalarSlice { .. } => self.scalar_slice_length(&value, conditions)?,
+            Value::CompositeSlice { .. } => self.composite_slice_length(&value, conditions)?,
             _ => return Err("subslice requires modeled readonly storage".into()),
         };
         let bits = u32::from(self.tcx.sess.target.pointer_width);
@@ -73,6 +74,10 @@ impl<'tcx> Engine<'tcx> {
             return Err("memory snapshot nesting limit reached".to_owned());
         }
         match value {
+            Value::CompositeSlice { .. } => {
+                self.composite_slice_length(value, conditions)?;
+                Ok(value.clone())
+            }
             Value::ScalarSlice { .. } => {
                 self.scalar_slice_length(value, conditions)?;
                 Ok(value.clone())
@@ -297,6 +302,12 @@ impl<'tcx> Engine<'tcx> {
                     return Err("memory downcast lacks a proven variant check".to_owned());
                 }
                 Ok(value.clone())
+            }
+            (MemoryProjection::Index(index), value @ Value::CompositeSlice { .. }) => {
+                self.composite_slice_select(&value, index, conditions)
+            }
+            (MemoryProjection::Slice { offset, length }, value @ Value::CompositeSlice { .. }) => {
+                self.composite_slice_region(&value, offset, length, conditions)
             }
             (MemoryProjection::Index(index), value @ Value::ScalarSlice { .. }) => {
                 self.scalar_slice_select(&value, index, conditions)
@@ -566,6 +577,9 @@ impl<'tcx> Engine<'tcx> {
                     let offset = symbolic::integer(&self.terms, u128::from(offset), width, false);
                     let index = if from_end {
                         let length = match &value {
+                            Value::CompositeSlice { .. } => {
+                                self.composite_slice_length(&value, &state.conditions)?
+                            }
                             Value::ScalarSlice { .. } => {
                                 self.scalar_slice_length(&value, &state.conditions)?
                             }
@@ -808,8 +822,17 @@ impl<'tcx> Engine<'tcx> {
                 place: false,
             });
         }
-        if matches!(value, Value::ScalarSlice { .. }) {
+        if matches!(
+            value,
+            Value::ScalarSlice { .. } | Value::CompositeSlice { .. }
+        ) {
             if mutable {
+                if matches!(value, Value::CompositeSlice { .. }) {
+                    return Err(self.categorized_error(
+                        UnknownCategory::Semantics,
+                        "readonly composite slice mutation is unsupported".into(),
+                    ));
+                }
                 return Err("scalar slice mutation is unsupported".into());
             }
             let (allocation, projection, _) = self.memory_path(state, place)?;
@@ -1184,6 +1207,9 @@ impl<'tcx> Engine<'tcx> {
             self.validate_static_initialization_graph(&value, state, &mut Vec::new())?;
         }
         match value {
+            Value::CompositeSlice { .. } => {
+                Err("composite slice returns require retained caller provenance".into())
+            }
             Value::ScalarSlice { .. } => {
                 Err("scalar slice returns require retained caller provenance".into())
             }

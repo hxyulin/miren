@@ -30,6 +30,7 @@ mod builtins;
 mod call_metadata;
 mod characters;
 mod closure_captures;
+mod composite_slices;
 mod constants;
 mod coroutines;
 mod enum_transmutes;
@@ -128,6 +129,7 @@ struct Engine<'tcx> {
     static_addresses: std::collections::HashMap<DefId, Term>,
     maybe_uninit_types: Vec<Ty<'tcx>>,
     scalar_slice_types: Vec<Ty<'tcx>>,
+    composite_slice_types: Vec<composite_slices::CompositeType<'tcx>>,
     tracked_addresses: Vec<(tracked_pointers::AddressLocation<'tcx>, Term)>,
     steps: usize,
     call_chain: Vec<DefId>,
@@ -195,6 +197,7 @@ pub fn verify(
         tracked_addresses: Vec::new(),
         maybe_uninit_types: Vec::new(),
         scalar_slice_types: Vec::new(),
+        composite_slice_types: Vec::new(),
         steps: 0,
         call_chain: Vec::new(),
         failed_call_chain: None,
@@ -372,7 +375,11 @@ impl<'tcx> Engine<'tcx> {
                     && let ty::Slice(element) = pointee.kind()
                     && *element != self.tcx.types.u8
                 {
-                    self.scalar_slice_input(*element, &mut conditions)?
+                    if self.scalar_slice_element(*element)?.is_some() {
+                        self.scalar_slice_input(*element, &mut conditions)?
+                    } else {
+                        self.composite_slice_input(id, *element, &mut conditions)?
+                    }
                 } else {
                     self.argument(id, ty, &mut conditions)?
                 };
@@ -402,7 +409,7 @@ impl<'tcx> Engine<'tcx> {
         }
         for (local, value) in body.args_iter().zip(&arguments) {
             self.validate_maybe_uninit_value(body.local_decls[local].ty, value, &conditions)?;
-            self.validate_scalar_slice_value(
+            self.validate_readonly_slice_value(
                 body.local_decls[local].ty,
                 value,
                 &memory,
@@ -463,6 +470,15 @@ impl<'tcx> Engine<'tcx> {
             Value::RawPointer { address, .. } => format!(
                 "raw address {}; no pointee provenance",
                 address.smt(self.limits.max_query_bytes)?
+            ),
+            Value::CompositeSlice { id, length, leaves } => format!(
+                "readonly composite descriptor {id}; len={}; leaf seeds={} (not physical storage)",
+                length.integer()?.0.smt(self.limits.max_query_bytes)?,
+                leaves
+                    .iter()
+                    .map(|term| term.smt(self.limits.max_query_bytes))
+                    .collect::<Result<Vec<_>, _>>()?
+                    .join(", ")
             ),
             Value::ScalarSlice {
                 element,
@@ -1053,7 +1069,7 @@ impl<'tcx> Engine<'tcx> {
             return Err("call arguments do not match the MIR body".to_owned());
         }
         for (local, value) in body.args_iter().zip(&arguments) {
-            self.validate_scalar_slice_value(
+            self.validate_readonly_slice_value(
                 body.local_decls[local].ty,
                 value,
                 &memory,
@@ -1216,7 +1232,7 @@ impl<'tcx> Engine<'tcx> {
                         self.local(&state, 0)?
                     };
                     self.validate_maybe_uninit_value(body.return_ty(), &value, &state.conditions)?;
-                    self.validate_scalar_slice_value(
+                    self.validate_readonly_slice_value(
                         body.return_ty(),
                         &value,
                         &state.memory,
@@ -1614,7 +1630,7 @@ impl<'tcx> Engine<'tcx> {
                     &value,
                     &state.conditions,
                 )?;
-                self.validate_scalar_slice_value(
+                self.validate_readonly_slice_value(
                     place.ty(&body.local_decls, self.tcx).ty,
                     &value,
                     &state.memory,
@@ -1707,7 +1723,8 @@ impl<'tcx> Engine<'tcx> {
             }
             (
                 ProjectionElem::Deref,
-                value @ (Value::ScalarSlice { .. }
+                value @ (Value::CompositeSlice { .. }
+                | Value::ScalarSlice { .. }
                 | Value::Bytes { .. }
                 | Value::Adt { .. }
                 | Value::Enum { .. }
@@ -1774,6 +1791,10 @@ impl<'tcx> Engine<'tcx> {
                 }
                 value.clone()
             }
+            (ProjectionElem::Index(index), value @ Value::CompositeSlice { .. }) => {
+                let index = self.local(state, index.as_usize())?;
+                self.composite_slice_select(&value, &index, &state.conditions)?
+            }
             (ProjectionElem::Index(index), value @ Value::ScalarSlice { .. }) => {
                 let index = self.local(state, index.as_usize())?;
                 self.scalar_slice_select(&value, &index, &state.conditions)?
@@ -1810,7 +1831,9 @@ impl<'tcx> Engine<'tcx> {
             }
             (
                 ProjectionElem::Subslice { from, to, from_end },
-                value @ (Value::ScalarSlice { .. } | Value::Bytes { .. }),
+                value @ (Value::CompositeSlice { .. }
+                | Value::ScalarSlice { .. }
+                | Value::Bytes { .. }),
             ) => self.byte_subslice(value, from, to, from_end, &state.conditions)?,
             (
                 ProjectionElem::ConstantIndex {
@@ -1818,7 +1841,8 @@ impl<'tcx> Engine<'tcx> {
                     min_length,
                     from_end,
                 },
-                value @ (Value::ScalarSlice { .. }
+                value @ (Value::CompositeSlice { .. }
+                | Value::ScalarSlice { .. }
                 | Value::Bytes { .. }
                 | Value::Elements(_)
                 | Value::StaticSlice { .. }),
@@ -1843,7 +1867,7 @@ impl<'tcx> Engine<'tcx> {
                     &value,
                     &state.conditions,
                 )?;
-                self.validate_scalar_slice_value(
+                self.validate_readonly_slice_value(
                     place.ty(&body.local_decls, self.tcx).ty,
                     &value,
                     &state.memory,
@@ -1996,6 +2020,9 @@ impl<'tcx> Engine<'tcx> {
             Rvalue::RawPtr(rustc_middle::mir::RawPtrKind::FakeForPtrMetadata, place) => {
                 let value = self.place(state, *place)?;
                 let length = match value {
+                    value @ Value::CompositeSlice { .. } => {
+                        self.composite_slice_length(&value, &state.conditions)?
+                    }
                     value @ Value::ScalarSlice { .. } => {
                         self.scalar_slice_length(&value, &state.conditions)?
                     }
@@ -2207,6 +2234,9 @@ impl<'tcx> Engine<'tcx> {
                     }),
                     (UnOp::PtrMetadata, Value::RawSlice { length, .. }) => Ok(*length),
                     (UnOp::PtrMetadata, Value::MetadataPointer(length)) => Ok(*length),
+                    (UnOp::PtrMetadata, value @ Value::CompositeSlice { .. }) => {
+                        self.composite_slice_length(&value, &state.conditions)
+                    }
                     (UnOp::PtrMetadata, value @ Value::ScalarSlice { .. }) => {
                         self.scalar_slice_length(&value, &state.conditions)
                     }

@@ -182,6 +182,7 @@ impl<'tcx> Engine<'tcx> {
             | Value::TrackedPointer { .. }
             | Value::StaticSlice { .. }
             | Value::StaticView { .. }
+            | Value::CompositeSlice { .. }
             | Value::ScalarSlice { .. }
             | Value::MaybeUninit { .. }
             | Value::Uninitialized

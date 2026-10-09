@@ -325,6 +325,7 @@ fn constant_storage_key(value: &Value) -> Option<ConstantStorageKey> {
         | Value::FormatArguments
         | Value::StaticSlice { .. }
         | Value::StaticView { .. }
+        | Value::CompositeSlice { .. }
         | Value::ScalarSlice { .. }
         | Value::MaybeUninit { .. }
         | Value::Uninitialized

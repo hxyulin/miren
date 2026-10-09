@@ -1216,3 +1216,21 @@ inputs have P/R controls, and missing bodies and retired sources retain their co
 The unchanged unrestricted scalar membership and equality functions now prove in all four compiler
 profiles. Byte and finite/custom policies remain distinct. The 58-case/21-family shared baseline
 expects 96 PROVED, 84 REFUTED and 52 UNKNOWN outcomes across host/ARM O0/O2.
+
+
+Stage 149 admits arbitrary-length read-only slices of exact pure tuple and fixed-array primitive
+elements. Compiler shape and layout certificates retain independent logical arrays for repeated
+field occurrences. Checked common-index reads reconstruct exact nested values; range views apply
+the same checked offset to every field. Float observations retain storage bits, Char observations
+decode valid scalars, and owned copies and caller-backed borrows retain their existing rights.
+The actual nonzero compiler element stride bounds allocation extent without capping slice length.
+Expanded types retain depth-16, 512-node and 128-element fixed-array shape budgets. Unsupported
+leaves are certified even beneath zero-length arrays; fully zero-sized whole elements refuse.
+
+The 32-root compiler matrix yields 11 PROVED, 5 REFUTED and 16 UNKNOWN per host/ARM O0/O2 build.
+Actual selected-field mutation refutes and fails valid native executions on 129-element inputs.
+Mutable and competing roots, invalid lifetime and mutation attempts, missing bodies, refined and
+identity-bearing leaves, oversized type arrays and deferred whole-composite consumers retain their
+specific UNKNOWN causes. Whole nested-array dynamic selection remains a separate finite-value gap.
+The original aggregate-slice false assertion now refutes without a source rewrite. The shared
+61-case/22-family baseline expects 100 PROVED, 92 REFUTED and 52 UNKNOWN across four builds.

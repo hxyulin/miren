@@ -89,7 +89,7 @@ impl Engine<'_> {
             return Ok(());
         }
         match value {
-            Value::ScalarSlice { length, .. } => {
+            Value::ScalarSlice { length, .. } | Value::CompositeSlice { length, .. } => {
                 self.validate_static_initialization_graph(length, state, visited)
             }
             Value::MaybeUninit { id, payload } => {

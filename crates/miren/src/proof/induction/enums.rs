@@ -65,7 +65,7 @@ fn normalize(
     let template = template.ok_or("missing inductive value template")?;
     let value = slot.as_mut().ok_or("missing inductive value")?;
     match (template, &mut *value) {
-        (Value::ScalarSlice { .. }, _) => {
+        (Value::ScalarSlice { .. } | Value::CompositeSlice { .. }, _) => {
             return Err("scalar slice induction is unsupported".into());
         }
         (

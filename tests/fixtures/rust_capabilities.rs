@@ -415,6 +415,26 @@ pub fn scalar_slice_full_missing_body(values: &[u16], needle: u16) -> bool {
     unsafe { opaque_full_scalar_predicate(values.contains(&needle)) }
 }
 
+pub fn composite_slice_views(values: &[(u16, [u16; 2])], index: usize) {
+    if index < values.len() {
+        let suffix = &values[index..];
+        let owned = suffix[0];
+        assert!(owned.0 == values[index].0);
+        assert!(owned.1[1] == values[index].1[1]);
+        assert!(suffix.len() == values.len() - index);
+    }
+}
+
+pub fn composite_slice_wrong_field(values: &[(u16, [u16; 2])]) {
+    if values.len() > 128 {
+        assert!(values[128].0 == values[128].1[1]);
+    }
+}
+
+pub fn composite_slice_iteration(values: &[(u16, u16)]) -> usize {
+    values.iter().count()
+}
+
 #[cfg(test)]
 mod native {
     use super::*;
@@ -423,6 +443,9 @@ mod native {
     #[test]
     fn positives() {
         integers(199);
+        composite_slice_views(&[], usize::MAX);
+        composite_slice_views(&[(3, [5, 7]), (11, [13, 17])], 1);
+        composite_slice_views(&[(3, [5, 7]); 129], 128);
         scalar_slice_full_member(&[], usize::MAX);
         scalar_slice_full_member(&[3, 7], 1);
         scalar_slice_full_member(&[7; 129], 128);
@@ -496,5 +519,16 @@ mod native {
     #[should_panic]
     fn negative_control() {
         reference_wrong_claim();
+    }
+    #[test]
+    #[should_panic]
+    fn composite_slice_wrong_field_panics() {
+        composite_slice_wrong_field(&[(3, [5, 7]); 129]);
+    }
+
+    #[test]
+    #[should_panic]
+    fn open_aggregate_slice_panics() {
+        open_aggregate_slice(&[(1, 0)]);
     }
 }

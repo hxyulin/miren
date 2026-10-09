@@ -11,8 +11,8 @@ execution at O0 and O2, positive/refuted/unknown controls, a source mutation tha
 structured UNKNOWN reporting, and passing repository checks. Completion establishes a repeatable
 baseline. It does not establish full Rust support or a completed memory-model refactor.
 
-The manifest contains 58 cases across 21 families. Each build configuration expects 24 PROVED,
-21 REFUTED and 13 UNKNOWN results. Stage 133 originally had 23 cases with 10 PROVED, 9 REFUTED
+The manifest contains 61 cases across 22 families. Each build configuration expects 25 PROVED,
+23 REFUTED and 13 UNKNOWN results. Stage 133 originally had 23 cases with 10 PROVED, 9 REFUTED
 and 4 UNKNOWN; stage 134 closed its retained-prefix projection gap. Stage 136 adds raw-pointer
 metadata P/R controls and a safe core reference-array grant that remains UNKNOWN without a
 temporal permission certificate. Stage 137 adds tuple-array P/R and unsupported symbolic-write
@@ -36,13 +36,21 @@ Stage 148 advances the unchanged unrestricted scalar membership root to PROVED a
 predicate P/R and missing invoked body U controls. Primitive scalar descriptors use scoped
 existential membership and universal equal-length comparison after source/type/extent validation.
 Byte and finite/custom comparison policies retain their separate work bounds and actual effects.
+Stage 149 advances the unchanged original aggregate-slice false claim to REFUTED and adds
+composite slice view P/R and deferred iterator U controls. Exact pure tuple and fixed-array element
+shapes use independent per-occurrence primitive arrays and checked common-index observations.
 These additions change the denominator, not a coverage percentage.
 Covered examples exercise arithmetic, enum payloads, array indexing, reference effects, concrete
 generics, closures, iterator callbacks, finite loops, destructors, fresh future polling and raw
 pointer metadata and typed initialization wrappers. Open dispatch and unsupported slice element
 shapes retain explicit frontiers. Exact primitive shared slices use an arbitrary-length logical
 array behind the existing single immutable caller-root certificate. Their length domain follows the
-actual target byte extent; it has no 128-element input cap. Mutable and competing incoming
+actual target byte extent; it has no 128-element input cap. Exact pure tuple and fixed-array
+primitive elements likewise admit arbitrary runtime lengths. Their expanded type shapes retain
+node/depth limits and a 128-element array shape budget, independently of the slice length.
+Fully zero-sized, refined and identity-bearing element shapes remain unsupported. Whole composite
+membership, equality and iteration require separate consumer models. Dynamic selection between
+whole nested aggregate arrays also remains a separate finite-value choice gap. Mutable and competing incoming
 references retain conservative boundaries. Indexed retained mutable integer/tuple prefixes use
 checked projection snapshots with a uniquely determined length of at most 128. Bounded tuple reads
 can select symbolic offsets while preserving field correlation; symbolic composite writes still

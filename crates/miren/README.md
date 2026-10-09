@@ -524,8 +524,8 @@ gaps by category and exact reason, preserving all root names. Saved coverage gap
 absent optional category. Existing schema version and safety statuses are unchanged.
 
 The Rust capability baseline is independent of fleet and hardware contracts. Run
-`cargo test --locked -p miren --test rust_capabilities`; its shared manifest selects 35 cases across
-15 families on host/ARM at O0/O2, with positive/refuted/unknown and actual source-mutation controls.
+`cargo test --locked -p miren --test rust_capabilities`; its shared manifest selects 61 cases across
+22 families on host/ARM at O0/O2, with positive/refuted/unknown and actual source-mutation controls.
 The standalone [survey](../../tools/rust_capability_survey.py) retains full reports and provenance.
 The typed SMT foundation supports explicit universal and existential Symbol bindings. Free-symbol
 metadata is lexical: the same Symbol may be bound in one term and free in another, and nested
@@ -645,6 +645,17 @@ selection creates no borrow, alias roots, assumptions or raw access rights. Byte
 and custom comparisons retain their existing comparison work bounds. Custom finite comparisons
 execute actual `PartialEq` bodies and retain their effects. Solver limits, unresolved results and
 budget exhaustion in iterative consumers remain explicit `UNKNOWN`.
+
+Single incoming immutable Rust borrows also support arbitrary-length slices of exact pure tuple
+and fixed-array primitive elements. A compiler type descriptor preserves each expanded primitive
+field occurrence in its own logical array; checked indexing reconstructs all fields with the same
+index. Nested Float fields retain storage bits and Char fields decode valid Unicode values. Reads,
+owned copies, caller-backed field borrows and checked range views retain the original allocation
+and projections. Runtime length has only the valid Rust allocation-size bound; type shapes retain
+the existing depth and node budgets and a 128-element fixed-array shape limit. Fully zero-sized
+elements, refined or identity-bearing leaves, mutable/competing roots and raw access remain
+unsupported. Logical field storage gives no padding-byte or physical representation rights. Whole
+composite membership, equality and iterators remain explicit semantic `UNKNOWN` boundaries.
 
 Concrete synchronous closures can carry supported read-only scalar slices and initialized pure
 `MaybeUninit` values through their exact compiler capture types. Shared capture metadata checks

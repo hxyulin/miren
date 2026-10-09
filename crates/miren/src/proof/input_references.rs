@@ -39,9 +39,9 @@ impl<'tcx> Engine<'tcx> {
         *nodes += 1;
         match ty.kind() {
             ty::Bool | ty::Char | ty::Int(_) | ty::Uint(_) | ty::Float(_) => Ok(true),
-            ty::Slice(element) => {
-                Ok(*element != self.tcx.types.u8 && self.scalar_slice_element(*element)?.is_some())
-            }
+            ty::Slice(element) => Ok(*element != self.tcx.types.u8
+                && (self.scalar_slice_element(*element)?.is_some()
+                    || self.composite_slice_shape(*element)?.is_some())),
             ty::Pat(base, _) => self.plain_root_storage(*base, depth + 1, nodes),
             ty::Tuple(fields) => {
                 for field in fields.iter() {

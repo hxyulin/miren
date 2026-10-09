@@ -95,7 +95,7 @@ impl<'tcx> Engine<'tcx> {
         };
         for (expected, value) in [(*first, raw_first), (*second, raw_second)] {
             self.validate_tracked_value(value, state)?;
-            self.validate_scalar_slice_value(expected, value, &state.memory, &state.conditions)?;
+            self.validate_readonly_slice_value(expected, value, &state.memory, &state.conditions)?;
         }
         let [first, second] = values else {
             return Err("slice membership requires two modeled arguments".to_owned());
@@ -106,6 +106,12 @@ impl<'tcx> Engine<'tcx> {
             (second, first)
         };
         let slice = slice.materialize()?;
+        if matches!(slice, Value::CompositeSlice { .. }) {
+            return Err(self.categorized_error(
+                UnknownCategory::Semantics,
+                "whole composite slice membership is unsupported".into(),
+            ));
+        }
         if matches!(slice, Value::ScalarSlice { .. }) {
             // Source and needle validity are established under the original free conditions.
             let length = self.scalar_slice_length(&slice, &state.conditions)?;
@@ -208,6 +214,7 @@ impl<'tcx> Engine<'tcx> {
                     member = self.terms.apply(Op::Or, &[member, equal])?;
                 }
             }
+            Value::CompositeSlice { .. } => unreachable!("composite membership refused above"),
             Value::ScalarSlice { .. } => unreachable!("certified scalar membership handled above"),
             Value::Input(_)
             | Value::Bool(_)
