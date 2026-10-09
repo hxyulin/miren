@@ -1,19 +1,19 @@
 use super::*;
 use symbolic::MemoryProjection;
 
-const MAX_TRACKED_ADDRESSES: usize = 512;
+pub(super) const MAX_TRACKED_ADDRESSES: usize = 512;
 
 #[derive(Clone, PartialEq, Eq)]
 pub(super) struct AddressLocation<'tcx> {
     pub(super) allocation: usize,
     pub(super) pointee: Ty<'tcx>,
-    projection: Vec<AddressProjection>,
-    extent: u64,
+    pub(super) projection: Vec<AddressProjection>,
+    pub(super) extent: u64,
     pub(super) cursor: Option<(Term, Term)>,
 }
 
 #[derive(Clone, PartialEq, Eq)]
-enum AddressProjection {
+pub(super) enum AddressProjection {
     Field(usize),
     Variant(usize),
     Index(Term),
@@ -31,39 +31,27 @@ impl<'tcx> Engine<'tcx> {
         if !ty.is_sized(self.tcx, ty::TypingEnv::fully_monomorphized()) {
             return Err("tracked raw addresses require a sized pointee".into());
         }
-        let reference = if place.projection.is_empty() {
-            let local = place.local.as_usize();
-            let allocation = if let Some(allocation) = state.addresses[local] {
-                self.local(state, local)?;
-                allocation
-            } else {
-                if state.memory.len() >= MAX_TRACKED_ADDRESSES {
-                    return Err("memory allocation budget reached".into());
-                }
-                let value = self.local(state, local)?;
-                let allocation = state.memory.len();
-                state.memory.push(Some(value));
-                state.addresses[local] = Some(allocation);
-                allocation
-            };
-            Value::Reference {
-                allocation,
-                projection: Vec::new(),
-                mutable,
-            }
+        if !place.projection.is_empty() {
+            return self.raw_subobject_pointer(body, state, place, mutable);
+        }
+        let local = place.local.as_usize();
+        let allocation = if let Some(allocation) = state.addresses[local] {
+            self.local(state, local)?;
+            allocation
         } else {
-            let (last, prefix) = place.projection.split_last().expect("nonempty projection");
-            if *last != ProjectionElem::Deref {
-                return Err("raw subobject addresses need tracked typed layout offsets".into());
+            if state.memory.len() >= MAX_TRACKED_ADDRESSES {
+                return Err("memory allocation budget reached".into());
             }
-            let base = Place {
-                local: place.local,
-                projection: self.tcx.mk_place_elems(prefix),
-            };
-            if !matches!(self.place(state, base)?, Value::Reference { .. }) {
-                return Err("raw reborrowing needs a tracked allocation reference".into());
-            }
-            self.borrow(state, place, mutable)?
+            let value = self.local(state, local)?;
+            let allocation = state.memory.len();
+            state.memory.push(Some(value));
+            state.addresses[local] = Some(allocation);
+            allocation
+        };
+        let reference = Value::Reference {
+            allocation,
+            projection: Vec::new(),
+            mutable,
         };
         self.tracked_reference_address(reference, ty, state)
     }
@@ -86,7 +74,7 @@ impl<'tcx> Engine<'tcx> {
         self.tracked_reference_address(value, *pointee, state)
     }
 
-    fn tracked_reference_address(
+    pub(super) fn tracked_reference_address(
         &mut self,
         reference: Value,
         pointee: Ty<'tcx>,
@@ -129,6 +117,13 @@ impl<'tcx> Engine<'tcx> {
         {
             address.clone()
         } else {
+            if self
+                .tracked_addresses
+                .iter()
+                .any(|(existing, _)| existing.allocation == location.allocation)
+            {
+                return Err("tracked raw region needs a compatible compiler-typed anchor".into());
+            }
             if self.tracked_addresses.len() >= MAX_TRACKED_ADDRESSES {
                 return Err("tracked raw address identity budget reached".into());
             }

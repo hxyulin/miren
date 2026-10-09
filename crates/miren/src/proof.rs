@@ -58,6 +58,7 @@ mod storage_layout;
 mod storage_locations;
 use startup::AtomicStorage;
 use startup_memory::Memory;
+mod raw_subobjects;
 mod tracked_pointers;
 mod trait_objects;
 mod typed_slices;
@@ -1939,6 +1940,13 @@ impl<'tcx> Engine<'tcx> {
             Rvalue::Cast(CastKind::Transmute, operand, target) => {
                 let source = operand.ty(&body.local_decls, self.tcx);
                 let value = self.operand(id, body, state, operand)?;
+                if let Some(value) =
+                    self.tracked_reference_array_transmute(source, *target, &value, state)?
+                {
+                    self.record_model(id,
+                        "compiler-typed initialized raw reference array; disjoint retained projections");
+                    return Ok(value);
+                }
                 if source == *target
                     && matches!(source.kind(), ty::Ref(_, _, mutability) if mutability.is_mut())
                     && matches!(value, Value::Reference { mutable: true, .. })

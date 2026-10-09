@@ -1302,3 +1302,12 @@ method slots resolve to the actual implementation, preserving reference permissi
 liveness and effects. Arbitrary dyn roots remain UNKNOWN rather than enumerating implementations.
 Host/ARM debug/optimized tests cover associated types, inherited slots, mutable updates, native
 implementation mutations, rejected forged coercions and dead/frame-escaping backing.
+
+## Stage 84: compiler-layout raw subobject addresses
+
+Bounded struct/tuple fields and array elements retain containing allocation identities, compiler
+layout offsets and child extents. Actual each_mut MIR executes its loop and converts only exact
+initialized raw pointer arrays to reference arrays, checking live typed projections, permissions
+and pairwise mutable disjointness. Numeric pointers, unions, incompatible anchors, dead or escaping
+backing and unsupported symbolic reference-array selections remain UNKNOWN. Host/ARM compiler
+and native mutation tests preserve child bounds and reject overlapping or permission-forged data.

@@ -721,3 +721,8 @@ startup, exclusion or stable shared-state evidence.
 Concrete trait-object unsizing preserves a compiler Unsize certificate and exact vtable slot.
 Actual method bodies execute with retained storage, mutations and lifetimes. Arbitrary dyn roots
 remain UNKNOWN; the analyzer does not infer a closed set of implementations from the workspace.
+
+Compiler-layout raw field and array-element pointers retain their containing allocation and child
+extent. The exact each_mut reference-array conversion checks initialized typed live projections
+and disjoint mutable elements. Numeric origins, unions, incompatible anchors, forged permissions
+and unsupported symbolic reference-array selection remain UNKNOWN.

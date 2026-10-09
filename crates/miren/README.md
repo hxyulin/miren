@@ -174,6 +174,11 @@ Concrete reference coercions to trait objects retain the compiler type and vtabl
 Virtual calls execute the exact resolved implementation with the original storage and permissions.
 Arbitrary trait-object roots, unsupported upcasts and raw/boxed trait objects remain UNKNOWN.
 
+Compiler-layout raw addresses of bounded struct/tuple fields and array elements retain allocation
+provenance, offsets and subobject extents. The exact initialized pointer-array to reference-array
+conversion used by each_mut requires live typed backing and disjoint mutable projections. Numeric
+origins, raw dereferences and unsupported reference-array selection remain UNKNOWN.
+
 The [coverage guide](../../docs/coverage.md) is the maintained feature reference. The
 [proof guide](../../docs/proofs.md) explains the encoding and limitations, and the
 [development guide](../../docs/development.md) lists required checks.
