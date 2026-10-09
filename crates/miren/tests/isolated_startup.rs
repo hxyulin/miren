@@ -136,7 +136,7 @@ fn isolated_static_history_retains_actual_writes_and_preserves_boundaries() {
         ),
         (
             "overwritten_parent_cannot_resurrect_a_child_initializer",
-            ProofStatus::Unknown,
+            ProofStatus::Refuted,
         ),
         ("async_factory", ProofStatus::Unknown),
         ("root_with_argument", ProofStatus::Unknown),

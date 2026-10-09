@@ -298,3 +298,10 @@ this check: a safe exported body may satisfy an unsafe declaration. ABI, argumen
 variadic status and bound variables remain exact; the reverse safety change stays UNKNOWN. Actual
 retained bodies still execute, and separate safe-pointer-to-unsafe-pointer conversions remain
 unsupported.
+
+Isolated retained struct/tuple stores support exact compiler-certified child reads and updates.
+A child write reconstructs the retained parent and preserves actual sibling values; it does not
+reuse initializer bytes. Transparent equal-footprint fields require a real declared field path.
+Paths are bounded to eight levels, 128 fields per aggregate and 256 visited types. Unions, arrays,
+enum paths, type punning and ambiguous overlapping identities remain UNKNOWN. Existing typed
+validity, initialization, retirement, reference escape and opaque-effect checks still apply.

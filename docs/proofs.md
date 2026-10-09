@@ -924,3 +924,12 @@ unsafe declaration or pointer by changing only its safety qualifier. Normalized 
 signatures retain exact bound variables, inputs, output, ABI and variadic status. Unsafe-to-safe
 changes remain UNKNOWN. This checks compatibility and executes the retained body; it does not prove
 a foreign contract or lift an opaque pointer into a known target.
+
+Retained isolated struct/tuple values can project children through exact compiler field types and
+layout offsets. Child stores update the retained parent using the same symbolic field projection
+protocol, then validate its complete typed value and reference graph. Actual siblings remain
+unchanged. Equal footprints require a declared field path between the types, and multiple candidate
+parents or paths stay UNKNOWN. Bounds are eight levels, 128 fields per aggregate and 256 visited
+types. Arrays, unions and enum paths remain unsupported. Retirement removes overlapping parents;
+opaque effects cannot be undone by a later child write. No initializer is recovered from a written
+footprint.

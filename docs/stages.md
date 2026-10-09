@@ -1732,3 +1732,29 @@ obligation arrays match stage 108 exactly. Captures are
 All 498 Rust workspace tests and 48 Python tests pass. Formatting, workspace Clippy, release builds,
 dependency checks, documentation builds and manual hooks pass. No application code or hardware
 assumption profile changes.
+
+## Stage 110: Retained aggregate field history
+
+Isolated actual struct/tuple stores now support certified child reads and child updates that
+reconstruct the retained parent. Compiler field types and offsets identify the path; transparent
+equal-footprint wrappers are accepted through declared fields, while type punning and ambiguous
+overlapping identities remain UNKNOWN. Bounds cap depth, fields and visited types. Retained actual
+values are validated before and after projection/update, including initialization and reference
+liveness. Retirement and opaque effects retain their existing conservative behavior.
+
+Writing Pair { left: 3, right: 4 }, then left = 5 preserves right = 4. The prior test claiming
+right = 2 now REFUTES that claim from the actual write instead of remaining UNKNOWN. Host/ARM and
+debug/optimized tests cover nesting, tuple/struct padding, transparent fields, branch isolation,
+disjoint storage, stale references, retirement, wrong types and opaque boundaries. A stored-value
+mutation refutes the claim and fails native execution. No initializer bytes are resurrected.
+
+All 502 Rust workspace tests and 48 Python tests pass. Formatting, workspace Clippy, release builds,
+dependency checks, documentation builds and manual hooks pass. Independent review found no required
+soundness fixes. No application code or hardware assumption profile changes.
+
+A complete ninth ordinary fleet pass froze the clean stage 109 analyzer at 80030b0. All 32 ARM
+units and 2,336 roots completed collection, with unchanged outcomes: 1,113 PROVED, 253 REFUTED and
+970 UNKNOWN, without assumptions. Its source heuristic remains 518/229/272. There are no added,
+removed or changed outcomes and no incompatible provenance. Raw capture:
+`/tmp/miren-fleet-pass9-20261009/summary.json`. This function-root measurement does not use isolated
+startup or establish application polling/boot.
