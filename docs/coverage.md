@@ -1109,3 +1109,16 @@ new assumptions. Raw writes, `zeroed`, reference-forming methods, pointer/refere
 arbitrary unions remain UNKNOWN. This does not establish general allocation initialization or
 raw-access permissions. The 32-case/15-family capability baseline expects 56 PROVED, 48 REFUTED
 and 24 UNKNOWN outcomes across host/ARM O0/O2.
+
+
+Stage 139 extends the owned `MaybeUninit` certificate to bounded arrays of supported pure values.
+Exact compiler counts, element types and layouts control construction and extraction. Element
+vectors must match the count and every typed child; byte arrays additionally need exact unsigned
+usize length metadata and the correct data sort and symbolic context. Counts are at most 128,
+and expanded trees retain depth-16 and 256-node limits. No input domain or resource budget expands.
+Initialized extraction preserves the array, including available float bits. Uninitialized arrays
+remain UNKNOWN unless their exact closed type has a unique zero-byte value: a supported empty
+array or an array of unit-only values. Unsupported element types remain unsupported even at
+length zero. Partial initialization, wrapper repetition, `array_assume_init`, raw/static access
+and reference-forming methods remain separate frontiers. The baseline now contains 35 cases in
+15 families, expecting 60 PROVED, 52 REFUTED and 28 UNKNOWN outcomes across host/ARM O0/O2.

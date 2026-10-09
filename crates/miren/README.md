@@ -524,7 +524,7 @@ gaps by category and exact reason, preserving all root names. Saved coverage gap
 absent optional category. Existing schema version and safety statuses are unchanged.
 
 The Rust capability baseline is independent of fleet and hardware contracts. Run
-`cargo test --locked -p miren --test rust_capabilities`; its shared manifest selects 32 cases across
+`cargo test --locked -p miren --test rust_capabilities`; its shared manifest selects 35 cases across
 15 families on host/ARM at O0/O2, with positive/refuted/unknown and actual source-mutation controls.
 The standalone [survey](../../tools/rust_capability_survey.py) retains full reports and provenance.
 See [the Rust roadmap](../../docs/rust-capabilities.md) for scope and intended model boundaries.
@@ -565,3 +565,12 @@ copies and whole assignments preserve branch-local typed values and available fl
 padding is not exposed as initialized bytes. Arbitrary incoming wrappers, reference or pointer
 payloads, raw partial writes, zeroed raw writes and reference-returning APIs remain unsupported.
 This value state grants no allocation identity, liveness or raw-access rights.
+
+The owned `MaybeUninit` value domain also covers exact constant-length arrays of its supported
+primitive and tuple leaves, including nested arrays. Counts are bounded at 128 and expanded shapes
+retain the existing 256-node and 16-level budgets. Each element type is certified even for empty
+arrays. Initialized byte arrays require exact target-width length and array-sort metadata; other
+arrays retain exact typed elements and available float bits. Closed unique zero-byte arrays use
+only their exact empty or unit-only values. Whole copies and assignments preserve payload state.
+Partial initialization, raw/reference access, wrapper repeats and `array_assume_init` remain
+UNKNOWN.

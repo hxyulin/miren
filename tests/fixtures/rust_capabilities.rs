@@ -232,6 +232,23 @@ pub fn maybe_uninit_uninitialized() -> u32 {
     unsafe { core::mem::MaybeUninit::<u32>::uninit().assume_init() }
 }
 
+pub fn maybe_uninit_array(value: [u16; 3]) {
+    let storage = core::mem::MaybeUninit::new(value);
+    let result = unsafe { storage.assume_init() };
+    assert!(result == value);
+}
+
+pub fn maybe_uninit_array_wrong_claim(value: [u16; 3]) {
+    let storage = core::mem::MaybeUninit::new(value);
+    let result = unsafe { storage.assume_init() };
+    assert!(result[0] == 0);
+}
+
+pub fn maybe_uninit_array_uninitialized() -> [u16; 3] {
+    // Analysis-only: never execute this uninitialized payload extraction.
+    unsafe { core::mem::MaybeUninit::<[u16; 3]>::uninit().assume_init() }
+}
+
 #[cfg(test)]
 mod native {
     use super::*;
@@ -243,6 +260,8 @@ mod native {
         raw_pointer_metadata(usize::MAX);
         maybe_uninit_round_trip(0, false);
         maybe_uninit_round_trip(u32::MAX, true);
+        maybe_uninit_array([0, 1, u16::MAX]);
+        maybe_uninit_array([u16::MAX, 0, 7]);
         for index in 0..3 {
             tuple_array_choice(index);
         }

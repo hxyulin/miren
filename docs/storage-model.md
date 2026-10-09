@@ -113,6 +113,12 @@ This state creates no allocation or temporal permission certificate: raw access,
 reference-forming methods, arbitrary payload types and general per-subobject initialization remain
 separate work.
 
+Stage 139 extends this retained payload domain to whole arrays with exact compiler counts at
+most 128 and the existing expanded tree budgets. Element vectors preserve typed initialized
+children; byte arrays preserve only actual u8 values and checked length/data metadata. Closed
+empty arrays and unit-only arrays can have a unique zero-byte value. This does not establish
+initialization of individual raw-written fields or elements of an array of wrappers.
+
 Retaining a value requires a visibility policy. Owned storage with no possible external mutation
 can retain exact values. Shared mutable statics retain at most initialization facts justified by
 the environment; their initializer is not the runtime state of an arbitrary selected root.

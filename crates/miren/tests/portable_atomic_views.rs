@@ -141,7 +141,7 @@ fn verify_entries(
                     o.status == ProofStatus::Unknown
                         && o.detail.contains("core::mem::MaybeUninit")
                         && o.detail
-                            .contains("MaybeUninit payload requires primitive or pure tuple types")
+                            .contains("MaybeUninit array exceeds the 128-element budget")
                 }),
                 "{:?}",
                 proof.obligations

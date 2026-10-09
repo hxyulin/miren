@@ -3,6 +3,7 @@ use super::*;
 const MAX_DEPTH: usize = 16;
 const MAX_NODES: usize = 256;
 const MAX_SHAPES: usize = 128;
+const MAX_ARRAY_ELEMENTS: u64 = 128;
 
 impl<'tcx> Engine<'tcx> {
     fn maybe_uninit_shape(&self, wrapper: Ty<'tcx>) -> Result<(Ty<'tcx>, usize, usize), String> {
@@ -123,8 +124,33 @@ impl<'tcx> Engine<'tcx> {
                 self.static_layout(ty)?;
                 Ok(())
             }
+            ty::Array(element, length) => {
+                let count = self.maybe_uninit_array_count(*length)?;
+                // Even an empty array must have an eligible element type, including raw
+                // restricted-pattern checks before any normalization.
+                let mut element_nodes = 0;
+                self.maybe_uninit_pure_type(*element, depth + 1, &mut element_nodes)?;
+                for _ in 0..count {
+                    self.maybe_uninit_pure_type(*element, depth + 1, nodes)?;
+                }
+                self.static_layout(ty)?;
+                Ok(())
+            }
             _ => Err("MaybeUninit payload requires primitive or pure tuple types".into()),
         }
+    }
+
+    fn maybe_uninit_array_count(&self, length: ty::Const<'tcx>) -> Result<u64, String> {
+        let count = length
+            .try_to_target_usize(self.tcx)
+            .ok_or("MaybeUninit array requires an exact compiler constant length")?;
+        if count > MAX_ARRAY_ELEMENTS {
+            return Err(self.categorized_error(
+                UnknownCategory::ResourceLimit,
+                "MaybeUninit array exceeds the 128-element budget".into(),
+            ));
+        }
+        Ok(count)
     }
 
     fn maybe_uninit_payload_value(&self, ty: Ty<'tcx>, value: &Value) -> Result<(), String> {
@@ -181,6 +207,26 @@ impl<'tcx> Engine<'tcx> {
                 }
                 Ok(())
             }
+            (ty::Array(element, count), Value::Elements(values)) => {
+                let count = self.maybe_uninit_array_count(*count)?;
+                if values.len() as u64 != count {
+                    return Err(
+                        "MaybeUninit initialized array has a mismatched element count".into(),
+                    );
+                }
+                for value in values.iter() {
+                    self.maybe_uninit_payload_value(*element, value)?;
+                }
+                Ok(())
+            }
+            (ty::Array(element, count), Value::Bytes { length, data })
+                if *element == self.tcx.types.u8 =>
+            {
+                let count = self.maybe_uninit_array_count(*count)?;
+                let pointer_bits = u32::from(self.tcx.sess.target.pointer_width);
+                validate_byte_payload(&self.terms, pointer_bits, count, length, data)
+            }
+
             _ => {
                 Err("MaybeUninit initialized payload does not match its exact compiler type".into())
             }
@@ -427,20 +473,41 @@ impl<'tcx> Engine<'tcx> {
         if self.static_layout(ty)?.size.bytes() != 0 {
             return Ok(None);
         }
-        let ty::Tuple(fields) = ty.kind() else {
-            return Ok(None);
-        };
-        if fields.is_empty() {
-            return Ok(Some(Value::Unit));
+        match ty.kind() {
+            ty::Tuple(fields) if fields.is_empty() => Ok(Some(Value::Unit)),
+            ty::Tuple(fields) => {
+                let mut values = Vec::new();
+                for field in fields.iter() {
+                    let Some(value) = self.unique_zero_byte_payload(field)? else {
+                        return Ok(None);
+                    };
+                    values.push(value);
+                }
+                Ok(Some(Value::Tuple(values)))
+            }
+            ty::Array(element, length) => {
+                let count = self.maybe_uninit_array_count(*length)?;
+                if *element == self.tcx.types.u8 && count == 0 {
+                    let bits = u32::from(self.tcx.sess.target.pointer_width);
+                    return Ok(Some(Value::Bytes {
+                        length: Box::new(symbolic::integer(&self.terms, 0, bits, false)),
+                        data: self.terms.apply(
+                            Op::ConstArray { index_bits: bits },
+                            &[self.terms.bit_vector(0, 8)?],
+                        )?,
+                    }));
+                }
+                let mut values = Vec::new();
+                for _ in 0..count {
+                    let Some(value) = self.unique_zero_byte_payload(*element)? else {
+                        return Ok(None);
+                    };
+                    values.push(value);
+                }
+                Ok(Some(Value::Elements(values.into())))
+            }
+            _ => Ok(None),
         }
-        let mut values = Vec::new();
-        for field in fields.iter() {
-            let Some(value) = self.unique_zero_byte_payload(field)? else {
-                return Ok(None);
-            };
-            values.push(value);
-        }
-        Ok(Some(Value::Tuple(values)))
     }
 
     pub(super) fn maybe_uninit_transmute(
@@ -539,4 +606,110 @@ fn contains_wrapper(value: &Value) -> bool {
         }
     }
     false
+}
+
+fn validate_byte_payload(
+    context: &Context,
+    pointer_bits: u32,
+    count: u64,
+    length: &Value,
+    data: &Term,
+) -> Result<(), String> {
+    let (length, bits, signed) = length.integer()?;
+    if bits != pointer_bits
+        || signed
+        || !length.belongs_to(context)
+        || length.sort() != &Sort::BitVec(pointer_bits)
+        || symbolic::constant(&length)
+            != Some(symbolic::Constant::BitVec {
+                value: u128::from(count),
+                bits: pointer_bits,
+            })
+        || !data.belongs_to(context)
+        || data.sort()
+            != &Sort::Array(
+                Box::new(Sort::BitVec(pointer_bits)),
+                Box::new(Sort::BitVec(8)),
+            )
+    {
+        return Err(
+            "MaybeUninit initialized byte array has invalid length, sort or context".into(),
+        );
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn initialized_byte_arrays_require_exact_length_sort_and_context() {
+        let context = Context::default();
+        let foreign = Context::default();
+        for bits in [32, 64] {
+            let length = symbolic::integer(&context, 3, bits, false);
+            let data = context
+                .apply(
+                    Op::ConstArray { index_bits: bits },
+                    &[context.bit_vector(7, 8).unwrap()],
+                )
+                .unwrap();
+            assert!(validate_byte_payload(&context, bits, 3, &length, &data).is_ok());
+            assert!(validate_byte_payload(&context, bits, 2, &length, &data).is_err());
+            assert!(
+                validate_byte_payload(
+                    &context,
+                    bits,
+                    3,
+                    &symbolic::integer(&context, 3, bits, true),
+                    &data
+                )
+                .is_err()
+            );
+            let wrong_width = Value::Int {
+                expression: context.bit_vector(3, 8).unwrap(),
+                bits,
+                signed: false,
+            };
+            assert!(validate_byte_payload(&context, bits, 3, &wrong_width, &data).is_err());
+            let symbolic_length = Value::Int {
+                expression: context.symbol(bits, Sort::BitVec(bits)).unwrap(),
+                bits,
+                signed: false,
+            };
+            assert!(validate_byte_payload(&context, bits, 3, &symbolic_length, &data).is_err());
+            assert!(
+                validate_byte_payload(
+                    &context,
+                    bits,
+                    3,
+                    &symbolic::integer(&foreign, 3, bits, false),
+                    &data
+                )
+                .is_err()
+            );
+            let wrong_element = context
+                .apply(
+                    Op::ConstArray { index_bits: bits },
+                    &[context.bit_vector(7, 16).unwrap()],
+                )
+                .unwrap();
+            assert!(validate_byte_payload(&context, bits, 3, &length, &wrong_element).is_err());
+            let wrong_index = context
+                .apply(
+                    Op::ConstArray { index_bits: 8 },
+                    &[context.bit_vector(7, 8).unwrap()],
+                )
+                .unwrap();
+            assert!(validate_byte_payload(&context, bits, 3, &length, &wrong_index).is_err());
+            let foreign_data = foreign
+                .apply(
+                    Op::ConstArray { index_bits: bits },
+                    &[foreign.bit_vector(7, 8).unwrap()],
+                )
+                .unwrap();
+            assert!(validate_byte_payload(&context, bits, 3, &length, &foreign_data).is_err());
+        }
+    }
 }

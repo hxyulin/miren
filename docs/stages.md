@@ -2831,3 +2831,39 @@ Validation passes 586 Rust tests, 67 Python tests, formatting, cargo lint, relea
 cargo deny, documentation build and manual hooks. Independent review approves exact type
 correlation, raw pattern refusal, initialization preservation, compiler guard execution and
 continued refusal of unsupported access grants.
+
+
+## Stage 139: bounded owned-array initialization certificates
+
+The `MaybeUninit` retained payload certificate now admits arrays of supported pure Copy/Freeze
+values. Exact compiler constant counts and element types are checked before normalization,
+including raw restricted types at length zero. Counts are at most 128; expanded nested trees
+retain depth-16 and 256-node limits. Element vectors require exact counts and recursively typed
+children. Only actual u8 arrays admit byte data, with exact constant unsigned target-usize length
+metadata and matching bitvector/array sorts and symbolic contexts.
+
+Whole initialized arrays survive actual core construction and exact extraction, assignments,
+copies and returns. Available float raw bits are preserved. Nonempty uninitialized arrays remain
+Semantics UNKNOWN unless their closed type has one zero-byte value. Supported empty arrays and
+unit-only arrays reconstruct that unique value with the correct typed representation, including
+empty u8 byte arrays. Unsupported element types remain unsupported even in empty arrays.
+The actual inhabitance guard queries the entire array type, not its element type.
+
+Host/ARM O0/O2 compiler controls cover primitive, byte, bool, tuple, nested and float-bit arrays;
+empty and unit-only arrays; copying and whole replacement; wrong claims and missing bounds.
+Count 128 versus 129, tuple counts 85 versus 86 at the 256-node boundary, zero-byte node exhaustion,
+and depth 17 have precise supported/resource outcomes. Empty reference/raw/NonZero/Never/Drop and
+restricted-pattern element cases remain UNKNOWN. Native valid controls pass, and an actual helper
+initializer mutation refutes in all four configurations and fails native O0/O2 tests. A separate
+metadata guard rejects malformed byte lengths, signedness, widths, sorts and foreign contexts.
+
+No per-element partial initialization, array-of-wrapper extraction, wrapper repetition, raw or
+static access, or reference grant is added. The vendored StaticCell `[u8; 256]` write keeps UNKNOWN
+at its explicit array-count limit. The capability family expands by P/R/U array cases to 35 cases
+across 15 families, with 15 PROVED, 13 REFUTED and 7 UNKNOWN per compiler configuration.
+
+Final standalone evidence: `/tmp/miren-stage139-capabilities-20261010`, with 60 PROVED,
+52 REFUTED and 28 UNKNOWN outcomes, unchanged frozen inputs/binaries and no collection errors.
+Validation passes 589 Rust tests, 67 Python tests, formatting, cargo lint, release builds,
+cargo deny, documentation build and manual hooks. Independent review approves the array and
+zero-byte certificates, precise metadata guards and continued access-permission boundaries.
