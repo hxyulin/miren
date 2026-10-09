@@ -8,7 +8,19 @@ impl<'tcx> Engine<'tcx> {
         instance: ty::Instance<'tcx>,
         values: &[Value],
     ) -> Result<Option<Value>, String> {
-        if self.tcx.item_name(instance.def_id()) != rustc_span::Symbol::intern("get") {
+        let callee = instance.def_id();
+        let Some(nonzero) = self
+            .tcx
+            .get_diagnostic_item(rustc_span::Symbol::intern("NonZero"))
+        else {
+            return Ok(None);
+        };
+        let parent = self.tcx.parent(callee);
+        if self.tcx.item_name(callee) != rustc_span::Symbol::intern("get")
+            || callee.krate != nonzero.krate
+            || self.tcx.def_kind(callee) != DefKind::AssocFn
+            || !matches!(self.tcx.def_kind(parent), DefKind::Impl { of_trait: false })
+        {
             return Ok(None);
         }
         let signature = self
@@ -19,12 +31,20 @@ impl<'tcx> Engine<'tcx> {
         let [receiver] = signature.inputs() else {
             return Ok(None);
         };
-        let ty::Adt(def, _) = receiver.kind() else {
+        let ty::Adt(def, args) = receiver.kind() else {
             return Ok(None);
         };
-        if !self
+        let owner = self
             .tcx
-            .is_diagnostic_item(rustc_span::Symbol::intern("NonZero"), def.did())
+            .type_of(parent)
+            .instantiate(self.tcx, instance.args)
+            .skip_norm_wip();
+        if def.did() != nonzero
+            || owner != *receiver
+            || args.type_at(0) != signature.output()
+            || signature.safety() != rustc_hir::Safety::Safe
+            || signature.abi() != rustc_abi::ExternAbi::Rust
+            || signature.c_variadic()
         {
             return Ok(None);
         }

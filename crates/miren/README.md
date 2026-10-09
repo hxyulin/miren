@@ -257,6 +257,11 @@ type names, variant positions, exact tags, Option metadata and empty payloads mu
 checks remain authoritative. Payload enums, mixed constructed/input choices and incompatible
 inventories remain UNKNOWN. No new pointer identities, contracts or entry assumptions are added.
 
+The NonZero getter model requires the actual core inherent method, its instantiated diagnostic
+owner and the exact safe primitive signature. User functions or local trait methods named get
+execute their retained bodies; a missing body stays UNKNOWN. Constructor and niche-transmute
+support is unchanged.
+
 Compiler inventories record whether each function directly returns a coroutine. Fleet surveys
 separate those future-construction roots from function-body roots; explicit async polling remains
 a separate capture. Older inventories without this metadata remain unclassified.

@@ -412,6 +412,12 @@ Host/ARM O0/O2 tests cover selected return values, casts and matches, wrong clai
 out-of-bounds indexing and UNKNOWN payload/mixed choices. Changing the actual selected index
 refutes the proof and fails native execution.
 
+NonZero getters validate compiler identity before applying the scalar model. Actual free and trait
+get lookalikes retain their return values and panics, including a dependency getter without MIR
+remaining UNKNOWN. Host/ARM O0/O2 regressions cover unsigned, signed and pointer-width core getters,
+wrong claims and actual-body mutations that fail native execution. Recognition does not add a
+NonZero constructor or new assumptions.
+
 ## Mutable byte regions and valid bounded roots
 
 Fixed byte-view updates permit larger destination allocations when the generated update contains

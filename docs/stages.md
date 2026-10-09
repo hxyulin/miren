@@ -2150,3 +2150,38 @@ refutation. Captures: `/tmp/miren-stage120/replay/{devices,sentry}`. All 72 stri
 obligation arrays match stage 119 exactly; twelve isolated runtime wrappers still record unfinished
 weak-CAS retry frontiers and unsupported SEV. Captures:
 `/tmp/miren-stage120-main-{strict,reset}-20261009` and `/tmp/miren-stage120/runtime`.
+
+## Stage 121: Certify NonZero getter identity
+
+The old getter model accepted any function named get with a NonZero input and integer output.
+A local get returning zero therefore made assert!(get(value) == value.get()) falsely PROVED,
+although valid value=1 fails natively. The defect reproduced on host/ARM O0/O2 with the actual
+lookalike body retained.
+
+Recognition now requires the diagnostic NonZero crate, an associated method under an inherent
+implementation, an instantiated owner exactly matching the receiver, and the safe nonvariadic
+Rust signature returning `NonZero<T>`'s exact primitive T. Existing typed wrapper and value checks
+remain. User free functions and local trait methods execute their actual bodies; missing bodies
+and unrelated unsupported input types stay UNKNOWN. No constructor capability is added.
+
+Three integration tests cover host/ARM O0/O2 return/panic lookalikes, real unsigned/signed/usize
+getters, wrong claims, unrelated inherent/string methods and an unavailable dependency getter.
+Model attribution assertions ensure only the core getter receives the NonZero model. Changing an
+actual free getter body refutes the positive claim and fails native execution. All nine focused
+integration tests pass, including existing root-domain and zeroed-value regressions. Formatting
+and workspace Clippy pass in the applied checkout. Full checks and coverage replays follow.
+
+All 537 Rust workspace tests and 48 Python tests pass. Formatting, Clippy, release builds,
+dependency checks, documentation builds and manual hooks pass. The original saved false-proof
+reproducer now REFUTES on host/ARM at O0/O2 using the release analyzer. Captures:
+`/tmp/miren-stage121/reproduction`. Actual Dr16, KeyTracker, Can1Bus and UI proofs remain intact;
+encode retains its audited bounds refutation. Captures: `/tmp/miren-stage121/replay`.
+All 72 strict/reset main obligation arrays match stage 120 exactly, and twelve isolated runtime
+wrappers retain unfinished weak-CAS frontiers and unsupported SEV. Captures:
+`/tmp/miren-stage121-main-{strict,reset}-20261009` and `/tmp/miren-stage121/runtime`.
+
+A separate compiler-identity audit checks 23 free/trait lookalike roots on host/ARM at O0/O2.
+All 92 outcomes agree with actual return/panic bodies, native controls pass, and no lookalike
+receives a library model or trusted call. No additional defect was found in this bounded audit.
+Evidence: `/tmp/miren-model-dispatch-audit/audit.md` and `validation.json`. Constructor/niche
+dispatch is excluded from this audit and remains unsupported here.
