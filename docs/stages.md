@@ -1892,3 +1892,16 @@ as_chunks_mut fixture remains UNKNOWN at its separate chunk-view budget.
 All 512 Rust workspace tests and 48 Python tests pass. Formatting, workspace Clippy, release builds,
 dependency checks, documentation builds and manual hooks pass. Independent review found no required
 soundness fixes. No application or assumption changes.
+
+The stage 114 encode witness is also reproduced by a temporary copy of the complete actual referee
+module in debug and release, while all payload lengths 0..127 and both UI helpers pass. Existing
+module tests remain included. Source/copy hashes and exact commands are recorded in
+`/tmp/miren-stage114/replay/audit/audit.md`; fleet application files are unchanged.
+
+The complete eleventh ordinary fleet pass freezes clean stage 114 analyzer d45d34f. All 32 ARM units
+and 2,336 roots completed collection: 1,113 PROVED, 256 REFUTED and 967 UNKNOWN, without
+assumptions. Exactly referee::encode moves UNKNOWN to REFUTED; no previous proof regresses and no
+roots change identity. Source-heuristic counts are 518/232/269. Both public UI roots now reach CRC16
+query-size limits. Firmware/source fingerprints and four artifact checkpoints per unit remain
+consistent. Raw capture: `/tmp/miren-fleet-pass11-20261009/summary.json`. Deterministic export
+validation passes before publication; the all-main publication remains separately frozen at 03e66a2.

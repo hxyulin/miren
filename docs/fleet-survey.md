@@ -2,12 +2,12 @@
 
 ## Current repeatable measurement
 
-The tenth 2026-10-09 pass collected all 2,336 roots from all 32 ARM library/binary units in
-fleet-2027: 1,113 PROVED, 255 REFUTED and 968 UNKNOWN, with no assumptions. All units completed
+The eleventh 2026-10-09 pass collected all 2,336 roots from all 32 ARM library/binary units in
+fleet-2027: 1,113 PROVED, 256 REFUTED and 967 UNKNOWN, with no assumptions. All units completed
 collection. Counts describe selected root domains, not line coverage or whole-firmware safety.
 
-The source-function heuristic identifies 1,019 declarations: 518 PROVED, 231 REFUTED and
-270 UNKNOWN. Refutations concern arbitrary supported root state and remain runtime unconfirmed.
+The source-function heuristic identifies 1,019 declarations: 518 PROVED, 232 REFUTED and
+269 UNKNOWN. Refutations concern arbitrary supported root state and remain runtime unconfirmed.
 
 The [current JSON summary](/data/fleet-survey-current.json) records every root, first blocker,
 compilation unit and input-integrity evidence. The deterministic exporter recreates this compact
@@ -16,7 +16,7 @@ publication from complete raw collections; inventories, solver reports and logs 
 - Firmware revision: `26377371e38ed3234f972bcdf6b2f9f4d26a7f02`;
   all 243 source-input fingerprints stayed equal. The existing untracked `rust-project.json`
   remains.
-- Full-survey analyzer: `2169311`, JSON schema 9; clean working tree, frozen binaries.
+- Full-survey analyzer: `d45d34f`, JSON schema 9; clean working tree, frozen binaries.
 - Compiler: nightly-2026-09-22; Z3 4.15.4.
 - Target: `thumbv7em-none-eabihf`; dev profile, Cargo default features and locked dependencies.
 - Panic abort, enabled overflow checks and root/dependency MIR optimization zero in all 32 units.
@@ -25,19 +25,19 @@ publication from complete raw collections; inventories, solver reports and logs 
 - No project proof configuration, startup assumptions, trusted contracts, induction
   or native replay.
 
-Compared with the ninth pass, two UNKNOWN roots become REFUTED: chassis::Chassis::update and
-arm::Arm::update. Ordered for_each traversal now executes their actual controller reset callbacks
-and reaches count subtraction overflow and a reversed PID clamp bound. Independent SMT rechecks
-and native helper/controller reproducers validate the witnesses. They violate normal constructor
-invariants, so full application reachability remains unverified. All 1,113 proofs and the previous
-253 refutations retain their outcomes. There are no added/removed roots, incompatible analysis
-configurations or resource-limit outcome changes.
+Compared with the tenth pass, referee::encode moves UNKNOWN to REFUTED after fixed byte copies
+pass the former allocation-capacity limit. Its arbitrary-root oversized payload violates slice
+bounds; independent SMT and native checks reproduce the failure. The intended data.len() <= 127
+domain excludes the witness, and actual UI callers pass payload lengths 8 and 21. Those callers
+remain UNKNOWN but now reach CRC16 query-size limits. All 1,113 proofs and the previous 255
+refutations retain their outcomes. There are no added/removed roots, incompatible analysis
+configurations or resource-limit outcome regressions.
 
 Compiler return-type metadata now separates direct future construction from function bodies:
 
 | Root scope | Roots | PROVED | REFUTED | UNKNOWN |
 | --- | ---: | ---: | ---: | ---: |
-| Function body | 2,232 | 1,063 | 255 | 914 |
+| Function body | 2,232 | 1,063 | 256 | 913 |
 | Direct coroutine factory | 104 | 50 | 0 | 54 |
 
 All roots have compiler-backed scope metadata. Among source-heuristic roots, 503 proofs concern
@@ -47,15 +47,16 @@ separate from this function-only collection.
 
 Nineteen source and 455 generated UNKNOWN diagnostics changed only compiler display. Two source
 UNKNOWN diagnostics exchanged solver-unknown and execution-budget grouping keys without changing
-their outcomes. Raw diagnostics remain retained separately from display
+their outcomes. Two more source UNKNOWN diagnostics advance from byte allocation capacity to CRC16
+query-size limits. Raw diagnostics remain retained separately from display
 normalization and proof outcomes.
 
 The constructor checkers share body availability, monomorphized MIR loading, resource caps,
 constant return binding and certificate finalization. Their distinct argument/origin policies and
 context caches remain explicit. Integer and pointer CAS share ordering and success calculations;
 each weak operation retains a fresh possible spurious failure. Integer history and pointer
-publication effects remain separate. The ordinary full survey records the two iterator advances
-described above.
+publication effects remain separate. Fixed byte-view writes now budget generated stores rather than
+total allocation capacity. The 128-write ceiling and separate typed-encoding/chunk limits remain.
 
 Numeric MMIO, arbitrary dynamic controller inputs, mutable references and alias constraints,
 solver/resource limits, larger byte views and iterator source provenance remain current gaps.
@@ -67,7 +68,7 @@ not hermetic capture of arbitrary custom build environment variables.
 
 The separate [all-main evidence](/data/fleet-embassy-main-current.json) covers every one of the
 12 binary mains in three scopes. Its refreshed analyzer is `03e66a2`; the full fleet measurement
-above remains frozen at `2169311`. Both use the same captured fleet artifacts and default limits.
+above remains frozen at `d45d34f`. Both use the same captured fleet artifacts and default limits.
 Factory construction alone does not
 execute the async body; `--async-entry` constructs a fresh future and follows its reached polls.
 
@@ -173,6 +174,12 @@ No hardware instruction is skipped or MMIO validity assumed. These conditional d
 change the ordinary full-survey or published fresh-future main outcomes.
 
 ## Earlier repeatable measurements
+
+The tenth 2026-10-09 pass at analyzer `2169311` collected 2,336 roots: 1,113 PROVED,
+255 REFUTED and 968 UNKNOWN. Its source-function heuristic was 518/231/270. Ordered for_each clears
+two controller traversal blockers and reaches audited Chassis/Arm refutations under arbitrary root
+state. Constructor/history invariants exclude those witnesses; application reachability remains
+unverified.
 
 The ninth 2026-10-09 pass at analyzer `80030b0` collected 2,336 roots: 1,113 PROVED,
 253 REFUTED and 970 UNKNOWN. All outcomes matched the eighth pass. Its source-function heuristic
