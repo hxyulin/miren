@@ -38,6 +38,20 @@ fn instruction(template: &[InlineAsmTemplatePiece]) -> Option<Instruction> {
     }
 }
 
+fn unsupported_template(template: &[InlineAsmTemplatePiece]) -> String {
+    match template {
+        [InlineAsmTemplatePiece::String(text)]
+            if text == "sev" || text == "wfe" || text == "wfi" =>
+        {
+            format!(
+                "unsupported Cortex-M instruction `{text}`; \
+                 hardware event/wait semantics are unmodeled"
+            )
+        }
+        _ => "unsupported Cortex-M interrupt-register assembly template".to_owned(),
+    }
+}
+
 fn general_register(reg: InlineAsmRegOrRegClass) -> bool {
     matches!(
         reg,
@@ -81,6 +95,7 @@ impl<'tcx> Engine<'tcx> {
         if !supported_target(&target.arch, target.pointer_width, &target.llvm_target) {
             return Err("interrupt-register assembly requires a supported Cortex-M target".into());
         }
+        let operation = instruction(template).ok_or_else(|| unsupported_template(template))?;
         let required =
             InlineAsmOptions::NOMEM | InlineAsmOptions::NOSTACK | InlineAsmOptions::PRESERVES_FLAGS;
         let [destination] = targets.as_ref() else {
@@ -92,8 +107,6 @@ impl<'tcx> Engine<'tcx> {
         {
             return Err("interrupt-register assembly options or unwind shape unsupported".into());
         }
-        let operation = instruction(template)
-            .ok_or("unsupported Cortex-M interrupt-register assembly template")?;
         match operation {
             Instruction::Read => {
                 let [

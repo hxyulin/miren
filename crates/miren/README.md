@@ -193,9 +193,13 @@ contracts are not substituted for an implementation; target contracts and the ac
 
 Exact Cortex-M PRIMASK read/write and interrupt mask instructions have a conservative model for
 supported compiler assembly shapes. Reads have arbitrary 32-bit values and do not establish stable
-interrupt state. Writes invalidate published history outside isolated startup. Other assembly remains
-UNKNOWN;
-these operations do not prove critical-section exclusion or interrupt scheduling.
+interrupt state. Writes invalidate published history outside isolated startup. Other assembly
+remains UNKNOWN. Exact `sev`, `wfe` and `wfi` templates report unmodeled hardware event/wait
+semantics
+before checking PRIMASK-specific options. These operations do not prove critical-section exclusion
+or interrupt scheduling. Unsupported assembly errors identify the selected root in `function` and
+`source`;
+`call_chain` retains the deepest failing call, which may be a dependency body.
 
 Compiler-typed inhabited zero-sized aggregates use bounded shared input shapes, including large
 peripheral token structures. They create no scalar symbols and preserve the root input budget.

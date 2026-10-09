@@ -46,6 +46,9 @@ impl Project {
             "unsupported",
             "independent_reads",
             "reserved_bits",
+            "send_event",
+            "wait_event",
+            "wait_interrupt",
         ] {
             command.args(["--entry", name]);
         }
@@ -97,6 +100,9 @@ pub fn independent_reads() {
     assert!(cortex_m::register::primask::read_raw() == cortex_m::register::primask::read_raw());
 }
 pub fn reserved_bits() { assert!(cortex_m::register::primask::read_raw() <= 1); }
+pub fn send_event() { cortex_m::asm::sev(); }
+pub fn wait_event() { cortex_m::asm::wfe(); }
+pub fn wait_interrupt() { cortex_m::asm::wfi(); }
 "#;
 
 #[test]
@@ -138,6 +144,31 @@ fn compiler_arm_instructions_reach_safe_dependency_calls_and_keep_unknown_bounda
             }
         }
         assert_eq!(proof(&report, "unsupported").status, ProofStatus::Unknown);
+        for (name, mnemonic) in [
+            ("send_event", "sev"),
+            ("wait_event", "wfe"),
+            ("wait_interrupt", "wfi"),
+        ] {
+            let proof = proof(&report, name);
+            assert_eq!(
+                proof.status,
+                ProofStatus::Unknown,
+                "{name}: {:?}",
+                proof.obligations
+            );
+            assert!(proof.assumptions.is_empty());
+            assert!(proof.trusted_calls.is_empty());
+            assert!(proof.models.is_empty());
+            assert!(
+                proof
+                    .obligations
+                    .iter()
+                    .any(|obligation| obligation.detail.contains(&format!(
+                        "unsupported Cortex-M instruction `{mnemonic}`; \
+                     hardware event/wait semantics are unmodeled"
+                    )))
+            );
+        }
     }
 }
 
@@ -260,4 +291,27 @@ fn compiler_cpsie_shape_in_copied_dependency_remains_a_narrow_supported_instruct
         "{:?}",
         proof(&report, "free").obligations
     );
+}
+
+#[test]
+fn bare_send_event_template_is_reported_before_primask_option_checks() {
+    let project = Project::new();
+    let assembly = project.0.join("third-party/cortex-m-0.7.9/src/asm.rs");
+    let original = std::fs::read_to_string(&assembly).unwrap();
+    let instruction = "asm!(\"sev\", options(nomem, nostack, preserves_flags))";
+    assert_eq!(original.matches(instruction).count(), 1);
+    std::fs::write(&assembly, original.replace(instruction, "asm!(\"sev\")")).unwrap();
+    for optimized in [false, true] {
+        let report = project.verify(Some("thumbv7em-none-eabihf"), optimized);
+        let proof = proof(&report, "send_event");
+        assert_eq!(proof.status, ProofStatus::Unknown);
+        assert!(proof.assumptions.is_empty());
+        assert!(proof.trusted_calls.is_empty());
+        assert!(proof.models.is_empty());
+        assert!(proof.obligations.iter().any(|obligation| {
+            obligation.detail.contains(
+            "unsupported Cortex-M instruction `sev`; hardware event/wait semantics are unmodeled"
+        )
+        }));
+    }
 }

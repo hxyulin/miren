@@ -699,7 +699,12 @@ assembly templates, u32 register operands, options and fallthrough shapes on sup
 PRIMASK reads remain arbitrary, including reserved upper bits. Repeated reads need not agree;
 counterexamples depending on that abstraction are labeled. Mask writes establish no exclusion or
 startup history and invalidate published atomic history. Other assembly remains UNKNOWN. This does
-not establish scheduling, interrupt handler behavior or MMIO access conditions.
+not establish scheduling, interrupt handler behavior or MMIO access conditions. Exact `sev`, `wfe`
+and `wfi` templates stay UNKNOWN with a diagnostic naming the unmodeled hardware event/wait
+instruction, including bare instructions with no PRIMASK-specific assembly options. Assembly
+recognition errors propagate to the selected root's `function` and `source`; the recorded
+`call_chain` retains
+the deepest failing dependency call. The diagnostic does not claim that assembly ran at the root.
 
 Compiler-typed inhabited zero-sized structs, tuples and arrays share bounded input descriptions.
 They emit no scalar symbols and consume one ordinary input slot per completed argument shape.

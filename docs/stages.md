@@ -1825,3 +1825,29 @@ All 509 Rust workspace tests and 48 Python tests pass. Formatting, workspace Cli
 dependency checks, documentation builds and manual hooks pass. Independent review found no required
 soundness fixes. Known pointers to foreign declarations remain conservatively outside this callback
 model, even when a Rust export could be resolved elsewhere. No application or assumption changes.
+
+## Stage 113: Hardware event and wait diagnostics
+
+Cortex-M assembly recognizes exact templates before enforcing PRIMASK-specific options and unwind
+shapes. `sev`, `wfe` and `wfi` remain UNKNOWN and report that hardware event/wait semantics are
+unmodeled. The change adds no hardware execution model, scheduler premise or assembly shortcut.
+Supported PRIMASK template, operand, target, option and fallthrough checks are unchanged.
+
+Compiler regressions retain PRIMASK positive, refuted and unknown controls and check all three
+hardware instructions in debug and release ARM builds. An isolated copy of the dependency fixture
+removes SEV options to match Embassy's bare `asm!("sev")`; it still reports the specific UNKNOWN
+boundary without assumptions, trusted calls or modeled execution.
+
+Assembly recognition errors currently bubble to the selected root's function and declaration source
+while preserving the deepest failed call chain. This stage documents that attribution limit and
+does not change the error representation or claim a full runtime-to-application traversal.
+
+All four ARM assembly and five isolated-startup integration tests pass, including the existing
+PRIMASK instruction/option mutation boundaries. Formatting and Clippy pass.
+
+All 510 Rust workspace tests and 48 Python tests pass. Formatting, workspace Clippy, release builds,
+dependency checks, documentation builds and manual hooks pass. Final strict and reset main captures
+retain all 72 obligation arrays exactly. All twelve isolated runtime wrappers now retain both their
+unfinished weak-CAS retry frontier and a specific unsupported SEV diagnostic, with the actual
+__pender call chain. Captures: `/tmp/miren-stage113-main-{strict,reset}-20261009` and
+`/tmp/miren-stage113-runtime`. No application or assumption changes.
