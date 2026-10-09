@@ -89,7 +89,7 @@ fn slice_for_each_executes_callbacks_and_preserves_mutable_backing_on_host_and_a
         ("last_callback_panics", ProofStatus::Refuted),
         ("callback_overflows", ProofStatus::Refuted),
         ("wrong_effect", ProofStatus::Refuted),
-        ("function_pointer", ProofStatus::Unknown),
+        ("function_pointer", ProofStatus::Proved),
         ("unbounded", ProofStatus::Unknown),
         ("ambiguous", ProofStatus::Unknown),
         ("callback_destructor", ProofStatus::Unknown),

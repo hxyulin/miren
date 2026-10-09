@@ -306,11 +306,14 @@ Paths are bounded to eight levels, 128 fields per aggregate and 256 visited type
 enum paths, type punning and ambiguous overlapping identities remain UNKNOWN. Existing typed
 validity, initialization, retirement, reference escape and opaque-effect checks still apply.
 
-Core slice Iterator::for_each supports finite tracked Iter/IterMut backing and concrete function-item
-or closure callbacks. It executes actual callback bodies in source order, retains their conditions
-and memory changes, advances borrowed cursors and retires closure environments. Completion requires
-an exhausted iterator and unit callback results. Function-pointer callbacks, callback destructors,
-unsupported backing and ambiguous mutable projections remain UNKNOWN.
+Core slice Iterator::for_each supports finite tracked Iter/IterMut backing and concrete function
+items, closures or known safe Rust function-pointer callbacks. It executes actual callback bodies in
+source order, retains their conditions and memory changes, advances borrowed cursors and retires
+closure environments. Completion requires an exhausted iterator and unit callback results.
+Fold/rfold, all/any and find_map share concrete callback resolution. Known pointer values require an
+exact registered signature and retained body; arbitrary pointers, callback references, unsafe or
+non-Rust signatures and missing bodies remain UNKNOWN. Callback destructors, unsupported backing and
+ambiguous mutable projections also remain UNKNOWN.
 
 Shared slice iterator stepping validates retained backing before exhaustion as well as element
 access, and repeats that check after callbacks. Retired empty backing remains UNKNOWN.

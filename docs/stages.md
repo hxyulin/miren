@@ -1799,3 +1799,29 @@ retain all 72 obligation arrays exactly. All 12 isolated runtime wrappers retain
 weak-CAS retry frontier and the reached SEV hardware instruction as UNKNOWN; ordinary wrappers
 retain their conservative outcomes. Captures: `/tmp/miren-for-each-final-main-{strict,reset}-20261009`
 and `/tmp/miren-for-each-final-runtime`. No application or hardware assumption changes.
+
+
+## Stage 112: Known function-pointer iterator callbacks
+
+Concrete callback resolution is shared by fold/rfold, all/any, find_map and for_each. Function items
+and closures retain their existing target resolution, environment creation and retirement. An
+already-known safe Rust function-pointer value now resolves through its registered exact signature
+and executes its actual retained target MIR. No target is guessed from the callable type.
+
+Arbitrary root pointer inputs, callback references, unsafe or non-Rust signatures and missing target
+bodies remain UNKNOWN. Existing capture liveness, iterator backing validation, callback destructor,
+contract and frame-escape checks remain in place. The change uses ordinary analysis and adds no
+entry assumptions or scheduler guarantees.
+
+Four new compiler integration tests cover host/ARM and O0/O2 outcomes, forward/reverse fold order,
+last-element mutable effects, conditionally selected targets, predicate and find_map short-circuit
+cursor state, callback contract failures and unsupported boundaries. A retained pointer with missing
+dependency MIR stays UNKNOWN. Mutating an actual fold callback breaks both analysis and native
+execution. The existing slice for_each known-pointer example now proves; closure and function-item
+regressions keep their outcomes. All 16 focused iterator tests and the positive native controls
+pass.
+
+All 509 Rust workspace tests and 48 Python tests pass. Formatting, workspace Clippy, release builds,
+dependency checks, documentation builds and manual hooks pass. Independent review found no required
+soundness fixes. Known pointers to foreign declarations remain conservatively outside this callback
+model, even when a Rust export could be resolved elsewhere. No application or assumption changes.

@@ -10,6 +10,41 @@ pub(super) struct Iteration {
 }
 
 impl<'tcx> Engine<'tcx> {
+    pub(super) fn iterator_callback_target(
+        &self,
+        callback_ty: Ty<'tcx>,
+        callback: &Value,
+        state: &State,
+    ) -> Result<(ty::Instance<'tcx>, bool), String> {
+        if callback_ty.needs_drop(self.tcx, ty::TypingEnv::fully_monomorphized()) {
+            return Err("iterator callback destructors are not modeled".into());
+        }
+        if let ty::Closure(id, args) = callback_ty.kind() {
+            return Ok((ty::Instance::new_raw(*id, args), true));
+        }
+        if let ty::FnDef(id, args) = callback_ty.kind() {
+            return Ok((self.resolve_function_item(*id, args.skip_binder())?, false));
+        }
+        if matches!(callback_ty.kind(), ty::FnPtr(..)) {
+            let signature = callback_ty.fn_sig(self.tcx).skip_binder();
+            if signature.safety() != rustc_hir::Safety::Safe
+                || signature.abi() != rustc_abi::ExternAbi::Rust
+                || signature.c_variadic()
+            {
+                return Err(
+                    "iterator function pointers require a safe fixed Rust signature".into(),
+                );
+            }
+            self.validate_tracked_value(callback, state)?;
+            let target = self.known_function_pointer(callback, callback_ty)?;
+            if !self.tcx.is_mir_available(target.def_id()) {
+                return Err("iterator function pointer requires its retained Rust body".into());
+            }
+            return Ok((target, false));
+        }
+        Err("iterator callback requires a concrete closure, function item or known pointer".into())
+    }
+
     pub(super) fn slice_iterator_kind(&self, ty: Ty<'tcx>) -> Option<bool> {
         let ty::Adt(def, _) = ty.kind() else {
             return None;
@@ -663,15 +698,13 @@ impl<'tcx> Engine<'tcx> {
         site: (DefId, Span),
     ) -> Result<Vec<Return>, String> {
         let signature = self.call_signature(instance)?;
-        let (callable, environment) = match signature.inputs()[1].kind() {
-            ty::Closure(id, args) => (ty::Instance::new_raw(*id, args), true),
-            ty::FnDef(id, args) => (self.resolve_function_item(*id, args.skip_binder())?, false),
-            _ => return Err("iterator predicate requires a concrete callable body".to_owned()),
-        };
         let predicate = values.get(1).ok_or("iterator predicate is missing")?;
-        if signature.inputs()[1].needs_drop(self.tcx, ty::TypingEnv::fully_monomorphized()) {
-            return Err("iterator predicate callback destructors are not modeled".to_owned());
-        }
+        let callback_ty = *signature
+            .inputs()
+            .get(1)
+            .ok_or("iterator predicate type is missing")?;
+        let (callable, environment) =
+            self.iterator_callback_target(callback_ty, predicate, state)?;
         let (predicate, memory) = if environment {
             self.callback_environment(predicate, state)?
         } else {

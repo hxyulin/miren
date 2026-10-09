@@ -127,7 +127,7 @@ checks the supported bit encodings.
 | Array map | Actual callback bodies in order, retaining capture state and reference-valued elements | At most 16 elements; callback destructors remain UNKNOWN |
 | Array from_fn | Actual callbacks in ascending index order, retaining capture state and effects | At most 128 owned elements and 256 values; drops and identity-bearing results remain UNKNOWN |
 | Owned array iteration | Compiler ArrayIntoIter, ordered cursors, count/last, predicates and fold/rfold callbacks | At most 128 owned elements and 256 values; owned Cell/atomic identities, user destructors, clone and views remain UNKNOWN |
-| Iterator fold/sum | Actual fold/rfold callbacks preserve accumulator, capture state and effects; sum uses ordinary MIR | Unfinished folds, callback drops and unsupported element/call shapes remain UNKNOWN |
+| Iterator fold/sum | Function items, closures and known safe Rust pointer callbacks execute actual fold/rfold bodies, preserving accumulator, capture state and effects; sum uses ordinary MIR | Unfinished folds, callback drops and unsupported element/call shapes remain UNKNOWN |
 | Evaluated closure constants | Typed noncapturing, zero-field, zero-sized closure values | Captured constants, including zero-sized captures, remain UNKNOWN |
 | Error formatting setup | Shared concrete core Debug coercions retain opaque reference identity; Result unwrap/expect variants execute branch MIR and recognize the pinned failure helper as a panic boundary | Calling formatters, mutable/other trait coercions, unknown trait-object inputs, vtable/address operations and induction remain UNKNOWN |
 | Integer operations | Arithmetic, overflow flags, min/max, saturating add/subtract, zero counts, byte/bit reversal, comparisons, casts, bit operations and shifts | Optional overflow checks depend on build settings; unsafe nonzero count intrinsics remain unsupported |
@@ -844,8 +844,11 @@ initializers, and symbolic pointer-origin merges retain address bits without poi
 Opaque calls and frame-escape checks remain conservative. Hardware and scheduler validity are not
 supplied by this premise.
 
-Core slice Iter/IterMut for_each uses tracked backing and executes concrete function-item or closure
-callbacks in order. Callback effects and branch conditions persist, borrowed cursors advance, and
-closure storage retires after exhaustion. Panicking callbacks refute the root; incomplete callbacks
-and unsupported storage remain UNKNOWN. This supports finite controller-array reset traversal
-without interpreting physical NonNull fields or assuming reset contracts.
+Core slice Iter/IterMut for_each uses tracked backing and executes concrete function-item, closure
+or known safe Rust function-pointer callbacks in order. Fold/rfold and predicates share the same
+callback resolver. Known pointer values require exact registered signatures and retained Rust bodies;
+arbitrary inputs, callback references, unsafe/non-Rust signatures and unavailable bodies stay UNKNOWN.
+Callback effects and branch conditions persist, borrowed cursors advance, and closure storage retires
+after exhaustion. Panicking callbacks refute the root; incomplete callbacks and unsupported storage
+remain UNKNOWN. This supports finite controller-array reset traversal without interpreting physical
+NonNull fields or assuming reset contracts.

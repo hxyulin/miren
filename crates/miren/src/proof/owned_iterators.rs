@@ -325,14 +325,8 @@ impl<'tcx> Engine<'tcx> {
             return Err("iterator fold callback arity mismatch".to_owned());
         }
         let callback_ty = signature.inputs()[2];
-        if callback_ty.needs_drop(self.tcx, ty::TypingEnv::fully_monomorphized()) {
-            return Err("iterator fold callback destructors are unmodeled".to_owned());
-        }
-        let (callable, has_environment) = match callback_ty.kind() {
-            ty::Closure(id, args) => (ty::Instance::new_raw(*id, args), true),
-            ty::FnDef(id, args) => (self.resolve_function_item(*id, args.skip_binder())?, false),
-            _ => return Err("iterator fold requires a concrete callback body".to_owned()),
-        };
+        let (callable, has_environment) =
+            self.iterator_callback_target(callback_ty, &values[2], state)?;
         let (callback, memory) = if has_environment {
             self.callback_environment(&values[2], state)?
         } else {
@@ -412,14 +406,8 @@ impl<'tcx> Engine<'tcx> {
             return Err("iterator for_each callback signature mismatch".to_owned());
         }
         let callback_ty = signature.inputs()[1];
-        if callback_ty.needs_drop(self.tcx, ty::TypingEnv::fully_monomorphized()) {
-            return Err("iterator for_each callback destructors are unmodeled".to_owned());
-        }
-        let (callable, has_environment) = match callback_ty.kind() {
-            ty::Closure(id, args) => (ty::Instance::new_raw(*id, args), true),
-            ty::FnDef(id, args) => (self.resolve_function_item(*id, args.skip_binder())?, false),
-            _ => return Err("iterator for_each requires a concrete callback body".to_owned()),
-        };
+        let (callable, has_environment) =
+            self.iterator_callback_target(callback_ty, &values[1], state)?;
         let (callback, memory) = if has_environment {
             self.callback_environment(&values[1], state)?
         } else {
