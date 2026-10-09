@@ -199,3 +199,9 @@ exporter-tool hashes. Counterexample and query payloads are represented by canon
 fingerprints; raw SMT, MIR and large dependency path maps remain in the original captures. Output
 larger than 500 KiB is rejected before atomic replacement. Registration or runtime outcomes never
 substitute for the async-body milestone, and conditional outcomes remain explicitly conditional.
+
+Fleet compact comparisons retain every original blocker string and outcome transition. They also
+label changed diagnostics using a grouping key that ignores rustc DefId indices, crate hashes and
+ordering of complete `dyn` Binder entries. Different payload types, paths and operations remain
+separate. This display grouping is not semantic equivalence or proof progress; unchanged UNKNOWN
+roots remain UNKNOWN regardless of grouping. Malformed Binder lists are left unsorted.

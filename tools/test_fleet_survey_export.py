@@ -173,6 +173,34 @@ class ExportTests(unittest.TestCase):
         self.assertEqual(result["unknown_blocker_transition_scope"],
                          "source_function_heuristic_in_either_collection")
 
+    def test_compiler_display_grouping_preserves_actual_type_and_operation_changes(self):
+        a = ("input dyn [Binder { value: Trait(control::Control), bound_vars: [] }, "
+             "Binder { value: Projection(DefId(2:4 ~ control[abcd]::Target), "
+             "Term::Ty([f32; 4_usize])), bound_vars: [] }]")
+        b = ("input dyn [Binder { value: Projection(DefId(8:9 ~ control[1234]::Target), "
+             "Term::Ty([f32; 4_usize])), bound_vars: [] }, "
+             "Binder { value: Trait(control::Control), bound_vars: [] }]")
+        self.assertEqual(exporter.stable_blocker_display(a), exporter.stable_blocker_display(b))
+        for mutation in [b.replace("f32", "f64"), b.replace("4_usize", "3_usize"),
+                         b.replace("::Target", "::Feedback"), b.replace("input", "call")]:
+            self.assertNotEqual(exporter.stable_blocker_display(a),
+                                exporter.stable_blocker_display(mutation))
+        for unchanged in [None, "", "input dyn [Binder { malformed", "unsupported [abcd]"]:
+            self.assertEqual(exporter.stable_blocker_display(unchanged), unchanged)
+        previous = deepcopy(self.raw)
+        index = next(i for i, r in enumerate(self.raw["roots"]) if r["status"] == "unknown"
+                     and r["classification"] == "source_function_heuristic")
+        previous["roots"][index]["first_blocker"] = a
+        self.raw["roots"][index]["first_blocker"] = b
+        result = exporter.comparison(self.raw, previous)
+        self.assertEqual(result["unknown_blocker_display_changes"], [
+            {"before_classification": "source_function_heuristic",
+             "after_classification": "source_function_heuristic",
+             "kind": "compiler_display_only", "count": 1}])
+        self.assertEqual(result["unknown_blocker_transitions"], [
+            {"before": a, "after": b, "count": 1}])
+        self.assertEqual(result["changed_roots"], 0)
+
 
 if __name__ == "__main__":
     unittest.main()

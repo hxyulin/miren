@@ -1338,3 +1338,12 @@ and absent native confirmation. Source and all four artifact checkpoints remain 
 The full implementation passes 446 Rust tests, 41 Python tool tests, formatting, Clippy, release
 builds, dependency checks, documentation builds and manual hooks. Compact exports validate both
 complete captures before publication; fleet application sources remain untouched.
+
+## Stage 87: Stable compiler diagnostic grouping in fleet comparisons
+
+Compact comparisons preserve raw blockers and outcome transitions while separately grouping
+compiler DefId indices, crate hashes and reordered complete dyn Binder entries. Types, array
+lengths, paths, operations and malformed lists are not collapsed. The grouping is diagnostic
+metadata, not semantic equivalence or proof progress. Mutation tests distinguish actual type and
+operation changes. Replaying the fourth-to-fifth comparison separates twenty changed source
+keys from nineteen compiler-display-only changes without modifying their UNKNOWN outcomes.

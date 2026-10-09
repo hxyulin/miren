@@ -7,6 +7,7 @@ from datetime import date
 import hashlib
 import json
 from pathlib import Path
+import re
 import sys
 
 from fleet_survey import STATUSES, compare
@@ -142,6 +143,51 @@ def artifact_provenance(units):
             "artifact_unit_count": len(evidence)}
 
 
+def stable_blocker_display(blocker):
+    """Ignore compiler DefId numbering/hashes and ordering of complete dyn Binder entries.
+
+    This is a diagnostic grouping key, never proof evidence or semantic equivalence.
+    Unbalanced or unrecognized lists retain their original text.
+    """
+    if blocker is None:
+        return None
+    blocker = re.sub(r"DefId\(\d+:\d+ ~ ([^()\n]+)\)",
+                     lambda match: "DefId(~ " + re.sub(r"\[[0-9a-f]+\]", "", match[1]) + ")",
+                     blocker)
+    start = 0
+    while True:
+        begin = blocker.find("dyn [Binder {", start)
+        if begin < 0:
+            return blocker
+        opening = begin + len("dyn ")
+        stack = []
+        entries = []
+        entry_start = opening + 1
+        closing = None
+        valid = True
+        for index in range(opening, len(blocker)):
+            char = blocker[index]
+            if char in "[{(":
+                stack.append(char)
+            elif char in "]})":
+                if not stack or stack.pop() != {"]": "[", "}": "{", ")": "("}[char]:
+                    valid = False
+                    break
+                if not stack:
+                    closing = index
+                    entries.append(blocker[entry_start:index].strip())
+                    break
+            elif char == "," and stack == ["["]:
+                entries.append(blocker[entry_start:index].strip())
+                entry_start = index + 1
+        if not valid or closing is None or not all(
+                entry.startswith("Binder {") and entry.endswith("}") for entry in entries):
+            return blocker
+        replacement = ", ".join(sorted(entries))
+        blocker = blocker[:opening + 1] + replacement + blocker[closing:]
+        start = opening + len(replacement) + 2
+
+
 def comparison(summary, previous):
     counts, _ = validate(previous, complete=False)
     changes = compare(summary, previous)
@@ -167,6 +213,13 @@ def comparison(summary, previous):
         for key in before.keys() & after
         if before[key]["status"] == after[key]["status"] == "unknown"
         and before[key]["first_blocker"] != after[key]["first_blocker"])
+    display_counts = Counter(
+        (before[key]["classification"], after[key]["classification"],
+         stable_blocker_display(before[key]["first_blocker"]) ==
+         stable_blocker_display(after[key]["first_blocker"]))
+        for key in before.keys() & after
+        if before[key]["status"] == after[key]["status"] == "unknown"
+        and before[key]["first_blocker"] != after[key]["first_blocker"])
     return {"baseline_collection_status": previous["status"],
             "baseline_failed_units": sum(u["status"] != "complete" for u in previous["units"]),
             "baseline_counts": counts,
@@ -182,6 +235,12 @@ def comparison(summary, previous):
                  "before": a, "after": b, "count": count}
                 for (ca, cb, a, b), count in sorted(classified_transitions.items())],
             "unknown_blocker_transition_scope": "source_function_heuristic_in_either_collection",
+            "unknown_blocker_display_grouping": "DefId identity and complete dyn Binder order only",
+            "unknown_blocker_display_changes": [
+                {"before_classification": ca, "after_classification": cb,
+                 "kind": "compiler_display_only" if same else "different_grouping_key",
+                 "count": count}
+                for (ca, cb, same), count in sorted(display_counts.items())],
             "unknown_blocker_change_counts": [
                 {"before_classification": ca, "after_classification": cb, "count": count}
                 for (ca, cb), count in sorted(blocker_counts.items())],
