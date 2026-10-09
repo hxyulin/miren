@@ -2,9 +2,22 @@ use super::{Constant, Kind, Op, Rounding, Sort, Term};
 use std::collections::{HashMap, HashSet};
 
 pub(super) fn print(root: &Term, max_bytes: usize) -> Result<String, String> {
+    print_roots(&[root], false, max_bytes)
+}
+
+pub(super) fn print_conjunction(roots: &[Term], max_bytes: usize) -> Result<String, String> {
+    let roots = roots.iter().collect::<Vec<_>>();
+    print_roots(&roots, true, max_bytes)
+}
+
+fn print_roots(roots: &[&Term], conjunction: bool, max_bytes: usize) -> Result<String, String> {
     let mut nodes = HashMap::new();
     let mut references = HashMap::<usize, usize>::new();
-    let mut pending = vec![root.clone()];
+    let mut pending = Vec::new();
+    for root in roots {
+        *references.entry(root.node.id).or_default() += 1;
+        pending.push((*root).clone());
+    }
     while let Some(term) = pending.pop() {
         if nodes.contains_key(&term.node.id) {
             continue;
@@ -58,7 +71,16 @@ pub(super) fn print(root: &Term, max_bytes: usize) -> Result<String, String> {
             available.insert(term.node.id);
         }
     }
-    expression(root, &available, &mut output)?;
+    if conjunction {
+        output.push("(and")?;
+        for root in roots {
+            output.push(" ")?;
+            expression(root, &available, &mut output)?;
+        }
+        output.push(")")?;
+    } else {
+        expression(roots[0], &available, &mut output)?;
+    }
     for _ in &available {
         output.push(")")?;
     }

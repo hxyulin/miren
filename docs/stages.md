@@ -1905,3 +1905,37 @@ roots change identity. Source-heuristic counts are 518/232/269. Both public UI r
 query-size limits. Firmware/source fingerprints and four artifact checkpoints per unit remain
 consistent. Raw capture: `/tmp/miren-fleet-pass11-20261009/summary.json`. Deterministic export
 validation passes before publication; the all-main publication remains separately frozen at 03e66a2.
+
+## Stage 115: Shared serialization for oversized typed queries
+
+Typed queries keep their existing per-condition representation when it fits the byte budget. On
+overflow, the same original Boolean roots share local let bindings inside one conjunction. No
+condition folding, global symbols or larger limits are introduced. Context and Boolean-sort checks
+precede serialization; floating-point conditions and non-floating probes retain their original
+semantics. Handwritten queries and Horn queries are unchanged. Previously oversized queries trade
+per-condition incremental prefix reuse for a bounded complete query; ordinary queries keep their
+text and cache keys.
+
+The shared-table regression shrinks from 48,560 to 3,528 bytes under the same 16,000-byte limit.
+Equivalent legacy and fallback queries agree on SAT models and UNSAT outcomes, and actual fallback
+sibling scopes exercise SAT to UNSAT to SAT session reuse. Complex forest serialization succeeds at
+its exact byte length and rejects one byte less. Small query text and single-term printing are
+unchanged; foreign-context and non-Boolean roots are rejected. Float conditions remain present in
+the full fallback while the separate non-floating probe excludes them.
+
+Synthetic CRC16 fixtures include a 136-byte packet buffer, five header bytes and twelve symbolic
+payload bytes. Standard checksum and packet roots prove, the wrong checksum claim refutes, and an
+untracked raw pointer stays UNKNOWN on host/ARM at O0/O2. Removing the table-index mask refutes and
+fails native execution. These are tool fixtures, with no application rewrites or new assumptions.
+
+Diagnostic actual fleet replays now PROVE referee::ui_delete_all without assumptions. The audited
+private encode refutation is unchanged, while ui_number remains UNKNOWN at the same query-byte
+limit. The remaining large forest repeats sixteen integer-table ITE lookups; no query limit is
+raised. Captures: `/tmp/miren-stage115/replay`.
+
+All 517 Rust workspace tests and 48 Python tests pass. Formatting, workspace Clippy, release builds,
+dependency checks, documentation builds and manual hooks pass. Independent review found no required
+soundness fixes. All 72 strict/reset main obligation arrays remain identical to stage 113. All
+twelve isolated wrappers retain both unfinished weak-CAS retries and unsupported SEV, with their
+actual __pender call chains. Captures: `/tmp/miren-stage115-main-{strict,reset}-20261009` and
+`/tmp/miren-stage115/runtime`. No application or assumption changes.

@@ -328,3 +328,9 @@ ambiguous mutable projections also remain UNKNOWN.
 
 Shared slice iterator stepping validates retained backing before exhaustion as well as element
 access, and repeats that check after callbacks. Retired empty backing remains UNKNOWN.
+
+Typed SMT queries retain the existing per-condition serialization when it fits the configured byte
+budget. Oversized queries retry with one Boolean conjunction and shared local let bindings across
+all original conditions, under the same whole-script budget. This preserves floating-point
+conditions and separate non-floating probes; unsupported or still oversized queries remain UNKNOWN.
+Handwritten solver queries retain their original representation.

@@ -864,3 +864,9 @@ Callback effects and branch conditions persist, borrowed cursors advance, and cl
 after exhaustion. Panicking callbacks refute the root; incomplete callbacks and unsupported storage
 remain UNKNOWN. This supports finite controller-array reset traversal without interpreting physical
 NonNull fields or assuming reset contracts.
+
+Typed solver queries that exceed their configured byte budget retry the same Boolean conditions
+with query-wide local DAG sharing. Ordinary queries retain their previous text and incremental
+prefixes. The fallback preserves all conditions, models and floating-point probes; budgets stay
+unchanged, and oversized results remain UNKNOWN. Compiler CRC16 fixtures cover host/ARM O0/O2
+PROVED, REFUTED and UNKNOWN outcomes and a natively failing table-index mutation.

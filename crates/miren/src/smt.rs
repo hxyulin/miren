@@ -324,6 +324,16 @@ impl Context {
             .collect()
     }
 
+    /// Print a Boolean conjunction without folding its roots or adding global symbols.
+    pub fn smt_conjunction(&self, roots: &[Term], max_bytes: usize) -> Result<String, String> {
+        for root in roots {
+            if root.sort() != &Sort::Bool || !root.belongs_to(self) {
+                return Err("SMT conjunction requires Boolean terms from its context".into());
+            }
+        }
+        printer::print_conjunction(roots, max_bytes)
+    }
+
     fn intern(&self, sort: Sort, kind: Kind) -> Term {
         let key = Key {
             sort: sort.clone(),

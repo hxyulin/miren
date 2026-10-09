@@ -155,7 +155,7 @@ impl Query {
         use miren::smt::{Constant, Sort};
         let mut seen = std::collections::HashSet::new();
         let mut ground = Some(true);
-        let mut assertions = Vec::new();
+        let mut retained = Vec::new();
         let mut symbols = std::collections::BTreeSet::new();
         for term in terms {
             if term.sort() != &Sort::Bool || !term.belongs_to(context) {
@@ -166,7 +166,7 @@ impl Query {
         let declarations = context.declarations_for(&symbols)?;
         let mut positive = std::collections::HashSet::new();
         let mut negative = std::collections::HashSet::new();
-        let mut bytes = prelude(limits.solver_timeout_ms).len()
+        let bytes = prelude(limits.solver_timeout_ms).len()
             + "(check-sat)\n".len()
             + declarations
                 .iter()
@@ -197,17 +197,24 @@ impl Query {
                 None => {}
             }
             if seen.insert(term.id()) {
-                let budget = limits
-                    .max_query_bytes
-                    .checked_sub(bytes + "(assert )\n".len())
-                    .ok_or("symbolic query size limit reached")?;
-                let text = term
-                    .smt(budget)
-                    .map_err(|_| "symbolic query size limit reached".to_owned())?;
-                bytes += text.len() + "(assert )\n".len();
-                assertions.push(text);
+                retained.push((*term).clone());
             }
         }
+        let assertions =
+            match Self::separate_term_assertions(&retained, bytes, limits.max_query_bytes) {
+                Ok(assertions) => assertions,
+                Err(_) => {
+                    let budget = limits
+                        .max_query_bytes
+                        .checked_sub(bytes + "(assert )\n".len())
+                        .ok_or("symbolic query size limit reached")?;
+                    vec![
+                        context
+                            .smt_conjunction(&retained, budget)
+                            .map_err(|_| "symbolic query size limit reached".to_owned())?,
+                    ]
+                }
+            };
         let mut query = Self::from_assertions(
             &declarations,
             limits.solver_timeout_ms,
@@ -216,6 +223,23 @@ impl Query {
         query.ground = ground;
         query.symbols = symbols;
         Ok(query)
+    }
+
+    fn separate_term_assertions(
+        terms: &[miren::smt::Term],
+        mut bytes: usize,
+        max_bytes: usize,
+    ) -> Result<Vec<String>, String> {
+        let mut assertions = Vec::new();
+        for term in terms {
+            let budget = max_bytes
+                .checked_sub(bytes + "(assert )\n".len())
+                .ok_or("symbolic query size limit reached")?;
+            let text = term.smt(budget)?;
+            bytes += text.len() + "(assert )\n".len();
+            assertions.push(text);
+        }
+        Ok(assertions)
     }
 }
 
@@ -1396,5 +1420,191 @@ mod encoding_tests {
             Answer::Unsat => panic!("sparse branch scopes leaked into the restored query"),
             Answer::Unknown(error) => panic!("{error}"),
         }
+    }
+
+    fn shared_table_conditions() -> (Context, miren::smt::Term, Vec<miren::smt::Term>) {
+        let context = Context::default();
+        let input = context.symbol(7, Sort::BitVec(8)).unwrap();
+        let zero = context.bit_vector(0, 8).unwrap();
+        let mut table = context
+            .apply(
+                Op::ConstArray { index_bits: 8 },
+                std::slice::from_ref(&zero),
+            )
+            .unwrap();
+        for index in 0..80 {
+            table = context
+                .apply(
+                    Op::Store,
+                    &[
+                        table,
+                        context.bit_vector(index, 8).unwrap(),
+                        context.bit_vector(1, 8).unwrap(),
+                    ],
+                )
+                .unwrap();
+        }
+        let mut conditions = Vec::new();
+        for offset in 0..20 {
+            let index = context
+                .apply(
+                    Op::BvAdd,
+                    &[input.clone(), context.bit_vector(offset, 8).unwrap()],
+                )
+                .unwrap();
+            let cell = context.apply(Op::Select, &[table.clone(), index]).unwrap();
+            conditions.push(context.apply(Op::Equal, &[cell, zero.clone()]).unwrap());
+        }
+        (context, input, conditions)
+    }
+
+    #[test]
+    fn joint_fallback_shares_tables_and_replaces_real_sibling_scopes() {
+        let (context, input, conditions) = shared_table_conditions();
+        let expected = context
+            .apply(
+                Op::Equal,
+                &[input.clone(), context.bit_vector(200, 8).unwrap()],
+            )
+            .unwrap();
+        let limits = AnalysisLimits {
+            max_query_bytes: 16_000,
+            ..AnalysisLimits::default()
+        };
+        let accepted = Query::from_terms_with_limits(
+            &context,
+            &conditions,
+            &expected,
+            &BTreeMap::new(),
+            limits,
+        )
+        .unwrap();
+        assert_eq!(accepted.assertions.len(), 1);
+        assert!(accepted.text().len() < limits.max_query_bytes);
+        let separately_rendered: Vec<_> = conditions
+            .iter()
+            .map(|term| term.smt(200_000).unwrap())
+            .collect();
+        let legacy = Query::new(
+            &context.declarations(),
+            &separately_rendered,
+            &expected.smt(200_000).unwrap(),
+        );
+        assert!(legacy.text().len() > limits.max_query_bytes);
+        let mut roots = conditions.clone();
+        roots.push(expected.clone());
+        let forest = context.smt_conjunction(&roots, 200_000).unwrap();
+        assert!(context.smt_conjunction(&roots, forest.len()).is_ok());
+        assert!(context.smt_conjunction(&roots, forest.len() - 1).is_err());
+        let mut solver = Solver::default();
+        for query in [&legacy, &accepted] {
+            let Answer::Sat(model) = solver.check_query(query) else {
+                panic!("equivalent table queries must remain satisfiable");
+            };
+            assert!(model.contains("bv200"), "{model}");
+        }
+        let impossible = context
+            .apply(Op::Equal, &[input, context.bit_vector(0, 8).unwrap()])
+            .unwrap();
+        let rejected = Query::from_terms_with_limits(
+            &context,
+            &conditions,
+            &impossible,
+            &BTreeMap::new(),
+            limits,
+        )
+        .unwrap();
+        assert_eq!(rejected.assertions.len(), 1);
+        assert_eq!(rejected.ground, None);
+        let legacy = Query::new(
+            &context.declarations(),
+            &separately_rendered,
+            &impossible.smt(200_000).unwrap(),
+        );
+        assert!(matches!(solver.check_query(&legacy), Answer::Unsat));
+        assert!(matches!(solver.check_query(&accepted), Answer::Sat(_)));
+        let before = solver.session.as_ref().unwrap().sequence;
+        assert!(matches!(solver.check_query(&rejected), Answer::Unsat));
+        assert!(solver.session.as_ref().unwrap().sequence > before);
+        assert!(matches!(solver.check_query(&accepted), Answer::Sat(_)));
+    }
+
+    #[test]
+    fn fallback_keeps_full_float_conditions_and_a_separate_non_float_probe() {
+        let (context, input, mut conditions) = shared_table_conditions();
+        let floating = context
+            .symbol(
+                8,
+                Sort::Float {
+                    exponent: 8,
+                    significand: 24,
+                },
+            )
+            .unwrap();
+        let zero = context
+            .apply(
+                Op::PositiveZero {
+                    exponent: 8,
+                    significand: 24,
+                },
+                &[],
+            )
+            .unwrap();
+        let is_zero = context.apply(Op::FpEqual, &[floating, zero]).unwrap();
+        conditions.push(is_zero);
+        let failure = context
+            .apply(Op::Equal, &[input, context.bit_vector(200, 8).unwrap()])
+            .unwrap();
+        let query = Query::from_terms_with_limits(
+            &context,
+            &conditions,
+            &failure,
+            &BTreeMap::new(),
+            AnalysisLimits {
+                max_query_bytes: 16_000,
+                ..AnalysisLimits::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(query.assertions.len(), 1);
+        assert!(query.text().contains("fp.eq"));
+        let probe = query.non_float.as_ref().unwrap();
+        assert_eq!(probe.assertions.len(), 1);
+        assert!(!probe.text().contains("fp.eq"));
+        assert!(!probe.symbols.contains(&8));
+        let mut solver = Solver::default();
+        assert!(matches!(solver.check_query(&query), Answer::Sat(_)));
+    }
+
+    #[test]
+    fn small_queries_keep_exact_legacy_text_and_forest_roots_are_validated() {
+        let context = Context::default();
+        let x = context.symbol(0, Sort::Bool).unwrap();
+        let y = context.symbol(1, Sort::Bool).unwrap();
+        let term = context.apply(Op::And, &[x.clone(), y.clone()]).unwrap();
+        assert_eq!(term.smt(200_000).unwrap(), "(and v0 v1)");
+        let typed =
+            Query::from_terms(&context, std::slice::from_ref(&x), &y, &BTreeMap::new()).unwrap();
+        let legacy = Query::new(&context.declarations(), &["v0".into()], "v1");
+        assert_eq!(typed.text(), legacy.text());
+        assert_eq!(typed.assertions, ["v0", "v1"]);
+        let other = Context::default().symbol(0, Sort::Bool).unwrap();
+        assert!(
+            context
+                .smt_conjunction(&[context.boolean(false), other], 200_000)
+                .is_err()
+        );
+        let integer = context.bit_vector(0, 8).unwrap();
+        assert!(
+            context
+                .smt_conjunction(&[context.boolean(false), integer], 200_000)
+                .is_err()
+        );
+        let forest = context.smt_conjunction(&[term], 200_000).unwrap();
+        assert_eq!(forest, "(and (and v0 v1))");
+        let roots = [x, y];
+        let forest = context.smt_conjunction(&roots, 200_000).unwrap();
+        assert!(context.smt_conjunction(&roots, forest.len()).is_ok());
+        assert!(context.smt_conjunction(&roots, forest.len() - 1).is_err());
     }
 }
