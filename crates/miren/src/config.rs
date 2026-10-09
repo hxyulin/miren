@@ -19,6 +19,9 @@ pub enum TrustedStorageEffect {
     /// No mutation, publication or retirement of pre-existing ordinary tracked storage.
     /// Static/startup state and atomic precision are still invalidated.
     PreserveExistingOrdinaryStorage,
+    /// Also preserves already-live Rust static allocations, initialized declared-type validity,
+    /// and existing modeled borrow/access rights. Values and atomic precision remain opaque.
+    PreserveExistingOrdinaryStorageAndStaticValidity,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -169,6 +172,9 @@ impl FunctionContract {
                 TrustedStorageEffect::PreserveExistingOrdinaryStorage => {
                     "preserve_existing_ordinary_storage"
                 }
+                TrustedStorageEffect::PreserveExistingOrdinaryStorageAndStaticValidity => {
+                    "preserve_existing_ordinary_storage_and_static_validity"
+                }
             };
             format!(
                 "trusted-storage:v1:selector={};effect={effect};reason={}",
@@ -252,6 +258,30 @@ mod tests {
             invalid["functions"][0][field] = value;
             let config: ContractConfig = serde_json::from_value(invalid).unwrap();
             assert!(config.validate().is_err(), "{field}");
+        }
+        opt_in["functions"][0]["storage_effect"] =
+            serde_json::json!("preserve_existing_ordinary_storage_and_static_validity");
+        let config: ContractConfig = serde_json::from_value(opt_in.clone()).unwrap();
+        config.validate().unwrap();
+        assert!(
+            config.functions[0]
+                .storage_assumption()
+                .unwrap()
+                .contains(";effect=preserve_existing_ordinary_storage_and_static_validity;reason=")
+        );
+        for field in ["modifies", "returns_alias"] {
+            let mut invalid = opt_in.clone();
+            invalid["functions"][0][field] = if field == "modifies" {
+                serde_json::json!([])
+            } else {
+                serde_json::json!("arg0")
+            };
+            assert!(
+                serde_json::from_value::<ContractConfig>(invalid)
+                    .unwrap()
+                    .validate()
+                    .is_err()
+            );
         }
         opt_in["functions"][0]["storage_effect"] = serde_json::json!("preserve_everything");
         assert!(serde_json::from_value::<ContractConfig>(opt_in).is_err());

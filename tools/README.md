@@ -316,3 +316,12 @@ base addresses. These remain explicit unverified access hypotheses; other ports/
 unmapped. The complete replay clears the future-frame loss and reaches RCC pointer constants on
 eight H7 mains plus retired USB static storage on the F4 main. Outcomes remain three REFUTED and
 nine UNKNOWN; no completed main proof or native boot claim is added.
+
+
+The separate combined `fleet-main-stm32-gpio-af-static-validity-hypothesis.json` profile adds
+explicit preservation of already-live modeled static allocation/type validity and existing
+borrow/access rights at the exact initialization call. Static values may change; startup caches
+and atomic precision remain invalidated. Dead epochs and retired/uninitialized subobjects cannot
+be restored. It assumes neither zero refcounts nor unused USB storage. Its distinct effect must
+appear in the exact recorded premise for a used boundary; the ordinary-frame profiles retain
+their earlier behavior.

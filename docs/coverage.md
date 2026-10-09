@@ -1009,3 +1009,18 @@ currently handles numeric bits and misses allocation-backed static provenance. T
 `rm_c::UsbPort::open::EP_OUT: StaticCell<[u8; 256]>`, whose view is retired by the opaque static
 effects. Neither diagnostic establishes a firmware lifetime failure. Static identity alone would
 not prove zero refcounts or an unused USB cell; those need separate state/effect evidence.
+
+
+Stage 131 separates exact Rust static address identity from a conditional preservation of existing
+static access validity. The new external storage effect retains already-live allocation/type and
+borrow/access rights, while invalidating value history and atomic precision. Whole compiler-named
+Rust static raw pointers retain exact declared types; bounded initialized mutable byte-array
+leaves admit arbitrary values. Neither initializer zeroes nor an unused USB cell is inferred.
+
+The stage-131 complete all-main replay remains three REFUTED and nine UNKNOWN. Eight H7 paths
+now stop at mutable static array-to-slice coercion; F4 reaches the portable-atomic bool-to-byte
+wrapper cast. These are Rust representation gaps, not MMIO access failures or observed boot bugs.
+All 36 strict obligation arrays match stage 130. The ordinary-frame profile still invalidates
+static views: eight H7 diagnostics now report that invalidation after raw identity is decoded,
+while all outcomes remain unchanged. Local evidence:
+`/tmp/miren-stage131-main-static-validity-20261010`.

@@ -313,6 +313,13 @@ impl<'tcx> Engine<'tcx> {
                 TrustedStorageEffect::PreserveExistingOrdinaryStorage => {
                     self.certify_trusted_owned_inputs(&signature, values, &state.conditions)?
                 }
+                TrustedStorageEffect::PreserveExistingOrdinaryStorageAndStaticValidity => {
+                    self.certify_trusted_owned_inputs(&signature, values, &state.conditions)?;
+                    let epoch = self
+                        .static_epoch
+                        .ok_or("static validity epoch unavailable")?;
+                    super::storage_locations::validate_static_epoch(&state.memory, epoch)?;
+                }
             }
         }
         let snapshots = self.snapshots(values, &state.memory, &state.conditions)?;
@@ -438,6 +445,14 @@ impl<'tcx> Engine<'tcx> {
                             .ok_or("static effect epoch outside memory")?;
                         *slot = None;
                     }
+                }
+                TrustedStorageEffect::PreserveExistingOrdinaryStorageAndStaticValidity => {
+                    // Explicitly preserves live allocation/type and existing access rights,
+                    // never payload history, initialization of MaybeUninit, or a dead epoch.
+                    let epoch = self
+                        .static_epoch
+                        .ok_or("static validity epoch unavailable")?;
+                    super::storage_locations::validate_static_epoch(&memory, epoch)?;
                 }
             }
         } else {

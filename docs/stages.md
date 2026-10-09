@@ -2566,3 +2566,29 @@ compiler integrations also pass after fixture-only line wrapping. Final strict a
 captures each match all 36 stage-129 obligation arrays exactly:
 `/tmp/miren-stage130-main-strict-final-20261010` and
 `/tmp/miren-stage130-main-gpio-legacy-final-20261010`.
+
+
+## Stage 131: static address identity and explicit access-validity effects
+
+A separate public trusted storage effect preserves already-live modeled Rust static allocation,
+initialized declared-type validity and existing borrow/access rights. Static value history and
+atomic precision remain invalidated; dead epochs and uninitialized subobjects cannot be restored.
+Exact whole compiler-named Rust static raw-pointer constants retain identity without borrowing
+numeric MMIO rights. Bounded initialized mutable u8-array leaves admit arbitrary values.
+
+
+Complete strict, ordinary-frame and static-validity all-main captures each contain 36 roots from
+12 units with no collection errors. The new conditional profile keeps three async REFUTED and
+nine UNKNOWN, reaching mutable static slice coercion on eight H7 paths and a portable-atomic
+wrapper cast on F4. Registration remains 12 PROVED, ordinary runtime 12 REFUTED, and all fresh
+future bodies are entered. The 36 strict obligation arrays are unchanged. Ordinary-frame
+invalidation remains conservative; eight H7 diagnostics advance from unsupported raw constants
+to the retained dead-epoch check. The paired compact export validates without replacing the
+published evidence. Captures: `/tmp/miren-stage131-main-{strict,legacy,static-validity}-20261010`.
+
+
+Validation passes: all 566 workspace Rust tests and 57 Python policy/runner tests, focused
+host/ARM O0/O2 positive/refuted/unknown controls, formatting, Clippy, release build, cargo-deny,
+documentation build and manual hooks. Actual pure Rust mutation and both storage-effect native
+replay refusals pass; custom invalid MIR and hardware paths are never executed natively.
+Independent review approves the exact provenance, access and history boundaries.

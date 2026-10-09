@@ -277,3 +277,24 @@ Every admitted use records the exact versioned selector/effect/reason premise an
 the report. Later REFUTED and UNKNOWN outcomes retain it. Strict defaults and existing omitted
 `modifies` contracts keep their conservative behavior. Native replay refuses configured or recorded
 storage effects because this API has no native implementation of the external boundary.
+
+
+### Preserving existing static access validity
+
+`TrustedStorageEffect::PreserveExistingOrdinaryStorageAndStaticValidity`, serialized as
+`"preserve_existing_ordinary_storage_and_static_validity"`, adds a separate conditional premise.
+The exact call preserves the ordinary storage frame above, plus already-live modeled Rust static
+allocation liveness, initialized declared-type validity and existing static borrow/access rights.
+Static values may change. This premise concerns the modeled Rust views; it establishes no numeric
+MMIO provenance or physical register behavior.
+
+The boundary needs the same pure owned input/output certificate and exact trusted selector. An
+already invalid static epoch cannot be restored. Retired or uninitialized subobjects remain
+invalid, including uninitialized `MaybeUninit` payloads. Startup/static value caches and atomic
+precision are still invalidated. Neither zero refcounts nor an unused `StaticCell` follows from
+this effect or from constructing a fresh application future.
+
+The exact effect has its own recorded selector/effect/reason premise. Ordinary-storage-only
+profiles retain their earlier invalidation behavior. Native replay remains unavailable for either
+external storage effect. A future device or Embassy-state adapter must supply explicit modeled
+state/effects; this declarative API does not execute a full peripheral emulator.

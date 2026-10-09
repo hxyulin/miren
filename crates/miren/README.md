@@ -455,3 +455,18 @@ Ordinary root-input and transmute limits stay unchanged. Existing dead storage s
 static views, startup values and atomic precision are invalidated. Every used effect records its exact versioned selector/reason premise.
 This provides an opt-in frame boundary for future external state models without inferring privacy
 from call arguments. Legacy unknown effects stay conservative; native replay refuses this mode.
+
+`TrustedStorageEffect::PreserveExistingOrdinaryStorageAndStaticValidity` additionally promises
+preservation of already-live Rust static allocations, initialized declared-type validity and
+existing modeled static borrow/access rights. A dead static epoch cannot be restored. Retired
+subobjects and uninitialized `MaybeUninit` payloads stay unavailable, and static/startup values and
+all atomic precision are still invalidated. The distinct effect premise is recorded only on use;
+configured or recorded effects refuse native replay.
+
+Raw constants backed by an exact nonforeign Rust static retain address provenance only when their
+whole pointee and original declared storage type match at offset zero. Numeric and anonymous
+allocation constants acquire no static rights. Raw mutability grants writes only for a mutable
+static; immutable interior access still requires the existing certified `UnsafeCell` operations.
+Initialized elements of mutable `[u8; N]` statics, with `N <= 128`, admit arbitrary byte reads
+through exact typed bounded projections. This recovers neither zero initializers nor write history after
+an external effect. Counterexamples using arbitrary reads retain their abstraction reasons.

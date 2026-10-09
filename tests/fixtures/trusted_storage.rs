@@ -1,6 +1,6 @@
 #![no_std]
 #![forbid(unsafe_code)]
-#![feature(custom_mir, core_intrinsics, pattern_types, pattern_type_macro)]
+#![feature(custom_mir, core_intrinsics, pattern_types, pattern_type_macro, sync_unsafe_cell)]
 use core::intrinsics::mir::*;
 use core::sync::atomic::{AtomicU16, Ordering};
 
@@ -115,4 +115,106 @@ mod native {
             core::future::Future::poll(future.as_mut(), &mut context) == core::task::Poll::Ready(7)
         );
     }
+}
+
+static mut BYTES: [u8; 3] = [0, 1, 2];
+#[custom_mir(dialect = "runtime", phase = "optimized")]
+fn read_byte(pointer: *const [u8; 3], index: usize) -> u8 {
+    mir! {{ RET = (*pointer)[index]; Return() }}
+}
+pub fn static_byte_is_valid() {
+    let _ = boundary(config());
+    let value = read_byte(&raw const BYTES, 1);
+    assert!(u16::from(value) + 1 <= 256);
+}
+pub fn static_byte_is_not_zero() {
+    let _ = boundary(config());
+    assert!(read_byte(&raw const BYTES, 1) == 0);
+}
+pub fn static_byte_can_overflow() {
+    let _ = boundary(config());
+    let value = read_byte(&raw const BYTES, 1);
+    let _ = value + 1;
+}
+#[custom_mir(dialect = "runtime", phase = "optimized")]
+fn retire_bytes(pointer: *mut [u8; 3]) {
+    mir! {{ Drop(*pointer, ReturnTo(done), UnwindUnreachable()) }
+        done = { Return() }}
+}
+pub fn retired_static_byte_stays_dead() {
+    retire_bytes(&raw mut BYTES);
+    let _ = boundary(config());
+    let _ = read_byte(&raw const BYTES, 1);
+}
+pub fn out_of_bounds_static_byte() {
+    let _ = boundary(config());
+    let _ = read_byte(&raw const BYTES, 3);
+}
+
+#[inline(never)]
+pub fn legacy_boundary(_: Config) -> u32 { 7 }
+pub fn dead_static_epoch_stays_dead() {
+    let _ = legacy_boundary(config());
+    let _ = boundary(config());
+    let _ = read_byte(&raw const BYTES, 1);
+}
+static IMMUTABLE_BYTES: [u8; 3] = [0, 1, 2];
+#[custom_mir(dialect = "runtime", phase = "optimized")]
+fn write_byte(pointer: *mut [u8; 3], index: usize, value: u8) {
+    mir! {{ (*pointer)[index] = value; Return() }}
+}
+pub fn readonly_static_array_write_is_unknown() {
+    let _ = boundary(config());
+    const POINTER: *const [u8; 3] = &raw const IMMUTABLE_BYTES;
+    write_readonly_byte(POINTER, 1, 7);
+}
+pub fn static_store_does_not_restore_history() {
+    let _ = boundary(config());
+    write_byte(&raw mut BYTES, 0, 7);
+    assert!(read_byte(&raw const BYTES, 0) == 7);
+}
+static mut LARGE_BYTES: [u8; 129] = [0; 129];
+#[custom_mir(dialect = "runtime", phase = "optimized")]
+fn read_large_byte(pointer: *const [u8; 129], index: usize) -> u8 {
+    mir! {{ RET = (*pointer)[index]; Return() }}
+}
+pub fn oversized_static_array_is_unknown() {
+    let _ = boundary(config());
+    let _ = read_large_byte(&raw const LARGE_BYTES, 1);
+}
+static USED: core::sync::atomic::AtomicBool = core::sync::atomic::AtomicBool::new(false);
+pub fn previously_used_cell_can_fail() {
+    let _ = boundary(config());
+    assert!(USED.compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed).is_ok());
+}
+static UNINITIALIZED: core::cell::SyncUnsafeCell<core::mem::MaybeUninit<u32>> =
+    core::cell::SyncUnsafeCell::new(core::mem::MaybeUninit::uninit());
+pub fn static_validity_does_not_initialize_payload() {
+    let _ = boundary(config());
+    let _ = read(UNINITIALIZED.get().cast::<u32>());
+}
+pub fn numeric_static_address_is_unknown() {
+    let _ = boundary(config());
+    let _ = read(0x20000000usize as *const u32);
+}
+pub fn type_punned_static_address_is_unknown() {
+    let _ = boundary(config());
+    let _ = read((&raw const BYTES).cast::<u16>());
+}
+
+static USED_BYTE: core::sync::atomic::AtomicU8 = core::sync::atomic::AtomicU8::new(0);
+pub fn previously_used_byte_cell_can_fail() {
+    let _ = boundary(config());
+    assert!(USED_BYTE.compare_exchange(0, 1, Ordering::Acquire, Ordering::Relaxed).is_ok());
+}
+pub fn promoted_pointer_is_unknown() {
+    let _ = boundary(config());
+    const POINTER: *const [u8; 3] = &[1u8, 2, 3];
+    let pointer = POINTER;
+    let _ = read_byte(pointer, 1);
+}
+
+#[custom_mir(dialect = "runtime", phase = "optimized")]
+fn write_readonly_byte(pointer: *const [u8; 3], index: usize, value: u8) {
+    mir! {{ (*pointer)[index] = value; Return() }}
 }

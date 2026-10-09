@@ -39,6 +39,9 @@ impl<'tcx> Engine<'tcx> {
         if let Some(value) = self.mutable_integer_static_constant(constant, span)? {
             return Ok(Some(value));
         }
+        if let Some(value) = self.raw_static_constant(constant, span)? {
+            return Ok(Some(value));
+        }
         let ty::Ref(_, pointee, mutability) = constant.ty().kind() else {
             return Ok(None);
         };
@@ -85,6 +88,64 @@ impl<'tcx> Engine<'tcx> {
             offset: 0,
             kind: ViewKind::Reference { mutable: false },
             writable: false,
+        })
+        .map(Some)
+    }
+
+    fn raw_static_constant(
+        &self,
+        constant: rustc_middle::mir::Const<'tcx>,
+        span: Span,
+    ) -> Result<Option<Value>, String> {
+        let ty::RawPtr(pointee, mutability) = constant.ty().kind() else {
+            return Ok(None);
+        };
+        if !self.thin_raw_pointer(constant.ty()) {
+            return Ok(None);
+        }
+        let env = ty::TypingEnv::fully_monomorphized();
+        let value = constant
+            .eval(self.tcx, env, span)
+            .map_err(|error| format!("raw static constant evaluation failed: {error:?}"))?;
+        let (ecx, operand) = mk_eval_cx_for_const_val(self.tcx.at(span), env, value, constant.ty())
+            .ok_or("raw static constant layout unavailable")?;
+        let pointer = ecx
+            .read_scalar(&operand)
+            .discard_err()
+            .ok_or("raw static constant requires a thin scalar pointer")?
+            .to_pointer(&ecx);
+        let Some(provenance) = pointer.provenance else {
+            return Ok(None);
+        };
+        let GlobalAlloc::Static(static_id) = self.tcx.global_alloc(provenance.alloc_id()) else {
+            return Ok(None);
+        };
+        if self.tcx.is_foreign_item(static_id)
+            || pointer.into_raw_parts().1.bytes() != 0
+            || self.static_declared_type(static_id)? != *pointee
+        {
+            return Err("raw static address requires whole exactly typed Rust storage".into());
+        }
+        let original = self.static_original_type(static_id, *pointee)?;
+        if original != *pointee {
+            return Err("raw static address requires its exact declared storage origin".into());
+        }
+        let writable = mutability.is_mut()
+            && matches!(
+                self.tcx.def_kind(static_id),
+                DefKind::Static {
+                    mutability: rustc_hir::Mutability::Mut,
+                    ..
+                }
+            );
+        self.intern_static_view(StaticView {
+            static_id,
+            original,
+            ty: *pointee,
+            certified: *pointee,
+            offset: 0,
+            kind: ViewKind::Raw,
+            writable,
         })
         .map(Some)
     }

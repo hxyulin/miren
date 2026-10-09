@@ -130,7 +130,8 @@ class MainSurveyTests(unittest.TestCase):
                       main.storage_assumption(normalized["functions"][0]))
         for changes in ({"trusted": False}, {"no_panic": False}, {"reason": ""},
                         {"modifies": []}, {"modifies": ["arg0"]},
-                        {"returns_alias": "arg0"}, {"storage_effect": "global_only"}):
+                        {"returns_alias": "arg0"}, {"storage_effect": "global_only"},
+                        {"storage_effect": []}, {"storage_effect": {}}):
             with self.subTest(changes=changes):
                 changed = copy.deepcopy(raw)
                 changed["functions"][0].update(changes)
@@ -162,6 +163,34 @@ class MainSurveyTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             main.checked_proof(self.unit, self.inventory, unused, self.directory,
                                "async_body", survey.LIMITS, 0, config, True)
+
+    def test_static_validity_effect_requires_its_distinct_used_premise(self):
+        report, config = self.conditional_report()
+        effect = "preserve_existing_ordinary_storage_and_static_validity"
+        config["functions"][0]["storage_effect"] = effect
+        normalized = main.normalized_contract_config(config)
+        premise = main.storage_assumption(normalized["functions"][0])
+        proof = report["functions"][0]["proof"]
+        proof["entry_assumptions"] = [premise]
+        checked = main.checked_proof(self.unit, self.inventory, report, self.directory,
+                                     "async_body", survey.LIMITS, 0, normalized, True)
+        self.assertEqual(checked["entry_assumptions"], [premise])
+        for entries in ([], [premise, premise],
+                        [premise.replace(effect, "preserve_existing_ordinary_storage")],
+                        [premise, "fresh Rust statics"]):
+            with self.subTest(entries=entries):
+                changed = copy.deepcopy(report)
+                changed["functions"][0]["proof"]["entry_assumptions"] = entries
+                with self.assertRaises(ValueError):
+                    main.checked_proof(self.unit, self.inventory, changed, self.directory,
+                                       "async_body", survey.LIMITS, 0, normalized, True)
+        for changes in ({"trusted": False}, {"no_panic": False}, {"reason": ""},
+                        {"modifies": []}, {"returns_alias": "arg0"}):
+            with self.subTest(changes=changes):
+                changed = copy.deepcopy(config)
+                changed["functions"][0].update(changes)
+                with self.assertRaises(ValueError):
+                    main.normalized_contract_config(changed)
 
     def test_storage_and_hardware_premises_compose_without_policy_leakage(self):
         report, config = self.conditional_report()

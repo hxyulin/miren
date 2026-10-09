@@ -197,7 +197,25 @@ impl<'tcx> Engine<'tcx> {
             );
         let cell_payload = view.original == declared
             && self.integer_cell_payload(declared, view.offset, Some(view.ty), false, 0)?;
-        if !whole_mutable && !cell_payload {
+        let byte_array = view.original == declared
+            && view.ty == self.tcx.types.u8
+            && matches!(
+                self.tcx.def_kind(view.static_id),
+                DefKind::Static {
+                    mutability: rustc_hir::Mutability::Mut,
+                    ..
+                }
+            )
+            && match declared.kind() {
+                ty::Array(element, _) if *element == self.tcx.types.u8 => {
+                    let layout = self.static_layout(declared)?;
+                    matches!(layout.fields, rustc_abi::FieldsShape::Array { stride, count }
+                        if stride.bytes() == 1 && count <= 128
+                        && layout.size.bytes() == count && view.offset < count)
+                }
+                _ => false,
+            };
+        if !whole_mutable && !cell_payload && !byte_array {
             return Ok(None);
         }
         Ok(Some(StaticLocation {

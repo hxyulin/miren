@@ -130,6 +130,42 @@ fn verify(
             "{target:?} O2={optimized} {name}: {:?}",
             proof.obligations
         );
+        let diagnostic = match *name {
+            "retired_static_byte_stays_dead" => Some("overlaps retired uninitialized storage"),
+            "out_of_bounds_static_byte" => Some("array read lacks a proven bounds check"),
+            "dead_static_epoch_stays_dead" => Some("static storage view invalidated"),
+            "oversized_static_array_is_unknown" => Some("128-element budget"),
+            "previously_used_cell_can_fail" => Some("unmodeled call adapter Intrinsic"),
+            "static_validity_does_not_initialize_payload" => Some("uninitialized static payload"),
+            "numeric_static_address_is_unknown" => Some("unsupported place projection Deref"),
+            "type_punned_static_address_is_unknown" => Some("allocation or required alignment"),
+            "promoted_pointer_is_unknown" => Some("unsupported allocation provenance"),
+            "readonly_static_array_write_is_unknown" => Some("certified UnsafeCell payload place"),
+            _ => None,
+        };
+        if let Some(diagnostic) = diagnostic {
+            assert!(
+                proof
+                    .obligations
+                    .iter()
+                    .any(|o| o.detail.contains(diagnostic)),
+                "{name}: {:?}",
+                proof.obligations
+            );
+        }
+        if *name == "static_byte_is_valid"
+            && *used
+            && *expected == ProofStatus::ProvedWithAssumptions
+        {
+            assert!(
+                proof
+                    .body_entries
+                    .iter()
+                    .any(|entry| entry.function == "read_byte"),
+                "actual typed byte-read body must execute: {:?}",
+                proof.body_entries
+            );
+        }
         let actual = proof
             .entry_assumptions
             .iter()
@@ -158,7 +194,12 @@ fn verify(
         if *used {
             assert_eq!(proof.trusted_calls.len(), 1);
         } else if assumption.is_some() {
-            assert!(proof.trusted_calls.is_empty());
+            assert!(
+                proof
+                    .trusted_calls
+                    .iter()
+                    .all(|call| call.contract.storage_effect.is_none())
+            );
         }
     }
 }
@@ -250,59 +291,50 @@ fn changed_ordinary_claim_refutes_and_fails_native_execution() {
     assert!(!native(&path));
     for target in [None, Some("thumbv7em-none-eabihf")] {
         for optimized in [false, true] {
-            verify(
-                &path,
-                &[("ordinary_backing", ProofStatus::Refuted, true)],
-                Some(model(true)),
-                target,
-                optimized,
-                &[],
-                false,
-            );
+            for config in [model(true), static_model()] {
+                verify(
+                    &path,
+                    &[("ordinary_backing", ProofStatus::Refuted, true)],
+                    Some(config),
+                    target,
+                    optimized,
+                    &[],
+                    false,
+                );
+            }
         }
     }
 }
 
 #[test]
 fn native_replay_refuses_configured_and_retained_storage_effects() {
-    let directory = Directory::new();
-    let config = directory.0.join("storage.json");
-    std::fs::write(&config, serde_json::to_vec(&model(true)).unwrap()).unwrap();
-    let output = Command::new(env!("CARGO_BIN_EXE_miren"))
-        .args([
-            "--verify",
-            "--json",
-            "--quiet",
-            "--entry",
-            "pure_wrong_claim",
-        ])
-        .arg("--contracts")
-        .arg(config)
-        .args([
-            "--",
-            "--crate-type=lib",
-            "--crate-name=trusted_storage",
-            "--edition=2024",
-            "-Cpanic=abort",
-        ])
-        .arg(fixture())
-        .arg("--out-dir")
-        .arg(&directory.0)
-        .output()
-        .unwrap();
-    let mut report: Report = serde_json::from_slice(&output.stdout).unwrap();
-    let proof = report
-        .functions
-        .iter()
-        .find(|f| f.name == "pure_wrong_claim")
-        .unwrap()
-        .proof
-        .as_ref()
-        .unwrap();
-    assert_eq!(proof.status, ProofStatus::Refuted);
-    assert!(proof.entry_assumptions.is_empty());
-    miren::replay::replay_report(&mut report);
-    let verify_refusal = |report: &Report| {
+    for selected in [model(true), static_model()] {
+        let directory = Directory::new();
+        let config = directory.0.join("storage.json");
+        std::fs::write(&config, serde_json::to_vec(&selected).unwrap()).unwrap();
+        let output = Command::new(env!("CARGO_BIN_EXE_miren"))
+            .args([
+                "--verify",
+                "--json",
+                "--quiet",
+                "--entry",
+                "pure_wrong_claim",
+            ])
+            .arg("--contracts")
+            .arg(config)
+            .args([
+                "--",
+                "--crate-type=lib",
+                "--crate-name=trusted_storage",
+                "--edition=2024",
+                "-Cpanic=abort",
+            ])
+            .arg(fixture())
+            .arg("--out-dir")
+            .arg(&directory.0)
+            .output()
+            .unwrap();
+        let mut report: Report = serde_json::from_slice(&output.stdout).unwrap();
         let proof = report
             .functions
             .iter()
@@ -311,31 +343,44 @@ fn native_replay_refuses_configured_and_retained_storage_effects() {
             .proof
             .as_ref()
             .unwrap();
-        let replay = proof
-            .obligations
-            .iter()
-            .find_map(|o| o.replay.as_ref())
+        assert_eq!(proof.status, ProofStatus::Refuted);
+        assert!(proof.entry_assumptions.is_empty());
+        miren::replay::replay_report(&mut report);
+        let verify_refusal = |report: &Report| {
+            let proof = report
+                .functions
+                .iter()
+                .find(|f| f.name == "pure_wrong_claim")
+                .unwrap()
+                .proof
+                .as_ref()
+                .unwrap();
+            let replay = proof
+                .obligations
+                .iter()
+                .find_map(|o| o.replay.as_ref())
+                .unwrap();
+            assert_eq!(replay.status, miren::replay::ReplayStatus::Unsupported);
+            assert_eq!(
+                replay.detail,
+                "external storage effects have no native replay implementation"
+            );
+        };
+        verify_refusal(&report);
+        let config = report.contract_config.take().unwrap();
+        let assumption = config.functions[0].storage_assumption().unwrap();
+        let proof = report
+            .functions
+            .iter_mut()
+            .find(|f| f.name == "pure_wrong_claim")
+            .unwrap()
+            .proof
+            .as_mut()
             .unwrap();
-        assert_eq!(replay.status, miren::replay::ReplayStatus::Unsupported);
-        assert_eq!(
-            replay.detail,
-            "external storage effects have no native replay implementation"
-        );
-    };
-    verify_refusal(&report);
-    let config = report.contract_config.take().unwrap();
-    let assumption = config.functions[0].storage_assumption().unwrap();
-    let proof = report
-        .functions
-        .iter_mut()
-        .find(|f| f.name == "pure_wrong_claim")
-        .unwrap()
-        .proof
-        .as_mut()
-        .unwrap();
-    proof.entry_assumptions.push(assumption);
-    miren::replay::replay_report(&mut report);
-    verify_refusal(&report);
+        proof.entry_assumptions.push(assumption);
+        miren::replay::replay_report(&mut report);
+        verify_refusal(&report);
+    }
 }
 
 #[test]
@@ -378,6 +423,71 @@ fn large_constructed_fieldless_enums_have_bounded_owned_boundary_certificates() 
                     false,
                 );
             }
+        }
+    }
+}
+
+fn static_model() -> ContractConfig {
+    let mut config = model(true);
+    let mut legacy = config.functions[0].clone();
+    legacy.function = "trusted_storage::legacy_boundary".into();
+    legacy.storage_effect = None;
+    for spec in &mut config.functions {
+        spec.storage_effect =
+            Some(miren::TrustedStorageEffect::PreserveExistingOrdinaryStorageAndStaticValidity);
+        spec.reason = Some(concat!(
+            "exact call preserves ordinary storage and already-live Rust static allocation, ",
+            "initialized declared-type validity and existing modeled borrow/access rights; ",
+            "static values, MaybeUninit payload initialization and atomic precision are unverified"
+        ).into());
+    }
+    config.functions.push(legacy);
+    config
+}
+#[test]
+fn static_validity_frame_preserves_only_live_typed_storage() {
+    use ProofStatus::{ProvedWithAssumptions as P, Refuted as R, Unknown as U};
+    for target in [None, Some("thumbv7em-none-eabihf")] {
+        for optimized in [false, true] {
+            verify(
+                &fixture(),
+                &[
+                    ("ordinary_backing", P, true),
+                    ("static_byte_is_valid", P, true),
+                    ("static_byte_is_not_zero", R, true),
+                    ("static_byte_can_overflow", R, true),
+                    ("retired_static_byte_stays_dead", U, true),
+                    ("out_of_bounds_static_byte", U, true),
+                    ("static_precision_is_retired", R, true),
+                    ("static_atomic_is_retired", R, true),
+                    ("local_atomic_precision_is_retired", R, true),
+                    ("dead_backing_stays_dead", U, true),
+                    ("dead_static_epoch_stays_dead", U, false),
+                    ("readonly_static_array_write_is_unknown", U, true),
+                    ("static_store_does_not_restore_history", R, true),
+                    ("oversized_static_array_is_unknown", U, true),
+                    ("previously_used_cell_can_fail", U, true),
+                    ("previously_used_byte_cell_can_fail", R, true),
+                    ("promoted_pointer_is_unknown", U, true),
+                    ("static_validity_does_not_initialize_payload", U, true),
+                    ("numeric_static_address_is_unknown", U, true),
+                    ("type_punned_static_address_is_unknown", U, true),
+                ],
+                Some(static_model()),
+                target,
+                optimized,
+                &[],
+                true,
+            );
+            verify(
+                &fixture(),
+                &[("static_byte_is_valid", U, true)],
+                Some(model(true)),
+                target,
+                optimized,
+                &[],
+                true,
+            );
         }
     }
 }

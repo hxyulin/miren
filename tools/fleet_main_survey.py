@@ -131,7 +131,9 @@ def normalized_contract_config(value):
         if spec.get("storage_effect") is None:
             spec.pop("storage_effect", None)
         else:
-            require(spec["storage_effect"] == "preserve_existing_ordinary_storage"
+            require(isinstance(spec["storage_effect"], str)
+                    and spec["storage_effect"] in {"preserve_existing_ordinary_storage",
+                    "preserve_existing_ordinary_storage_and_static_validity"}
                     and spec["trusted"] and spec["modifies"] is None
                     and spec.get("returns_alias") is None,
                     "storage effect requires a trusted boundary without modifies or alias return")
