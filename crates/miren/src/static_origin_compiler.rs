@@ -151,16 +151,20 @@ fn check_construction<'tcx>(
         return None;
     }
     let id = instance.def_id();
+    // Local trait declarations have a DefId but no body. The compiler availability query
+    // checks actual local body owners before any mir_for_ctfe request.
+    if !tcx.is_mir_available(id) {
+        return None;
+    }
     if !id.is_local()
-        && (!tcx.is_mir_available(id)
-            || !matches!(
-                tcx.def_kind(id),
-                DefKind::Fn
-                    | DefKind::AssocFn
-                    | DefKind::Const
-                    | DefKind::AssocConst
-                    | DefKind::AnonConst
-            ))
+        && !matches!(
+            tcx.def_kind(id),
+            DefKind::Fn
+                | DefKind::AssocFn
+                | DefKind::Const
+                | DefKind::AssocConst
+                | DefKind::AnonConst
+        )
     {
         return None;
     }
@@ -680,18 +684,20 @@ fn check_closed_construction<'tcx>(
     construction: &mut Vec<Construction>,
 ) -> Option<OriginKind> {
     let id = instance.def_id();
+    if !tcx.is_mir_available(id) {
+        return None;
+    }
     if tcx.intrinsic(id).is_some()
         || !matches!(instance.def, ty::InstanceKind::Item(_))
         || !id.is_local()
-            && (!tcx.is_mir_available(id)
-                || !matches!(
-                    tcx.def_kind(id),
-                    DefKind::Fn
-                        | DefKind::AssocFn
-                        | DefKind::Const
-                        | DefKind::AssocConst
-                        | DefKind::AnonConst
-                ))
+            && !matches!(
+                tcx.def_kind(id),
+                DefKind::Fn
+                    | DefKind::AssocFn
+                    | DefKind::Const
+                    | DefKind::AssocConst
+                    | DefKind::AnonConst
+            )
     {
         return None;
     }

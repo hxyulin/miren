@@ -198,8 +198,8 @@ Concrete function-item pointers continue executing their actual bodies and effec
 
 Owned non-byte arrays share immutable host payloads and detach changed paths on writes. Rust copies
 retain independent storage. Evaluated constants check every occurrence before reusing exact typed
-initialized values, with at most 2,048 visited values, sixteen levels and 256 scalar or 128 composite
-array elements.
+initialized values, with at most 2,048 visits, sixteen levels and 256 scalar or 128 composite array
+elements.
 Owned repeats retain the 256-value budget but charge validated shared payloads once and bounded
 clone handles separately; unsupported payloads and interior mutation remain UNKNOWN.
 
@@ -217,7 +217,8 @@ constant element is decoded and validated; indices require bounds checks and flo
 
 Dependency origin schema 2 includes exact typed associated-constant construction edges. Retained
 builds use a new cache generation so prior certificates are not reused. Construction certificates
-establish origin metadata, without granting initialized payload reads or startup history.
+establish origin metadata, without granting initialized payload reads or startup history. Local and
+foreign declarations without bodies are rejected before any compiler CTFE MIR query.
 
 Closed constructor calls accept aggregate parameters only after checking each actual operand's
 origin, exact compiler type and monomorphized signature. Straight-line construction preserves

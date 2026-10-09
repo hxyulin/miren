@@ -102,3 +102,21 @@ pub fn dependency_mixed_forward() {
         .counter
         .load(Ordering::Relaxed);
 }
+
+pub fn dependency_required_trait_origin() {
+    let _ = dependency_statics::REQUIRED_TRAIT_ORIGIN
+        .0
+        .load(Ordering::Relaxed);
+}
+
+pub fn dependency_concrete_trait_origin() {
+    let _ = dependency_statics::CONCRETE_TRAIT_ORIGIN
+        .0
+        .load(Ordering::Relaxed);
+}
+
+pub fn dependency_concrete_body_origin() {
+    let _ = dependency_statics::CONCRETE_BODY_ORIGIN
+        .0
+        .load(Ordering::Relaxed);
+}

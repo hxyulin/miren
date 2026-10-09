@@ -1438,3 +1438,11 @@ indices and rejects later conflicting ordinary access. Missing backing, bare sna
 bounds, duplicates and induction histories stay UNKNOWN. Host/ARM compiler tests and safe native
 mutations check shared reads, float zip updates and cursor offsets; invalid custom MIR is analyzed
 without native undefined behavior.
+
+## Stage 97: Guard unavailable local associated-constant bodies
+
+The fresh fleet inventory exposed a compiler ICE when construction checking queried CTFE MIR for
+an abstract local trait associated constant. Both construction checkers now reject definitions
+without available bodies before querying compiler MIR. A trait declaration regression checks
+continued collection, supported concrete implementations and explicit UNKNOWN for unresolved
+construction evidence. The failed capture remains separate and contributes no published outcomes.

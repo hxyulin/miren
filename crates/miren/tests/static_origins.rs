@@ -244,6 +244,7 @@ fn compiler_origins_unlock_atomic_dependencies_and_fail_closed_on_bad_evidence()
                 "dependency_usize_channel",
                 "dependency_forwarded_atomic",
                 "dependency_mixed_forward",
+                "dependency_concrete_body_origin",
             ] {
                 let report = verify_entry(&artifact, &directory, target, optimized, entry, false);
                 assert_eq!(
@@ -258,6 +259,8 @@ fn compiler_origins_unlock_atomic_dependencies_and_fail_closed_on_bad_evidence()
                 "dependency_union_argument",
                 "dependency_spoof_argument",
                 "dependency_spoof_usize",
+                "dependency_required_trait_origin",
+                "dependency_concrete_trait_origin",
             ] {
                 let report = verify_entry(&artifact, &directory, target, optimized, entry, false);
                 assert_eq!(

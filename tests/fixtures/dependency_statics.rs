@@ -179,3 +179,27 @@ pub static MIXED_FORWARD: GenericMutex<Empty, (AtomicU32, AtomicU32)> = generic_
     ),
     AtomicU32::new(7),
 );
+
+pub trait RequiredOrigin {
+    const INFO: Site;
+    fn make() -> Site;
+}
+
+pub struct ConcreteOrigin;
+impl RequiredOrigin for ConcreteOrigin {
+    const INFO: Site = Site::new();
+    fn make() -> Site {
+        Site::new()
+    }
+}
+
+const fn generic_origin<T: RequiredOrigin>() -> Site {
+    T::INFO
+}
+pub static REQUIRED_TRAIT_ORIGIN: Site = generic_origin::<ConcreteOrigin>();
+pub static CONCRETE_TRAIT_ORIGIN: Site = <ConcreteOrigin as RequiredOrigin>::INFO;
+
+impl ConcreteOrigin {
+    pub const DIRECT: Site = Site::new();
+}
+pub static CONCRETE_BODY_ORIGIN: Site = ConcreteOrigin::DIRECT;

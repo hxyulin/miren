@@ -771,7 +771,8 @@ signed zero, uninitialized storage, composite limits and 257-element scalar reje
 Origin schema 2 certifies unevaluated aggregate constant items and associated constants only
 through available monomorphized compiler MIR with exact operand and return types. Construction
 DAG edges bind every referenced definition; missing edges, obsolete schemas and unsupported
-operations remain UNKNOWN. This certifies construction provenance, not runtime values, verified
+operations remain UNKNOWN. Local and foreign declarations without bodies are rejected before
+compiler CTFE MIR queries. This certifies construction provenance, not runtime values, verified
 callee behavior, initialization history or synchronization.
 
 Closed constructor dataflow checks actual aggregate arguments, initialized locals and exact
