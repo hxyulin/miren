@@ -195,3 +195,9 @@ Arbitrary function-pointer inputs retain their exact compiler signature as opaqu
 unsafe callbacks and Waker table fields. Unused or copied fields do not choose a callback target.
 Calls, address casts, pointer comparisons and native replay of these inputs remain UNKNOWN.
 Concrete function-item pointers continue executing their actual bodies and effects.
+
+Owned non-byte arrays share immutable host payloads and detach changed paths on writes. Rust copies
+retain independent storage. Evaluated constants check every occurrence before reusing exact typed
+initialized values, with at most 2,048 visited values, sixteen levels and 128 array elements.
+Owned repeats retain the 256-value budget but charge validated shared payloads once and bounded
+clone handles separately; unsupported payloads and interior mutation remain UNKNOWN.

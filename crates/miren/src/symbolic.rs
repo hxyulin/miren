@@ -1,9 +1,11 @@
 mod adt_fields;
+mod elements;
 mod floating;
 pub mod input;
 #[cfg(test)]
 mod tests;
 pub use adt_fields::AdtFields;
+pub use elements::Elements;
 pub use floating::{float, float_cast, float_from_bits, float_negate};
 pub use miren::smt::{Context, Op, Sort, Term};
 
@@ -100,7 +102,7 @@ pub enum Value {
         mutable: bool,
     },
     Tuple(Vec<Value>),
-    Elements(Vec<Value>),
+    Elements(Elements),
     MetadataPointer(Box<Value>),
     TraitObject {
         source: Box<Value>,
@@ -133,12 +135,14 @@ impl Value {
             | Self::Bytes { .. }
             | Self::RawPointer { .. }
             | Self::Unit => Some(1),
-            Self::Tuple(fields) | Self::Elements(fields) => {
-                fields.iter().try_fold(1_usize, |size, value| {
-                    size.checked_add(value.owned_repeat_size()?)
-                        .filter(|size| *size <= MAX_REPEAT_VALUES)
-                })
-            }
+            Self::Tuple(fields) => fields.iter().try_fold(1_usize, |size, value| {
+                size.checked_add(value.owned_repeat_size()?)
+                    .filter(|size| *size <= MAX_REPEAT_VALUES)
+            }),
+            Self::Elements(fields) => fields.iter().try_fold(1_usize, |size, value| {
+                size.checked_add(value.owned_repeat_size()?)
+                    .filter(|size| *size <= MAX_REPEAT_VALUES)
+            }),
             Self::Adt { fields, .. } => fields.iter().try_fold(1_usize, |size, (_, value)| {
                 size.checked_add(value.owned_repeat_size()?)
                     .filter(|size| *size <= MAX_REPEAT_VALUES)
@@ -173,15 +177,66 @@ impl Value {
         }
     }
 
+    /// Values copied when cloning an already validated owned repeat operand. Shared
+    /// array/ADT payloads detach only when a branch writes, retaining independent storage.
+    pub fn owned_repeat_clone_size(&self) -> Option<usize> {
+        self.owned_repeat_size()?;
+        match self {
+            Self::Tuple(fields) => fields.iter().try_fold(1_usize, |size, value| {
+                size.checked_add(value.owned_repeat_clone_size()?)
+                    .filter(|size| *size <= MAX_REPEAT_VALUES)
+            }),
+            Self::Enum {
+                discriminant,
+                variants,
+                ..
+            } => variants.iter().try_fold(
+                1 + discriminant.owned_repeat_clone_size()?,
+                |size, value| {
+                    size.checked_add(value.owned_repeat_clone_size()?)
+                        .filter(|size| *size <= MAX_REPEAT_VALUES)
+                },
+            ),
+            Self::Input(_)
+            | Self::Bool(_)
+            | Self::Int { .. }
+            | Self::Float { .. }
+            | Self::Bytes { .. }
+            | Self::RawPointer { .. }
+            | Self::Unit
+            | Self::Elements(_)
+            | Self::Adt { .. } => Some(1),
+            Self::Cell { .. }
+            | Self::Atomic { .. }
+            | Self::LocalAtomic { .. }
+            | Self::RawSlice { .. }
+            | Self::TrackedPointer { .. }
+            | Self::Reference { .. }
+            | Self::SliceIterator { .. }
+            | Self::MetadataPointer(_)
+            | Self::StaticText
+            | Self::FormatArguments
+            | Self::StaticSlice { .. }
+            | Self::StaticView { .. }
+            | Self::Uninitialized
+            | Self::TraitObject { .. }
+            | Self::DebugReference { .. }
+            | Self::FunctionPointer { .. }
+            | Self::Function => None,
+        }
+    }
+
     pub fn owned_iterator_size(&self) -> Option<usize> {
         match self {
             Self::Reference { .. } => Some(1),
-            Self::Tuple(fields) | Self::Elements(fields) => {
-                fields.iter().try_fold(1_usize, |size, value| {
-                    size.checked_add(value.owned_iterator_size()?)
-                        .filter(|size| *size <= MAX_REPEAT_VALUES)
-                })
-            }
+            Self::Tuple(fields) => fields.iter().try_fold(1_usize, |size, value| {
+                size.checked_add(value.owned_iterator_size()?)
+                    .filter(|size| *size <= MAX_REPEAT_VALUES)
+            }),
+            Self::Elements(fields) => fields.iter().try_fold(1_usize, |size, value| {
+                size.checked_add(value.owned_iterator_size()?)
+                    .filter(|size| *size <= MAX_REPEAT_VALUES)
+            }),
             Self::Adt { fields, .. } => fields.iter().try_fold(1_usize, |size, (_, value)| {
                 size.checked_add(value.owned_iterator_size()?)
                     .filter(|size| *size <= MAX_REPEAT_VALUES)
@@ -237,9 +292,8 @@ impl Value {
             | Self::LocalAtomic { .. } => false,
             Self::Adt { fields, .. } => fields.iter().any(|(_, value)| value.contains_mutable()),
             Self::Enum { variants, .. } => variants.iter().any(Self::contains_mutable),
-            Self::Tuple(fields) | Self::Elements(fields) => {
-                fields.iter().any(Self::contains_mutable)
-            }
+            Self::Tuple(fields) => fields.iter().any(Self::contains_mutable),
+            Self::Elements(fields) => fields.iter().any(Self::contains_mutable),
             Self::Bool(_)
             | Self::Int { .. }
             | Self::Float { .. }
@@ -268,9 +322,10 @@ impl Value {
             Self::Adt { fields, .. } => fields
                 .iter()
                 .any(|(_, value)| value.contains_local_atomic()),
-            Self::Enum { variants, .. } | Self::Tuple(variants) | Self::Elements(variants) => {
+            Self::Enum { variants, .. } | Self::Tuple(variants) => {
                 variants.iter().any(Self::contains_local_atomic)
             }
+            Self::Elements(variants) => variants.iter().any(Self::contains_local_atomic),
             Self::SliceIterator { source, .. }
             | Self::MetadataPointer(source)
             | Self::TraitObject { source, .. }

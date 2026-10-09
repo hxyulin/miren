@@ -1356,3 +1356,12 @@ unused witnesses within the existing input and registry budgets. Opaque invocati
 comparisons, address casts and native replay remain UNKNOWN. Concrete known function-item targets
 retain ordinary execution and contract behavior. Compiler tests cover positive, refuted and unknown
 cases on host/ARM, unsafe signatures, signature mutations and native guard mutations.
+
+## Stage 89: Shared initialized array storage and bounded constants
+
+Owned arrays use concrete immutable shared host storage, detaching changed paths on writes while
+preserving Rust copy and allocation identities. Constants validate every initialized occurrence
+before lossless exact-type reuse, with 2,048 visits, sixteen levels and 128 array elements. Repeats
+validate bounded operands and charge actual shared clone handles within the existing 256-value
+budget. Unsupported initialization, payloads and interior mutation remain UNKNOWN. Compiler and
+native mutation tests check large tables, repeat values, copy independence and resource boundaries.

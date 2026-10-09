@@ -61,7 +61,13 @@ impl<'tcx> Engine<'tcx> {
                 }
                 Ok(())
             }
-            Value::Tuple(fields) | Value::Elements(fields) => {
+            Value::Tuple(fields) => {
+                for value in fields {
+                    Self::validate_reference_graph(value, state, incoming, visited)?;
+                }
+                Ok(())
+            }
+            Value::Elements(fields) => {
                 for value in fields {
                     Self::validate_reference_graph(value, state, incoming, visited)?;
                 }

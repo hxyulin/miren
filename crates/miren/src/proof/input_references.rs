@@ -104,7 +104,7 @@ impl<'tcx> Engine<'tcx> {
                         self.retain_shared_input_storage(*element, value, memory, depth + 1)
                     })
                     .collect::<Result<Vec<_>, _>>()?;
-                Ok(Value::Elements(fields))
+                Ok(Value::Elements(fields.into()))
             }
             (
                 ty::Adt(def, args),

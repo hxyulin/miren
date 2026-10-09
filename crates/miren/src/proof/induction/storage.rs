@@ -523,9 +523,13 @@ pub(super) fn same_shape(expected: Option<&Value>, actual: Option<&Value>) -> Re
             }
             Ok(())
         }
-        (Value::Tuple(a), Value::Tuple(b)) | (Value::Elements(a), Value::Elements(b))
-            if a.len() == b.len() =>
-        {
+        (Value::Tuple(a), Value::Tuple(b)) if a.len() == b.len() => {
+            for (a, b) in a.iter().zip(b) {
+                same_shape(Some(a), Some(b))?;
+            }
+            Ok(())
+        }
+        (Value::Elements(a), Value::Elements(b)) if a.len() == b.len() => {
             for (a, b) in a.iter().zip(b) {
                 same_shape(Some(a), Some(b))?;
             }

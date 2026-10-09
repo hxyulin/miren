@@ -1025,7 +1025,12 @@ fn flatten_value(value: &Value, result: &mut Vec<Term>) -> Result<(), String> {
                 flatten_value(field, result)?;
             }
         }
-        Value::Elements(fields) | Value::Tuple(fields) => {
+        Value::Elements(fields) => {
+            for field in fields {
+                flatten_value(field, result)?;
+            }
+        }
+        Value::Tuple(fields) => {
             for field in fields {
                 flatten_value(field, result)?;
             }

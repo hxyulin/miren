@@ -315,7 +315,7 @@ impl<'tcx> Engine<'tcx> {
             self.static_store_value(*pointee, &stored, state, 0, &mut 0)?;
             references.push(reference);
         }
-        Ok(Some(Value::Elements(references)))
+        Ok(Some(Value::Elements(references.into())))
     }
 
     fn disjoint_raw_references(

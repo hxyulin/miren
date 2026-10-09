@@ -328,7 +328,7 @@ impl<'tcx> Engine<'tcx> {
                         conditions,
                     )?);
                 }
-                Ok(Value::Elements(chunks))
+                Ok(Value::Elements(chunks.into()))
             }
             _ => Err("unsupported memory projection".to_owned()),
         }

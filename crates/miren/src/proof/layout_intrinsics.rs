@@ -78,7 +78,10 @@ impl<'tcx> Engine<'tcx> {
             };
             let length = match value.materialize()? {
                 Value::Bytes { length, .. } => *length,
-                Value::Elements(elements) | Value::StaticSlice { elements, .. } => {
+                Value::Elements(elements) => {
+                    symbolic::integer(&self.terms, elements.len() as u128, bits, false)
+                }
+                Value::StaticSlice { elements, .. } => {
                     symbolic::integer(&self.terms, elements.len() as u128, bits, false)
                 }
                 _ => return Err("dynamic slice size requires retained length metadata".into()),

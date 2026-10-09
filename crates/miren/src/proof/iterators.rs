@@ -592,7 +592,10 @@ impl<'tcx> Engine<'tcx> {
                         bits: 8,
                         signed: false,
                     },
-                    Value::Elements(elements) | Value::StaticSlice { elements, .. } if !mutable => {
+                    Value::Elements(elements) if !mutable => {
+                        self.fixed_element(&elements, &index, &conditions)?
+                    }
+                    Value::StaticSlice { elements, .. } if !mutable => {
                         self.fixed_element(&elements, &index, &conditions)?
                     }
                     _ => return Err("iterator element storage is not modeled".to_owned()),

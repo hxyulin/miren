@@ -2742,7 +2742,7 @@ fn owned_aggregate_repeats_preserve_independent_copies_and_keep_storage_limits_o
         ("over_value_budget", ProofStatus::Unknown),
         ("bad_copy", ProofStatus::Refuted),
         ("too_many", ProofStatus::Unknown),
-        ("too_large", ProofStatus::Unknown),
+        ("too_large", ProofStatus::Proved),
         ("ambiguous", ProofStatus::Unknown),
         ("references", ProofStatus::Unknown),
         ("interior", ProofStatus::Unknown),
@@ -2768,7 +2768,7 @@ fn owned_aggregate_repeats_preserve_independent_copies_and_keep_storage_limits_o
                 "{target:?} {name}: {:?}",
                 proof.obligations
             );
-            if name == "too_large" {
+            if name == "over_value_budget" {
                 assert!(
                     proof
                         .obligations
@@ -2833,8 +2833,8 @@ fn aggregate_constants_preserve_variants_fields_and_initialized_memory_on_host_a
         ("raw_pointer", ProofStatus::Proved),
         ("oversized_array", ProofStatus::Proved),
         ("oversized_bytes", ProofStatus::Unknown),
-        ("oversized_shape", ProofStatus::Unknown),
-        ("deep_shape", ProofStatus::Unknown),
+        ("oversized_shape", ProofStatus::Proved),
+        ("deep_shape", ProofStatus::Proved),
     ];
     for target in [None, Some("thumbv7em-none-eabihf")] {
         let args = target

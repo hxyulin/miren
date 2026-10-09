@@ -437,7 +437,7 @@ impl<'tcx> Engine<'tcx> {
                         data,
                     }
                 } else {
-                    Value::Elements(elements)
+                    Value::Elements(elements.into())
                 };
                 results.push(Return {
                     value,
@@ -580,7 +580,7 @@ impl<'tcx> Engine<'tcx> {
                     data,
                 }
             } else {
-                Value::Elements(elements)
+                Value::Elements(elements.into())
             };
             results.push(Return {
                 value,
@@ -605,7 +605,7 @@ impl<'tcx> Engine<'tcx> {
             return Err("array map element limit reached".to_owned());
         }
         match value {
-            Value::Elements(elements) if elements.len() as u64 == count => Ok(elements.clone()),
+            Value::Elements(elements) if elements.len() as u64 == count => Ok(elements.to_vec()),
             Value::Bytes { data, .. } if *element == self.tcx.types.u8 => {
                 let bits = u32::from(self.tcx.sess.target.pointer_width);
                 Ok((0..count)

@@ -92,7 +92,7 @@ fn evaluated_constant_tables_keep_bounds_storage_bits_and_shape_limits_on_host_a
         ("unbounded_code", ProofStatus::Refuted),
         ("wrong_sample_encoding", ProofStatus::Refuted),
         ("element_limit", ProofStatus::Unknown),
-        ("value_limit", ProofStatus::Unknown),
+        ("value_limit", ProofStatus::Proved),
         ("ambiguous_exhibit", ProofStatus::Unknown),
         ("root_array_limit", ProofStatus::Proved),
         ("interior_table", ProofStatus::Unknown),

@@ -130,7 +130,7 @@ impl<'tcx> Engine<'tcx> {
         state: &State,
     ) -> Result<Vec<Value>, String> {
         match value.materialize()? {
-            Value::Elements(elements) if elements.len() == count => Ok(elements),
+            Value::Elements(elements) if elements.len() == count => Ok(elements.to_vec()),
             Value::Bytes { length, data } if element == self.tcx.types.u8 => {
                 let valid = symbolic::binary(
                     &self.terms,

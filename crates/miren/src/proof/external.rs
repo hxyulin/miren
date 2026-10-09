@@ -224,7 +224,12 @@ impl<'tcx> Engine<'tcx> {
                     Self::invalidate_local_atomics(field, memory)?;
                 }
             }
-            Value::Enum { variants, .. } | Value::Tuple(variants) | Value::Elements(variants) => {
+            Value::Enum { variants, .. } | Value::Tuple(variants) => {
+                for variant in variants {
+                    Self::invalidate_local_atomics(variant, memory)?;
+                }
+            }
+            Value::Elements(variants) => {
                 for variant in variants {
                     Self::invalidate_local_atomics(variant, memory)?;
                 }

@@ -114,10 +114,15 @@ impl Engine<'_> {
             }
             Value::Enum { variants, .. }
             | Value::Tuple(variants)
-            | Value::Elements(variants)
             | Value::StaticSlice {
                 elements: variants, ..
             } => {
+                for variant in variants {
+                    self.validate_static_initialization_graph(variant, state, visited)?;
+                }
+                Ok(())
+            }
+            Value::Elements(variants) => {
                 for variant in variants {
                     self.validate_static_initialization_graph(variant, state, visited)?;
                 }

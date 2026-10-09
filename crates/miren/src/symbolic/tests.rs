@@ -200,10 +200,10 @@ fn moving_references_through_owned_iterators_does_not_enable_identity_repeats() 
             projection: Vec::new(),
             mutable,
         };
-        let values = Value::Elements(vec![Value::Tuple(vec![reference])]);
+        let values = Value::Elements(vec![Value::Tuple(vec![reference])].into());
         assert_eq!(values.owned_iterator_size(), Some(3));
         assert_eq!(values.owned_repeat_size(), None);
     }
-    let cells = Value::Elements(vec![Value::Cell { allocation: 0 }]);
+    let cells = Value::Elements(vec![Value::Cell { allocation: 0 }].into());
     assert_eq!(cells.owned_iterator_size(), None);
 }

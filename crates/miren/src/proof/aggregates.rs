@@ -213,7 +213,7 @@ impl<'tcx> Engine<'tcx> {
                 if values.len() > MAX_ARRAY_ELEMENTS {
                     return Err("fixed array element model size limit reached".to_owned());
                 }
-                Ok(Value::Elements(values))
+                Ok(Value::Elements(values.into()))
             }
             AggregateKind::Adt(id, variant, _, _, active) if active.is_none() => {
                 let def = self.tcx.adt_def(*id);
@@ -325,7 +325,10 @@ impl<'tcx> Engine<'tcx> {
         let bits = u32::from(self.tcx.sess.target.pointer_width);
         let length = match &value {
             Value::Bytes { length, .. } => length.as_ref().clone(),
-            Value::Elements(elements) | Value::StaticSlice { elements, .. } => {
+            Value::Elements(elements) => {
+                symbolic::integer(&self.terms, elements.len() as u128, bits, false)
+            }
+            Value::StaticSlice { elements, .. } => {
                 symbolic::integer(&self.terms, elements.len() as u128, bits, false)
             }
             _ => return Err("constant indexing needs a modeled array or slice".to_owned()),
@@ -405,10 +408,18 @@ impl<'tcx> Engine<'tcx> {
             let size = value
                 .owned_repeat_size()
                 .ok_or("repeat operand needs a small owned value")?;
-            if size * count as usize + 1 > symbolic::MAX_REPEAT_VALUES {
+            let copies = value
+                .owned_repeat_clone_size()
+                .and_then(|size| size.checked_mul(count.saturating_sub(1) as usize))
+                .ok_or("owned repeat clone cost exceeds the model budget")?;
+            if size
+                .checked_add(copies)
+                .and_then(|size| size.checked_add(1))
+                .is_none_or(|size| size > symbolic::MAX_REPEAT_VALUES)
+            {
                 return Err("owned repeat exceeds the 256-value budget".to_owned());
             }
-            return Ok(Value::Elements(vec![value; count as usize]));
+            return Ok(Value::Elements(vec![value; count as usize].into()));
         }
         let (expression, width, signed) = value.integer()?;
         if width != 8 || signed {

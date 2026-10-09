@@ -118,8 +118,14 @@ fn normalize(
                 *field = slot.ok_or("missing inductive field")?;
             }
         }
-        (Value::Tuple(expected), Value::Tuple(fields))
-        | (Value::Elements(expected), Value::Elements(fields)) => {
+        (Value::Tuple(expected), Value::Tuple(fields)) => {
+            for (template, field) in expected.iter().zip(fields) {
+                let mut slot = Some(field.clone());
+                normalize(context, Some(template), &mut slot)?;
+                *field = slot.ok_or("missing inductive element")?;
+            }
+        }
+        (Value::Elements(expected), Value::Elements(fields)) => {
             for (template, field) in expected.iter().zip(fields) {
                 let mut slot = Some(field.clone());
                 normalize(context, Some(template), &mut slot)?;

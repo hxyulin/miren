@@ -54,7 +54,7 @@ Ordinary membership can read lazily represented fixed arrays, including nested s
 custom element records. Custom equality still executes its actual body; changing that body or an
 index guard refutes the original proof. Host/ARM cases and native execution check these
 interactions.
-Owned repeats and iteration count deferred fields against the same 256-value limit; small no-drop
+Owned repeats and iteration validate deferred fields within the 256-value limit; small no-drop
 records can remain deferred, while oversized values and identity-bearing storage remain UNKNOWN.
 
 Compiler-typed `u8` MIR repeats use a constant SMT array, independent of their byte count, with
@@ -264,8 +264,10 @@ intrinsic declaration and primitive clamp implementation; they do not trust appl
 
 Small repeated tuples, structs, enum values and nested arrays preserve their contents and variant
 tags. Each copy owns its data: changing a field or byte in one copy does not change another copy.
-Generated repeats have at most 128 elements and 256 modeled values, counting aggregate containers
-and their children. Non-byte root arrays allow 256 elements with eager values or bounded lazy
+Generated repeats have at most 128 elements and a 256-value retained clone budget. Operand
+validation
+counts aggregate containers and their children. Non-byte root arrays allow 256 elements with eager
+values or bounded lazy
 descriptors; evaluated constants permit 128 elements. Byte arrays retain their 128-byte limit.
 Tracked references, Cell/atomic identities and mutable views are excluded from repeat cloning.
 
@@ -387,8 +389,8 @@ adding ordinary intrinsic models does not extend the loop-state encoding.
 
 ## Larger evaluated tables and numeric-only float exploration
 
-Evaluated constants now allow up to 128 elements, with the same 256-value total and eight-level
-depth budgets. Symbolic compatible scalar selection needs a bounds proof, while constant indices
+Evaluated constants allow up to 128 array elements, a 2,048-visit total and sixteen-level
+depth budget. Symbolic compatible scalar selection needs a bounds proof, while constant indices
 select directly. Composite indices still require uniqueness. Host/ARM tests retain unknown results
 for oversized, ambiguous, uninitialized and interior-mutable cases.
 
@@ -417,7 +419,8 @@ inside those bodies still remain UNKNOWN. Primitive integer endian encoding and 
 exact compiler identities, signatures and byte order.
 
 Root arrays allow 256 non-byte elements with eager values or bounded lazy descriptors, and enums
-allow 256 fieldless or 64 payload variants. Integer compiler patterns and Unicode char validity constrain the input domain.
+allow 256 fieldless or 64 payload variants. Integer compiler patterns and Unicode char validity
+constrain the input domain.
 The exact core NonZero getter reads the modeled scalar; other struct invariants are not inferred.
 Exhausted budgets and unresolved input types remain UNKNOWN.
 
@@ -731,6 +734,7 @@ Compiler-identified volatile scalar loads require exact typed, initialized, live
 backing and a matching registered address. Values retain exact integer/float storage bits.
 Numeric MMIO, static payloads, projections, cursor offsets, punned or invalidated storage remain
 UNKNOWN. The model supplies no synchronization or device access guarantee.
+
 Arbitrary valid function-pointer input fields use bounded typed opaque witnesses. These witnesses
 retain the full compiler signature, including safety, ABI and bound regions, without a numeric
 address, concrete target or callback effects. Unused fields, lazy input arrays and exact typed
@@ -738,3 +742,10 @@ stores are supported. Invocation, address casts, identity comparisons, contract 
 native replay remain UNKNOWN. Host/ARM tests cover ordinary and unsafe signatures, Waker tables,
 reached panics, changed guards and forged signature mutations.
 
+Owned non-byte arrays use immutable shared host payloads with copy-on-write updates. Sharing the
+host representation creates no Rust alias: each retained value and branch detaches changed paths.
+Constant storage reuse requires exact compiler types and lossless decoded value keys; every field
+is still read and validated before reuse. Limits count all 2,048 CTFE visits, not only unique keys.
+Owned repeats validate their operand within 256 values, then charge bounded shared clone handles.
+Nested array copies and writes, large tables, signed-zero/NaN bits, unsupported payloads and budget
+boundaries have compiler and mutation tests.

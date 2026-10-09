@@ -3,10 +3,30 @@ use rustc_abi::FieldIdx;
 use rustc_const_eval::const_eval::{CompileTimeInterpCx, mk_eval_cx_for_const_val};
 use rustc_const_eval::interpret::{OpTy, Projectable};
 use rustc_middle::mir::Const;
+use std::collections::HashMap;
 
-const MAX_CONSTANT_VALUES: usize = 256;
+const MAX_CONSTANT_VALUES: usize = 2048;
 const MAX_CONSTANT_ELEMENTS: u64 = 128;
-const MAX_CONSTANT_DEPTH: usize = 8;
+const MAX_CONSTANT_DEPTH: usize = 16;
+
+#[derive(Hash, PartialEq, Eq)]
+enum ConstantStorageKey {
+    Unit,
+    Bool(Term),
+    Int(Term, u32, bool),
+    Float(Term, u32, Option<Term>),
+    Address(Term, u32),
+    Bytes(Term, Box<ConstantStorageKey>),
+    Tuple(Vec<ConstantStorageKey>),
+    Elements(Vec<ConstantStorageKey>),
+    Adt(String, usize, bool, u128, Vec<(String, ConstantStorageKey)>),
+}
+
+#[derive(Default)]
+struct ConstantStorage<'tcx> {
+    values: usize,
+    shared: HashMap<(Ty<'tcx>, ConstantStorageKey), Value>,
+}
 
 impl<'tcx> Engine<'tcx> {
     pub(super) fn constant(
@@ -31,7 +51,7 @@ impl<'tcx> Engine<'tcx> {
         let (ecx, operand) =
             mk_eval_cx_for_const_val(self.tcx.at(span), typing_env, value, constant.ty())
                 .ok_or("unsupported constant layout")?;
-        self.constant_value(&ecx, &operand, 0, &mut 0)
+        self.constant_value(&ecx, &operand, 0, &mut ConstantStorage::default())
     }
 
     fn constant_value(
@@ -39,12 +59,33 @@ impl<'tcx> Engine<'tcx> {
         ecx: &CompileTimeInterpCx<'tcx>,
         operand: &OpTy<'tcx>,
         depth: usize,
-        values: &mut usize,
+        storage: &mut ConstantStorage<'tcx>,
     ) -> Result<Value, String> {
-        if depth >= MAX_CONSTANT_DEPTH || *values >= MAX_CONSTANT_VALUES {
+        if depth >= MAX_CONSTANT_DEPTH || storage.values >= MAX_CONSTANT_VALUES {
             return Err("unsupported constant shape exceeds depth or value budget".to_owned());
         }
-        *values += 1;
+        storage.values += 1;
+        let value = self.decode_constant_value(ecx, operand, depth, storage)?;
+        // Reuse only decoded initialized values with an exact type and lossless storage key.
+        // Every occurrence is still evaluated and checked, so padding or an unsupported field
+        // cannot be hidden by a previously successful constant with the same outer shape.
+        if let Some(key) = constant_storage_key(&value) {
+            let key = (operand.layout.ty, key);
+            if let Some(existing) = storage.shared.get(&key) {
+                return Ok(existing.clone());
+            }
+            storage.shared.insert(key, value.clone());
+        }
+        Ok(value)
+    }
+
+    fn decode_constant_value(
+        &self,
+        ecx: &CompileTimeInterpCx<'tcx>,
+        operand: &OpTy<'tcx>,
+        depth: usize,
+        storage: &mut ConstantStorage<'tcx>,
+    ) -> Result<Value, String> {
         let ty = match operand.layout.ty.kind() {
             ty::Pat(base, _) => *base,
             _ => operand.layout.ty,
@@ -60,7 +101,7 @@ impl<'tcx> Engine<'tcx> {
             if !ecx.type_is_freeze(pointee.layout.ty) {
                 return Err("unsupported constant reference to interior mutable storage".to_owned());
             }
-            return self.constant_value(ecx, &pointee.into(), depth + 1, values);
+            return self.constant_value(ecx, &pointee.into(), depth + 1, storage);
         }
         if self.thin_raw_pointer(ty) {
             let address = ecx
@@ -130,7 +171,7 @@ impl<'tcx> Engine<'tcx> {
                             .project_field(&down, FieldIdx::from_usize(index))
                             .discard_err()
                             .ok_or("unsupported constant field projection")?;
-                        self.constant_value(ecx, &field, depth + 1, values)
+                        self.constant_value(ecx, &field, depth + 1, storage)
                     })
                     .collect::<Result<Vec<_>, String>>()?;
                 self.constructed(ty, variant.as_usize(), fields)
@@ -146,7 +187,7 @@ impl<'tcx> Engine<'tcx> {
                                 .project_field(operand, FieldIdx::from_usize(index))
                                 .discard_err()
                                 .ok_or("unsupported constant tuple projection")?;
-                            self.constant_value(ecx, &field, depth + 1, values)
+                            self.constant_value(ecx, &field, depth + 1, storage)
                         })
                         .collect::<Result<_, String>>()?,
                 ))
@@ -166,11 +207,11 @@ impl<'tcx> Engine<'tcx> {
                             .project_index(operand, index)
                             .discard_err()
                             .ok_or("unsupported constant element projection")?;
-                        self.constant_value(ecx, &element, depth + 1, values)
+                        self.constant_value(ecx, &element, depth + 1, storage)
                     })
                     .collect::<Result<Vec<_>, String>>()?;
                 if !bytes {
-                    return Ok(Value::Elements(elements));
+                    return Ok(Value::Elements(elements.into()));
                 }
                 let width = u32::from(self.tcx.sess.target.pointer_width);
                 let mut data = self.terms.apply(
@@ -200,5 +241,83 @@ impl<'tcx> Engine<'tcx> {
             }
             _ => Err(format!("unsupported constant type {ty}")),
         }
+    }
+}
+
+fn constant_storage_key(value: &Value) -> Option<ConstantStorageKey> {
+    match value {
+        Value::Unit => Some(ConstantStorageKey::Unit),
+        Value::Bool(term) => Some(ConstantStorageKey::Bool(term.clone())),
+        Value::Int {
+            expression,
+            bits,
+            signed,
+        } => Some(ConstantStorageKey::Int(expression.clone(), *bits, *signed)),
+        Value::Float {
+            expression,
+            bits,
+            raw_bits,
+        } => Some(ConstantStorageKey::Float(
+            expression.clone(),
+            *bits,
+            raw_bits.clone(),
+        )),
+        Value::RawPointer { address, bits } => {
+            Some(ConstantStorageKey::Address(address.clone(), *bits))
+        }
+        Value::Bytes { length, data } => Some(ConstantStorageKey::Bytes(
+            data.clone(),
+            Box::new(constant_storage_key(length)?),
+        )),
+        Value::Tuple(fields) => Some(ConstantStorageKey::Tuple(
+            fields
+                .iter()
+                .map(constant_storage_key)
+                .collect::<Option<_>>()?,
+        )),
+        Value::Elements(fields) => Some(ConstantStorageKey::Elements(
+            fields
+                .iter()
+                .map(constant_storage_key)
+                .collect::<Option<_>>()?,
+        )),
+        Value::Adt {
+            name,
+            variant,
+            is_option,
+            discriminant,
+            fields,
+        } => {
+            let fields = fields
+                .iter()
+                .map(|(name, value)| Some((name.clone(), constant_storage_key(value)?)))
+                .collect::<Option<_>>()?;
+            Some(ConstantStorageKey::Adt(
+                name.clone(),
+                *variant,
+                *is_option,
+                *discriminant,
+                fields,
+            ))
+        }
+        Value::Input(_)
+        | Value::Enum { .. }
+        | Value::Cell { .. }
+        | Value::Atomic { .. }
+        | Value::LocalAtomic { .. }
+        | Value::RawSlice { .. }
+        | Value::TrackedPointer { .. }
+        | Value::Reference { .. }
+        | Value::SliceIterator { .. }
+        | Value::MetadataPointer(_)
+        | Value::StaticText
+        | Value::FormatArguments
+        | Value::StaticSlice { .. }
+        | Value::StaticView { .. }
+        | Value::Uninitialized
+        | Value::TraitObject { .. }
+        | Value::DebugReference { .. }
+        | Value::FunctionPointer { .. }
+        | Value::Function => None,
     }
 }
