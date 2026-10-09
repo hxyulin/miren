@@ -23,10 +23,12 @@ const fn coefficients() -> [[f32; 6]; 40] {
 const COEFFICIENTS: [[f32; 6]; 40] = coefficients();
 const SHARED_ROWS: [[u16; 8]; 64] = [[23; 8]; 64];
 const OVER_BUDGET: [[u16; 16]; 128] = [[7; 16]; 128];
-const OVER_ELEMENTS: [u16; 129] = [7; 129];
+const OVER_ELEMENTS: [(u16, u16); 129] = [(7, 7); 129];
 
 pub fn initialized_configuration_copies() {
-    let mut changed = Configuration { coefficients: COEFFICIENTS };
+    let mut changed = Configuration {
+        coefficients: COEFFICIENTS,
+    };
     let original = changed;
     changed.coefficients[39][5] = 999.0;
     assert!(original.coefficients[39][5] == 239.0);
@@ -56,14 +58,24 @@ pub fn deep_repeat(value: u16) {
 }
 
 pub fn constant_bounds_failure(index: usize) -> f32 {
-    let configuration = Configuration { coefficients: COEFFICIENTS };
+    let configuration = Configuration {
+        coefficients: COEFFICIENTS,
+    };
     configuration.coefficients[index][0]
 }
 
-pub fn constant_value_budget() -> [[u16; 16]; 128] { OVER_BUDGET }
-pub fn constant_element_budget() -> [u16; 129] { OVER_ELEMENTS }
-pub fn repeat_clone_budget(value: u16) -> [(u16, u16); 86] { [(value, value); 86] }
-pub fn repeat_element_budget(value: u16) -> [u16; 129] { [value; 129] }
+pub fn constant_value_budget() -> [[u16; 16]; 128] {
+    OVER_BUDGET
+}
+pub fn constant_element_budget() -> [(u16, u16); 129] {
+    OVER_ELEMENTS
+}
+pub fn repeat_clone_budget(value: u16) -> [(u16, u16); 86] {
+    [(value, value); 86]
+}
+pub fn repeat_element_budget(value: u16) -> [u16; 129] {
+    [value; 129]
+}
 pub fn interior_repeat() -> [core::cell::Cell<u16>; 40] {
     [const { core::cell::Cell::new(23) }; 40]
 }

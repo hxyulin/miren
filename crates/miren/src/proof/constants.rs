@@ -7,6 +7,7 @@ use std::collections::HashMap;
 
 const MAX_CONSTANT_VALUES: usize = 2048;
 const MAX_CONSTANT_ELEMENTS: u64 = 128;
+const MAX_CONSTANT_SCALAR_ELEMENTS: u64 = 256;
 const MAX_CONSTANT_DEPTH: usize = 16;
 
 #[derive(Hash, PartialEq, Eq)]
@@ -198,7 +199,17 @@ impl<'tcx> Engine<'tcx> {
                     .discard_err()
                     .ok_or("unsupported constant array length")?;
                 let bytes = *element == self.tcx.types.u8;
-                if count > MAX_CONSTANT_ELEMENTS {
+                // Scalar tables use the existing lossless decoder and bounded scalar selection.
+                // Composite arrays retain their lower fanout limit; total visits still count.
+                let scalar = element.is_bool()
+                    || self.integer_type(*element).is_some()
+                    || self.float_type(*element).is_some();
+                let limit = if scalar {
+                    MAX_CONSTANT_SCALAR_ELEMENTS
+                } else {
+                    MAX_CONSTANT_ELEMENTS
+                };
+                if count > limit {
                     return Err("unsupported constant array exceeds element budget".to_owned());
                 }
                 let elements = (0..count)

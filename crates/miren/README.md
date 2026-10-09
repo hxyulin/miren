@@ -198,7 +198,8 @@ Concrete function-item pointers continue executing their actual bodies and effec
 
 Owned non-byte arrays share immutable host payloads and detach changed paths on writes. Rust copies
 retain independent storage. Evaluated constants check every occurrence before reusing exact typed
-initialized values, with at most 2,048 visited values, sixteen levels and 128 array elements.
+initialized values, with at most 2,048 visited values, sixteen levels and 256 scalar or 128 composite
+array elements.
 Owned repeats retain the 256-value budget but charge validated shared payloads once and bounded
 clone handles separately; unsupported payloads and interior mutation remain UNKNOWN.
 
@@ -208,3 +209,6 @@ Non-byte ranges and missing writable provenance remain UNKNOWN.
 Compiler inventories record whether each function directly returns a coroutine. Fleet surveys
 separate those future-construction roots from function-body roots; explicit async polling remains
 a separate capture. Older inventories without this metadata remain unclassified.
+Initialized scalar constant arrays support up to 256 exact bool, integer or f32/f64 elements.
+Composite arrays retain the 128-element cap, with the existing total and depth budgets. Every
+constant element is decoded and validated; indices require bounds checks and float bits survive.

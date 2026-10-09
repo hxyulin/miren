@@ -121,8 +121,8 @@ pub fn constant_slice() {
 }
 
 pub fn maximum_bytes() {
-    const BYTES: [u8; 128] = [7; 128];
-    assert!(BYTES[127] == 7);
+    const BYTES: [u8; 256] = [7; 256];
+    assert!(BYTES[255] == 7);
 }
 
 pub fn uninitialized() {
@@ -167,7 +167,7 @@ pub fn oversized_array() {
 }
 
 pub fn oversized_bytes() {
-    const ARRAY: [u8; 129] = [1; 129];
+    const ARRAY: [u8; 257] = [1; 257];
     let _value = ARRAY;
 }
 
@@ -177,7 +177,6 @@ pub fn oversized_shape() {
 }
 
 pub fn deep_shape() {
-    const ARRAY: [[[[[[[[[u16; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1] =
-        [[[[[[[[[1]]]]]]]]];
+    const ARRAY: [[[[[[[[[u16; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1]; 1] = [[[[[[[[[1]]]]]]]]];
     let _value = ARRAY;
 }

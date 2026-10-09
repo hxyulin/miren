@@ -44,7 +44,12 @@ struct Exhibit {
     open: bool,
 }
 
-const EXHIBITS: [Exhibit; 32] = [const { Exhibit { year: 2024, open: true } }; 32];
+const EXHIBITS: [Exhibit; 32] = [const {
+    Exhibit {
+        year: 2024,
+        open: true,
+    }
+}; 32];
 const ROWS: [[u16; 4]; 32] = [[7, 11, 13, 17]; 32];
 
 #[requires(index < 128)]
@@ -100,7 +105,7 @@ pub fn wrong_sample_encoding(index: usize) {
     assert!(SAMPLE_LABELS[index].to_bits() == 0x7fc0_0000);
 }
 
-const OVERSIZED: [u16; 129] = [11; 129];
+const OVERSIZED: [u16; 257] = [11; 257];
 const TOO_MANY_VALUES: [[u16; 4]; 64] = [[1, 2, 3, 4]; 64];
 
 pub fn element_limit() -> u16 {

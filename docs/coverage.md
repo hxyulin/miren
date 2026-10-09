@@ -19,7 +19,7 @@ program: resource limits and undecided queries remain separate sources of UNKNOW
 | Bytes | Shared byte slices and fixed arrays; symbolic contents and valid-reference length bounds | Disjoint mutable byte-slice roots support guarded writes; general aliases remain unsupported |
 | Tuples | Nested values, shared references, field projections and numeric contract fields such as `value.1.0` | Destructured argument names with projected debug bindings are not contract bindings |
 | Structs | Nested local/dependency structs, concrete generic fields and supported shared-reference fields | Unions, reference fields in mutable root pointees and unresolved generics remain unsupported |
-| Fixed non-byte arrays | At most 256 input elements; large eligible subtrees use bounded lazy descriptors; evaluated constants and generated owned repeats support up to 128 | Larger arrays fail as UNKNOWN |
+| Fixed non-byte arrays | At most 256 input elements; large eligible subtrees use bounded lazy descriptors; scalar constants up to 256; composite constants and generated owned repeats up to 128 | Larger arrays fail as UNKNOWN |
 | Array indexing | Symbolic bounded integer/bool/float selection, start/end pattern offsets and uniquely determined composite indices | An ambiguous tuple/struct/enum index remains UNKNOWN |
 | Fixed-array equality | Primitive numeric equality and actual custom/nested comparisons; ordered short-circuit effects | At most 128 elements per array; general slice equality and inlined pointer-based comparisons remain gaps |
 | Enums | Local/dependency inputs with symbolic tags/payloads; constructed variants and core Option/Result/ControlFlow | At most 256 fieldless or 64 payload input variants, all payloads modeled; enum/struct slices remain unsupported |
@@ -268,7 +268,8 @@ Generated repeats have at most 128 elements and a 256-value retained clone budge
 validation
 counts aggregate containers and their children. Non-byte root arrays allow 256 elements with eager
 values or bounded lazy
-descriptors; evaluated constants permit 128 elements. Byte arrays retain their 128-byte limit.
+descriptors; evaluated scalar constants permit 256 elements and composite constants 128. Byte arrays
+as inputs retain their 128-byte limit.
 Tracked references, Cell/atomic identities and mutable views are excluded from repeat cloning.
 
 Host/ARM tests prove six-by-six float matrix initialization, tuple/struct/enum copies, 18-element
@@ -389,9 +390,9 @@ adding ordinary intrinsic models does not extend the loop-state encoding.
 
 ## Larger evaluated tables and numeric-only float exploration
 
-Evaluated constants allow up to 128 array elements, a 2,048-visit total and sixteen-level
-depth budget. Symbolic compatible scalar selection needs a bounds proof, while constant indices
-select directly. Composite indices still require uniqueness. Host/ARM tests retain unknown results
+Evaluated constants allow 256 scalar or 128 composite array elements, a 2,048-visit total and
+sixteen-level depth budget. Symbolic compatible scalar selection needs a bounds proof, while constant
+indices select directly. Composite indices still require uniqueness. Host/ARM tests retain unknown results
 for oversized, ambiguous, uninitialized and interior-mutable cases.
 
 Deferred float encoding relations avoid translating unused storage observations into numeric-only
@@ -759,3 +760,8 @@ Compiler inventories record direct coroutine return types independently of proof
 The fleet exporter counts future factories separately and identifies their compact root rows.
 These proofs construct futures without polling them. Explicit async-entry results remain separate;
 missing metadata in legacy inventories is unclassified rather than inferred from function names.
+Scalar constant tables contain at most 256 bool, integer or f32/f64 elements, including nested
+`Table<1>`-shaped arrays. Every element passes exact typed initialized decoding and retains raw
+float bits. Composite arrays keep the 128-element cap; total visits remain 2,048 and depth sixteen.
+Host/ARM and native tests check bounded lookup, bad indices, data and guard mutations, NaN payloads,
+signed zero, uninitialized storage, composite limits and 257-element scalar rejection.

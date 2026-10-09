@@ -1401,3 +1401,11 @@ function-body roots. Exported counts and row indices retain that distinction; le
 metadata remains unclassified. Polling proofs cannot enter a function-only capture. Compiler/native
 host/ARM tests prove construction of a panicking future and refute its reached poll; metadata and
 scope mutations fail collection without changing proof outcomes.
+
+## Stage 93: Initialized scalar constant tables
+
+Exact bool, integer and f32/f64 constants support 256 elements while composite arrays keep 128.
+Every value remains typed, initialized and within the existing 2,048-visit/sixteen-level budgets.
+Nested CRC-shaped tables preserve symbolic bounds and raw float encodings. Host/ARM and native
+mutations check data, guards, NaN payloads and signed zero; unsupported initialization, 257 scalars
+and oversized composites remain UNKNOWN. Older scalar-cap fixtures now test the correct boundary.
