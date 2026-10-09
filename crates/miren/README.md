@@ -251,6 +251,12 @@ Constructor evidence uses shared compiler-body validation, return-type binding a
 finalization. Scalar-only and closed aggregate checking retain separate argument/cache policies;
 U32 carriers and exact `Atomic<usize>` constructors retain their separate layout requirements.
 
+Explicit `--startup` additionally retains initialized null or numeric address bits from certified
+static pointer atomics. Reads share the integer atomic footprint and budget checks. Returned raw
+addresses grant no pointee access; provenance-bearing initializers remain UNKNOWN. Stores, CAS,
+opaque calls and interrupt-mask writes discard startup history, including unseen locations.
+Ordinary roots retain arbitrary pointer reads, and async roots cannot select startup assumptions.
+
 Integer and pointer compare-exchange share ordering validation and the success formula. Each weak
 operation creates a fresh possible spurious failure. Receiver certification, primitive value types
 and storage updates remain specific to each model. Pointer equality supplies no shared-state

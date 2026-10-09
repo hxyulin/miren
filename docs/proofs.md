@@ -850,7 +850,11 @@ An explicit `--startup` run assumes fresh Rust static initializers for a zero-ar
 external changes to tracked static storage before pointer publication or opaque calls. This premise
 is recorded in `entry_assumptions`; a successful proof is PROVED_WITH_ASSUMPTIONS. Certified integer
 atomics and boolean static payloads share exact allocation/offset/size identities and branch-local
-updates. Boolean initializer reads check initialized bytes, provenance and the valid 0/1 encoding;
+updates. Certified static pointer atomics additionally retain initialized null or numeric address
+bits without pointee provenance. Scalar decoding rejects relocation-bearing pointer initializers;
+shared footprint and budget checks prevent incompatible cached views from replacing history.
+Pointer stores and CAS invalidate the domain rather than retaining replacement values.
+Boolean initializer reads check initialized bytes, provenance and the valid 0/1 encoding;
 this applies only to the previously supported whole mutable bool and UnsafeCell field paths.
 Nonboolean static stores, mixed or overlapping views and trusted boundaries discard precise history,
 including future first accesses. A later boolean write cannot restore invalidated history.

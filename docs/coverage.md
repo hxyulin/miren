@@ -635,11 +635,12 @@ partial initialization and exact mutable-static payload histories are still sepa
 Compiler-identified thin pointer atomic loads validate their exact inherent signature and permit
 Relaxed, Acquire and SeqCst ordering. Release and AcqRel orderings produce panic obligations.
 Initialized certified static receivers and exact compiler-shaped tracked wrappers support these
-loads, including static fields at nonzero offsets. Every load returns arbitrary target-width
+loads, including static fields at nonzero offsets. Ordinary loads return arbitrary target-width
 address bits. A saved observation stays consistent, but separate reads and initializer-specific
-claims can refute under the reported abstraction. Startup mode supplies no additional pointer
-history or pointee provenance. Raw intrinsic loads, loaded-pointer dereferences, volatile loads,
-and general raw atomic destinations remain unsupported.
+claims can refute under the reported abstraction. Explicit startup mode retains initialized null or
+numeric address bits at certified static locations until history is invalidated. Provenance-bearing
+initializers remain UNKNOWN; loaded addresses grant no pointee access. Raw intrinsic loads,
+loaded-pointer dereferences, volatile loads and general raw atomic destinations remain unsupported.
 
 Host/ARM debug and optimized fixtures cover legal comparisons, guarded ordering, uninitialized
 receivers, numeric intrinsic destinations, conservative local and shared reads, and startup

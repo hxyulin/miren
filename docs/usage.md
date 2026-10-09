@@ -514,11 +514,14 @@ separately from contracts. Cargo forwards the same options.
 
 Supported integer static atomics and certified boolean static payloads retain initial values and
 sequential updates through branches and calls. This includes whole mutable bool statics and exact
-UnsafeCell/Cell boolean fields. Other typed static stores, mixed or overlapping views and trusted
-calls discard precision; unseen statics and later writes cannot restore invalidated history.
-Arbitrary-root analysis keeps shared atomic and boolean reads conservative. Startup roots with
-arguments, unsupported initializer storage and cyclic induction remain UNKNOWN. This mode does not verify the reset handler, runtime loader,
-hardware initialization or an interrupt/task execution environment.
+UnsafeCell/Cell boolean fields. Certified static pointer atomic loads also retain null and numeric
+initializer address bits; these do not authorize pointee reads. Pointer initializers with provenance
+remain UNKNOWN, and pointer stores or CAS discard history. Other typed static stores, mixed or
+overlapping views and trusted calls discard precision; unseen statics and later writes cannot
+restore invalidated history. Arbitrary-root analysis keeps shared atomic and boolean reads
+conservative. Startup roots with arguments, unsupported initializer storage and cyclic induction
+remain UNKNOWN. This mode does not verify the reset handler, runtime loader, hardware initialization
+or an interrupt/task execution environment.
 
 Saved reports preserve `functions[].proof.entry_assumptions`. Recompiling with `--from-report`
 requires selecting `--startup` again; saved compiler arguments do not silently select a proof

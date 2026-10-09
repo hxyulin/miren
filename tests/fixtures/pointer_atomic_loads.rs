@@ -2,8 +2,8 @@
 #![forbid(unsafe_code)]
 #![feature(custom_mir, core_intrinsics, adt_const_params, sync_unsafe_cell)]
 
-use core::sync::atomic::{AtomicPtr, Ordering};
 use core::intrinsics::mir::*;
+use core::sync::atomic::{AtomicPtr, Ordering};
 
 static LINK: AtomicPtr<u32> = AtomicPtr::new(core::ptr::null_mut());
 
@@ -37,7 +37,10 @@ pub fn a_nested_pointer_atomic_has_a_certified_storage_offset() {
 }
 
 pub fn guarded_load_ordering(order: Ordering) {
-    if matches!(order, Ordering::Relaxed | Ordering::Acquire | Ordering::SeqCst) {
+    if matches!(
+        order,
+        Ordering::Relaxed | Ordering::Acquire | Ordering::SeqCst
+    ) {
         let _pointer = LINK.load(order);
     }
 }
@@ -154,7 +157,6 @@ mod tests {
     }
 }
 
-
 pub fn loaded_addresses_do_not_authorize_pointee_reads() -> u32 {
     let pointer = LINK.load(Ordering::Relaxed);
     if pointer.is_null() {
@@ -209,4 +211,94 @@ pub fn user_load_methods_are_not_compiler_atomic_models() {
 #[should_panic]
 fn a_user_load_method_keeps_its_native_panic() {
     user_load_methods_are_not_compiler_atomic_models();
+}
+
+static NUMERIC_LINK: AtomicPtr<u32> = AtomicPtr::new(0x2000_0000_usize as *mut u32);
+static TARGET: u32 = 7;
+static RELOCATED_LINK: AtomicPtr<u32> = AtomicPtr::new((&raw const TARGET).cast_mut());
+static COUNT: core::sync::atomic::AtomicU32 = core::sync::atomic::AtomicU32::new(0);
+
+pub fn startup_null_and_numeric_addresses_keep_their_initial_bits() {
+    assert!(LINK.load(Ordering::Relaxed).is_null());
+    assert!(HEADER.next.load(Ordering::Acquire).is_null());
+    assert!(NUMERIC_LINK.load(Ordering::SeqCst) as usize == 0x2000_0000);
+}
+
+pub fn startup_disjoint_integer_and_pointer_locations_remain_independent() {
+    COUNT.store(7, Ordering::Relaxed);
+    assert!(LINK.load(Ordering::Relaxed).is_null());
+    assert!(COUNT.load(Ordering::Relaxed) == 7);
+}
+
+pub fn nonzero_numeric_initializers_do_not_grant_pointee_access() -> u32 {
+    read_loaded_pointer(NUMERIC_LINK.load(Ordering::Relaxed))
+}
+
+pub fn relocated_initializers_need_a_pointer_provenance_model() {
+    let _pointer = RELOCATED_LINK.load(Ordering::Relaxed);
+}
+
+pub fn a_pointer_store_discards_initializer_history() {
+    assert!(LINK.load(Ordering::Relaxed).is_null());
+    LINK.store(core::ptr::null_mut(), Ordering::Release);
+    assert!(LINK.load(Ordering::Relaxed).is_null());
+}
+
+pub fn pointer_cas_discards_initializer_history() {
+    let _result = LINK.compare_exchange(
+        core::ptr::null_mut(),
+        core::ptr::null_mut(),
+        Ordering::Relaxed,
+        Ordering::Relaxed,
+    );
+    assert!(LINK.load(Ordering::Relaxed).is_null());
+}
+
+pub fn a_pointer_write_cannot_restore_invalidated_initializer_history() {
+    LINK.store(core::ptr::null_mut(), Ordering::Relaxed);
+    assert!(HEADER.next.load(Ordering::Relaxed).is_null());
+}
+
+pub fn boundary() {}
+
+pub fn a_boundary_discards_pointer_initializer_history() {
+    assert!(LINK.load(Ordering::Relaxed).is_null());
+    boundary();
+    assert!(LINK.load(Ordering::Relaxed).is_null());
+}
+
+pub fn a_boundary_prevents_unseen_pointer_initializers() {
+    boundary();
+    assert!(LINK.load(Ordering::Relaxed).is_null());
+}
+
+#[cfg(test)]
+#[test]
+fn native_startup_pointer_bits() {
+    startup_null_and_numeric_addresses_keep_their_initial_bits();
+}
+
+#[custom_mir(dialect = "runtime", phase = "optimized")]
+fn borrow_integer_overlay(
+    pointer: *mut core::sync::atomic::AtomicUsize,
+) -> &'static core::sync::atomic::AtomicUsize {
+    mir! {{ RET = &*pointer; Return() }}
+}
+
+#[custom_mir(dialect = "runtime", phase = "optimized")]
+fn borrow_pointer_overlay(pointer: *mut AtomicPtr<u32>) -> &'static AtomicPtr<u32> {
+    mir! {{ RET = &*pointer; Return() }}
+}
+
+static POINTER_OVERLAY: core::cell::SyncUnsafeCell<AtomicPtr<u32>> =
+    core::cell::SyncUnsafeCell::new(AtomicPtr::new(core::ptr::null_mut()));
+static INTEGER_OVERLAY: core::cell::SyncUnsafeCell<core::sync::atomic::AtomicUsize> =
+    core::cell::SyncUnsafeCell::new(core::sync::atomic::AtomicUsize::new(0));
+
+pub fn pointer_storage_cannot_be_read_as_integer_atomic() {
+    let _value = borrow_integer_overlay(POINTER_OVERLAY.get().cast()).load(Ordering::Relaxed);
+}
+
+pub fn integer_storage_cannot_be_read_as_pointer_atomic() {
+    let _value = borrow_pointer_overlay(INTEGER_OVERLAY.get().cast()).load(Ordering::Relaxed);
 }

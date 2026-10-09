@@ -40,21 +40,8 @@ impl<'tcx> Engine<'tcx> {
                 Some(AtomicStorage::Startup(location)),
             ));
         }
-        if state
-            .memory
-            .startup_values
-            .keys()
-            .any(|existing| location.overlaps(*existing))
-        {
-            state.memory.invalidate_startup();
-            self.record_model(
-                location.definition,
-                "overlapping startup atomic views invalidate exact static history",
-            );
+        if !self.startup_location_available(location, state)? {
             return Ok((self.opaque_atomic_value(bits, signed), None));
-        }
-        if state.memory.startup_values.len() >= MAX_STARTUP_LOCATIONS {
-            return Err("startup atomic history exceeds the 128-location budget".into());
         }
         let value = self.startup_atomic_initializer(location, bits, signed)?;
         state.memory.startup_values.insert(location, value.clone());
@@ -63,6 +50,79 @@ impl<'tcx> Engine<'tcx> {
             "fresh-startup static integer atomic; initializer and path-local updates",
         );
         Ok((value, Some(AtomicStorage::Startup(location))))
+    }
+
+    pub(super) fn startup_pointer_atomic_load(
+        &mut self,
+        receiver: &Value,
+        receiver_ty: Ty<'tcx>,
+        pointer_ty: Ty<'tcx>,
+        state: &mut State,
+    ) -> Result<Option<Value>, String> {
+        if !self.startup || !matches!(receiver, Value::StaticView { .. }) {
+            return Ok(None);
+        }
+        let location = self.static_atomic_storage(receiver, receiver_ty, pointer_ty, state)?;
+        if state.memory.startup_invalidated {
+            return Ok(None);
+        }
+        let bits = u32::from(self.tcx.sess.target.pointer_width);
+        if let Some(Value::RawPointer {
+            address,
+            bits: width,
+        }) = state.memory.startup_values.get(&location)
+        {
+            if *width != bits || *address.sort() != Sort::BitVec(bits) {
+                return Err("startup pointer atomic history has an inconsistent width".into());
+            }
+            return Ok(Some(Value::RawPointer {
+                address: address.clone(),
+                bits,
+            }));
+        }
+        if !self.startup_location_available(location, state)? {
+            return Ok(None);
+        }
+        if location.bytes != u64::from(bits / 8) {
+            return Err("startup pointer atomic initializer has an inconsistent width".into());
+        }
+        let initializer = self.startup_scalar_initializer(location)?;
+        let value = Value::RawPointer {
+            address: self.terms.bit_vector(initializer, bits)?,
+            bits,
+        };
+        state.memory.startup_values.insert(location, value.clone());
+        self.record_model(
+            location.definition,
+            "fresh-startup pointer atomic; initialized address bits without pointee provenance",
+        );
+        Ok(Some(value))
+    }
+
+    // Called after a typed cache lookup misses. Any cached overlapping footprint is then
+    // incompatible, even when its allocation/offset/size matches exactly.
+    fn startup_location_available(
+        &mut self,
+        location: StaticLocation,
+        state: &mut State,
+    ) -> Result<bool, String> {
+        if state
+            .memory
+            .startup_values
+            .keys()
+            .any(|other| location.overlaps(*other))
+        {
+            state.memory.invalidate_startup();
+            self.record_model(
+                location.definition,
+                "overlapping startup atomic views invalidate exact static history",
+            );
+            return Ok(false);
+        }
+        if state.memory.startup_values.len() >= MAX_STARTUP_LOCATIONS {
+            return Err("startup atomic history exceeds the 128-location budget".into());
+        }
+        Ok(true)
     }
 
     pub(super) fn opaque_atomic_value(&mut self, bits: u32, signed: bool) -> Value {

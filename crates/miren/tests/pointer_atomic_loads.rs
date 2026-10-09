@@ -36,11 +36,27 @@ fn verify(
     optimized: bool,
     startup: bool,
 ) -> Report {
+    verify_with_specification(path, entries, target, optimized, startup, None)
+}
+
+fn verify_with_specification(
+    path: &Path,
+    entries: &[(&str, ProofStatus)],
+    target: Option<&str>,
+    optimized: bool,
+    startup: bool,
+    specification: Option<serde_json::Value>,
+) -> Report {
     let directory = Directory::new();
     let mut command = Command::new(env!("CARGO_BIN_EXE_miren"));
     command.args(["--verify", "--json", "--quiet"]);
     if startup {
         command.args(["--startup", "--allow-assumptions"]);
+    }
+    if let Some(specification) = &specification {
+        let path = directory.0.join("contracts.json");
+        std::fs::write(&path, serde_json::to_vec(specification).unwrap()).unwrap();
+        command.arg("--contracts").arg(path);
     }
     for (name, _) in entries {
         command.args(["--entry", name]);
@@ -86,7 +102,10 @@ fn verify(
             "{target:?} optimized={optimized} {name}: {:?}",
             proof.obligations
         );
-        assert!(proof.trusted_calls.is_empty());
+        assert_eq!(
+            proof.trusted_calls.len(),
+            usize::from(specification.is_some())
+        );
         assert_eq!(!proof.entry_assumptions.is_empty(), startup);
     }
     report
@@ -201,31 +220,145 @@ fn shared_pointer_loads_check_ordering_and_preserve_only_observed_address_bits()
 }
 
 #[test]
-fn startup_does_not_silently_supply_pointer_provenance_or_history() {
+fn explicit_startup_retains_pointer_address_bits_without_pointee_provenance() {
+    let entries = [
+        (
+            "one_observed_address_has_consistent_nullability",
+            ProofStatus::ProvedWithAssumptions,
+        ),
+        (
+            "an_initializer_does_not_establish_pointer_history",
+            ProofStatus::ProvedWithAssumptions,
+        ),
+        (
+            "separate_reads_do_not_establish_a_stable_address",
+            ProofStatus::ProvedWithAssumptions,
+        ),
+        (
+            "startup_null_and_numeric_addresses_keep_their_initial_bits",
+            ProofStatus::ProvedWithAssumptions,
+        ),
+        (
+            "startup_disjoint_integer_and_pointer_locations_remain_independent",
+            ProofStatus::ProvedWithAssumptions,
+        ),
+        (
+            "loaded_addresses_do_not_authorize_pointee_reads",
+            ProofStatus::ProvedWithAssumptions,
+        ),
+        (
+            "a_local_pointer_read_does_not_silently_assume_exclusivity",
+            ProofStatus::Refuted,
+        ),
+        ("release_load_ordering_panics", ProofStatus::Refuted),
+        ("acquire_release_load_ordering_panics", ProofStatus::Refuted),
+        (
+            "a_pointer_store_discards_initializer_history",
+            ProofStatus::Refuted,
+        ),
+        (
+            "pointer_cas_discards_initializer_history",
+            ProofStatus::Refuted,
+        ),
+        (
+            "a_pointer_write_cannot_restore_invalidated_initializer_history",
+            ProofStatus::Refuted,
+        ),
+        (
+            "a_pointer_atomic_receiver_cannot_bypass_retirement",
+            ProofStatus::Unknown,
+        ),
+        (
+            "nonzero_numeric_initializers_do_not_grant_pointee_access",
+            ProofStatus::Unknown,
+        ),
+        (
+            "relocated_initializers_need_a_pointer_provenance_model",
+            ProofStatus::Unknown,
+        ),
+        (
+            "numeric_addresses_do_not_authorize_atomic_loads",
+            ProofStatus::Unknown,
+        ),
+        (
+            "uninitialized_atomic_storage_is_not_a_pointer_receiver",
+            ProofStatus::Unknown,
+        ),
+        (
+            "pointer_storage_cannot_be_read_as_integer_atomic",
+            ProofStatus::Unknown,
+        ),
+        (
+            "integer_storage_cannot_be_read_as_pointer_atomic",
+            ProofStatus::Unknown,
+        ),
+    ];
     for target in [None, Some("thumbv7em-none-eabihf")] {
         for optimized in [false, true] {
-            verify(
+            verify(&fixture(), &entries, target, optimized, true);
+        }
+    }
+}
+
+#[test]
+fn opaque_calls_discard_known_and_unseen_pointer_initializer_facts() {
+    let specification = serde_json::json!({"schema_version":1,"functions":[{
+        "function":"pointer_atomic_loads::boundary", "trusted":true,"no_panic":true,
+        "modifies":[],"reason":"Explicit opaque effect boundary"
+    }]});
+    for target in [None, Some("thumbv7em-none-eabihf")] {
+        for optimized in [false, true] {
+            verify_with_specification(
                 &fixture(),
                 &[
                     (
-                        "one_observed_address_has_consistent_nullability",
-                        ProofStatus::ProvedWithAssumptions,
-                    ),
-                    (
-                        "an_initializer_does_not_establish_pointer_history",
+                        "a_boundary_discards_pointer_initializer_history",
                         ProofStatus::Refuted,
                     ),
                     (
-                        "a_pointer_atomic_receiver_cannot_bypass_retirement",
-                        ProofStatus::Unknown,
+                        "a_boundary_prevents_unseen_pointer_initializers",
+                        ProofStatus::Refuted,
                     ),
                 ],
+                target,
+                optimized,
+                true,
+                Some(specification.clone()),
+            );
+        }
+    }
+}
+
+#[test]
+fn changing_a_null_initializer_refutes_conditional_and_native_null_claims() {
+    let directory = Directory::new();
+    let source = std::fs::read_to_string(fixture()).unwrap();
+    let original = "static LINK: AtomicPtr<u32> = AtomicPtr::new(core::ptr::null_mut());";
+    assert!(source.contains(original));
+    let mutant = directory.0.join("mutant.rs");
+    std::fs::write(
+        &mutant,
+        source.replace(
+            original,
+            "static LINK: AtomicPtr<u32> = AtomicPtr::new(0x2000_0000_usize as *mut u32);",
+        ),
+    )
+    .unwrap();
+    for target in [None, Some("thumbv7em-none-eabihf")] {
+        for optimized in [false, true] {
+            verify(
+                &mutant,
+                &[(
+                    "an_initializer_does_not_establish_pointer_history",
+                    ProofStatus::Refuted,
+                )],
                 target,
                 optimized,
                 true,
             );
         }
     }
+    assert!(!native_tests(&mutant, &directory));
 }
 
 #[test]

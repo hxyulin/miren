@@ -1581,3 +1581,32 @@ dependency checks, documentation builds and manual hooks pass. Application code 
 Local captures are `/tmp/miren-fresh-entry-{strict,reset}-20261009`; the comparison manifest has
 SHA-256
 `ce28d8505179a52f167815107df379b5af5000e073f331dd6c80f5e903c3b443`.
+
+## Stage 105: Conditional static pointer-atomic initializer addresses
+
+The explicit startup domain retains null and numeric initializer address bits from exact certified
+static pointer atomic storage. Returned values remain raw addresses without pointee provenance;
+relocation-bearing initializers and nonzero pointee reads remain UNKNOWN. Ordinary roots and async
+entry analysis keep their previous domains. Stores, CAS, opaque calls and interrupt-mask writes
+retain conservative global invalidation, including locations that have not yet been read.
+
+Integer and pointer startup reads share overlap and 128-location admission checks after typed cache
+lookup. Exact overlapping footprints with incompatible cached types invalidate history. Compiler
+receiver, allocation, initialization, extent and target-width checks remain prerequisites.
+
+Host/ARM debug and optimized integration cases cover conditional proofs, refutations and unknowns,
+disjoint integer/pointer storage, pointer/integer overlay rejection and opaque-boundary
+invalidation.
+Changing the null initializer refutes its conditional assertion and fails native execution. Native
+ordering mutation coverage remains in place. No application code or assumption profile changes.
+
+Strict and reset-profile main replays still enter all twelve application futures, with all 72
+obligation arrays matching the prior captures exactly. The diagnostic startup runtime probe still
+refutes Cordyceps' `links.next.is_none()` assertion at `stack.rs:129`: its static Option tag is
+abstract after history invalidation. This remains an abstract-model counterexample, with boot
+reachability unverified. Static pointer address reads alone cannot establish that queue history.
+Captures are `/tmp/miren-startup-pointer-main-{strict,reset}-20261009` and
+`/tmp/miren-startup-pointer-runtime-comparison`.
+
+All 472 Rust workspace tests and 48 Python tests pass, as do formatting, workspace Clippy, release
+builds, dependency checks, documentation builds and manual hooks.
