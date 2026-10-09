@@ -2222,3 +2222,17 @@ Captures: `/tmp/miren-stage122/replay`. All 72 strict/reset main obligation arra
 exactly; twelve isolated runtime wrappers still record both startup premises, unfinished
 weak-CAS retry frontiers and unsupported SEV. Captures:
 `/tmp/miren-stage122-main-{strict,reset}-20261009` and `/tmp/miren-stage122/runtime`.
+
+## Fleet publication 15: Preserve corrected models and new software proofs
+
+The complete frozen clean 9f2c7c9 collection has 1,118 PROVED, 256 REFUTED and 962 UNKNOWN roots
+across all 32 units, with no assumptions. Among 1,019 source declarations, 523 PROVE, 232 REFUTE
+and 264 remain UNKNOWN. Compared with published pass 13, KeyTracker::state, Dr16::from_raw and
+Can1Bus::velocities move UNKNOWN to PROVED; every previous proof and refutation retains its
+outcome. No roots were added/removed and no analysis configuration is incompatible. The corrected
+core NonZero getter identity is included; stage 122 constructors are outside this frozen run.
+
+All 243 firmware input fingerprints and four artifact checkpoints per unit remain unchanged.
+The exporter repeats byte-for-byte; raw diagnostics remain separate from normalized display
+changes. The separately frozen 03e66a2 main evidence is preserved. Raw capture:
+`/tmp/miren-fleet-pass15-20261009`; deterministic publication compares against pass 13.
