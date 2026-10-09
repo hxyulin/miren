@@ -1373,3 +1373,22 @@ writable byte projection into its original allocation. Nested and empty ranges p
 lengths and updates. Invalid bounds refute; readonly, non-byte, arbitrary raw and dead backing stay
 UNKNOWN. Host/ARM positive, negative and unknown tests plus native mutations check the model;
 lookalike user methods execute their own bodies. Unchecked non-byte iterator adapters remain gaps.
+
+## Stage 91: Sixth fleet measurement and main replay
+
+Frozen clean `901304a` collects all 2,336 roots in 32 units with no assumptions: 1,112 PROVED,
+252 REFUTED and 972 UNKNOWN. The source-function heuristic counts 517 proofs, 228 refutations
+and 274 unknowns. All previous proofs and refutations remain. Five ordinary configuration/default
+helpers gain proofs; eleven async future-construction roots and twelve generated wrappers also
+prove, without establishing task-body execution. The new private referee helper refutation
+requires a content length outside its two current callers' domains; native confirmation is absent.
+
+Twenty-nine source roots reach different blocker keys, while nineteen diagnostic changes are
+compiler display only. DMA storage origins, nested mutable slices, alias constraints, constant
+array limits and step limits remain explicit gaps. Every source fingerprint and all four artifact
+checkpoints stay unchanged. Fresh strict/reset-only main captures retain the prior outcomes and
+exact eight-call conditional policy; boot reachability remains unverified.
+
+All 457 Rust tests, 42 Python tool tests, formatting, Clippy, release builds, dependency checks,
+documentation builds and manual hooks pass. Compact exporters validate both complete captures
+before publication. Fleet application code remains untouched.
