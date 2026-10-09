@@ -10,6 +10,7 @@ enum IntegerIntrinsic {
     LeadingZeros,
     LeadingZerosNonzero,
     TrailingZeros,
+    TrailingZerosNonzero,
     SwapBytes,
     ReverseBits,
 }
@@ -24,6 +25,7 @@ impl IntegerIntrinsic {
             Self::LeadingZeros => "ctlz",
             Self::LeadingZerosNonzero => "ctlz_nonzero",
             Self::TrailingZeros => "cttz",
+            Self::TrailingZerosNonzero => "cttz_nonzero",
             Self::SwapBytes => "bswap",
             Self::ReverseBits => "bitreverse",
         }
@@ -35,6 +37,7 @@ impl IntegerIntrinsic {
             Self::LeadingZeros
             | Self::LeadingZerosNonzero
             | Self::TrailingZeros
+            | Self::TrailingZerosNonzero
             | Self::SwapBytes
             | Self::ReverseBits => 1,
         }
@@ -57,6 +60,7 @@ impl<'tcx> Engine<'tcx> {
             IntegerIntrinsic::LeadingZeros,
             IntegerIntrinsic::LeadingZerosNonzero,
             IntegerIntrinsic::TrailingZeros,
+            IntegerIntrinsic::TrailingZerosNonzero,
             IntegerIntrinsic::SwapBytes,
             IntegerIntrinsic::ReverseBits,
         ]
@@ -67,16 +71,18 @@ impl<'tcx> Engine<'tcx> {
         }) else {
             return Ok(None);
         };
-        if matches!(operation, IntegerIntrinsic::LeadingZerosNonzero)
-            && (self
-                .tcx
-                .lang_items()
-                .get(LangItem::Option)
-                .map(|option| option.krate)
-                != Some(callee.krate)
-                || signature.safety() != rustc_hir::Safety::Unsafe
-                || signature.abi() != rustc_abi::ExternAbi::Rust
-                || signature.c_variadic())
+        if matches!(
+            operation,
+            IntegerIntrinsic::LeadingZerosNonzero | IntegerIntrinsic::TrailingZerosNonzero
+        ) && (self
+            .tcx
+            .lang_items()
+            .get(LangItem::Option)
+            .map(|option| option.krate)
+            != Some(callee.krate)
+            || signature.safety() != rustc_hir::Safety::Unsafe
+            || signature.abi() != rustc_abi::ExternAbi::Rust
+            || signature.c_variadic())
         {
             return Ok(None);
         }
@@ -84,6 +90,11 @@ impl<'tcx> Engine<'tcx> {
             return Err("integer intrinsic argument count mismatch".to_owned());
         }
         let input_ty = signature.inputs()[0];
+        if matches!(operation, IntegerIntrinsic::TrailingZerosNonzero)
+            && !matches!(input_ty.kind(), ty::Int(_) | ty::Uint(_))
+        {
+            return Err("cttz_nonzero requires an exact primitive integer type".into());
+        }
         let (bits, signed) = self
             .integer_type(input_ty)
             .ok_or("integer intrinsic needs a primitive integer input")?;
@@ -95,6 +106,7 @@ impl<'tcx> Engine<'tcx> {
             IntegerIntrinsic::LeadingZeros
                 | IntegerIntrinsic::LeadingZerosNonzero
                 | IntegerIntrinsic::TrailingZeros
+                | IntegerIntrinsic::TrailingZerosNonzero
         );
         if (count && signature.output() != self.tcx.types.u32)
             || (!count && signature.output() != input_ty)
@@ -115,12 +127,18 @@ impl<'tcx> Engine<'tcx> {
             })
             .collect::<Result<Vec<_>, String>>()?;
         let left = &arguments[0];
-        if matches!(operation, IntegerIntrinsic::LeadingZerosNonzero) {
+        if matches!(
+            operation,
+            IntegerIntrinsic::LeadingZerosNonzero | IntegerIntrinsic::TrailingZerosNonzero
+        ) {
             let zero = self
                 .terms
                 .apply(Op::Equal, &[left.clone(), self.terms.bit_vector(0, bits)?])?;
             if self.feasible(&[conditions.to_vec(), vec![zero]].concat())? {
-                return Err("ctlz_nonzero requires a proven nonzero primitive operand".into());
+                return Err(format!(
+                    "{} requires a proven nonzero primitive operand",
+                    operation.name()
+                ));
             }
         }
         let expression = match operation {
@@ -147,7 +165,8 @@ impl<'tcx> Engine<'tcx> {
             }
             IntegerIntrinsic::LeadingZeros
             | IntegerIntrinsic::LeadingZerosNonzero
-            | IntegerIntrinsic::TrailingZeros => {
+            | IntegerIntrinsic::TrailingZeros
+            | IntegerIntrinsic::TrailingZerosNonzero => {
                 let mut result = self.terms.bit_vector(u128::from(bits), 32)?;
                 for offset in 0..bits {
                     let bit = if matches!(
@@ -230,6 +249,7 @@ fn saturation(
         | IntegerIntrinsic::LeadingZeros
         | IntegerIntrinsic::LeadingZerosNonzero
         | IntegerIntrinsic::TrailingZeros
+        | IntegerIntrinsic::TrailingZerosNonzero
         | IntegerIntrinsic::SwapBytes
         | IntegerIntrinsic::ReverseBits => unreachable!("only saturating arithmetic is dispatched"),
     };

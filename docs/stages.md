@@ -2699,3 +2699,32 @@ Final standalone evidence: `/tmp/miren-stage134-capabilities-20261010`, with 44 
 36 REFUTED and 12 UNKNOWN outcomes and no collection errors. Validation passes 577 Rust
 tests, 67 Python tests, formatting, cargo lint, release builds, cargo deny, documentation
 build and manual hooks.
+
+## Stage 135: proven-nonzero trailing-zero intrinsic
+
+The integer intrinsic dispatcher now admits the compiler-identified core `cttz_nonzero`
+operation with its exact unsafe Rust signature and primitive input/output types. Existing
+path constraints must prove the operand nonzero before the exact bit scan executes. A
+possible zero operand or inconclusive solver query remains UNKNOWN; no premise is added.
+Safe `NonZero::trailing_zeros` executes its actual core bodies to this boundary.
+
+Host/ARM O0/O2 controls cover every primitive integer width, signed values, safe NonZero
+methods, wrong counts, zero/possibly-zero operands and method-name lookalikes. Native
+controls cover all bit positions and all nonzero u8 inputs. The count mutation refutes
+in all four compiler configurations and fails native O0/O2. Invalid intrinsic operands
+are never executed natively. The 23-case capability baseline is unchanged.
+
+A separate audit found missing temporal access certification in existing tracked volatile
+reads and raw byte-slice views. Four sequences that reuse an old pointer across writes or
+competing reference access report PROVED in all four compiler configurations, without
+assumptions. Evidence is retained at `/tmp/miren-raw-alias-validity-audit`. These results
+do not establish access validity: current checks certify spatial bounds, allocation
+lifetime and stored mutability, but not temporal permission. Broad raw dereferences
+remain unsupported. Hardening existing access paths takes priority over expanding them;
+this stage adds no raw-memory semantics.
+
+Final standalone evidence: `/tmp/miren-stage135-capabilities-20261010`, with unchanged
+44 PROVED, 36 REFUTED and 12 UNKNOWN outcomes and no collection errors. Validation passes
+579 Rust tests, 67 Python tests, formatting, cargo lint, release builds, cargo deny,
+documentation build and manual hooks. Independent review approves the compiler/type gates,
+nonzero feasibility refusal, exact scan and valid native mutation controls.

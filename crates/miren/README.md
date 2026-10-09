@@ -527,3 +527,9 @@ See [the Rust roadmap](../../docs/rust-capabilities.md) for scope and intended m
 Portable-atomic/static-cell integration fixtures use pristine versioned sources under
 `tests/vendor`, with upstream licenses and a checked provenance manifest. They remain analyzed
 inputs outside the host workspace, not trusted summaries or a replacement for Rust semantics.
+
+Compiler-identified `cttz_nonzero` executes exact trailing-zero counting for primitive integers
+only when existing path conditions prove its operand nonzero. A feasible zero operand or an
+unfinished nonzero proof remains UNKNOWN; the model adds no nonzero premise. Safe
+`NonZero::trailing_zeros` follows its actual core body, preserving primitive width, signedness
+and the exact `u32` count. Local lookalike functions execute their bodies rather than this model.

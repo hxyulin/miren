@@ -19,6 +19,11 @@ byte of supported padding-free storage. Bounds and reference graphs are checked 
 numeric address equality creates no provenance. Unsupported padding, mutable raw slices and raw
 subobject formation remain UNKNOWN.
 
+These checks do not yet certify temporal access permission across competing accesses. The
+[raw-access validity audit](rust-capabilities.md#open-access-validity-blocker) found old-pointer
+sequences that currently prove without that certificate. Liveness and retained mutability
+must not be presented as a complete Rust reference-validity model.
+
 ## First migration stage: footprints and subobject certificates
 
 The ordinary interpreter now checks static address extents through a common `StorageFootprint`.

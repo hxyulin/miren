@@ -77,6 +77,28 @@ Ordinary Embassy code should execute as Rust. A future environment adapter suppl
 interrupt/scheduling behavior, not replacements for arbitrary Rust bodies. Likewise, the engine
 understands volatile accesses while an STM32 package supplies the meaning of its registers.
 
+## Open access-validity blocker
+
+Tracked volatile reads and raw byte-slice views currently lack a certificate for temporal
+access permission. A live allocation, matching type, aligned address and retained writable
+flag do not establish that an old pointer remains valid after competing reference access.
+The [Rust pointer documentation](https://doc.rust-lang.org/std/ptr/index.html#safety)
+describes temporal permission and a limited reference-to-pointer access guarantee; precise
+aliasing rules are not fully settled. The audit is a missing-certificate finding, not a
+claim that every probed sequence is necessarily undefined behavior under every model.
+
+Four old-pointer access sequences currently report PROVED on host and ARM at O0/O2 without
+assumptions. Those results do not certify the omitted access condition. Preserve their
+reports at `/tmp/miren-raw-alias-validity-audit` while implementing conservative rejection
+or a justified access model. Do not use these results as evidence of full Rust parity.
+
+A future model needs path-local access tokens, derivation lineage and invalidation at
+actual MIR reads, writes, borrows and call boundaries. Re-registering the same address
+must not resurrect revoked rights, and forming a pointer from a stale reference must not
+create permission. Raw slices also require valid retained reference rights after their
+construction. Internal snapshot or validation reads must remain distinct from actual
+program accesses. Until this foundation is certified, defer broad raw-pointer expansion.
+
 ## Next implementation stages
 
 1. Migrate common allocation, typed projection, initialization and access checks incrementally.
