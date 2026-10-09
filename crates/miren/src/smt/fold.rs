@@ -8,7 +8,8 @@ pub(super) fn simplify(context: &Context, op: Op, args: &[Term], sort: &Sort) ->
             Kind::Apply(Op::Not, inner) => Some(inner[0].clone()),
             Kind::Constant(Constant::BitVec(_) | Constant::Rounding(_))
             | Kind::Symbol(_)
-            | Kind::Apply(_, _) => None,
+            | Kind::Apply(_, _)
+            | Kind::Quantified(..) => None,
         },
         (Op::BvSub, [sum, subtrahend]) => {
             if let Kind::Apply(Op::BvAdd, addends) = &sum.node.kind {
@@ -177,7 +178,7 @@ fn select(context: &Context, array: &Term, index: &Term, sort: &Sort) -> Option<
             {
                 source = &values[0];
             }
-            Kind::Constant(_) | Kind::Symbol(_) | Kind::Apply(_, _) => break,
+            Kind::Constant(_) | Kind::Symbol(_) | Kind::Apply(_, _) | Kind::Quantified(..) => break,
         }
     }
     (source != array).then(|| {

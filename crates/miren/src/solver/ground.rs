@@ -17,12 +17,26 @@ struct Parser<'a> {
 
 pub(crate) fn constant(expression: &str) -> Option<Constant> {
     let mut parser = Parser::new(expression)?;
+    if parser
+        .tokens
+        .iter()
+        .any(|token| matches!(*token, "forall" | "exists"))
+    {
+        return None;
+    }
     let value = parser.expression(0)?;
     (parser.position == parser.tokens.len()).then_some(value)
 }
 
 pub(super) fn feasible(query: &str) -> Option<bool> {
     let mut parser = Parser::new(query)?;
+    if parser
+        .tokens
+        .iter()
+        .any(|token| matches!(*token, "forall" | "exists"))
+    {
+        return None;
+    }
     parser.expect("(")?;
     parser.expect("set-logic")?;
     parser.expect("ALL")?;

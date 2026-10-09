@@ -1,4 +1,4 @@
-use super::{Constant, Kind, Op, Rounding, Sort, Term};
+use super::{Constant, Kind, Op, Quantifier, Rounding, Sort, Term};
 use std::collections::{HashMap, HashSet};
 
 pub(super) fn print(root: &Term, max_bytes: usize) -> Result<String, String> {
@@ -14,6 +14,7 @@ fn print_roots(roots: &[&Term], conjunction: bool, max_bytes: usize) -> Result<S
     let mut nodes = HashMap::new();
     let mut references = HashMap::<usize, usize>::new();
     let mut pending = Vec::new();
+    let mut binders = HashSet::new();
     for root in roots {
         *references.entry(root.node.id).or_default() += 1;
         pending.push((*root).clone());
@@ -22,11 +23,19 @@ fn print_roots(roots: &[&Term], conjunction: bool, max_bytes: usize) -> Result<S
         if nodes.contains_key(&term.node.id) {
             continue;
         }
-        if let Kind::Apply(_, children) = &term.node.kind {
-            for child in children {
-                *references.entry(child.node.id).or_default() += 1;
-                pending.push(child.clone());
+        match &term.node.kind {
+            Kind::Apply(_, children) => {
+                for child in children {
+                    *references.entry(child.node.id).or_default() += 1;
+                    pending.push(child.clone());
+                }
             }
+            Kind::Quantified(_, binder, body) => {
+                binders.insert(binder.symbol_index().expect("certified symbol binder"));
+                *references.entry(body.id()).or_default() += 1;
+                pending.push(body.clone());
+            }
+            Kind::Constant(_) | Kind::Symbol(_) => {}
         }
         nodes.insert(term.node.id, term);
     }
@@ -43,12 +52,28 @@ fn print_roots(roots: &[&Term], conjunction: bool, max_bytes: usize) -> Result<S
                 .fold(operator(*op, term.sort()).len() + 1, |cost, child| {
                     cost.saturating_add(1 + costs[&child.node.id])
                 }),
+            Kind::Quantified(kind, binder, body) => {
+                quantifier(*kind).len()
+                    + sort(binder.sort()).len()
+                    + format!(
+                        "v{}",
+                        binder.symbol_index().expect("certified symbol binder")
+                    )
+                    .len()
+                    + 8
+                    + costs[&body.id()]
+            }
         };
         let count = references.get(&term.node.id).copied().unwrap_or_default();
         let name_bytes = format!("t{}", term.node.id).len();
         let binding_bytes = 12 + name_bytes;
-        if matches!(term.node.kind, Kind::Apply(_, _))
+        if matches!(term.node.kind, Kind::Apply(_, _) | Kind::Quantified(..))
             && count > 1
+            && (binders.is_empty()
+                || term
+                    .symbols()
+                    .iter()
+                    .all(|symbol| !binders.contains(symbol)))
             && cost.saturating_sub(name_bytes).saturating_mul(count - 1)
                 > binding_bytes + name_bytes
         {
@@ -134,6 +159,16 @@ fn expression(root: &Term, shared: &HashSet<usize>, output: &mut Output) -> Resu
         match &term.node.kind {
             Kind::Constant(value) => output.push(&literal(*value, term.sort()))?,
             Kind::Symbol(index) => output.push(&format!("v{index}"))?,
+            Kind::Quantified(kind, binder, body) => {
+                output.push(&format!(
+                    "({} ((v{} {})) ",
+                    quantifier(*kind),
+                    binder.symbol_index().expect("certified symbol binder"),
+                    sort(binder.sort())
+                ))?;
+                pending.push(Action::Close);
+                pending.push(Action::Term(body));
+            }
             Kind::Apply(Op::ArrayOffset, children) => {
                 let name = format!("i{}", term.node.id);
                 output.push(&format!(
@@ -156,6 +191,13 @@ fn expression(root: &Term, shared: &HashSet<usize>, output: &mut Output) -> Resu
         }
     }
     Ok(())
+}
+
+fn quantifier(kind: Quantifier) -> &'static str {
+    match kind {
+        Quantifier::Forall => "forall",
+        Quantifier::Exists => "exists",
+    }
 }
 
 fn literal(value: Constant, sort: &Sort) -> String {

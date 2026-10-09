@@ -29,6 +29,9 @@ is proved on the actual call path without capping incoming input lengths.
 Stage 146 adds returned scalar-slice closure capture P/R and missing invoked body U controls.
 Synchronous captures retain exact compiler types and original backing; admitting a closure does
 not summarize its body or permit a borrowed local to escape.
+Stage 147 adds scoped universal and existential SMT terms, lexical free-symbol metadata and
+solver/printer controls. It adds no Rust consumer or baseline case; full-sequence models require
+a separate semantic implementation.
 These additions change the denominator, not a coverage percentage.
 Covered examples exercise arithmetic, enum payloads, array indexing, reference effects, concrete
 generics, closures, iterator callbacks, finite loops, destructors, fresh future polling and raw

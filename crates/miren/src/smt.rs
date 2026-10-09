@@ -139,11 +139,18 @@ pub enum Constant {
     Rounding(Rounding),
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum Quantifier {
+    Forall,
+    Exists,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 enum KeyKind {
     Constant(Constant),
     Symbol(u32),
     Apply(Op, Vec<usize>),
+    Quantified(Quantifier, usize, usize),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -156,6 +163,7 @@ enum Kind {
     Constant(Constant),
     Symbol(u32),
     Apply(Op, Vec<Term>),
+    Quantified(Quantifier, Term, Term),
 }
 
 struct Node {
@@ -164,6 +172,7 @@ struct Node {
     kind: Kind,
     symbols: OnceCell<Option<BTreeSet<u32>>>,
     uses_floating_point: bool,
+    has_quantifiers: bool,
 }
 
 #[derive(Default)]
@@ -225,7 +234,7 @@ impl Term {
     pub fn symbol_index(&self) -> Option<u32> {
         match self.node.kind {
             Kind::Symbol(index) => Some(index),
-            Kind::Constant(_) | Kind::Apply(_, _) => None,
+            Kind::Constant(_) | Kind::Apply(_, _) | Kind::Quantified(..) => None,
         }
     }
 
@@ -233,31 +242,83 @@ impl Term {
         if let Some(Some(symbols)) = self.node.symbols.get() {
             return symbols.clone();
         }
-        let mut visited = HashSet::new();
-        let mut symbols = BTreeSet::new();
-        let mut pending = vec![self];
-        while let Some(term) = pending.pop() {
-            if !visited.insert(term.node.id) {
+        if !self.has_quantifiers() {
+            // Preserve the existing quantifier-free traversal and root-only retained cache.
+            let mut visited = HashSet::new();
+            let mut symbols = BTreeSet::new();
+            let mut pending = vec![self];
+            while let Some(term) = pending.pop() {
+                if !visited.insert(term.id()) {
+                    continue;
+                }
+                if let Some(Some(cached)) = term.node.symbols.get() {
+                    symbols.extend(cached);
+                    continue;
+                }
+                match &term.node.kind {
+                    Kind::Symbol(index) => {
+                        symbols.insert(*index);
+                    }
+                    Kind::Apply(_, children) => pending.extend(children),
+                    Kind::Constant(_) => {}
+                    Kind::Quantified(..) => unreachable!("quantifier-free metadata is retained"),
+                }
+            }
+            let _ = self
+                .node
+                .symbols
+                .set((symbols.len() <= 64).then(|| symbols.clone()));
+            return symbols;
+        }
+        let mut computed = HashMap::<usize, BTreeSet<u32>>::new();
+        let mut pending = vec![(self, false)];
+        while let Some((term, expanded)) = pending.pop() {
+            if computed.contains_key(&term.id()) {
                 continue;
             }
             if let Some(Some(cached)) = term.node.symbols.get() {
-                symbols.extend(cached);
+                computed.insert(term.id(), cached.clone());
                 continue;
             }
-            match &term.node.kind {
-                Kind::Symbol(index) => {
-                    symbols.insert(*index);
-                }
-                Kind::Apply(_, children) => pending.extend(children),
-                Kind::Constant(_) => {}
+            if !term.has_quantifiers() {
+                computed.insert(term.id(), term.symbols());
+                continue;
             }
+            if !expanded {
+                pending.push((term, true));
+                match &term.node.kind {
+                    Kind::Apply(_, children) => {
+                        pending.extend(children.iter().map(|child| (child, false)));
+                    }
+                    Kind::Quantified(_, _, body) => pending.push((body, false)),
+                    Kind::Constant(_) | Kind::Symbol(_) => {}
+                }
+                continue;
+            }
+            let symbols = match &term.node.kind {
+                Kind::Constant(_) => BTreeSet::new(),
+                Kind::Symbol(index) => BTreeSet::from([*index]),
+                Kind::Apply(_, children) => {
+                    let mut symbols = BTreeSet::new();
+                    for child in children {
+                        symbols.extend(&computed[&child.id()]);
+                    }
+                    symbols
+                }
+                Kind::Quantified(_, binder, body) => {
+                    let mut symbols = computed[&body.id()].clone();
+                    symbols.remove(&binder.symbol_index().expect("certified symbol binder"));
+                    symbols
+                }
+            };
+            // Bound retained metadata even when an expression contains many free inputs.
+            let _ = term
+                .node
+                .symbols
+                .set((symbols.len() <= 64).then(|| symbols.clone()));
+            computed.insert(term.id(), symbols);
         }
-        // Bound retained metadata even when a root's expressions contain many inputs.
-        if self.node.symbols.get().is_none() {
-            let cached = (symbols.len() <= 64).then(|| symbols.clone());
-            let _ = self.node.symbols.set(cached);
-        }
-        symbols
+        computed.remove(&self.id()).expect("root symbols computed")
     }
 
     pub fn belongs_to(&self, context: &Context) -> bool {
@@ -267,7 +328,7 @@ impl Term {
     pub fn negated(&self) -> Option<&Term> {
         match &self.node.kind {
             Kind::Apply(Op::Not, arguments) => arguments.first(),
-            Kind::Constant(_) | Kind::Symbol(_) | Kind::Apply(_, _) => None,
+            Kind::Constant(_) | Kind::Symbol(_) | Kind::Apply(_, _) | Kind::Quantified(..) => None,
         }
     }
 
@@ -277,7 +338,9 @@ impl Term {
         while let Some(term) = pending.pop() {
             match &term.node.kind {
                 Kind::Apply(Op::And, arguments) => pending.extend(arguments.iter().rev()),
-                Kind::Constant(_) | Kind::Symbol(_) | Kind::Apply(_, _) => terms.push(term),
+                Kind::Constant(_) | Kind::Symbol(_) | Kind::Apply(_, _) | Kind::Quantified(..) => {
+                    terms.push(term)
+                }
             }
         }
         terms
@@ -287,10 +350,14 @@ impl Term {
         self.node.uses_floating_point
     }
 
+    pub fn has_quantifiers(&self) -> bool {
+        self.node.has_quantifiers
+    }
+
     pub fn constant(&self) -> Option<Constant> {
         match self.node.kind {
             Kind::Constant(constant) => Some(constant),
-            Kind::Symbol(_) | Kind::Apply(_, _) => None,
+            Kind::Symbol(_) | Kind::Apply(_, _) | Kind::Quantified(..) => None,
         }
     }
 
@@ -344,6 +411,9 @@ impl Context {
                 Kind::Apply(op, terms) => {
                     KeyKind::Apply(*op, terms.iter().map(|term| term.node.id).collect())
                 }
+                Kind::Quantified(kind, binder, body) => {
+                    KeyKind::Quantified(*kind, binder.id(), body.id())
+                }
             },
         };
         let mut pool = self.0.borrow_mut();
@@ -356,14 +426,23 @@ impl Context {
         let uses_floating_point = sort.uses_floating_point()
             || match &kind {
                 Kind::Apply(_, children) => children.iter().any(Term::uses_floating_point),
+                Kind::Quantified(_, binder, body) => {
+                    binder.uses_floating_point() || body.uses_floating_point()
+                }
                 Kind::Constant(_) | Kind::Symbol(_) => false,
             };
+        let has_quantifiers = match &kind {
+            Kind::Quantified(..) => true,
+            Kind::Apply(_, children) => children.iter().any(Term::has_quantifiers),
+            Kind::Constant(_) | Kind::Symbol(_) => false,
+        };
         let node = Rc::new(Node {
             id: pool.next_id,
             sort,
             kind,
             symbols: OnceCell::new(),
             uses_floating_point,
+            has_quantifiers,
         });
         pool.next_id += 1;
         pool.nodes.insert(key, Rc::downgrade(&node));
@@ -421,6 +500,23 @@ impl Context {
             return Ok(term);
         }
         Ok(self.intern(sort, Kind::Apply(op, arguments.to_vec())))
+    }
+
+    /// Lexically binds every occurrence of this Symbol within this Boolean body.
+    /// The same symbol remains free outside this node; nested bindings may shadow it.
+    /// Consumers should choose fresh logical indices, independently of application inputs.
+    pub fn quantify(&self, kind: Quantifier, binder: &Term, body: &Term) -> Result<Term, String> {
+        if !binder.belongs_to(self) || !body.belongs_to(self) {
+            return Err("quantifier operands belong to different analysis contexts".into());
+        }
+        if binder.symbol_index().is_none() || body.sort() != &Sort::Bool {
+            return Err("quantifier requires a Symbol binder and Boolean body".into());
+        }
+        binder.sort().validate()?;
+        Ok(self.intern(
+            Sort::Bool,
+            Kind::Quantified(kind, binder.clone(), body.clone()),
+        ))
     }
 }
 
@@ -588,4 +684,34 @@ fn result_sort(op: Op, args: &[Term]) -> Result<Sort, String> {
             .then_some(target_float(exponent, significand)),
     };
     result.ok_or_else(|| format!("invalid sorts or arity for term operator {op:?}"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn wide_lexical_free_sets_keep_bounded_retained_caches() {
+        let context = Context::default();
+        let symbols: Vec<_> = (0..96)
+            .map(|index| context.symbol(index, Sort::Bool).unwrap())
+            .collect();
+        let body = context.apply(Op::And, &symbols).unwrap();
+        let expected: BTreeSet<_> = (0..96).collect();
+        assert_eq!(body.symbols(), expected);
+        assert!(matches!(body.node.symbols.get(), Some(None)));
+        let quantified = context
+            .quantify(Quantifier::Exists, &symbols[65], &body)
+            .unwrap();
+        let mut free = expected.clone();
+        free.remove(&65);
+        assert_eq!(quantified.symbols(), free);
+        assert!(matches!(quantified.node.symbols.get(), Some(None)));
+        assert_eq!(body.symbols(), expected);
+        let mixed = context
+            .apply(Op::Or, &[quantified, symbols[65].clone()])
+            .unwrap();
+        assert_eq!(mixed.symbols(), expected);
+        assert_eq!(mixed.symbols(), expected);
+    }
 }

@@ -59,6 +59,9 @@ impl System {
                 if condition.sort() != &Sort::Bool || !condition.belongs_to(context) {
                     return Err("Horn conditions require Boolean terms in this context".into());
                 }
+                if condition.has_quantifiers() {
+                    return Err("quantified terms are not supported in Horn conditions".into());
+                }
                 symbols.extend(condition.symbols());
             }
             for atom in clause.premise.iter().chain(&clause.conclusion) {
@@ -72,6 +75,9 @@ impl System {
                 for (sort, argument) in sorts.iter().zip(&atom.arguments) {
                     if argument.sort() != sort || !argument.belongs_to(context) {
                         return Err("Horn relation argument type or context mismatch".into());
+                    }
+                    if argument.has_quantifiers() {
+                        return Err("quantified terms are not supported in Horn arguments".into());
                     }
                     symbols.extend(argument.symbols());
                 }

@@ -527,6 +527,13 @@ The Rust capability baseline is independent of fleet and hardware contracts. Run
 `cargo test --locked -p miren --test rust_capabilities`; its shared manifest selects 35 cases across
 15 families on host/ARM at O0/O2, with positive/refuted/unknown and actual source-mutation controls.
 The standalone [survey](../../tools/rust_capability_survey.py) retains full reports and provenance.
+The typed SMT foundation supports explicit universal and existential Symbol bindings. Free-symbol
+metadata is lexical: the same Symbol may be bound in one term and free in another, and nested
+bindings may shadow it. Binder-dependent expressions stay inside their scope during shared-term
+printing. Queries declare and request models only for free symbols, retain floating-point metadata,
+and keep existing byte and solver budgets. Ground shortcuts and Horn clauses refuse quantified
+terms. This foundation admits no additional Rust consumers, input assumptions or storage rights.
+
 See [the Rust roadmap](../../docs/rust-capabilities.md) for scope and intended model boundaries.
 Portable-atomic/static-cell integration fixtures use pristine versioned sources under
 `tests/vendor`, with upstream licenses and a checked provenance manifest. They remain analyzed

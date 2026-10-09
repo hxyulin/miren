@@ -3137,3 +3137,36 @@ environment premise, raw-access permission or default proof budget is added.
 Final merged validation passes 611 Rust tests and 68 Python tests, formatting, cargo lint,
 release builds, cargo deny, documentation build and manual hooks. Independent review approves
 the exact capture metadata, return escape checks and execution of actual compiler call shims.
+
+## Stage 147: scoped SMT predicate foundation
+
+Typed terms now support explicit universal and existential quantifiers with an exact same-context
+Symbol binder and Boolean body. Free-symbol metadata is lexical: a symbol bound in one term may
+remain free in another. Nested scopes and shadowing retain their SMT meaning. Shared expression
+printing keeps binder-dependent nodes inside their scope and retains existing query byte budgets.
+Model requests and global bindings use only the actual free symbols; a logical binder is not an
+application input. Float metadata includes the binder format and full body. Ordinary quantifier-free
+terms retain their previous traversal and sharing paths. Ground shortcuts and Horn output refuse
+quantified terms explicitly instead of treating a binder as an assigned global value.
+
+Independent solver controls cover mixed bound/free roots, shadowing, unsafe hoist mutations, joint
+printing fallback, full-width array offsets, IEEE NaN and signed zero, decoded Unicode observations,
+deep terms, context/sort rejection and retained free bindings. This foundation admits no new Rust
+operation, input domain, memory permission or environment assumption. Whole-slice consumers remain
+a separate stage.
+
+Standalone foundation validation passes 620 Rust tests and 68 Python tests, formatting, cargo
+lint, release builds, cargo deny, documentation build and manual hooks. Independent scope and
+solver review approves the final implementation. The isolated 52-case baseline is unchanged:
+`/tmp/miren-stage147-capabilities-20261010` records 84 PROVED, 76 REFUTED and 48 UNKNOWN,
+with unchanged frozen inputs/binaries and no collection errors.
+
+After integration with stage 146, the shared 55-case baseline remains unchanged. Frozen evidence
+at `/tmp/miren-stage147-merged-capabilities-20261010` records 88 PROVED, 80 REFUTED and
+52 UNKNOWN with unchanged inputs/binaries and no collection errors. The 168 completed P/R roots
+retain byte-identical obligation statuses, details and query text across host/ARM O0/O2 builds.
+The resource-limited loop controls retain their actual conservative frontiers.
+Merged validation passes 624 Rust tests and 68 Python tests, formatting, cargo lint, release
+builds, cargo deny, documentation build and manual hooks. Long independent SMT reference
+literals are wrapped without changing their bytes; all nine scoped-term integration controls
+and all 37 solver units pass again after that formatting change.

@@ -220,7 +220,11 @@ impl Query {
             limits.solver_timeout_ms,
             assertions.iter().map(String::as_str),
         );
-        query.ground = ground;
+        query.ground = if terms.iter().any(|term| term.has_quantifiers()) {
+            None
+        } else {
+            ground
+        };
         query.symbols = symbols;
         Ok(query)
     }
@@ -1574,6 +1578,126 @@ mod encoding_tests {
         assert!(!probe.symbols.contains(&8));
         let mut solver = Solver::default();
         assert!(matches!(solver.check_query(&query), Answer::Sat(_)));
+    }
+
+    #[test]
+    fn quantified_queries_retain_only_lexically_free_bindings_and_model_symbols() {
+        use miren::smt::Quantifier;
+        let context = Context::default();
+        let x = context.symbol(0, Sort::Bool).unwrap();
+        let exists = context.quantify(Quantifier::Exists, &x, &x).unwrap();
+        let binding = context
+            .apply(Op::Equal, &[x.clone(), context.boolean(false)])
+            .unwrap();
+        let bindings = BTreeMap::from([(0, binding)]);
+        let bound_only = Query::from_terms(&context, &[], &exists, &bindings).unwrap();
+        assert!(bound_only.symbols().is_empty());
+        assert!(bound_only.declarations.is_empty());
+        assert_eq!(bound_only.assertions.len(), 1);
+        assert_eq!(bound_only.ground, None);
+        let negative = context.apply(Op::Not, std::slice::from_ref(&x)).unwrap();
+        let mixed = Query::from_terms(&context, &[negative], &exists, &bindings).unwrap();
+        assert_eq!(mixed.symbols(), &std::collections::BTreeSet::from([0]));
+        assert_eq!(mixed.declarations, ["(declare-const v0 Bool)"]);
+        // The free binding folds to the same negation and is deduplicated, while its
+        // assignment must not be substituted into the independently bound occurrence.
+        assert_eq!(mixed.assertions.len(), 2);
+        let mut solver = Solver::default();
+        let Answer::Sat(model) = solver.check_query(&bound_only) else {
+            panic!("closed existential must be SAT through the real solver");
+        };
+        assert!(
+            !model.contains("v0"),
+            "bound symbols cannot become model inputs: {model}"
+        );
+        let Answer::Sat(model) = solver.check_query(&mixed) else {
+            panic!("the same Symbol is independently bound and free");
+        };
+        assert!(
+            model.contains("v0"),
+            "free symbol must remain in the model: {model}"
+        );
+        assert_eq!(solver.decisions.len(), 2);
+        assert!(matches!(solver.check_query(&mixed), Answer::Sat(_)));
+        let opposite = Query::from_terms(&context, &[x], &exists, &bindings).unwrap();
+        assert!(matches!(solver.check_query(&opposite), Answer::Unsat));
+    }
+
+    #[test]
+    fn quantified_ground_fast_paths_refuse_even_closed_or_contradictory_formulas() {
+        use miren::smt::Quantifier;
+        let context = Context::default();
+        let x = context.symbol(0, Sort::Bool).unwrap();
+        let all = context
+            .quantify(Quantifier::Forall, &x, &context.boolean(true))
+            .unwrap();
+        let query =
+            Query::from_terms(&context, &[all], &context.boolean(false), &BTreeMap::new()).unwrap();
+        assert_eq!(query.ground, None);
+        assert_eq!(ground::feasible(query.text()), None);
+        assert_eq!(ground::constant("(forall ((v0 Bool)) true)"), None);
+        assert_eq!(ground::constant("(exists ((v0 Bool)) false)"), None);
+        let mut solver = Solver {
+            executable: std::env::temp_dir().join("miren-no-quantifier-solver"),
+            ..Solver::default()
+        };
+        assert!(matches!(solver.check_query(&query), Answer::Unknown(_)));
+        assert!(matches!(
+            Solver::default().check_query(&query),
+            Answer::Unsat
+        ));
+    }
+
+    #[test]
+    fn quantified_joint_budget_fallback_shares_only_binder_independent_tables() {
+        use miren::smt::Quantifier;
+        let (context, input, conditions) = shared_table_conditions();
+        let quantified: Vec<_> = conditions
+            .iter()
+            .map(|condition| {
+                context
+                    .quantify(Quantifier::Forall, &input, condition)
+                    .unwrap()
+            })
+            .collect();
+        let limits = AnalysisLimits {
+            max_query_bytes: 16_000,
+            ..AnalysisLimits::default()
+        };
+        let query = Query::from_terms_with_limits(
+            &context,
+            &quantified,
+            &context.boolean(true),
+            &BTreeMap::new(),
+            limits,
+        )
+        .unwrap();
+        assert_eq!(
+            query.assertions.len(),
+            1,
+            "must exercise the joint printer fallback"
+        );
+        assert!(query.symbols().is_empty());
+        assert_eq!(query.ground, None);
+        assert!(query.text().contains("(let ((t"));
+        assert!(query.text().len() < limits.max_query_bytes);
+        assert!(matches!(
+            Solver::default().check_query(&query),
+            Answer::Unsat
+        ));
+        let reference = Query::new(
+            &[],
+            &[],
+            concat!(
+                "(forall ((i (_ BitVec 8))) (= (select (store ((as const ",
+                "(Array (_ BitVec 8) (_ BitVec 8))) (_ bv0 8)) (_ bv0 8) ",
+                "(_ bv1 8)) i) (_ bv0 8)))",
+            ),
+        );
+        assert!(matches!(
+            Solver::default().check_query(&reference),
+            Answer::Unsat
+        ));
     }
 
     #[test]
