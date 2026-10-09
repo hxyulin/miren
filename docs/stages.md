@@ -2051,3 +2051,36 @@ three source solver/step/time grouping changes retain UNKNOWN. All 243 source fi
 artifact checkpoints remain consistent. Raw capture: `/tmp/miren-fleet-pass13-20261009/summary.json`.
 Repeated deterministic exports are identical before publication. Main evidence remains separately
 frozen at 03e66a2; hardware and boot validity are unverified.
+
+## Stage 119: Fieldless enum array choices
+
+Bounded fieldless enum input arrays can select an element at a symbolic index by selecting the
+integer discriminant and preserving the unchanged complete variant inventory. Every inventory must
+agree on the enum's Adt names, ordinal positions, exact discriminants, Option metadata and empty
+fields, as well as signedness and actual SMT width. Foreign analysis contexts and forged width
+metadata are rejected, including singleton index choices. Duplicate tags are checked by their
+represented bits, retaining legitimate sign extension without admitting truncated collisions.
+Payloads and mixed constructed/symbolic choices remain UNKNOWN. The existing bounds obligations and
+array budgets remain unchanged.
+
+Two binary unit tests cover retained signed sparse tags and malformed inventories, payloads, context
+and width controls. Two compiler tests cover host/ARM O0/O2 positive/refuted/unknown cases, returned
+enum values, casts, matches, unguarded bounds failure and actual index mutation. Native positives
+pass; shifting the actual selected index breaks proof and native execution. All 75 binary tests, 17
+SMT term tests and ten affected integration tests pass in the applied checkout. Formatting and
+workspace Clippy pass. Full checks and fleet outcomes are separate.
+
+Pass 12 has one exact source first blocker for this capability:
+devices::dr16::keys::KeyTracker::state (shared/devices/src/dr16/keys.rs:107), whose body reads its
+18-element Press array at key as usize. The report call chain contains only
+dr16::keys::KeyTracker::state. Unchecked-iterator source-liveness
+checks remain intact; they require a separate root-lifetime view rather than accepting Freeze
+snapshots as retained allocations.
+
+All 532 Rust workspace tests and 48 Python tests pass. Formatting, Clippy, release builds,
+dependency checks, documentation builds and manual hooks pass. Actual KeyTracker::state now PROVES
+without assumptions; ui_number/ui_delete_all remain PROVED and encode retains its audited bounds
+refutation. Capture: `/tmp/miren-stage119/replay`. All 72 strict/reset main obligation arrays match
+stage 118 exactly; twelve isolated runtime wrappers retain unfinished weak-CAS retries and
+unsupported SEV. Captures: `/tmp/miren-stage119-main-{strict,reset}-20261009` and
+`/tmp/miren-stage119/runtime`. No application or hardware assumption changes.

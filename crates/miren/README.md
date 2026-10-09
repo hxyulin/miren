@@ -251,6 +251,12 @@ writable provenance and allocation liveness remain checked. Typed-byte encoding 
 limits are unchanged. Same-term cancellation applies at the exact bit-vector width and does not
 remove Rust overflow checks or memory-region obligations.
 
+Symbolic indexing can select fieldless enum input values when every element retains the same
+complete variant inventory. Selection changes only the signed, target-width integer discriminant;
+type names, variant positions, exact tags, Option metadata and empty payloads must agree. Bounds
+checks remain authoritative. Payload enums, mixed constructed/input choices and incompatible
+inventories remain UNKNOWN. No new pointer identities, contracts or entry assumptions are added.
+
 Compiler inventories record whether each function directly returns a coroutine. Fleet surveys
 separate those future-construction roots from function-body roots; explicit async polling remains
 a separate capture. Older inventories without this metadata remain unclassified.

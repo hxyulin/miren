@@ -1,5 +1,6 @@
 mod adt_fields;
 mod elements;
+mod fieldless_choices;
 mod floating;
 pub mod input;
 #[cfg(test)]
@@ -641,6 +642,9 @@ pub fn select_element(
     elements: &[Value],
     index: &Value,
 ) -> Result<Value, String> {
+    if let Some(value) = fieldless_choices::fieldless_enum_choice(context, elements, index)? {
+        return Ok(value);
+    }
     let (index, index_bits, _) = index.integer()?;
     if let Some(value) = constant_integer_choice(context, elements, &index, index_bits)? {
         return Ok(value);

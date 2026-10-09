@@ -20,7 +20,7 @@ program: resource limits and undecided queries remain separate sources of UNKNOW
 | Tuples | Nested values, shared references, field projections and numeric contract fields such as `value.1.0` | Destructured argument names with projected debug bindings are not contract bindings |
 | Structs | Nested local/dependency structs, concrete generic fields and supported shared-reference fields | Unions, reference fields in mutable root pointees and unresolved generics remain unsupported |
 | Fixed non-byte arrays | At most 256 input elements; large eligible subtrees use bounded lazy descriptors; scalar constants up to 256; composite constants and generated owned repeats up to 128 | Larger arrays fail as UNKNOWN |
-| Array indexing | Symbolic bounded integer/bool/float selection, start/end pattern offsets and uniquely determined composite indices | An ambiguous tuple/struct/enum index remains UNKNOWN |
+| Array indexing | Symbolic bounded scalar and compatible fieldless enum input choices, start/end pattern offsets and uniquely determined composite indices | Ambiguous payload, mixed enum, tuple and struct choices remain UNKNOWN |
 | Fixed-array equality | Primitive numeric equality and actual custom/nested comparisons; ordered short-circuit effects | At most 128 elements per array; general slice equality and inlined pointer-based comparisons remain gaps |
 | Enums | Local/dependency inputs with symbolic tags/payloads; constructed variants and core Option/Result/ControlFlow | At most 256 fieldless or 64 payload input variants, all payloads modeled; enum/struct slices remain unsupported |
 | Mutable storage | Disjoint mutable root references, projected writes, tracked aggregate/capture references and incoming-storage returns | Reference fields in root pointees, general aliasing and partial initialization remain UNKNOWN |
@@ -404,6 +404,13 @@ remains unchanged.
 Opaque static string transport now supports guarded Option expect and nested shared arguments.
 Unguarded expect calls refute; changed guards also refute. String length/content operations and
 mutable string-reference storage remain UNKNOWN.
+
+Fixed-array selection supports same-type fieldless enum input choices with identical complete
+variant metadata and discriminant representation. Signed sparse tags retain their exact bits.
+Actual compiler array bounds are still checked; payloads and mixed inventories do not merge.
+Host/ARM O0/O2 tests cover selected return values, casts and matches, wrong claims, unguarded
+out-of-bounds indexing and UNKNOWN payload/mixed choices. Changing the actual selected index
+refutes the proof and fails native execution.
 
 ## Mutable byte regions and valid bounded roots
 
