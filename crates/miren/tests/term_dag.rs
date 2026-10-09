@@ -582,3 +582,160 @@ fn add_sub_cancellation_does_not_identify_distinct_terms_or_cross_extensions() {
     let local_sum = context.apply(Op::BvAdd, &[offset.clone(), offset]).unwrap();
     assert!(context.apply(Op::BvSub, &[local_sum, foreign]).is_err());
 }
+
+#[test]
+fn literal_array_reads_skip_only_unequal_keys_and_preserve_latest_writes() {
+    let mut queries = Vec::new();
+    for bits in [8, 16, 32, 64, 128] {
+        let context = Context::default();
+        let array = context
+            .symbol(
+                0,
+                Sort::Array(Box::new(Sort::BitVec(bits)), Box::new(Sort::BitVec(8))),
+            )
+            .unwrap();
+        let mut stored = array.clone();
+        let mut expected = "v0".to_owned();
+        for (key, byte) in [(3, 7), (9, 11), (3, 17), (255, 19)] {
+            stored = context
+                .apply(
+                    Op::Store,
+                    &[
+                        stored,
+                        context.bit_vector(key, bits).unwrap(),
+                        context.bit_vector(byte, 8).unwrap(),
+                    ],
+                )
+                .unwrap();
+            expected = format!("(store {expected} (_ bv{key} {bits}) (_ bv{byte} 8))");
+        }
+        for key in [0, 3, 9, 255] {
+            let read = context
+                .apply(
+                    Op::Select,
+                    &[stored.clone(), context.bit_vector(key, bits).unwrap()],
+                )
+                .unwrap();
+            queries.push(format!(
+                "{}\n{}",
+                context.declarations().join("\n"),
+                equivalent(&read, &format!("(select {expected} (_ bv{key} {bits}))"))
+            ));
+            if key == 3 {
+                assert_eq!(read.constant(), Some(Constant::BitVec(17)));
+            }
+        }
+    }
+    assert!(solve(&queries).iter().all(|answer| answer == "unsat"));
+}
+
+#[test]
+fn read_over_write_stops_at_symbolic_keys_and_keeps_conditional_payloads() {
+    let context = Context::default();
+    let array = context
+        .symbol(
+            0,
+            Sort::Array(Box::new(Sort::BitVec(32)), Box::new(Sort::BitVec(8))),
+        )
+        .unwrap();
+    let key = context.symbol(1, Sort::BitVec(32)).unwrap();
+    let condition = context.symbol(2, Sort::Bool).unwrap();
+    let conditional = context
+        .apply(
+            Op::Ite,
+            &[
+                condition,
+                context.bit_vector(9, 8).unwrap(),
+                context.bit_vector(13, 8).unwrap(),
+            ],
+        )
+        .unwrap();
+    let initial = context
+        .apply(
+            Op::Store,
+            &[
+                array,
+                context.bit_vector(3, 32).unwrap(),
+                context.bit_vector(7, 8).unwrap(),
+            ],
+        )
+        .unwrap();
+    let barrier = context
+        .apply(Op::Store, &[initial, key.clone(), conditional])
+        .unwrap();
+    let stored = context
+        .apply(
+            Op::Store,
+            &[
+                barrier.clone(),
+                context.bit_vector(4, 32).unwrap(),
+                context.bit_vector(11, 8).unwrap(),
+            ],
+        )
+        .unwrap();
+    let read = context
+        .apply(
+            Op::Select,
+            &[stored.clone(), context.bit_vector(3, 32).unwrap()],
+        )
+        .unwrap();
+    let shortened = context
+        .apply(Op::Select, &[barrier, context.bit_vector(3, 32).unwrap()])
+        .unwrap();
+    assert_eq!(read, shortened);
+    assert!(read.smt(200_000).unwrap().contains("v1"));
+    let original = "(select (store (store (store v0 (_ bv3 32) (_ bv7 8)) v1 (ite v2 (_ bv9 8) (_ bv13 8))) (_ bv4 32) (_ bv11 8)) (_ bv3 32))";
+    let declarations = context.declarations().join("\n");
+    let query = format!("{declarations}\n{}", equivalent(&read, original));
+    let symbolic_read = context.apply(Op::Select, &[stored, key]).unwrap();
+    let query2 = format!(
+        "{declarations}\n{}",
+        equivalent(
+            &symbolic_read,
+            "(select (store (store (store v0 (_ bv3 32) (_ bv7 8)) v1 (ite v2 (_ bv9 8) (_ bv13 8))) (_ bv4 32) (_ bv11 8)) v1)"
+        )
+    );
+    assert_eq!(solve(&[query, query2]), ["unsat", "unsat"]);
+}
+
+#[test]
+fn long_literal_store_chains_are_walked_without_recursive_select_rewriting() {
+    let context = Context::default();
+    let base = context
+        .symbol(
+            0,
+            Sort::Array(Box::new(Sort::BitVec(32)), Box::new(Sort::BitVec(8))),
+        )
+        .unwrap();
+    let mut array = base.clone();
+    for key in 1..=512 {
+        array = context
+            .apply(
+                Op::Store,
+                &[
+                    array,
+                    context.bit_vector(key, 32).unwrap(),
+                    context.bit_vector(key % 256, 8).unwrap(),
+                ],
+            )
+            .unwrap();
+    }
+    let zero = context.bit_vector(0, 32).unwrap();
+    let read = context.apply(Op::Select, &[array, zero.clone()]).unwrap();
+    let expected = context.apply(Op::Select, &[base, zero]).unwrap();
+    assert_eq!(read, expected);
+    let backing = context
+        .symbol(
+            1,
+            Sort::Array(Box::new(Sort::BitVec(32)), Box::new(Sort::BitVec(8))),
+        )
+        .unwrap();
+    let foreign_key = Context::default().bit_vector(0, 32).unwrap();
+    assert!(
+        context
+            .apply(Op::Select, &[backing.clone(), foreign_key])
+            .is_err()
+    );
+    let wrong_key = context.bit_vector(0, 16).unwrap();
+    assert!(context.apply(Op::Select, &[backing, wrong_key]).is_err());
+}

@@ -879,3 +879,9 @@ width, signedness, context and index-key capacity checks preserve all element va
 unmatched-index default. Compiler bounds and storage checks stay active. Host/ARM O0/O2 fixtures
 cover guarded lookup and a 21-byte symbolic CRC payload, with failing native array-value mutations.
 Other scalar and pointer choices retain their previous domain.
+
+SMT read-over-write simplification walks store chains iteratively. It skips a store only for
+same-sort literal bit-vector keys proven unequal by their exact values. Exact key identity retains
+the newest matching payload; constant-array bases retain their default. A symbolic key remains a
+barrier, including stores with conditional payloads. Context and key-sort checks run before folding;
+no solver answer, pointer origin, bounds obligation or storage-lifetime check is bypassed.

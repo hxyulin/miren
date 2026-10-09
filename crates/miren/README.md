@@ -344,3 +344,8 @@ width, and actual term sorts and analysis contexts must match declared metadata.
 bounds, origin and liveness checks remain authoritative. Symbolic, mixed, Boolean, floating-point
 and pointer choices keep their prior behavior. The representation adds no assumptions or larger
 budgets.
+
+SMT array reads skip intervening stores only when the read and stored keys are same-width literal
+bit vectors with unequal values. Traversal is iterative, preserves the latest matching write and
+constant-array default, and stops at symbolic keys. This exact read-over-write simplification adds
+no memory rights or assumptions; compiler bounds and storage-lifetime checks still apply.

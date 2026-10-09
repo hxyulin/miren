@@ -2009,3 +2009,34 @@ remains PROVED and the audited encode refutation remains unchanged. Captures:
 All twelve isolated runtime wrappers retain unfinished weak-CAS retry frontiers and unsupported
 SEV before the first executor poll. Captures: `/tmp/miren-stage117-main-{strict,reset}-20261009`
 and `/tmp/miren-stage117/runtime`. These replays do not establish hardware or boot validity.
+
+## Stage 118: Literal-key array reads
+
+SMT Select reads walk Store chains iteratively, skipping only writes at unequal same-sort literal
+bit-vector keys. Exact key identity returns the latest matching write; a constant-array base returns
+its default. Unknown or symbolic keys stop traversal, preserving that store and the remaining
+array. Residual selects are interned directly, avoiding recursive rewriting of long store chains.
+No application, library-name rule, memory permission or entry assumption changes.
+
+Three term regressions compare simplified reads with independent Z3 array formulas across
+8/16/32/64/128-bit keys, repeated writes, symbolic barriers and conditional payloads. A 512-store
+chain checks iterative traversal; foreign-context and mismatched-key-sort controls verify rejection
+before folding. Existing byte-view and iterator lifetime compiler tests retain ordinary P/R/U and
+native mutation checks. This removes residual layout terms; it does not claim additional CRC or
+application coverage before fresh survey evidence.
+
+All 26 focused term, byte-view, lifetime and compact-table tests pass, including host/ARM O0/O2
+compiler outcomes and failing native mutations. Formatting and Clippy pass.
+
+Byte-expression cost tests retain their exact P/R/U outcomes, nonempty complete-query requirement,
+60,000-byte ceiling, native positives and trailer-mutation refutation. They no longer require
+particular let/extract syntax: exact read-over-write folding can remove resolved byte reads.
+The trailer mutation is checked on both host and ARM targets.
+
+Full workspace execution passes all 525 tests outside the affected byte-cost suite; its three
+updated tests pass on targeted replay, completing 528 passing Rust cases. All 48 Python tests,
+formatting, Clippy, release builds, dependency checks, documentation builds and manual hooks pass.
+Actual referee replays retain ui_number/ui_delete_all PROVED and encode REFUTED without assumptions.
+All 72 strict/reset main obligation arrays match stage 117 exactly; twelve isolated wrappers still
+record unfinished weak-CAS retries and unsupported SEV. Captures: `/tmp/miren-stage118/replay`,
+`/tmp/miren-stage118-main-{strict,reset}-20261009` and `/tmp/miren-stage118/runtime`.

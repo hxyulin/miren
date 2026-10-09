@@ -153,13 +153,38 @@ pub(super) fn simplify(context: &Context, op: Op, args: &[Term], sort: &Sort) ->
             (Some(left), Some(right)) => Some(context.boolean(left == right)),
             _ => None,
         },
-        (Op::Select, [array, index]) => match &array.node.kind {
-            Kind::Apply(Op::ConstArray { .. }, values) => Some(values[0].clone()),
-            Kind::Apply(Op::Store, values) if &values[1] == index => Some(values[2].clone()),
-            Kind::Constant(_) | Kind::Symbol(_) | Kind::Apply(_, _) => None,
-        },
+        (Op::Select, [array, index]) => select(context, array, index, sort),
         _ => bit_vector(context, op, args, sort),
     }
+}
+
+fn select(context: &Context, array: &Term, index: &Term, sort: &Sort) -> Option<Term> {
+    let mut source = array;
+    loop {
+        match &source.node.kind {
+            Kind::Apply(Op::ConstArray { .. }, values) => return Some(values[0].clone()),
+            Kind::Apply(Op::Store, values) if &values[1] == index => {
+                return Some(values[2].clone());
+            }
+            Kind::Apply(Op::Store, values)
+                if values[1].sort() == index.sort()
+                    && matches!(
+                        (values[1].constant(), index.constant()),
+                        (Some(Constant::BitVec(stored)), Some(Constant::BitVec(read)))
+                            if stored != read
+                    ) =>
+            {
+                source = &values[0];
+            }
+            Kind::Constant(_) | Kind::Symbol(_) | Kind::Apply(_, _) => break,
+        }
+    }
+    (source != array).then(|| {
+        context.intern(
+            sort.clone(),
+            Kind::Apply(Op::Select, vec![source.clone(), index.clone()]),
+        )
+    })
 }
 
 fn unsigned_extended_comparison(context: &Context, left: &Term, right: &Term) -> Option<Term> {

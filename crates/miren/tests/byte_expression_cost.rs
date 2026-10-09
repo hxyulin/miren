@@ -118,12 +118,12 @@ fn repeated_numeric_chunk_copies_keep_complete_queries_bounded_on_host_and_arm()
                     .collect();
                 assert!(!queries.is_empty());
                 assert!(
-                    queries.iter().all(|query| query.len() < 60_000),
+                    queries
+                        .iter()
+                        .all(|query| !query.is_empty() && query.len() < 60_000),
                     "largest query: {}",
                     queries.iter().map(|q| q.len()).max().unwrap()
                 );
-                assert!(queries.iter().any(|query| query.contains("(let ((t")));
-                assert!(queries.iter().any(|query| query.contains("((_ extract")));
             }
         }
     }
@@ -159,15 +159,17 @@ fn changed_trailer_encoding_is_refuted() {
     let directory = Directory::new();
     let path = directory.0.join("byte_expression_cost.rs");
     std::fs::write(&path, source.replace("&[61, 83]", "&[61, 84]")).unwrap();
-    let (_, report) = verify(&path, &["scaled_sample_storage"], None);
-    let proof = report
-        .functions
-        .iter()
-        .find(|f| f.name.ends_with("scaled_sample_storage"))
-        .unwrap()
-        .proof
-        .as_ref()
-        .unwrap();
-    assert_eq!(proof.status, ProofStatus::Refuted);
-    assert!(proof.obligations.iter().any(|o| o.model.is_some()));
+    for target in [None, Some("thumbv7em-none-eabihf")] {
+        let (_, report) = verify(&path, &["scaled_sample_storage"], target);
+        let proof = report
+            .functions
+            .iter()
+            .find(|f| f.name.ends_with("scaled_sample_storage"))
+            .unwrap()
+            .proof
+            .as_ref()
+            .unwrap();
+        assert_eq!(proof.status, ProofStatus::Refuted);
+        assert!(proof.obligations.iter().any(|o| o.model.is_some()));
+    }
 }
