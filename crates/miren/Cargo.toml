@@ -17,7 +17,9 @@ syn.workspace = true
 [dev-dependencies]
 critical-section = "=1.2.0"
 miren-contracts = { path = "../miren-contracts" }
+portable-atomic = "=1.15.0"
 quote.workspace = true
+static_cell = "=2.1.1"
 
 [[bin]]
 name = "miren"

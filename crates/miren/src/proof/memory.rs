@@ -500,6 +500,14 @@ impl<'tcx> Engine<'tcx> {
         {
             return Err("readonly reference cannot be exposed as a declared mutable handle".into());
         }
+        if matches!(expected.kind(), ty::Ref(_, _, mutability) if mutability.is_mut()) {
+            if matches!(value, Value::StaticSlice { mutable: false, .. }) {
+                return Err("readonly static slice cannot be exposed as a mutable handle".into());
+            }
+            if matches!(value, Value::StaticView { .. }) {
+                self.validate_mutable_static_handle(value)?;
+            }
+        }
         if let ty::Tuple(types) = expected.kind()
             && let Value::Tuple(fields) = value
         {
@@ -564,12 +572,18 @@ impl<'tcx> Engine<'tcx> {
             // Further compiler dereference-only copies preserve the already narrowed rights.
             return Ok(Some(value));
         }
-        if !value.contains_mutable() {
+        if !self.contains_mutable_handles(&value)? {
             return Ok(None);
         }
         let (_, _, writable) = self.memory_path(state, place)?;
         if writable {
             return Ok(None);
+        }
+        if matches!(value, Value::StaticSlice { .. }) {
+            return self.reborrow_static_slice(&value, false, state).map(Some);
+        }
+        if matches!(value, Value::StaticView { .. }) {
+            return self.weaken_static_reference(&value, state).map(Some);
         }
         if let Value::Reference {
             allocation,
@@ -642,6 +656,9 @@ impl<'tcx> Engine<'tcx> {
                 source,
                 place: false,
             });
+        }
+        if matches!(value, Value::StaticSlice { .. }) {
+            return self.reborrow_static_slice(&value, mutable, state);
         }
         if matches!(value, Value::StaticView { .. }) && self.static_place_view(&value, state)? {
             return self.borrow_static_view(&value, mutable, state);

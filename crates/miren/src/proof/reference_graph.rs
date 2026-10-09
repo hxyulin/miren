@@ -83,7 +83,13 @@ impl<'tcx> Engine<'tcx> {
             | Value::DebugReference { source, .. } => {
                 Self::validate_reference_graph(source, state, incoming, visited)
             }
-            Value::StaticSlice { epoch, elements } => {
+            Value::StaticSlice {
+                source,
+                epoch,
+                elements,
+                ..
+            } => {
+                Self::validate_reference_graph(source, state, incoming, visited)?;
                 validate_static_epoch(&state.memory, *epoch)?;
                 for element in elements {
                     Self::validate_reference_graph(element, state, incoming, visited)?;

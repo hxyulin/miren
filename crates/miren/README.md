@@ -470,3 +470,33 @@ static; immutable interior access still requires the existing certified `UnsafeC
 Initialized elements of mutable `[u8; N]` statics, with `N <= 128`, admit arbitrary byte reads
 through exact typed bounded projections. This recovers neither zero initializers nor write history after
 an external effect. Counterexamples using arbitrary reads retain their abstraction reasons.
+
+Exact mutable Rust static `[u8; N]` references, with `N <= 128`, can unsize to mutable byte slices.
+The retained slice records its parent allocation, typed extent, epoch and mutability; the actual
+core `get_mut` body returns the same uniquely selected element or `None` for an out-of-bounds index.
+Parent lifetime and initialization are checked even for empty slices, `None` and escaping views.
+Ambiguous symbolic element addresses and mutable static iterators remain UNKNOWN. Shared reborrows
+and iterators narrow both parent and element permissions, and shared copies cannot expose an owned
+mutable static handle. Reads after opaque effects still admit arbitrary valid bytes; neither zero
+initializers nor precise write history are restored. Overflow counterexamples retain that
+abstraction reason. This adds bounded access support without a general alias or concurrency theorem.
+
+The actual portable-atomic shared `AtomicBool::as_atomic_u8` method can retain a live static
+address as its core-backed byte-atomic wrapper. This separate certificate checks the concrete
+inherent method signature, bounded pure-cast MIR, declared typed origin, and exact one-byte
+`UnsafeCell<u8>`/core `Atomic<u8>` layouts, including the compiler alignment wrapper and marker.
+It grants no initialization, values, mutable rights or general reinterpretation capability.
+Actual Boolean conversions and CAS bodies execute normally; opaque reads retain the unrestricted
+byte abstraction and its reasons. A byte counterexample is not evidence of a reachable logical
+Boolean state. Native already-used cell controls are separate from those abstract assignments.
+Core Boolean CAS, numeric or foreign origins, other backends, changed method bodies and the
+`MaybeUninit<[u8; 256]>` write frontier remain unsupported.
+
+Uninitialized stores retain the original certified `UnsafeCell` raw capability. A shared
+`&MaybeUninit<T>` reborrow with a `Freeze` payload makes its `as_ptr` address read-only; converting
+that pointer to mutable cannot restore write permission. Stores through that path remain UNKNOWN.
+A payload containing an actual compiler-certified `UnsafeCell` can obtain interior write rights
+through its exact raw access operation, without pretending its uninitialized payload is readable.
+Uninitialized payload reference validity, including `&UnsafeCell<T>` before its payload is
+initialized, remains unsupported; exact raw access requires no such reference. Native mutation
+controls execute only the valid original raw-pointer store path.

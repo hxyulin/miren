@@ -97,6 +97,9 @@ impl<'tcx> Engine<'tcx> {
         if self.tcx.def_kind(callee) == DefKind::Closure {
             return Ok(None);
         }
+        if let Some(value) = self.static_atomic_wrapper_call(instance, values, state)? {
+            return Ok(Some(value));
+        }
         if let Some(value) = self.nonzero_get(instance, values)? {
             self.record_model(callee, "nonzero integer value");
             return Ok(Some(value));

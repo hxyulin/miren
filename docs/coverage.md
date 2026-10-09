@@ -1024,3 +1024,40 @@ All 36 strict obligation arrays match stage 130. The ordinary-frame profile stil
 static views: eight H7 diagnostics now report that invalidation after raw identity is decoded,
 while all outcomes remain unchanged. Local evidence:
 `/tmp/miren-stage131-main-static-validity-20261010`.
+
+
+Stage 132 addresses the newly exposed Rust representations: bounded mutable static byte-array
+slices and an exact portable-atomic wrapper conversion. The existing static-validity profile is
+reused; no initializer values or hardware progress assumptions are added.
+
+
+The complete stage-132 replay reaches the conditional supported-outcome milestone: all twelve
+application async mains are REFUTED under the captured root domain. Three RTT lifecycle results
+remain unchanged; eight H7 paths expose REFCOUNTS[1] == 255 overflowing checked u8 addition, and
+F4 reaches the real already-full StaticCell panic. These are abstract shared-state witnesses,
+with startup/native/boot reachability unverified. The F4 saved byte witness is 255; independent
+solver replay also admits valid already-used byte 1 and excludes unused byte 0. No unused-cell or
+zero-refcount premise is added, and the success-path MaybeUninit write remains unsupported.
+
+Strict remains four REFUTED/eight UNKNOWN, and all fresh application future bodies are entered.
+Final captures are `/tmp/miren-stage132-main-{strict,legacy,static-validity}-verified-20261010`.
+Paired export validation checks exact configured premises and captured source/artifact identities.
+This milestone supplies supported outcomes for the chosen abstract domain; startup and firmware
+boot reachability remain unverified.
+
+A separate permission correction rejects writes recovered from shared Freeze-payload
+`MaybeUninit::as_ptr` views. Valid original raw capabilities and exact `UnsafeCell::raw_get` keep
+address-only access, without assuming initialized payload references. Embassy's actual
+`UninitCell::as_mut_ptr` forms such a reference before payload initialization and remains UNKNOWN.
+Registration and runtime therefore each have twelve UNKNOWN results in the final capture.
+The [core raw_get documentation](https://doc.rust-lang.org/core/cell/struct.UnsafeCell.html#method.raw_get)
+recommends raw access for gradual initialization; the
+[Rust validity reference](https://doc.rust-lang.org/reference/behavior-considered-undefined.html#undefined.validity.reference-box)
+leaves the exact reference-pointee requirement unsettled. This boundary does not establish an
+Embassy application bug or authorize replacing its actual reference-forming MIR with raw_get.
+
+The fresh strict fleet survey records 32 units and 2336 roots: 1107 PROVED, 237 REFUTED and
+992 UNKNOWN, with no collection errors or assumptions. Compared with pass 19, three UNKNOWN
+become REFUTED; 13 PROVED and 24 REFUTED become UNKNOWN at that validity boundary. New refutations
+also use arbitrary static-state witnesses, with boot reachability unverified. Final evidence:
+`/tmp/miren-fleet-pass20-final-20261010`. All 570 Rust and 57 Python tests pass.

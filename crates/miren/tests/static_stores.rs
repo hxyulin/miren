@@ -88,6 +88,12 @@ fn verify(
             "{target:?} optimized={optimized} {name}: {:?}",
             proof.obligations
         );
+        if *name == "uninit_cell_address_chain" {
+            assert!(proof.obligations.iter().any(|o| {
+                o.detail
+                    .contains("uninitialized static payload borrowing remains unsupported")
+            }));
+        }
         if *expected == ProofStatus::Proved {
             assert!(proof.trusted_calls.is_empty());
         }
@@ -123,7 +129,7 @@ fn typed_stores_and_uninitialized_addresses_keep_shared_reads_opaque() {
             ProofStatus::Proved,
         ),
         ("initialized_wrapper_addresses", ProofStatus::Proved),
-        ("uninit_cell_address_chain", ProofStatus::Proved),
+        ("uninit_cell_address_chain", ProofStatus::Unknown),
         ("stores_a_constructed_future", ProofStatus::Proved),
         ("caller_owned_references_are_retained", ProofStatus::Proved),
         ("writes_do_not_hide_panics", ProofStatus::Refuted),

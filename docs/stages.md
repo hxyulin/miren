@@ -2592,3 +2592,56 @@ host/ARM O0/O2 positive/refuted/unknown controls, formatting, Clippy, release bu
 documentation build and manual hooks. Actual pure Rust mutation and both storage-effect native
 replay refusals pass; custom invalid MIR and hardware paths are never executed natively.
 Independent review approves the exact provenance, access and history boundaries.
+
+
+## Stage 132: typed static slice and atomic-wrapper translation
+
+This stage implements bounded mutable static byte-array slices and the exact
+portable-atomic bool-to-byte view conversion. These are Rust representation extensions under the
+existing conditional profile; the hardware model and initialization premises stay separate.
+
+
+Bounded mutable byte slices now retain parent identity, typed extent, epoch and mutability.
+Actual core get_mut executes, including Some/None branches; shared copies, reborrows and iterators
+cannot forward mutable rights. Parent initialization/lifetime is validated before empty, None,
+escape and exhausted paths. Ambiguous symbolic addresses and mutable static iterators stay UNKNOWN.
+The separate portable-atomic conversion requires exact compiler identity, one-byte full-coverage
+layouts and bounded pure-cast instantiated MIR. Changed dependency bodies remain UNKNOWN without
+model use; generic pointer casts are unchanged. Exact test-only dependencies make offline fixtures
+independent of the firmware Cargo cache.
+
+Complete new-profile collection yields twelve async REFUTED, reaching the conditional
+supported-outcome milestone. Eight new H7 results use REFCOUNTS[1] == 255 at checked addition;
+F4 reaches StaticCell::uninit's already-full panic. All are explicitly abstract shared-state
+counterexamples, with boot/native reachability unverified. Every saved query and model is
+independently SAT; excluding 255 makes all eight RCC queries UNSAT. F4 also admits valid already-used
+byte 1 and excludes unused byte 0, independently of its saved unrestricted-byte255 witness.
+The MaybeUninit write success branch remains unsupported in its separate fixture.
+
+Strict remains four REFUTED/eight UNKNOWN, and every fresh application future body is entered.
+Final captures use a freshly collected fleet manifest:
+`/tmp/miren-stage132-main-{strict,legacy,static-validity}-verified-20261010`.
+The paired compact export validates exact policies, source/artifact checkpoints and frozen binary
+hashes. Independent source and solver audits distinguish abstract witnesses from boot reachability.
+
+A permission audit also corrects the old uninitialized-store positive fixture: its shared
+Freeze-payload `MaybeUninit::as_ptr` path cannot recover write rights by casting to mutable.
+Shared static borrows and that pointer operation retain read-only rights. The positive fixture
+now preserves the original certified raw capability; exact `UnsafeCell::raw_get` is separately
+supported without forming a reference to its uninitialized payload. Unsupported payload references
+remain UNKNOWN, including the actual Embassy `UninitCell::as_mut_ptr` reference/get path.
+
+Consequently, final task registration and runtime captures are each twelve UNKNOWN. The fresh
+strict fleet survey contains 32 units and 2336 roots: 1107 PROVED, 237 REFUTED and 992 UNKNOWN,
+with no collection errors or assumptions. Relative to pass 19, three UNKNOWN become REFUTED;
+13 PROVED and 24 REFUTED become UNKNOWN at this uninitialized-reference boundary. This is a
+conservative validity limitation, not a confirmed Embassy bug. The pinned core documentation
+recommends raw_get for gradual initialization, while the Rust Reference leaves the exact extent
+of reference pointee validity unsettled. No firmware rewrites or implicit validity premises are
+introduced. Evidence: `/tmp/miren-fleet-pass20-final-20261010` and
+`/tmp/miren-stage132-uninitcell-audit`.
+
+Final validation passes 570 Rust workspace tests and 57 Python tests, formatting, cargo lint,
+release builds and cargo deny. Documentation build and manual hooks complete the stage checks.
+The public model API remains a declarative hardware/storage policy boundary; correlated peripheral
+state and executable emulator callbacks require later work.

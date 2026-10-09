@@ -31,8 +31,10 @@ pub enum MemoryProjection {
 pub enum Value {
     Uninitialized,
     StaticSlice {
+        source: Box<Value>,
         elements: Vec<Value>,
         epoch: usize,
+        mutable: bool,
     },
     StaticView {
         id: usize,
@@ -285,6 +287,7 @@ impl Value {
         match self {
             Self::Input(_) => false,
             Self::Reference { mutable: true, .. } => true,
+            Self::StaticSlice { mutable, .. } => *mutable,
             Self::SliceIterator {
                 mutable, source, ..
             } => *mutable || source.contains_mutable(),
@@ -304,7 +307,6 @@ impl Value {
             | Self::StaticText
             | Self::FormatArguments
             | Self::RawPointer { .. }
-            | Self::StaticSlice { .. }
             | Self::StaticView { .. }
             | Self::Uninitialized
             | Self::FunctionPointer { .. }

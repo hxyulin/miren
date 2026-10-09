@@ -86,10 +86,12 @@ version = "0.1.0"
 dependencies = [
  "critical-section",
  "miren-contracts",
+ "portable-atomic",
  "quote",
  "serde",
  "serde_json",
  "sha2",
+ "static_cell",
  "syn 2.0.119",
 ]
 
@@ -100,6 +102,12 @@ dependencies = [
  "quote",
  "syn 2.0.119",
 ]
+
+[[package]]
+name = "portable-atomic"
+version = "1.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "05c8b63e8d9609db387f0324918f81d68fe27748f084ef092fb35954d0539a85"
 
 [[package]]
 name = "proc-macro2"
@@ -171,6 +179,15 @@ dependencies = [
  "cfg-if",
  "cpufeatures",
  "digest",
+]
+
+[[package]]
+name = "static_cell"
+version = "2.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0530892bb4fa575ee0da4b86f86c667132a94b74bb72160f58ee5a4afec74c23"
+dependencies = [
+ "portable-atomic",
 ]
 
 [[package]]

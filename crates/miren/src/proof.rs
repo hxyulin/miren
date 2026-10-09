@@ -1697,7 +1697,7 @@ impl<'tcx> Engine<'tcx> {
                     place.ty(&body.local_decls, self.tcx).ty,
                     &value,
                 )?;
-                if value.contains_mutable() {
+                if self.contains_mutable_handles(&value)? {
                     let (_, _, writable) = self.memory_path(state, *place)?;
                     if !writable {
                         return Err(

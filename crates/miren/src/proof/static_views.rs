@@ -2,6 +2,7 @@ use super::*;
 use rustc_const_eval::const_eval::mk_eval_cx_for_const_val;
 use rustc_middle::mir::interpret::GlobalAlloc;
 
+mod atomic_wrapper;
 mod atomics;
 mod initialization;
 mod integers;
@@ -807,6 +808,101 @@ impl<'tcx> Engine<'tcx> {
         }
     }
 
+    pub(super) fn contains_mutable_handles(&self, value: &Value) -> Result<bool, String> {
+        self.contains_mutable_static_handles(value, 0)
+    }
+
+    fn contains_mutable_static_handles(&self, value: &Value, depth: usize) -> Result<bool, String> {
+        if depth >= 16 {
+            return Err("mutable handle graph exceeds depth budget".into());
+        }
+        if value.contains_mutable() {
+            return Ok(true);
+        }
+        match value {
+            Value::StaticView { id, .. } => {
+                let views = self.static_views.borrow();
+                let view = views.get(*id).ok_or("static handle shape unavailable")?;
+                Ok(view.kind == (ViewKind::Reference { mutable: true }))
+            }
+            Value::Adt { fields, .. } => {
+                for (_, field) in fields {
+                    if self.contains_mutable_static_handles(field, depth + 1)? {
+                        return Ok(true);
+                    }
+                }
+                Ok(false)
+            }
+            Value::Enum { variants, .. } | Value::Tuple(variants) => {
+                for field in variants {
+                    if self.contains_mutable_static_handles(field, depth + 1)? {
+                        return Ok(true);
+                    }
+                }
+                Ok(false)
+            }
+            Value::Elements(variants) => {
+                for field in variants {
+                    if self.contains_mutable_static_handles(field, depth + 1)? {
+                        return Ok(true);
+                    }
+                }
+                Ok(false)
+            }
+            Value::Input(_)
+            | Value::Bool(_)
+            | Value::Int { .. }
+            | Value::Float { .. }
+            | Value::Bytes { .. }
+            | Value::Reference { .. }
+            | Value::StaticSlice { .. }
+            | Value::Cell { .. }
+            | Value::Atomic { .. }
+            | Value::LocalAtomic { .. }
+            | Value::SliceIterator { .. }
+            | Value::TrackedPointer { .. }
+            | Value::RawSlice { .. }
+            | Value::RawPointer { .. }
+            | Value::MetadataPointer(_)
+            | Value::StaticText
+            | Value::FormatArguments
+            | Value::Uninitialized
+            | Value::TraitObject { .. }
+            | Value::DebugReference { .. }
+            | Value::FunctionPointer { .. }
+            | Value::Function
+            | Value::Unit => Ok(false),
+        }
+    }
+
+    pub(super) fn weaken_static_reference(
+        &self,
+        value: &Value,
+        state: &State,
+    ) -> Result<Value, String> {
+        let mut view = self.static_view(value, state)?;
+        if !matches!(view.kind, ViewKind::Reference { .. }) {
+            return Err("static shared copy requires a reference handle".into());
+        }
+        view.kind = ViewKind::Reference { mutable: false };
+        view.writable = false;
+        self.intern_static_view(view)
+    }
+
+    pub(super) fn validate_mutable_static_handle(&self, value: &Value) -> Result<(), String> {
+        let Value::StaticView { id, .. } = value else {
+            return Err("mutable static handle requires a static view".into());
+        };
+        let views = self.static_views.borrow();
+        let view = views
+            .get(*id)
+            .ok_or("static mutable handle shape unavailable")?;
+        if view.kind != (ViewKind::Reference { mutable: true }) || !view.writable {
+            return Err("readonly static reference cannot be exposed as a mutable handle".into());
+        }
+        Ok(())
+    }
+
     pub(super) fn static_place_view(&self, value: &Value, state: &State) -> Result<bool, String> {
         Ok(self.static_view(value, state)?.kind == ViewKind::Place)
     }
@@ -871,6 +967,9 @@ impl<'tcx> Engine<'tcx> {
         }
         view.ty = payload;
         view.kind = ViewKind::Raw;
+        // The pointer originates from a shared MaybeUninit borrow, not the outer cell.
+        // Actual UnsafeCell payload operations can grant their own certified interior rights.
+        view.writable = false;
         self.intern_static_view(view).map(Some)
     }
 
@@ -883,6 +982,9 @@ impl<'tcx> Engine<'tcx> {
         let mut view = self.static_view(value, state)?;
         match projection {
             ProjectionElem::Deref if view.kind != ViewKind::Place => {
+                if let ViewKind::Reference { mutable } = view.kind {
+                    view.writable &= mutable;
+                }
                 if !self.uninit_static_address(view)? {
                     if !self.certified_static_type(view)? {
                         self.certify_atomic_overlay(view.certified, view.ty)?;
@@ -968,9 +1070,7 @@ impl<'tcx> Engine<'tcx> {
         }
         self.require_static_initialization(view, state)?;
         if self.uninit_static_address(view)? {
-            if mutable || !self.is_static_unsafe_cell(view.ty) {
-                return Err("uninitialized static payload borrowing remains unsupported".into());
-            }
+            return Err("uninitialized static payload borrowing remains unsupported".into());
         } else {
             if !self.certified_static_type(view)? {
                 return Err(
@@ -980,6 +1080,7 @@ impl<'tcx> Engine<'tcx> {
             view.certified = view.ty;
         }
         view.kind = ViewKind::Reference { mutable };
+        view.writable &= mutable;
         if !mutable && matches!(view.ty.kind(), ty::Array(..)) {
             return self.static_array_elements(&self.intern_static_view(view)?, state);
         }
@@ -996,10 +1097,8 @@ impl<'tcx> Engine<'tcx> {
         let ty::Array(element, _) = view.ty.kind() else {
             return Err("static slice views require a certified fixed array".into());
         };
-        if !matches!(
-            view.kind,
-            ViewKind::Reference { mutable: false } | ViewKind::Place
-        ) || view.certified != view.ty
+        if !matches!(view.kind, ViewKind::Reference { .. } | ViewKind::Place)
+            || view.certified != view.ty
         {
             return Err("static slice views require a shared certified array reference".into());
         }
@@ -1009,6 +1108,24 @@ impl<'tcx> Engine<'tcx> {
         };
         if count > 128 {
             return Err("static slice view exceeds the 128-element budget".into());
+        }
+        let mutable = view.writable && view.kind == (ViewKind::Reference { mutable: true });
+        if mutable
+            && (*element != self.tcx.types.u8
+                || view.original != view.ty
+                || view.offset != 0
+                || self.static_declared_type(view.static_id)? != view.ty
+                || stride.bytes() != 1
+                || layout.size.bytes() != count
+                || !matches!(
+                    self.tcx.def_kind(view.static_id),
+                    DefKind::Static {
+                        mutability: rustc_hir::Mutability::Mut,
+                        ..
+                    }
+                ))
+        {
+            return Err("mutable static slices require an exact whole mutable byte array".into());
         }
         let mut elements = Vec::new();
         for index in 0..count {
@@ -1021,7 +1138,16 @@ impl<'tcx> Engine<'tcx> {
                 ty: *element,
                 certified: *element,
                 offset,
-                kind: ViewKind::Reference { mutable: false },
+                kind: if view.kind == ViewKind::Place {
+                    ViewKind::Raw
+                } else {
+                    ViewKind::Reference { mutable }
+                },
+                writable: if view.kind == ViewKind::Place {
+                    view.writable
+                } else {
+                    mutable
+                },
                 ..view
             })?);
         }
@@ -1029,8 +1155,10 @@ impl<'tcx> Engine<'tcx> {
             unreachable!();
         };
         Ok(Value::StaticSlice {
+            source: Box::new(value.clone()),
             elements,
             epoch: *epoch,
+            mutable,
         })
     }
 
@@ -1050,14 +1178,56 @@ impl<'tcx> Engine<'tcx> {
         else {
             return Err("static slice coercion requires an array and slice".into());
         };
-        if source_mut.is_mut()
-            || target_mut.is_mut()
+        let view = self.static_view(value, state)?;
+        if (target_mut.is_mut() && !source_mut.is_mut())
             || element != target_element
-            || self.static_view(value, state)?.ty != *array
+            || view.ty != *array
+            || view.kind
+                != (ViewKind::Reference {
+                    mutable: source_mut.is_mut(),
+                })
+            || (source_mut.is_mut() && !view.writable)
         {
             return Err("static slice coercion changes element type or mutability".into());
         }
-        self.static_array_elements(value, state)
+        let slice = self.static_array_elements(value, state)?;
+        self.reborrow_static_slice(&slice, target_mut.is_mut(), state)
+    }
+
+    pub(super) fn reborrow_static_slice(
+        &self,
+        value: &Value,
+        mutable: bool,
+        state: &State,
+    ) -> Result<Value, String> {
+        self.validate_tracked_value(value, state)?;
+        let Value::StaticSlice {
+            source,
+            elements,
+            epoch,
+            mutable: rights,
+        } = value
+        else {
+            return Err("static slice reborrow requires retained typed storage".into());
+        };
+        if mutable && !rights {
+            return Err("mutable static slice reborrow requires existing writable rights".into());
+        }
+        if mutable {
+            return Ok(value.clone());
+        }
+        let weaken = |value: &Value| -> Result<Value, String> {
+            let mut view = self.static_view(value, state)?;
+            view.kind = ViewKind::Reference { mutable: false };
+            view.writable = false;
+            self.intern_static_view(view)
+        };
+        Ok(Value::StaticSlice {
+            source: Box::new(weaken(source)?),
+            elements: elements.iter().map(weaken).collect::<Result<_, _>>()?,
+            epoch: *epoch,
+            mutable: false,
+        })
     }
 
     pub(super) fn cast_static_view(

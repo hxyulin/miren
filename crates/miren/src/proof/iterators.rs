@@ -107,7 +107,7 @@ impl<'tcx> Engine<'tcx> {
                 },
             ] = values
             && let [(_, value)] = fields.as_slice()
-            && value.contains_mutable()
+            && self.contains_mutable_handles(value)?
         {
             self.record_model(
                 callee,
@@ -142,9 +142,16 @@ impl<'tcx> Engine<'tcx> {
                     Value::Elements(elements) => {
                         (source.clone(), self.iterator_index(elements.len() as u128))
                     }
-                    Value::StaticSlice { ref elements, .. } => {
+                    value @ Value::StaticSlice { .. } => {
+                        if mutable {
+                            return Err("mutable static slice iterators remain unsupported".into());
+                        }
+                        let value = self.reborrow_static_slice(&value, false, state)?;
+                        let Value::StaticSlice { ref elements, .. } = value else {
+                            unreachable!()
+                        };
                         let back = self.iterator_index(elements.len() as u128);
-                        (snapshot, back)
+                        (value, back)
                     }
                     Value::StaticView { .. } if !mutable => {
                         let elements = self.static_array_elements(&snapshot, state)?;

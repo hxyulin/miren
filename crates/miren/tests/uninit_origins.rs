@@ -136,6 +136,16 @@ fn compiler_certifies_uninitialized_container_construction_without_payload_reads
             assert_eq!(evidence.origins.len(), 3);
             for (entry, expected) in [
                 ("dependency_uninit_store", ProofStatus::Proved),
+                ("shared_uninit_pointer_cannot_write", ProofStatus::Unknown),
+                (
+                    "directly_forwarded_shared_uninit_pointer_cannot_write",
+                    ProofStatus::Unknown,
+                ),
+                ("shared_uninit_interior_cell_can_write", ProofStatus::Proved),
+                (
+                    "shared_uninit_payload_reference_is_unknown",
+                    ProofStatus::Unknown,
+                ),
                 ("dependency_boolean_storage", ProofStatus::Proved),
                 ("dependency_uninit_read", ProofStatus::Unknown),
                 ("dependency_initialized_union", ProofStatus::Unknown),
@@ -147,6 +157,39 @@ fn compiler_certifies_uninitialized_container_construction_without_payload_reads
             ] {
                 let report = verify_entry(&artifact, &directory, target, optimized, entry, false);
                 assert_eq!(status_entry(&report, entry), expected, "{report:?}");
+                if entry == "shared_uninit_payload_reference_is_unknown" {
+                    let proof = report
+                        .functions
+                        .iter()
+                        .find(|f| f.name == entry)
+                        .unwrap()
+                        .proof
+                        .as_ref()
+                        .unwrap();
+                    assert!(
+                        proof.obligations.iter().any(|o| o.detail.contains(
+                            "uninitialized static payload borrowing remains unsupported"
+                        ))
+                    );
+                }
+                if matches!(
+                    entry,
+                    "shared_uninit_pointer_cannot_write"
+                        | "directly_forwarded_shared_uninit_pointer_cannot_write"
+                ) {
+                    let proof = report
+                        .functions
+                        .iter()
+                        .find(|f| f.name == entry)
+                        .unwrap()
+                        .proof
+                        .as_ref()
+                        .unwrap();
+                    assert!(proof.obligations.iter().any(|o| {
+                        o.detail
+                            .contains("static store needs a certified UnsafeCell payload place")
+                    }));
+                }
             }
         }
     }
