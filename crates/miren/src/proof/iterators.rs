@@ -138,6 +138,13 @@ impl<'tcx> Engine<'tcx> {
             } else {
                 let snapshot = self.snapshot(source, &state.memory, &state.conditions, 0)?;
                 match snapshot {
+                    Value::ScalarSlice { .. } if !mutable => {
+                        self.instantiated_body(instance)?;
+                        (
+                            source.clone(),
+                            self.scalar_slice_length(&snapshot, &state.conditions)?,
+                        )
+                    }
                     Value::Bytes { length, .. } => (source.clone(), *length),
                     Value::Elements(elements) => {
                         (source.clone(), self.iterator_index(elements.len() as u128))
@@ -220,9 +227,8 @@ impl<'tcx> Engine<'tcx> {
         else {
             return Err("slice iterator state is not modeled".to_owned());
         };
-        if matches!(source.as_ref(), Value::StaticSlice { .. }) {
-            self.snapshot(source, &state.memory, &state.conditions, 0)?;
-        }
+        let scalar_source =
+            self.validate_iterator_source(source, &state.memory, &state.conditions)?;
         if let Value::SliceIterator {
             mutable: true,
             unchecked,
@@ -270,6 +276,10 @@ impl<'tcx> Engine<'tcx> {
         };
         if !supported {
             return Ok(None);
+        }
+        if scalar_source {
+            // An exact ordinary core API still needs its selected concrete Rust body.
+            self.instantiated_body(instance)?;
         }
         if matches!(name.as_str(), "by_ref" | "into_iter") {
             if signature.inputs().len() != 1
@@ -582,6 +592,24 @@ impl<'tcx> Engine<'tcx> {
         self.write_projection(storage, projection, iterator, conditions)
     }
 
+    fn validate_iterator_source(
+        &self,
+        source: &Value,
+        memory: &[Option<Value>],
+        conditions: &[Term],
+    ) -> Result<bool, String> {
+        // Retained finite views validate their parent without flattening the view.
+        // Metadata and exhausted cursors need the same source certificate as next.
+        if self
+            .finite_element_slice_length(source, memory, conditions)?
+            .is_none()
+        {
+            let storage = self.snapshot(source, memory, conditions, 0)?;
+            return Ok(matches!(storage, Value::ScalarSlice { .. }));
+        }
+        Ok(false)
+    }
+
     pub(super) fn iterator_step(
         &mut self,
         iterator: Value,
@@ -592,7 +620,10 @@ impl<'tcx> Engine<'tcx> {
     ) -> Result<Vec<Iteration>, String> {
         self.steps += 1;
         if self.steps > self.limits.max_steps {
-            return Err("symbolic execution step limit reached".to_owned());
+            return Err(self.categorized_error(
+                UnknownCategory::ResourceLimit,
+                "symbolic execution step limit reached".into(),
+            ));
         }
         let Value::SliceIterator {
             source,
@@ -607,14 +638,7 @@ impl<'tcx> Engine<'tcx> {
         if mutable && !unchecked.is_empty() {
             return Err("ordinary iteration after unchecked mutable access is unsupported".into());
         }
-        // Finite element views cannot be owned snapshots. Resolve their parent storage and
-        // bounds even when exhausted, retaining the same dead-source refusal as snapshots.
-        if self
-            .finite_element_slice_length(&source, &memory, &conditions)?
-            .is_none()
-        {
-            self.snapshot(&source, &memory, &conditions, 0)?;
-        }
+        self.validate_iterator_source(&source, &memory, &conditions)?;
         let remaining = symbolic::binary(&self.terms, "sub", (*back).clone(), (*front).clone())?;
         let inside = symbolic::binary(&self.terms, "lt", skip.clone(), remaining)?.boolean()?;
         let mut results = Vec::new();
@@ -664,6 +688,9 @@ impl<'tcx> Engine<'tcx> {
                     value => value,
                 };
                 match storage {
+                    value @ Value::ScalarSlice { .. } if !mutable => {
+                        self.scalar_slice_select(&value, &index, &conditions)?
+                    }
                     Value::Bytes { data, .. } => Value::Int {
                         expression: self
                             .terms

@@ -619,3 +619,12 @@ compiler element identities, layout, array sorts and contexts are checked at typ
 Competing borrowed roots, mutable slices, refined or composite elements, raw access, whole-slice
 comparison and unbounded iteration retain their existing unsupported frontiers. Byte slice
 representations and their input policy remain unchanged.
+
+Read-only scalar slices support exact core shared iterator cursors with arbitrary valid lengths.
+Forward/reverse skips, exhaustion, length/count/size hints and cloning preserve the retained
+immutable source and validate its lifetime even for metadata or exhausted cursors. Selected ordinary
+core APIs require their available concrete Rust bodies before modeled success. Cursor bounds
+use checked target-usize terms and the original compiler element identity; no raw access or mutable
+iterator rights are added. Floating reads retain storage bits and Char reads decode valid scalars.
+Whole-slice callbacks still require complete execution or a separate loop proof; step exhaustion
+returns ResourceLimit UNKNOWN rather than narrowing the admitted input length.

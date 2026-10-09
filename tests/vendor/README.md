@@ -8,6 +8,8 @@ These directories are exact unpacked crates.io archives, not workspace members o
 Original sources, manifests and licenses remain unchanged. `manifest.json` records registry archive
 SHA256 values checked against the workspace Cargo.lock and SHA256 for every unpacked file.
 `python3 -m unittest discover -s tools -p 'test_vendor_sources.py'` checks the snapshot.
+Original package lockfiles are tracked even when an upstream `.gitignore` excludes them; they
+must match the manifest in a clean checkout as well as an existing development directory.
 
 `crates/miren/tests/portable_atomic_views.rs` uses these sources as path dependencies. Mutation
 controls change a temporary copy only. They do not execute invalid custom MIR or hardware paths.

@@ -44,6 +44,25 @@ fn validate_slice_terms(
     Ok(())
 }
 
+fn validate_cursor_terms(
+    context: &Context,
+    pointer_bits: u32,
+    front: &Value,
+    back: &Value,
+) -> Result<(), String> {
+    for bound in [front, back] {
+        let (term, width, signed) = bound.integer()?;
+        if width != pointer_bits
+            || signed
+            || term.sort() != &Sort::BitVec(pointer_bits)
+            || !term.belongs_to(context)
+        {
+            return Err("scalar slice cursor requires target usize bounds".into());
+        }
+    }
+    Ok(())
+}
+
 fn decode_scalar_element(
     context: &Context,
     element: ScalarSliceElement,
@@ -432,6 +451,60 @@ impl<'tcx> Engine<'tcx> {
                     )?;
                 }
             }
+            Value::SliceIterator {
+                source,
+                front,
+                back,
+                mutable,
+                unchecked,
+            } => {
+                let stored = self.reference_value(source, memory, conditions)?;
+                // The discovery walk visits whole allocations; a projected finite source
+                // may share its parent with an unrelated scalar-slice field.
+                if !contains_scalar_slice(&stored, memory, &mut Vec::new()) {
+                    return Ok(());
+                }
+                let ty::Adt(def, args) = expected.kind() else {
+                    return Err("scalar slice cursor requires exact compiler Iter type".into());
+                };
+                if self
+                    .tcx
+                    .get_diagnostic_item(rustc_span::Symbol::intern("SliceIter"))
+                    != Some(def.did())
+                    || *mutable
+                    || !unchecked.is_empty()
+                    || !matches!(source.as_ref(), Value::Reference { mutable: false, .. })
+                {
+                    return Err(
+                        "scalar slice cursor requires an immutable retained core Iter".into(),
+                    );
+                }
+                let element = args
+                    .types()
+                    .next()
+                    .ok_or("scalar slice cursor lacks its compiler element argument")?;
+                self.scalar_slice_typed_depth(
+                    Ty::new_slice(self.tcx, element),
+                    &stored,
+                    memory,
+                    conditions,
+                    depth + 1,
+                )?;
+                let length = self.scalar_slice_length(&stored, conditions)?;
+                let bits = u32::from(self.tcx.sess.target.pointer_width);
+                validate_cursor_terms(&self.terms, bits, front, back)?;
+                let ordered =
+                    symbolic::binary(&self.terms, "le", (**front).clone(), (**back).clone())?
+                        .boolean()?;
+                let inside =
+                    symbolic::binary(&self.terms, "le", (**back).clone(), length)?.boolean()?;
+                let safe = self.terms.apply(Op::And, &[ordered, inside])?;
+                let mut invalid = conditions.to_vec();
+                invalid.push(symbolic::not(&safe));
+                if self.feasible(&invalid)? {
+                    return Err("scalar slice cursor lacks ordered live source bounds".into());
+                }
+            }
             Value::Input(_)
             | Value::Bool(_)
             | Value::Int { .. }
@@ -441,7 +514,6 @@ impl<'tcx> Engine<'tcx> {
             | Value::Cell { .. }
             | Value::Atomic { .. }
             | Value::LocalAtomic { .. }
-            | Value::SliceIterator { .. }
             | Value::MetadataPointer(_)
             | Value::StaticText
             | Value::FormatArguments
@@ -689,6 +761,26 @@ fn contains_scalar_slice(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn cursor_bounds_reject_signed_wrong_width_and_foreign_context_terms() {
+        let context = Context::default();
+        let foreign = Context::default();
+        for bits in [32, 64] {
+            let front = symbolic::integer(&context, 0, bits, false);
+            let back = symbolic::integer(&context, 129, bits, false);
+            assert!(validate_cursor_terms(&context, bits, &front, &back).is_ok());
+            for malformed in [
+                symbolic::integer(&context, 0, bits, true),
+                symbolic::integer(&context, 0, 16, false),
+                symbolic::integer(&foreign, 0, bits, false),
+                Value::Bool(context.boolean(false)),
+            ] {
+                assert!(validate_cursor_terms(&context, bits, &malformed, &back).is_err());
+                assert!(validate_cursor_terms(&context, bits, &front, &malformed).is_err());
+            }
+        }
+    }
 
     #[test]
     fn logical_scalar_slices_require_exact_length_element_sort_and_context() {

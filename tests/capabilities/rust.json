@@ -251,6 +251,23 @@
       "expected": "unknown",
       "unknown_reason": "no compiler-exported Rust definition matches the foreign symbol",
       "unknown_category": "missing_compiler_evidence"
+    },
+    {
+      "entry": "scalar_slice_nth",
+      "family": "scalar_slice_iterator",
+      "expected": "proved"
+    },
+    {
+      "entry": "scalar_slice_iterator_wrong_claim",
+      "family": "scalar_slice_iterator",
+      "expected": "refuted"
+    },
+    {
+      "entry": "scalar_slice_unbounded_fold",
+      "family": "scalar_slice_iterator",
+      "expected": "unknown",
+      "unknown_reason": "symbolic root exceeded the 30-second execution budget",
+      "unknown_category": "resource_limit"
     }
   ]
 }

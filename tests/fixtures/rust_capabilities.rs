@@ -190,6 +190,28 @@ pub fn open_aggregate_slice(values: &[(u16, u16)]) {
     }
 }
 
+pub fn scalar_slice_nth(values: &[u16], index: usize) {
+    match values.iter().nth(index) {
+        Some(value) => {
+            assert!(index < values.len());
+            assert!(*value == values[index]);
+        }
+        None => assert!(index >= values.len()),
+    }
+}
+
+pub fn scalar_slice_iterator_wrong_claim(values: &[u16]) {
+    if !values.is_empty() {
+        assert!(*values.iter().nth(0).unwrap() == 0);
+    }
+}
+
+pub fn scalar_slice_unbounded_fold(values: &[u16]) -> u64 {
+    values
+        .iter()
+        .fold(0_u64, |sum, value| sum.wrapping_add(u64::from(*value)))
+}
+
 pub fn raw_pointer_metadata(length: usize) {
     let pointer = core::ptr::slice_from_raw_parts(core::ptr::null::<u8>(), length);
     assert!(pointer.len() == length);
@@ -331,6 +353,11 @@ mod native {
         open_slice_read_correlation(&[], 0);
         open_slice_read_correlation(&[0, 1, u16::MAX], 2);
         open_slice_read_correlation(&[u16::MAX; 129], 128);
+        scalar_slice_nth(&[], 0);
+        scalar_slice_nth(&[0, 1, u16::MAX], 2);
+        scalar_slice_nth(&[u16::MAX; 129], 128);
+        scalar_slice_nth(&[7; 129], usize::MAX);
+        assert!(scalar_slice_unbounded_fold(&[3, 7]) == 10);
         float_remainder(false);
         float_remainder(true);
         raw_pointer_metadata(usize::MAX);

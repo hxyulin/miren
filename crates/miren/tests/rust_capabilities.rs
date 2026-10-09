@@ -133,14 +133,19 @@ fn check_report(report: &Report, cases: &[Case], target: Option<&str>, optimized
             );
         }
         if expected == ProofStatus::Unknown {
-            assert!(proof.obligations.iter().any(|obligation| {
-                obligation.status == ProofStatus::Unknown
-                    && obligation
-                        .detail
-                        .contains(case.unknown_reason.as_deref().unwrap())
-                    && obligation.unknown_category
-                        == Some(case.unknown_category.unwrap_or(UnknownCategory::Semantics))
-            }));
+            assert!(
+                proof.obligations.iter().any(|obligation| {
+                    obligation.status == ProofStatus::Unknown
+                        && obligation
+                            .detail
+                            .contains(case.unknown_reason.as_deref().unwrap())
+                        && obligation.unknown_category
+                            == Some(case.unknown_category.unwrap_or(UnknownCategory::Semantics))
+                }),
+                "{} target={target:?} optimized={optimized}: {:?}",
+                case.entry,
+                proof.obligations
+            );
         }
     }
 }

@@ -1177,3 +1177,13 @@ parent lifetime before metadata or empty paths. Original pattern, aggregate, ref
 zero-sized and mutable input domains retain UNKNOWN boundaries. Unrestricted equality, iteration
 and induction require their own supported consumers. The existing finite retained integer/tuple
 projection budgets remain separate from this arbitrary input domain.
+
+
+Stage 144 adds compiler-identified shared scalar-slice iterator cursors and metadata. Arbitrary
+lengths stay admitted; nth, reverse traversal, count, clone and exhaustion operate on checked
+target-usize front/back positions and the original readonly source. Missing selected bodies remain
+UNKNOWN. Every new result validates retained backing, including metadata and empty cursors.
+Floating input bits and decoded character values preserve stage-143 correlations. Full loops
+still require complete execution or a supported invariant; an unrestricted wrapping fold reaches
+the default execution time budget. The 49-case/18-family baseline expects 80 PROVED, 72 REFUTED
+and 44 UNKNOWN outcomes across host/ARM O0/O2.

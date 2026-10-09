@@ -3032,3 +3032,37 @@ Final standalone evidence: `/tmp/miren-stage143-capabilities-20261010`, with 76 
 Validation passes 602 Rust tests, 68 Python tests, formatting, cargo lint, release builds,
 cargo deny, documentation build and manual hooks. The affected preexisting regression suites
 also pass; no application source, environment premise or raw-access permission is added.
+
+
+## Stage 144: arbitrary read-only scalar iterator cursors
+
+Exact core shared iterator constructors and cursor operations extend the stage-143 primitive slice
+domain without a finite input-length cap. Cursor types retain their original compiler element and
+caller source; target-usize front/back metadata is checked for context, order and source extent.
+Metadata, count, cloning and exhausted cursors validate source backing before supplying results.
+Dropping a copied reference handle does not retire live backing. Floating values retain input bits;
+character values use decoded observations.
+
+The shared manifest adds nth correlation P, an unchanged false first-value claim R and an
+unrestricted wrapping fold U. All four default-budget compiler configurations match: the fold
+reaches ResourceLimit at the actual 30-second execution budget. The source and default budget
+remain unchanged. Dedicated smaller-budget controls separately reach the symbolic step limit.
+Current baseline: 49 cases in 18 families, expecting 20 PROVED, 18 REFUTED and 11 UNKNOWN per build.
+Selected concrete bodies are required before new iterator model results.
+
+The isolated comparison worktree exposed an upstream-ignored static_cell lockfile omitted from
+version control. Its original bytes match the existing pinned manifest and are now tracked. No
+upstream contents or hashes are changed; clean checkouts must retain the complete archive snapshot.
+
+Dedicated controls cover 26 roots per host/ARM O0/O2 configuration: 15 PROVED, 4 REFUTED
+and 7 UNKNOWN. They include arbitrary nth/reverse traversal, cloning, count, source-preserving
+helper returns, Float storage bits and decoded Unicode. Retired owned backing fails metadata,
+clone and exhausted queries; a dead reference handle with live backing remains supported. Actual
+nth-index mutation refutes all four builds and fails valid native O0/O2 executions. Malformed
+cursor widths, signedness and contexts refuse. Independent review approves all new body gates,
+source validity and cursor bounds.
+
+Final standalone evidence: `/tmp/miren-stage144-capabilities-20261010`, with 80 PROVED,
+72 REFUTED and 44 UNKNOWN outcomes, unchanged frozen inputs/binaries and no collection errors.
+Validation passes 605 Rust tests, 68 Python tests, formatting, cargo lint, release builds,
+cargo deny, documentation build and manual hooks. No default proof budget is changed.
