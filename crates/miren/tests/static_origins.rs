@@ -236,7 +236,93 @@ fn compiler_origins_unlock_atomic_dependencies_and_fail_closed_on_bad_evidence()
                     ),
                     aggregate_parameter,
                 ),
-                ProofStatus::Unknown
+                ProofStatus::Proved
+            );
+            for entry in [
+                "dependency_nested_mutex",
+                "dependency_aggregate_parameter",
+                "dependency_usize_channel",
+                "dependency_forwarded_atomic",
+                "dependency_mixed_forward",
+            ] {
+                let report = verify_entry(&artifact, &directory, target, optimized, entry, false);
+                assert_eq!(
+                    status_entry(&report, entry),
+                    ProofStatus::Proved,
+                    "{report:?}"
+                );
+            }
+            for entry in [
+                "dependency_callback_argument",
+                "dependency_reference_argument",
+                "dependency_union_argument",
+                "dependency_spoof_argument",
+                "dependency_spoof_usize",
+            ] {
+                let report = verify_entry(&artifact, &directory, target, optimized, entry, false);
+                assert_eq!(
+                    status_entry(&report, entry),
+                    ProofStatus::Unknown,
+                    "{report:?}"
+                );
+            }
+            let usize_expected = "dependency_usize_channel_expected";
+            assert_eq!(
+                status_entry(
+                    &verify_entry(
+                        &artifact,
+                        &directory,
+                        target,
+                        optimized,
+                        usize_expected,
+                        false
+                    ),
+                    usize_expected
+                ),
+                ProofStatus::Refuted,
+            );
+            assert_eq!(
+                status_entry(
+                    &verify_entry(
+                        &artifact,
+                        &directory,
+                        target,
+                        optimized,
+                        usize_expected,
+                        true
+                    ),
+                    usize_expected
+                ),
+                ProofStatus::ProvedWithAssumptions,
+            );
+            let mutex_expected = "dependency_nested_mutex_expected";
+            assert_eq!(
+                status_entry(
+                    &verify_entry(
+                        &artifact,
+                        &directory,
+                        target,
+                        optimized,
+                        mutex_expected,
+                        false
+                    ),
+                    mutex_expected
+                ),
+                ProofStatus::Refuted,
+            );
+            assert_eq!(
+                status_entry(
+                    &verify_entry(
+                        &artifact,
+                        &directory,
+                        target,
+                        optimized,
+                        mutex_expected,
+                        true
+                    ),
+                    mutex_expected
+                ),
+                ProofStatus::ProvedWithAssumptions,
             );
             let nested_expected = "dependency_nested_constant_expected";
             let nested_arbitrary = verify_entry(
@@ -264,6 +350,47 @@ fn compiler_origins_unlock_atomic_dependencies_and_fail_closed_on_bad_evidence()
                 ProofStatus::ProvedWithAssumptions
             );
             let evidence = std::fs::read(sidecar(&artifact)).unwrap();
+            let graph: Evidence = serde_json::from_slice(&evidence).unwrap();
+            assert!(graph.origins.iter().any(|origin| {
+                origin.kind == OriginKind::U32
+                    && origin
+                        .construction
+                        .iter()
+                        .any(|node| node.definition.contains(":argument-origins:"))
+            }));
+            let mut missing_u32: Evidence = serde_json::from_slice(&evidence).unwrap();
+            let mut removed = false;
+            for origin in &mut missing_u32.origins {
+                if let Some(index) = origin
+                    .construction
+                    .iter()
+                    .position(|node| node.kind == OriginKind::U32)
+                {
+                    origin.construction.remove(index);
+                    removed = true;
+                }
+            }
+            assert!(removed);
+            missing_u32.seal().unwrap();
+            std::fs::write(
+                sidecar(&artifact),
+                serde_json::to_vec(&missing_u32).unwrap(),
+            )
+            .unwrap();
+            assert_eq!(
+                status_entry(
+                    &verify_entry(
+                        &artifact,
+                        &directory,
+                        target,
+                        optimized,
+                        "dependency_nested_mutex",
+                        false
+                    ),
+                    "dependency_nested_mutex"
+                ),
+                ProofStatus::Unknown,
+            );
             let mut missing_dependency: Evidence = serde_json::from_slice(&evidence).unwrap();
             // Every nested constructor/constant edge must have a corresponding compiler node.
             for origin in &mut missing_dependency.origins {
@@ -326,12 +453,42 @@ fn compiler_origins_unlock_atomic_dependencies_and_fail_closed_on_bad_evidence()
             let mutation = directory.0.join("dependency_mutant.rs");
             std::fs::write(
                 &mutation,
-                original_source.replace("AtomicU32::new(7)", "AtomicU32::new(8)"),
+                original_source
+                    .replace("AtomicU32::new(7)", "AtomicU32::new(8)")
+                    .replace("AtomicUsize::new(7)", "AtomicUsize::new(8)"),
             )
             .unwrap();
             compile_dependency(&artifact, &mutation, target, optimized);
             let bad_claim = verify_entry(&artifact, &directory, target, optimized, expected, true);
             assert_eq!(status_entry(&bad_claim, expected), ProofStatus::Refuted);
+            assert_eq!(
+                status_entry(
+                    &verify_entry(
+                        &artifact,
+                        &directory,
+                        target,
+                        optimized,
+                        mutex_expected,
+                        true
+                    ),
+                    mutex_expected
+                ),
+                ProofStatus::Refuted,
+            );
+            assert_eq!(
+                status_entry(
+                    &verify_entry(
+                        &artifact,
+                        &directory,
+                        target,
+                        optimized,
+                        usize_expected,
+                        true
+                    ),
+                    usize_expected
+                ),
+                ProofStatus::Refuted,
+            );
             let bad_nested = verify_entry(
                 &artifact,
                 &directory,
@@ -402,7 +559,9 @@ fn producer_emits_and_binds_its_own_metadata_when_source_changed_after_first_com
     let before = digest(&std::fs::read(&artifact).unwrap());
     std::fs::write(
         &source,
-        original.replace("AtomicU32::new(7)", "AtomicU32::new(8)"),
+        original
+            .replace("AtomicU32::new(7)", "AtomicU32::new(8)")
+            .replace("AtomicUsize::new(7)", "AtomicUsize::new(8)"),
     )
     .unwrap();
     let producer = Command::new(env!("CARGO_BIN_EXE_miren"))
@@ -514,7 +673,9 @@ fn nested_constant_constructor_mutation_fails_natively() {
     for (source, succeeds) in [
         (original.clone(), true),
         (
-            original.replace("AtomicU32::new(7)", "AtomicU32::new(8)"),
+            original
+                .replace("AtomicU32::new(7)", "AtomicU32::new(8)")
+                .replace("AtomicUsize::new(7)", "AtomicUsize::new(8)"),
             false,
         ),
     ] {

@@ -770,3 +770,11 @@ through available monomorphized compiler MIR with exact operand and return types
 DAG edges bind every referenced definition; missing edges, obsolete schemas and unsupported
 operations remain UNKNOWN. This certifies construction provenance, not runtime values, verified
 callee behavior, initialization history or synchronization.
+Closed constructor dataflow checks actual aggregate arguments, initialized locals and exact
+monomorphized input/output types before reusing a construction node. Straight-line calls, moves,
+fields, aggregates and repeats retain bounded origin evidence; joins, cycles, dynamic calls,
+references and unions remain unsupported. Whole U32 carriers keep their origin kind. Composition
+admits only the compiler's exact `Atomic<u32>` with matching layout, and a separate exact
+`Atomic<usize>::new` rule checks initialized usize input and its typed scalar conversion. Folded
+constants admit only compiler `Option::None` and inhabited fieldless zero-sized structs. These rules
+supply neither selected runtime state nor synchronization, initialization history or device models.

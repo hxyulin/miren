@@ -215,3 +215,7 @@ constant element is decoded and validated; indices require bounds checks and flo
 Dependency origin schema 2 includes exact typed associated-constant construction edges. Retained
 builds use a new cache generation so prior certificates are not reused. Construction certificates
 establish origin metadata, without granting initialized payload reads or startup history.
+Closed constructor calls accept aggregate parameters only after checking each actual operand's
+origin, exact compiler type and monomorphized signature. Straight-line construction preserves
+whole scalar carrier origins; composition recognizes only exact compiler atomic types with
+matching layouts. This certifies construction metadata without selecting atomic values or history.

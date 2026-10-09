@@ -1418,3 +1418,14 @@ constant dependency and exact operand/body types. Missing edges, obsolete certif
 unsupported operations remain UNKNOWN. Retained-origin cache generation four prevents prior
 certificate reuse. This grants provenance metadata without payload reads or startup history.
 Aggregate constructor parameters still need checked callsite dataflow in the following stage.
+
+## Stage 95: Closed aggregate constructor argument origins
+
+A separate bounded straight-line checker validates actual argument origins and exact fully
+monomorphized compiler types before accepting aggregate constructor parameters. Context identities
+preserve U32 origins through whole forwarding; composition requires exact diagnostic `Atomic<u32>`
+layout. Exact core `Atomic<usize>::new` checks initialized scalar input and layout separately.
+Compiler `Option::None` and inhabited fieldless ZST constants retain typed construction evidence.
+Callback/reference/union arguments, lookalike atomics and missing graph leaves stay UNKNOWN.
+Host/ARM and native data mutations check arbitrary-state reads and constructor changes. Evidence
+certifies origins without asserting runtime values, synchronization or startup history.
