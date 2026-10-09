@@ -2318,3 +2318,20 @@ refutation. Captures: `/tmp/miren-stage124/replay`. All 72 strict/reset main obl
 match stage 123 exactly. Twelve isolated runtime wrappers retain both startup premises, unfinished
 weak-CAS retry frontiers and unsupported SEV. Captures:
 `/tmp/miren-stage124-main-{strict,reset}-20261009` and `/tmp/miren-stage124/runtime`.
+
+## Fleet publication 17: Lazy enum proof and audited root bounds failure
+
+The complete clean frozen b6d154e collection has 1,120 PROVED, 257 REFUTED and 959 UNKNOWN roots,
+without assumptions. Source declarations have 525 PROVED, 233 REFUTED and 261 UNKNOWN outcomes.
+Only Bench::watching moves UNKNOWN to PROVED and run UNKNOWN to REFUTED versus pass 16.
+No previous proofs/refutations are lost, roots added/removed or analysis configurations changed.
+All 243 firmware fingerprints and four artifact checkpoints per unit remain unchanged; export
+repeats byte-for-byte. Stage 124 guarded bit operations are outside this frozen run.
+
+run reaches actual Line::as_str with a compiler-valid Typed::Line len=88 and byte capacity 80.
+Saved SMT/path/witness checks are SAT; adding len<=80 makes that failure UNSAT. Unchanged console
+source and actual Bus/Kind declarations pass nine native tests at O0/O2, reproducing the exact
+bounds panic and covering valid lengths, UTF-8 and feed controls. Source branch induction from
+LineReader::NEW preserves len<=80, so this is an audited arbitrary root-input refutation, not a
+confirmed firmware-entry defect. No assumption or application rewrite. Audit:
+`/tmp/miren-stage123-run-audit/audit.md`; raw capture: `/tmp/miren-fleet-pass17-20261009`.
