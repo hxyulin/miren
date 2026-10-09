@@ -1484,3 +1484,22 @@ Each weak call still creates a distinct spurious-failure symbol. Primitive recei
 integer owned/startup updates and pointer publication invalidation retain their original order and
 separate models. Host/ARM regression cases refute equality of two independent weak choices and prove
 matching strong-choice properties; existing negative, UNKNOWN and native mutation cases remain.
+
+## Stage 101: Main failure audit and unchanged refactor replay
+
+Source/model audit separates numeric RCC MMIO UNKNOWNs from singleton/RTT/task-pool state-domain
+counterexamples. Strict async roots have four refutations and eight unknowns; the existing exact
+reset-only profile retains twelve refutations with eight trusted calls. Runtime wrappers unwrap
+failed main-task allocation before spawner.spawn. The arbitrary old-word witness 0xffffffff exceeds
+safe AtomicBool history, but a valid busy word 0x101 remains SAT in all twelve captured panic
+queries. Compiler byte-storage validity alone does not supply the missing safe-library invariant.
+The audit retains source/query/model/capture hashes and unverified boot reachability. Fresh global
+initialization and exclusive first use are not established by these selected roots.
+
+Frozen clean `a65192d` replays all 2,336 fleet roots with exactly unchanged outcomes: 1,113 PROVED,
+253 REFUTED and 970 UNKNOWN. There are no substantive blocker or resource-limit outcome changes;
+nineteen source and 455 generated diagnostics change compiler display only. All 243 source hashes
+and four artifact checkpoints remain unchanged. Fresh strict/reset main replays also preserve their
+outcomes and policy, with no new assumptions. All 464 Rust tests, 44 Python tool tests, formatting,
+Clippy, release builds, dependency checks, documentation builds and manual hooks pass. The compact
+exporters validate complete evidence before publication. Application code remains untouched.

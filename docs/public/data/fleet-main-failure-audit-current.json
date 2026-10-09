@@ -1,0 +1,242 @@
+{
+  "analyzer_source": {
+    "changes": "",
+    "commit": "c9085980ff52cac98541bd20dbd2f36a3b508094",
+    "dirty": false
+  },
+  "boot_reachability": "unverified",
+  "constraint": "v1 = (_ bv257 32); 0x101",
+  "interpretation": "Satisfying abstract runtime-wrapper countermodels under valid busy flag encoding; no native boot reproduction. v0 is static address, v1 old CAS word.",
+  "results": [
+    {
+      "constrained_query": "/tmp/miren-main-failure-audit-20261009/dm-mc02-bringup.busy-0x101.smt2",
+      "constrained_query_sha256": "dcdd153111ea8772f1de1b4783fd29673243e5cf1ab7b0f73ad23728fc484d07",
+      "function": "core::result::Result::<T, E>::unwrap",
+      "model": "/tmp/miren-main-failure-audit-20261009/dm-mc02-bringup.busy-0x101.model",
+      "model_sha256": "26f731228b9018e6d49567ad73ce50f4428ac5e182f8cf6ce371c32f96cd8754",
+      "original_query": "/tmp/miren-main-failure-audit-20261009/dm-mc02-bringup.original.smt2",
+      "original_query_sha256": "f4efaf13fc051cf58d493d95926f4e7200340cbbb139fc745d2d043dbf27ae9e",
+      "result": "sat",
+      "scope": "runtime_entry",
+      "source": {
+        "column": 23,
+        "file": "/Users/hxyulin/.rustup/toolchains/nightly-2026-09-22-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/result.rs",
+        "line": 1232
+      },
+      "stopped_after_counterexample": true,
+      "unit": "bsp/dm-mc02/dm-mc02-bringup/bin/dm-mc02-bringup"
+    },
+    {
+      "constrained_query": "/tmp/miren-main-failure-audit-20261009/engineer-lower-board.busy-0x101.smt2",
+      "constrained_query_sha256": "5d91f41282baa485ee99c4693b4519aec071a770372ebe2870be3ee72a80b277",
+      "function": "core::result::Result::<T, E>::unwrap",
+      "model": "/tmp/miren-main-failure-audit-20261009/engineer-lower-board.busy-0x101.model",
+      "model_sha256": "26f731228b9018e6d49567ad73ce50f4428ac5e182f8cf6ce371c32f96cd8754",
+      "original_query": "/tmp/miren-main-failure-audit-20261009/engineer-lower-board.original.smt2",
+      "original_query_sha256": "17e233231dd00a3f9ad4d73ab6d76bdbd1a0751d24f54576dd3da1e55f285cd3",
+      "result": "sat",
+      "scope": "runtime_entry",
+      "source": {
+        "column": 23,
+        "file": "/Users/hxyulin/.rustup/toolchains/nightly-2026-09-22-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/result.rs",
+        "line": 1232
+      },
+      "stopped_after_counterexample": true,
+      "unit": "bsp/dm-mc02/engineer-lower-board/bin/engineer-lower-board"
+    },
+    {
+      "constrained_query": "/tmp/miren-main-failure-audit-20261009/engineer-upper-board.busy-0x101.smt2",
+      "constrained_query_sha256": "248576b8b9ef40b5344652e9bde6f6b7290e3471e7f5378ddd10fafbceb79129",
+      "function": "core::result::Result::<T, E>::unwrap",
+      "model": "/tmp/miren-main-failure-audit-20261009/engineer-upper-board.busy-0x101.model",
+      "model_sha256": "26f731228b9018e6d49567ad73ce50f4428ac5e182f8cf6ce371c32f96cd8754",
+      "original_query": "/tmp/miren-main-failure-audit-20261009/engineer-upper-board.original.smt2",
+      "original_query_sha256": "c3d5eb06369af9910a051ba5bc3a061873c1f216498765cb03a54e18f6e70d67",
+      "result": "sat",
+      "scope": "runtime_entry",
+      "source": {
+        "column": 23,
+        "file": "/Users/hxyulin/.rustup/toolchains/nightly-2026-09-22-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/result.rs",
+        "line": 1232
+      },
+      "stopped_after_counterexample": true,
+      "unit": "bsp/dm-mc02/engineer-upper-board/bin/engineer-upper-board"
+    },
+    {
+      "constrained_query": "/tmp/miren-main-failure-audit-20261009/hero-chassis-board.busy-0x101.smt2",
+      "constrained_query_sha256": "212fb35199fdafc32fad9e8b747ad0ba0f830bd86651e41637b724538277dffd",
+      "function": "core::result::Result::<T, E>::unwrap",
+      "model": "/tmp/miren-main-failure-audit-20261009/hero-chassis-board.busy-0x101.model",
+      "model_sha256": "26f731228b9018e6d49567ad73ce50f4428ac5e182f8cf6ce371c32f96cd8754",
+      "original_query": "/tmp/miren-main-failure-audit-20261009/hero-chassis-board.original.smt2",
+      "original_query_sha256": "779ee0e8b05d886878da1e4c2facd8ad7bd6c39d820f32daa298063f24fbe234",
+      "result": "sat",
+      "scope": "runtime_entry",
+      "source": {
+        "column": 23,
+        "file": "/Users/hxyulin/.rustup/toolchains/nightly-2026-09-22-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/result.rs",
+        "line": 1232
+      },
+      "stopped_after_counterexample": true,
+      "unit": "bsp/dm-mc02/hero-chassis-board/bin/hero-chassis-board"
+    },
+    {
+      "constrained_query": "/tmp/miren-main-failure-audit-20261009/hero-gimbal-board.busy-0x101.smt2",
+      "constrained_query_sha256": "4b781d7c9a320eda564ed9a29d7e1f78003f9351630edbf74bd09faa5858ac27",
+      "function": "core::result::Result::<T, E>::unwrap",
+      "model": "/tmp/miren-main-failure-audit-20261009/hero-gimbal-board.busy-0x101.model",
+      "model_sha256": "26f731228b9018e6d49567ad73ce50f4428ac5e182f8cf6ce371c32f96cd8754",
+      "original_query": "/tmp/miren-main-failure-audit-20261009/hero-gimbal-board.original.smt2",
+      "original_query_sha256": "b330953f2a1c4215a50d853d11b40bf6adca4b5e776782f32242e5b4ef0d2d57",
+      "result": "sat",
+      "scope": "runtime_entry",
+      "source": {
+        "column": 23,
+        "file": "/Users/hxyulin/.rustup/toolchains/nightly-2026-09-22-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/result.rs",
+        "line": 1232
+      },
+      "stopped_after_counterexample": true,
+      "unit": "bsp/dm-mc02/hero-gimbal-board/bin/hero-gimbal-board"
+    },
+    {
+      "constrained_query": "/tmp/miren-main-failure-audit-20261009/infantry-1-chassis-board.busy-0x101.smt2",
+      "constrained_query_sha256": "5609028c6e2c72df192d38671268054daeb8f61cb7831843ccea7280ff3d41e1",
+      "function": "core::result::Result::<T, E>::unwrap",
+      "model": "/tmp/miren-main-failure-audit-20261009/infantry-1-chassis-board.busy-0x101.model",
+      "model_sha256": "224a52e1478e3f7e44ab588d4bc76ab91031240d7f91c1df22da3e00c4b3bf8a",
+      "original_query": "/tmp/miren-main-failure-audit-20261009/infantry-1-chassis-board.original.smt2",
+      "original_query_sha256": "a313724bf25e66cc282f930efcc51fbafba23f5fb587e1819fa72f18c5095aef",
+      "result": "sat",
+      "scope": "runtime_entry",
+      "source": {
+        "column": 23,
+        "file": "/Users/hxyulin/.rustup/toolchains/nightly-2026-09-22-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/result.rs",
+        "line": 1232
+      },
+      "stopped_after_counterexample": true,
+      "unit": "bsp/dm-mc02/infantry-1-chassis-board/bin/infantry-1-chassis-board"
+    },
+    {
+      "constrained_query": "/tmp/miren-main-failure-audit-20261009/infantry-1-gimbal-board.busy-0x101.smt2",
+      "constrained_query_sha256": "4b781d7c9a320eda564ed9a29d7e1f78003f9351630edbf74bd09faa5858ac27",
+      "function": "core::result::Result::<T, E>::unwrap",
+      "model": "/tmp/miren-main-failure-audit-20261009/infantry-1-gimbal-board.busy-0x101.model",
+      "model_sha256": "26f731228b9018e6d49567ad73ce50f4428ac5e182f8cf6ce371c32f96cd8754",
+      "original_query": "/tmp/miren-main-failure-audit-20261009/infantry-1-gimbal-board.original.smt2",
+      "original_query_sha256": "b330953f2a1c4215a50d853d11b40bf6adca4b5e776782f32242e5b4ef0d2d57",
+      "result": "sat",
+      "scope": "runtime_entry",
+      "source": {
+        "column": 23,
+        "file": "/Users/hxyulin/.rustup/toolchains/nightly-2026-09-22-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/result.rs",
+        "line": 1232
+      },
+      "stopped_after_counterexample": true,
+      "unit": "bsp/dm-mc02/infantry-1-gimbal-board/bin/infantry-1-gimbal-board"
+    },
+    {
+      "constrained_query": "/tmp/miren-main-failure-audit-20261009/infantry-2-chassis-board.busy-0x101.smt2",
+      "constrained_query_sha256": "5609028c6e2c72df192d38671268054daeb8f61cb7831843ccea7280ff3d41e1",
+      "function": "core::result::Result::<T, E>::unwrap",
+      "model": "/tmp/miren-main-failure-audit-20261009/infantry-2-chassis-board.busy-0x101.model",
+      "model_sha256": "26f731228b9018e6d49567ad73ce50f4428ac5e182f8cf6ce371c32f96cd8754",
+      "original_query": "/tmp/miren-main-failure-audit-20261009/infantry-2-chassis-board.original.smt2",
+      "original_query_sha256": "a313724bf25e66cc282f930efcc51fbafba23f5fb587e1819fa72f18c5095aef",
+      "result": "sat",
+      "scope": "runtime_entry",
+      "source": {
+        "column": 23,
+        "file": "/Users/hxyulin/.rustup/toolchains/nightly-2026-09-22-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/result.rs",
+        "line": 1232
+      },
+      "stopped_after_counterexample": true,
+      "unit": "bsp/dm-mc02/infantry-2-chassis-board/bin/infantry-2-chassis-board"
+    },
+    {
+      "constrained_query": "/tmp/miren-main-failure-audit-20261009/infantry-2-gimbal-board.busy-0x101.smt2",
+      "constrained_query_sha256": "4b781d7c9a320eda564ed9a29d7e1f78003f9351630edbf74bd09faa5858ac27",
+      "function": "core::result::Result::<T, E>::unwrap",
+      "model": "/tmp/miren-main-failure-audit-20261009/infantry-2-gimbal-board.busy-0x101.model",
+      "model_sha256": "1a73618db6828367f6de3a5e279c364f8fcfa24fb20cfc495a4fe234fe8d3d28",
+      "original_query": "/tmp/miren-main-failure-audit-20261009/infantry-2-gimbal-board.original.smt2",
+      "original_query_sha256": "b330953f2a1c4215a50d853d11b40bf6adca4b5e776782f32242e5b4ef0d2d57",
+      "result": "sat",
+      "scope": "runtime_entry",
+      "source": {
+        "column": 23,
+        "file": "/Users/hxyulin/.rustup/toolchains/nightly-2026-09-22-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/result.rs",
+        "line": 1232
+      },
+      "stopped_after_counterexample": true,
+      "unit": "bsp/dm-mc02/infantry-2-gimbal-board/bin/infantry-2-gimbal-board"
+    },
+    {
+      "constrained_query": "/tmp/miren-main-failure-audit-20261009/sentry-chassis-board.busy-0x101.smt2",
+      "constrained_query_sha256": "5260ee43fbbf2edfc088fdaeca7fdf485be415edc84208bff50fbf93d4ae955c",
+      "function": "core::result::Result::<T, E>::unwrap",
+      "model": "/tmp/miren-main-failure-audit-20261009/sentry-chassis-board.busy-0x101.model",
+      "model_sha256": "42f4bad8c9b407bb574c2abccc704c8e0c5278720b0ad7adaee517935daa22d4",
+      "original_query": "/tmp/miren-main-failure-audit-20261009/sentry-chassis-board.original.smt2",
+      "original_query_sha256": "c01490a6f879a003074badf4655e17b49aa144e9bfe457458a4ed93e5a130682",
+      "result": "sat",
+      "scope": "runtime_entry",
+      "source": {
+        "column": 23,
+        "file": "/Users/hxyulin/.rustup/toolchains/nightly-2026-09-22-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/result.rs",
+        "line": 1232
+      },
+      "stopped_after_counterexample": true,
+      "unit": "bsp/dm-mc02/sentry-chassis-board/bin/sentry-chassis-board"
+    },
+    {
+      "constrained_query": "/tmp/miren-main-failure-audit-20261009/sentry-gimbal-board.busy-0x101.smt2",
+      "constrained_query_sha256": "c6ded076950f83a335f993802afcd7b82dbbe3ec5b3f2c97d33a6c06088668ed",
+      "function": "core::result::Result::<T, E>::unwrap",
+      "model": "/tmp/miren-main-failure-audit-20261009/sentry-gimbal-board.busy-0x101.model",
+      "model_sha256": "26f731228b9018e6d49567ad73ce50f4428ac5e182f8cf6ce371c32f96cd8754",
+      "original_query": "/tmp/miren-main-failure-audit-20261009/sentry-gimbal-board.original.smt2",
+      "original_query_sha256": "5ec6ac4f910551f4e2f68ec7a696d4c87f55554fdc31da427c7a64fdef4932ed",
+      "result": "sat",
+      "scope": "runtime_entry",
+      "source": {
+        "column": 23,
+        "file": "/Users/hxyulin/.rustup/toolchains/nightly-2026-09-22-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/result.rs",
+        "line": 1232
+      },
+      "stopped_after_counterexample": true,
+      "unit": "bsp/dm-mc02/sentry-gimbal-board/bin/sentry-gimbal-board"
+    },
+    {
+      "constrained_query": "/tmp/miren-main-failure-audit-20261009/rm-c-bringup.busy-0x101.smt2",
+      "constrained_query_sha256": "5b96906f406683ce58309c3cc30581a3dea7f8cc318e7901870f72afa3e8e7aa",
+      "function": "core::result::Result::<T, E>::unwrap",
+      "model": "/tmp/miren-main-failure-audit-20261009/rm-c-bringup.busy-0x101.model",
+      "model_sha256": "34babdd10de96651758a51b0b086f770b0c421e0f06c8c8eb408e106563849d3",
+      "original_query": "/tmp/miren-main-failure-audit-20261009/rm-c-bringup.original.smt2",
+      "original_query_sha256": "d9be3ccf7a74aaf38c4d00d1c04b336a89089b7cbc72698655fd4ec8bb2dc6a6",
+      "result": "sat",
+      "scope": "runtime_entry",
+      "source": {
+        "column": 23,
+        "file": "/Users/hxyulin/.rustup/toolchains/nightly-2026-09-22-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/result.rs",
+        "line": 1232
+      },
+      "stopped_after_counterexample": true,
+      "unit": "bsp/rm-c/rm-c-bringup/bin/rm-c-bringup"
+    }
+  ],
+  "schema_version": 1,
+  "solver_version": "4.15.4",
+  "source_hashes": {
+    "/Users/hxyulin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/embassy-executor-0.10.0/src/lib.rs": "e07e7f2dcebbd42c138067d50fe96884dc654b3a8bd582553c26e6a6d118c0a0",
+    "/Users/hxyulin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/embassy-executor-0.10.0/src/raw/mod.rs": "94b1e69ff513bedbc62d2c204bb0a9c13259eee38d55dbb8ea75ee07f30854c3",
+    "/Users/hxyulin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/embassy-executor-0.10.0/src/raw/state_atomics_arm.rs": "0063ece68f90c167042a81277367524f04d20c40fe144c3504e9223616a7662f",
+    "/Users/hxyulin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/embassy-executor-macros-0.8.0/src/macros/main.rs": "b399d361bbdd61d49c027fccc326ab45ed7a59619e586f3b4312ba39cc65bdfd",
+    "/Users/hxyulin/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/embassy-executor-macros-0.8.0/src/macros/task.rs": "8f39536995cf24140424ed5fda69c629eef6564fdc100811a2e56fbab1b7c244",
+    "/Users/hxyulin/.rustup/toolchains/nightly-2026-09-22-aarch64-apple-darwin/lib/rustlib/src/rust/library/core/src/sync/atomic.rs": "a4086dea6b286144226dec5e7b5f2ce444d8606303f73ffc1aab3838c09a1b1c"
+  },
+  "summary_hashes": {
+    "/tmp/miren-main-pass7-reset-20261009/summary.json": "1859635bba6cd95d9c7beadd7c0467ce52a6bfb0b876373016d1096e441e90f7",
+    "/tmp/miren-main-pass7-strict-20261009/summary.json": "291244cda5cd5607542891a4528bc841a9b568373e8b1a862c7fe00da8b4840e"
+  }
+}

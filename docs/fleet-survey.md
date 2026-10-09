@@ -2,7 +2,7 @@
 
 ## Current repeatable measurement
 
-The seventh 2026-10-09 pass collected all 2,336 roots from all 32 ARM library/binary units in
+The eighth 2026-10-09 pass collected all 2,336 roots from all 32 ARM library/binary units in
 fleet-2027: 1,113 PROVED, 253 REFUTED and 970 UNKNOWN, with no assumptions. All units completed
 collection. Counts describe selected root domains, not line coverage or whole-firmware safety.
 
@@ -16,7 +16,7 @@ publication from complete raw collections; inventories, solver reports and logs 
 - Firmware revision: `26377371e38ed3234f972bcdf6b2f9f4d26a7f02`;
   all 243 source-input fingerprints stayed equal. The existing untracked `rust-project.json`
   remains.
-- Full-survey analyzer: `c908598`, JSON schema 9; clean working tree, frozen binaries.
+- Full-survey analyzer: `a65192d`, JSON schema 9; clean working tree, frozen binaries.
 - Compiler: nightly-2026-09-22; Z3 4.15.4.
 - Target: `thumbv7em-none-eabihf`; dev profile, Cargo default features and locked dependencies.
 - Panic abort, enabled overflow checks and root/dependency MIR optimization zero in all 32 units.
@@ -25,17 +25,10 @@ publication from complete raw collections; inventories, solver reports and logs 
 - No project proof configuration, startup assumptions, trusted contracts, induction
   or native replay.
 
-Compared with the sixth pass, one root gained a proof and one gained a refutation. All previous
-1,112 proofs and 252 refutations retain their outcomes. No roots were added or removed, and the
-recorded analysis configurations remain compatible.
-
-`dr16::Dr16::parse` now proves. Sentry chassis `hardware::Can1Bus::receive` refutes when an
-arbitrary incoming wheel has ESC ID 65024: the checked u16 expression `512 + esc_id` overflows
-at 65536.
-The actual `Can1Bus::wired` constructor uses IDs 2, 1, 4 and 3, and main constructs the bus through
-`Can1Bus::new`. This receiver-domain counterexample does not establish firmware reachability or a
-confirmed firmware defect; no native replay was collected. Both outcome gains execute function
-bodies, with no new future-construction proofs.
+Compared with the seventh pass, all 2,336 root outcomes remain identical. All 1,113 proofs and
+253 refutations retain their outcomes; there are no added/removed roots, incompatible analysis
+configurations or resource-limit outcome changes. The pass refactors shared constructor validation
+and integer/pointer CAS conditions without granting new semantics.
 
 Compiler return-type metadata now separates direct future construction from function bodies:
 
@@ -49,21 +42,16 @@ function bodies and fifteen concern future construction. A function-body label c
 a generated wrapper; it does not imply execution of a wrapped task. Explicit task polling remains
 separate from this function-only collection.
 
-Another 22 source roots reach different first-blocker keys while remaining UNKNOWN. Seventeen
-DMA helpers clear the missing STATE-origin barrier and reach numeric MMIO pointer offsets. Three
-referee encoding helpers clear the scalar-table cap and reach the 128-byte view-allocation cap.
-Two iterator callers reach an explicit retained-source-liveness boundary: bare snapshots cannot
-justify unchecked access. Nineteen additional source changes and all 455 changed generated
-UNKNOWN diagnostics are compiler display only. The comparison preserves raw diagnostics and
-separates display grouping from outcome progress.
+Nineteen source and 455 generated UNKNOWN diagnostics changed only compiler display. There are
+no different diagnostic grouping keys. Raw diagnostics remain retained separately from display
+normalization and proof outcomes.
 
-Initialized scalar constants support 256 elements; composites retain 128 and total/depth budgets
-stay bounded. Associated-constant origin graphs and closed constructor argument dataflow certify
-exact typed construction without selecting runtime values or granting startup history. Unchecked
-slice iterators require retained live backing, proven bounds and distinct mutable issued indices.
-The fresh fleet run also exposed a missing local trait-constant body query; the guarded regression
-now keeps that evidence unsupported. Its incomplete capture is preserved separately and excluded
-from published outcomes.
+The constructor checkers share body availability, monomorphized MIR loading, resource caps,
+constant return binding and certificate finalization. Their distinct argument/origin policies and
+context caches remain explicit. Integer and pointer CAS share ordering and success calculations;
+each weak operation retains a fresh possible spurious failure. Integer history and pointer
+publication effects remain separate. Fixture metadata and certificates match the previous compiler
+byte for byte, and all existing fleet outcomes remain unchanged.
 
 Numeric MMIO, arbitrary dynamic controller inputs, mutable references and alias constraints,
 solver/resource limits, larger byte views and iterator source provenance remain current gaps.
@@ -74,7 +62,7 @@ not hermetic capture of arbitrary custom build environment variables.
 ## Progress through Embassy main
 
 The separate [all-main evidence](/data/fleet-embassy-main-current.json) covers every one of the
-12 binary mains in three scopes. Its final analyzer is `c908598`, matching the full survey.
+12 binary mains in three scopes. Its final analyzer is `a65192d`, matching the full survey.
 It uses the same captured fleet artifacts and default limits. Factory construction alone does not
 execute the async body; `--async-entry` constructs a fresh future and follows its reached polls.
 
@@ -112,7 +100,68 @@ interrupt handling, cancellation, returned-output drops or persistent-loop induc
 strict UNKNOWN bodies still require a Rust-supported reset boundary or a separately specified
 conditional hardware model to progress past numeric MMIO.
 
+## Why the main counterexamples appear
+
+The audited failures are state-domain counterexamples, not confirmed fresh-boot failures. The
+checker starts at the selected Rust root and admits arbitrary shared state. Z3 does not assume
+that initialization has already happened; it chooses already-used resources because the analyzer
+has not established reset initialization, exclusive first use or stable shared-state history.
+
+| Selected roots | First stop | Interpretation |
+| --- | --- | --- |
+| Eight strict DM robot async mains | `reset_cause → Rcc::rsr → ptr::add` | UNKNOWN at numeric MMIO, before reading RCC_RSR |
+| DM bring-up and both sentry async mains | RTT repeated-init guard | REFUTED with `INITIALIZED=true` |
+| RM-C bring-up async main | Peripheral singleton guard | REFUTED with taken flag true |
+| Eight reset-profile DM robot async mains | Peripheral singleton guard | Conditional REFUTED with taken flag true |
+| All twelve runtime wrappers | Main-task pool claim followed by unwrap | REFUTED with an occupied task pool |
+
+The MMIO address is RCC at `0x58024400`, then offset `0xd0` for RCC_RSR. Numeric device addresses
+supply no Rust allocation provenance. The reset-only profile assumes a terminating panic-free
+`dm_mc02::reset_cause` returning a valid ResetCause, with no Rust argument-storage modifications.
+It neither grants fresh startup nor assumes that the singleton, RTT or task pool is available.
+Its arbitrary reset discriminant does not cause the following singleton panic.
+
+The actual singleton macro declares its flag false, panics when true and then sets true. RTT
+uses the same lifecycle in a critical-section `Mutex<Cell<bool>>`. Source inspection found one board
+initialization per main and separate RTT initialization in three mains. The existing safe lifecycle
+fixture proves fresh single initialization and refutes a repeated call, including native mutations.
+Neither lexical call counts nor declared initializers prove that the captured shared state is fresh.
+
+Runtime entry fails earlier than task spawning: `embassy-executor-macros` main expansion unwraps
+`__embassy_main(spawner)` before calling `spawner.spawn(main_task)`. Task allocation calls
+`State::spawn`; failed pool claim returns `SpawnError::Busy`, and unwrap panics. The model's old CAS
+word is `v1`; `v0` is an abstract compiler-backed static address, not a task flag.
+
+The original runtime witness uses `0xffffffff`, which exceeds values produced by safe AtomicBool
+operations. Pinned core represents AtomicBool through byte storage, so compiler layout validity
+alone does not establish its safe-library boolean encoding invariant. Silently imposing that
+invariant would require additional history or effect evidence. The broad word is unnecessary:
+adding `v1=0x101` to each captured runtime panic query still yields SAT for all twelve wrappers.
+This word represents spawned/run-queued true with both padding flags false, and is produced by a
+prior successful claim. A registration-wrapper proof establishes panic freedom even when allocation
+returns an error; it does not establish successful allocation. The
+[audit manifest](/data/fleet-main-failure-audit-current.json) records source, original/constrained
+query, model and capture hashes; queries and models remain local.
+This check validates an arbitrary-history busy candidate, not native boot reachability.
+
+Under a correctly initialized, exclusive first-use premise, these repeated-init/busy candidates
+would be spurious for fresh boot. That premise remains unverified. Existing REFUTED outcomes are
+therefore retained and explicitly scoped; they do not prove traversal or safety after the first
+counterexample. The next semantic step requires recorded startup and exclusion evidence before
+initial values or writes can constrain subsequent shared reads. Strict hardware boundaries remain
+UNKNOWN without a Rust-supported access model.
+
 ## Earlier repeatable measurements
+
+The seventh 2026-10-09 pass at analyzer `c908598` collected 2,336 roots: 1,113 PROVED,
+253 REFUTED and 970 UNKNOWN. Its source subset had 518 proofs, 229 refutations and 272 unknowns.
+Dr16::parse gained a body proof. Sentry Can1Bus::receive refuted for arbitrary ESC ID 65024,
+overflowing checked 512 + esc_id; its constructor uses IDs 2, 1, 4 and 3, so firmware reachability
+and native confirmation remained unverified. Seventeen DMA helpers cleared missing STATE origins
+and reached numeric MMIO; three encoding helpers reached byte-view limits and two iterator callers
+reached retained-source liveness. No future factory gained a proof. A missing local trait-constant
+body query was guarded after its incomplete capture was preserved separately. Main outcomes stayed
+unchanged under the exact eight-call reset-only hypothesis.
 
 The sixth 2026-10-09 pass at analyzer `901304a` collected 2,336 roots: 1,112 PROVED,
 252 REFUTED and 972 UNKNOWN. Its source subset had 517 proofs, 228 refutations and 274 unknowns.
