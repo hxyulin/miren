@@ -34,8 +34,16 @@ pub struct MmioWriteRegister {
     pub address: u64,
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct MmioReadRegister {
+    pub name: String,
+    pub address: u64,
+}
+
 /// Schema 1 admits byte-address transport and exact write-only unsigned 32-bit registers.
-/// It supplies no Rust allocation, reference, read permission, scheduler or emulator semantics.
+/// Schema 2 additionally admits independent arbitrary u32 reads at configured addresses.
+/// Neither schema supplies Rust allocation, reference, scheduler or emulator semantics.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct HardwareModel {
@@ -45,6 +53,8 @@ pub struct HardwareModel {
     pub reason: String,
     pub regions: Vec<MmioRegion>,
     pub write_registers: Vec<MmioWriteRegister>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub read_registers: Vec<MmioReadRegister>,
 }
 
 impl HardwareModel {
@@ -56,6 +66,7 @@ impl HardwareModel {
             reason: reason.into(),
             regions: Vec::new(),
             write_registers: Vec::new(),
+            read_registers: Vec::new(),
         }
     }
 
@@ -76,10 +87,20 @@ impl HardwareModel {
         self
     }
 
+    pub fn with_read_register(mut self, name: impl Into<String>, address: u64) -> Self {
+        self.schema_version = 2;
+        self.read_registers.push(MmioReadRegister {
+            name: name.into(),
+            address,
+        });
+        self
+    }
+
     /// Canonical report premise. Only actual admitted operations record this assumption.
     pub fn assumption(&self) -> String {
         format!(
-            "hardware-model:v1:device={};pointer_bits={};reason={}",
+            "hardware-model:v{}:device={};pointer_bits={};reason={}",
+            self.schema_version,
             self.device.chip(),
             self.pointer_bits,
             self.reason,
@@ -87,16 +108,21 @@ impl HardwareModel {
     }
 
     pub fn validate(&self) -> Result<(), String> {
-        if self.schema_version != 1 || self.pointer_bits != 32 {
-            return Err("hardware model requires schema 1 and pointer_bits 32".into());
+        if !matches!(self.schema_version, 1 | 2) || self.pointer_bits != 32 {
+            return Err("hardware model requires schema 1 or 2 and pointer_bits 32".into());
         }
         if self.reason.trim().is_empty() {
             return Err("hardware model requires an explicit nonempty assumption reason".into());
         }
         if !(1..=16).contains(&self.regions.len())
-            || !(1..=64).contains(&self.write_registers.len())
+            || self.write_registers.len() > 64
+            || self.read_registers.len() > 64
+            || (self.write_registers.is_empty() && self.read_registers.is_empty())
+            || (self.schema_version == 1 && !self.read_registers.is_empty())
         {
-            return Err("hardware model requires 1..16 regions and 1..64 write registers".into());
+            return Err(
+                "hardware model requires bounded registers, regions, and schema 2 for reads".into(),
+            );
         }
         let limit = 1_u128 << self.pointer_bits;
         let mut names = BTreeSet::new();
@@ -139,6 +165,25 @@ impl HardwareModel {
             {
                 return Err(
                     "hardware write registers need unique aligned contained u32 addresses".into(),
+                );
+            }
+        }
+        names.clear();
+        addresses.clear();
+        for register in &self.read_registers {
+            if register.name.trim().is_empty()
+                || register.name.trim() != register.name
+                || !names.insert(&register.name)
+                || !addresses.insert(register.address)
+                || register.address % 4 != 0
+                || !self.regions.iter().any(|region| {
+                    register.address >= region.start
+                        && u128::from(register.address) + 4
+                            <= u128::from(region.start) + u128::from(region.length)
+                })
+            {
+                return Err(
+                    "hardware read registers need unique aligned contained u32 addresses".into(),
                 );
             }
         }
@@ -219,5 +264,37 @@ mod tests {
         let mut invalid = model();
         invalid.reason.clear();
         assert!(invalid.validate().is_err());
+    }
+    #[test]
+    fn versioned_reads_preserve_v1_bytes_and_validate_directional_access() {
+        let legacy = model();
+        let json = serde_json::to_value(&legacy).unwrap();
+        assert!(json.get("read_registers").is_none());
+        let mut reads = legacy.with_read_register("pupdr", 0x5802_080c);
+        reads.validate().unwrap();
+        assert_eq!(reads.schema_version, 2);
+        assert!(reads.assumption().starts_with("hardware-model:v2:"));
+        let decoded: HardwareModel =
+            serde_json::from_value(serde_json::to_value(&reads).unwrap()).unwrap();
+        decoded.validate().unwrap();
+        reads.schema_version = 1;
+        assert!(reads.validate().is_err());
+        reads.schema_version = 2;
+        reads.write_registers.clear();
+        reads.validate().unwrap();
+        assert!(
+            reads
+                .clone()
+                .with_read_register("duplicate", 0x5802_080c)
+                .validate()
+                .is_err()
+        );
+        for address in [0x5802_080d, 0x5802_0c00, 0x2000_0000] {
+            let mut invalid = reads.clone();
+            invalid.read_registers[0].address = address;
+            assert!(invalid.validate().is_err());
+        }
+        reads.read_registers.clear();
+        assert!(reads.validate().is_err());
     }
 }

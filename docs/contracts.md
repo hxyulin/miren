@@ -165,8 +165,9 @@ representation. Existing `FunctionContract` entries describe explicit function b
 Rust storage effects. The optional `hardware` field adds a versioned device model without replacing
 application source. It is absent from legacy configuration and disabled in strict runs.
 
-The first hardware schema supplies bounded byte-address transport and exact write-only u32
-register accesses for STM32H723VG or STM32F407IG. It is a conditional model, not an emulator.
+Hardware schema 1 supplies bounded byte-address transport and exact write-only u32 register
+accesses for STM32H723VG or STM32F407IG. Schema 2 adds explicitly permitted independent reads.
+Both are conditional models.
 The current devices require a 32-bit compiler pointer domain. Build indicators must match the
 selected device; these indicators do
 not establish which physical chip exists. Register access, device validity and absence of
@@ -214,5 +215,27 @@ REFUTED or UNKNOWN. Reports retain the complete model configuration and reached 
 This is the initial integration boundary. Future peripheral models can extend the versioned
 operations and effects; Embassy state models need separate Rust initialization, publication and
 lifetime semantics. The existing `--startup` and `--startup-isolated` premises remain explicit and
-independent of hardware permission. No register value, hardware readiness, instruction behavior,
-executor progress or loop termination follows from this write model.
+independent of hardware permission. No fixed register value, hardware readiness, instruction
+behavior, executor progress or loop termination follows from these models.
+
+
+Hardware schema 2 adds optional `read_registers`, containing the same `{name, address}` fields as
+write registers. `with_read_register` opts into schema 2. Up to 64 reads and 64 writes are allowed,
+with at least one permitted operation; reads and writes need independent direction permissions.
+Legacy schema-1 models omit the empty read list and cannot gain read permission. The builder can
+emit a complete GPIO policy with an optional argument:
+
+```sh
+cargo run --locked -p miren --example stm32_model -- stm32h723vg rmw > /tmp/h7-rmw-model.json
+```
+
+Each admitted read returns a fresh arbitrary u32 or its compiler-certified transparent wrapper.
+It promises no fixed value, correlation between reads, readback after a write or eventual ready
+bit. The actual `Reg::modify` body and callback execute before the independently permitted store.
+Read-dependent counterexamples carry the explicit device-correlation abstraction reason; native
+or physical-device confirmation remains separate. Reads retain the same conservative interference
+invalidation as writes, and retained ordinary RAM reads keep their existing semantics.
+
+Native replay refuses reports with hardware configuration or a recorded hardware-model premise,
+including a counterexample reached before the first hardware operation. The API supplies symbolic
+analysis effects without a native hardware execution implementation.

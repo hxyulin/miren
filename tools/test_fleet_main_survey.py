@@ -182,6 +182,48 @@ class MainSurveyTests(unittest.TestCase):
         self.assertEqual(main.normalized_contract_config(legacy), legacy)
         self.assertEqual(main.normalized_contract_config(dict(legacy, hardware=None)), legacy)
 
+    def test_hardware_reads_are_versioned_and_preserve_direction_permissions(self):
+        model = copy.deepcopy(self.hardware_config()["hardware"])
+        model["read_registers"] = [{"name": "PUPDR", "address": 0x5802080c}]
+        with self.assertRaises(ValueError):
+            main.normalized_hardware_model(model)
+        model["schema_version"] = 2
+        normalized = main.normalized_hardware_model(model)
+        self.assertEqual(normalized, model)
+        self.assertTrue(main.hardware_assumption(normalized).startswith("hardware-model:v2:"))
+        read_only = dict(model, write_registers=[])
+        self.assertEqual(main.normalized_hardware_model(read_only), read_only)
+        legacy = self.hardware_config()["hardware"]
+        self.assertEqual(main.normalized_hardware_model(dict(legacy, read_registers=[])), legacy)
+        mutations = [lambda h: h.update(schema_version=3),
+                     lambda h: h.update(read_registers=None),
+                     lambda h: h.update(write_registers=[], read_registers=[]),
+                     lambda h: h["read_registers"].append(dict(h["read_registers"][0])),
+                     lambda h: h["read_registers"][0].update(address=0x5802080d),
+                     lambda h: h["read_registers"][0].update(address=0x58020820),
+                     lambda h: h["read_registers"][0].update(stable=True)]
+        for mutation in mutations:
+            changed = copy.deepcopy(model)
+            mutation(changed)
+            with self.assertRaises(ValueError):
+                main.normalized_hardware_model(changed)
+
+    def test_hardware_read_proofs_require_the_actual_versioned_premise(self):
+        config = self.hardware_config()
+        config["hardware"].update(schema_version=2,
+            read_registers=[{"name": "PUPDR", "address": 0x5802080c}])
+        report = self.report(status="proved_with_assumptions")
+        report["contract_config"] = config
+        proof = report["functions"][0]["proof"]
+        proof.update(obligations=[],
+                     entry_assumptions=[main.hardware_assumption(config["hardware"])])
+        main.checked_proof(self.unit, self.inventory, report, self.directory,
+                           "async_body", survey.LIMITS, 0, config, True)
+        proof["entry_assumptions"][0] = proof["entry_assumptions"][0].replace(":v2:", ":v1:")
+        with self.assertRaises(ValueError):
+            main.checked_proof(self.unit, self.inventory, report, self.directory,
+                               "async_body", survey.LIMITS, 0, config, True)
+
     def test_configured_root_preconditions_are_conditional_even_with_proved_status(self):
         report = self.report()
         config = main.normalized_contract_config({"schema_version": 1, "functions": [{

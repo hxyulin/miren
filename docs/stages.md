@@ -2451,3 +2451,32 @@ builds, cargo deny, documentation builds and manual hooks. The separate strict t
 capture matches all 36 prior stage125 obligation arrays exactly, without assumptions:
 `/tmp/miren-stage127-main-strict-20261009`. Model builder JSON normalizes identically through the
 Rust API and Python policy validator for both devices.
+
+## Stage 128: Exact independent MMIO reads and read-modify-write callbacks
+
+Public MmioReadRegister and with_read_register opt into hardware schema 2. Empty read lists
+remain omitted, and schema 1 rejects nonempty reads. Schema 2 supports exact independent read
+and write permissions, including read-only policies. The primitive/transparent full-range u32
+certificate is shared by loads and stores. Each admitted numeric volatile read creates a fresh
+arbitrary word with an explicit device-correlation abstraction label. Read-modify-write bodies
+and callbacks execute, and reads retain conservative interference invalidation. Ordinary retained
+RAM reads keep their existing model. There is no readback, stable register or readiness promise.
+
+Native replay explicitly refuses any hardware configuration or recorded hardware-model premise,
+including an unused policy before an earlier counterexample. Three compiler tests plus one DTO
+unit cover independent samples, conditional proofs, correlation/constant-claim refutations,
+callback mutations with pure native execution, direction/layout/device/width refusals, unchanged
+RAM reads, schema compatibility and used/unused native-replay refusal. Two Python tests validate
+versioned policy permissions/premises. Independent review approves the implementation and models;
+full validation expects 554 Rust and 53 Python tests.
+
+The complete twelve-main schema-2 replay retains three RTT refutations and nine conditional
+UNKNOWN outcomes. All nine execute BSRR and read PUPDR, then enter the actual setter callback
+and stop at Pupdr::to_bits enum-to-u8 Transmute. This is a strict Rust translation gap now exposed
+by the hardware model, not an MMIO read failure. All registration/runtime outcomes and the fresh
+application-body entry milestone remain unchanged. Capture:
+`/tmp/miren-stage128-main-gpio-rmw-20261009`.
+
+All 554 Rust workspace tests and 53 Python tests pass, along with formatting, cargo lint,
+release builds, cargo deny, documentation builds and manual hooks. Positive, negative and unknown
+compiler controls include native callback mutation failures; hardware replay remains refused.

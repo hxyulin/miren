@@ -286,3 +286,17 @@ using a hardware model. Registration remains twelve PROVED and ordinary runtime 
 REFUTED. This is conditional traversal progress, not nine new proofs or a supported-outcome
 milestone. Raw capture: `/tmp/miren-stage127-main-gpio-20261009`. The separate existing reset-only
 and initialization-only publications remain unchanged.
+
+The separate `fleet-main-stm32*-gpio-rmw-hypothesis.json` profiles opt into hardware schema 2.
+They add exact independent u32 reads and writes for PUPDR, OTYPER, OSPEEDR and MODER on the same
+GPIO ports, retaining write-only BSRR. Each read samples an arbitrary word; no readback, stability
+or eventual hardware-ready value is promised. Select the combined RMW file with the same explicit
+profile flags. Canonical hardware premises include the actual model version; schema 1 cannot
+inherit read permission, and legacy empty read lists remain omitted.
+
+The first schema-2 replay completes collection on all twelve mains. Nine paths execute BSRR and
+read PUPDR, then stop inside the actual Rust callback at Pupdr::to_bits enum-to-u8 transmute.
+This is a newly exposed Rust translation gap, not a register-read failure or demonstrated firmware
+panic. Three earlier RTT refutations remain unchanged. Counterexamples that depend on sampled
+register values are labeled as abstract device-correlation witnesses. Raw capture:
+`/tmp/miren-stage128-main-gpio-rmw-20261009`.

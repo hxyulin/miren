@@ -425,3 +425,12 @@ physical validity and unmodeled hardware/Rust effects are assumptions. Numeric a
 become retained Rust allocations, references or read permission. Each actual model use records
 its premise even on refuted/unknown roots. Unsupported operations remain UNKNOWN. See the
 [external model guide](../../docs/contracts.md#external-model-api) for limits and future state models.
+
+
+Hardware schema 2 adds `MmioReadRegister` and `with_read_register`. Exact numeric u32 reads return
+independent fresh words with an explicit device-correlation abstraction reason; they do not cache
+readback or assume ready bits. Compiler-certified transparent scalar values share the write
+certificate. Actual read-modify-write callbacks and their Rust effects execute, and each read
+conservatively invalidates publication/startup history. Tracked RAM reads retain existing behavior.
+Schema 1 stays write-only with its empty read list omitted. Native replay refuses configured or
+recorded hardware models, including an unused policy on an earlier counterexample.

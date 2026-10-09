@@ -241,45 +241,51 @@ impl<'tcx> Engine<'tcx> {
         )
     }
 
+    fn hardware_u32_type(&self, ty: Ty<'tcx>) -> Result<Option<(String, String)>, String> {
+        if ty == self.tcx.types.u32 {
+            return Ok(None);
+        }
+        let ty::Adt(def, args) = ty.kind() else {
+            return Err("MMIO access requires exact u32 or a transparent scalar wrapper".into());
+        };
+        if !def.is_struct()
+            || !def.repr().transparent()
+            || def.non_enum_variant().fields.len() != 1
+            || ty.needs_drop(self.tcx, ty::TypingEnv::fully_monomorphized())
+        {
+            return Err(
+                "MMIO scalar wrapper requires a non-Drop one-field transparent struct".into(),
+            );
+        }
+        let field = &def.non_enum_variant().fields[rustc_abi::FieldIdx::from_usize(0)];
+        let field_ty = self
+            .tcx
+            .try_normalize_erasing_regions(
+                ty::TypingEnv::fully_monomorphized(),
+                field.ty(self.tcx, args),
+            )
+            .map_err(|error| format!("MMIO scalar field normalization failed: {error:?}"))?;
+        let layout = self.static_layout(ty)?;
+        let integer = self.static_layout(self.tcx.types.u32)?;
+        if field_ty != self.tcx.types.u32
+            || layout.size != integer.size
+            || layout.align != integer.align
+            || layout.fields.offset(0).bytes() != 0
+            || !matches!(layout.backend_repr,
+                BackendRepr::Scalar(Scalar::Initialized {
+                value: Primitive::Int(rustc_abi::Integer::I32, false), valid_range,
+                }) if valid_range.start == 0 && valid_range.end == u128::from(u32::MAX))
+        {
+            return Err("MMIO scalar wrapper lacks exact initialized full-range u32 layout".into());
+        }
+        Ok(Some((
+            self.tcx.def_path_str(def.did()),
+            field.name.as_str().to_owned(),
+        )))
+    }
+
     fn hardware_u32_value(&self, ty: Ty<'tcx>, value: &Value) -> Result<Term, String> {
-        let scalar = if ty == self.tcx.types.u32 {
-            value.clone()
-        } else {
-            let ty::Adt(def, args) = ty.kind() else {
-                return Err("MMIO write requires exact u32 or a transparent scalar wrapper".into());
-            };
-            if !def.is_struct()
-                || !def.repr().transparent()
-                || def.non_enum_variant().fields.len() != 1
-                || ty.needs_drop(self.tcx, ty::TypingEnv::fully_monomorphized())
-            {
-                return Err(
-                    "MMIO scalar wrapper requires a non-Drop one-field transparent struct".into(),
-                );
-            }
-            let field = &def.non_enum_variant().fields[rustc_abi::FieldIdx::from_usize(0)];
-            let field_ty = self
-                .tcx
-                .try_normalize_erasing_regions(
-                    ty::TypingEnv::fully_monomorphized(),
-                    field.ty(self.tcx, args),
-                )
-                .map_err(|error| format!("MMIO scalar field normalization failed: {error:?}"))?;
-            let layout = self.static_layout(ty)?;
-            let integer = self.static_layout(self.tcx.types.u32)?;
-            if field_ty != self.tcx.types.u32
-                || layout.size != integer.size
-                || layout.align != integer.align
-                || layout.fields.offset(0).bytes() != 0
-                || !matches!(layout.backend_repr,
-                    BackendRepr::Scalar(Scalar::Initialized {
-                        value: Primitive::Int(rustc_abi::Integer::I32, false), valid_range,
-                    }) if valid_range.start == 0 && valid_range.end == u128::from(u32::MAX))
-            {
-                return Err(
-                    "MMIO scalar wrapper lacks exact initialized full-range u32 layout".into(),
-                );
-            }
+        let scalar = if let Some((expected_name, expected_field)) = self.hardware_u32_type(ty)? {
             let Value::Adt {
                 name,
                 variant: 0,
@@ -293,12 +299,14 @@ impl<'tcx> Engine<'tcx> {
             let [(field_name, scalar)] = fields.as_slice() else {
                 return Err("MMIO scalar wrapper needs one exact modeled field".into());
             };
-            if *name != self.tcx.def_path_str(def.did()) || field_name != field.name.as_str() {
+            if *name != expected_name || *field_name != expected_field {
                 return Err(
                     "MMIO scalar wrapper modeled identity disagrees with compiler metadata".into(),
                 );
             }
             scalar.clone()
+        } else {
+            value.clone()
         };
         let (expression, bits, signed) = scalar.integer()?;
         if bits != 32
@@ -306,9 +314,73 @@ impl<'tcx> Engine<'tcx> {
             || expression.sort() != &Sort::BitVec(32)
             || !expression.belongs_to(&self.terms)
         {
-            return Err("MMIO store value needs exact unsigned u32 width and context".into());
+            return Err("MMIO value needs exact unsigned u32 width and context".into());
         }
         Ok(expression)
+    }
+
+    pub(super) fn hardware_volatile_load(
+        &mut self,
+        instance: ty::Instance<'tcx>,
+        values: &[Value],
+        state: &State,
+    ) -> Result<Option<Vec<Return>>, String> {
+        if !self
+            .tcx
+            .is_intrinsic(instance.def_id(), Symbol::intern("volatile_load"))
+            || !matches!(values.first(), Some(Value::RawPointer { .. }))
+        {
+            return Ok(None);
+        }
+        let Some(model) = self.selected_hardware_model()? else {
+            return Ok(None);
+        };
+        let signature = self.call_signature(instance)?;
+        let [pointer_ty] = signature.inputs() else {
+            return Err("MMIO volatile load requires one compiler input".into());
+        };
+        if !matches!(pointer_ty.kind(), ty::RawPtr(pointee, _) if *pointee == signature.output()) {
+            return Err("MMIO volatile load compiler pointer/output types disagree".into());
+        }
+        let [pointer] = values else {
+            return Err("MMIO load input arity mismatch".into());
+        };
+        let address = self.hardware_address(pointer, model.pointer_bits)?;
+        let wrapper = self.hardware_u32_type(signature.output())?;
+        for register in &model.read_registers {
+            let expected = self
+                .terms
+                .bit_vector(u128::from(register.address), model.pointer_bits)?;
+            let equal = self.terms.apply(Op::Equal, &[address.clone(), expected])?;
+            if !self.feasible(&[state.conditions.clone(), vec![symbolic::not(&equal)]].concat())? {
+                let scalar = Value::Int {
+                    expression: self.fresh_abstraction(Sort::BitVec(32),
+                        "external hardware reads admit independent arbitrary u32 values; device correlations are unverified"),
+                    bits: 32, signed: false,
+                };
+                let value = if wrapper.is_some() {
+                    self.constructed(signature.output(), 0, vec![scalar])?
+                } else {
+                    scalar
+                };
+                self.record_hardware_use(
+                    &model,
+                    instance.def_id(),
+                    format!(
+                        "external independent arbitrary u32 MMIO read {}; no readback correlation",
+                        register.name,
+                    ),
+                );
+                let mut memory = state.memory.clone();
+                Self::invalidate_published_atomics(state, &mut memory)?;
+                return Ok(Some(vec![Return {
+                    value,
+                    conditions: state.conditions.clone(),
+                    memory,
+                }]));
+            }
+        }
+        Err("MMIO load does not equal one exact configured readable u32 register".into())
     }
 
     pub(super) fn hardware_volatile_store(

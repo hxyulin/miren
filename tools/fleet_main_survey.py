@@ -33,8 +33,9 @@ def require(condition, message):
 
 def normalized_hardware_model(value):
     fields = {"schema_version", "device", "pointer_bits", "reason", "regions", "write_registers"}
-    require(isinstance(value, dict) and set(value) == fields, "invalid hardware model schema")
-    require(type(value["schema_version"]) is int and value["schema_version"] == 1,
+    require(isinstance(value, dict) and fields <= set(value)
+            and set(value) <= fields | {"read_registers"}, "invalid hardware model schema")
+    require(type(value["schema_version"]) is int and value["schema_version"] in {1, 2},
             "unsupported hardware model version")
     require(isinstance(value["device"], str)
             and value["device"] in {"stm32h723vg", "stm32f407ig"},
@@ -45,8 +46,11 @@ def normalized_hardware_model(value):
             "hardware model requires an explicit reason")
     regions, registers = value["regions"], value["write_registers"]
     require(isinstance(regions, list) and 1 <= len(regions) <= 16, "invalid hardware regions")
-    require(isinstance(registers, list) and 1 <= len(registers) <= 64,
-            "invalid hardware write registers")
+    reads = value.get("read_registers", [])
+    require(isinstance(registers, list) and len(registers) <= 64
+            and isinstance(reads, list) and len(reads) <= 64 and registers + reads,
+            "invalid hardware register permissions")
+    require(value["schema_version"] == 2 or not reads, "hardware reads require schema 2")
     names, extents = set(), []
     for region in regions:
         require(isinstance(region, dict) and set(region) == {"name", "start", "length"},
@@ -62,23 +66,28 @@ def normalized_hardware_model(value):
         require(all(start + length <= lo or start >= hi for lo, hi in extents),
                 "overlapping hardware regions")
         extents.append((start, start + length))
-    names, addresses = set(), set()
-    for register in registers:
-        require(isinstance(register, dict) and set(register) == {"name", "address"},
-                "invalid hardware write register schema")
-        name, address = register["name"], register["address"]
-        require(isinstance(name, str) and name.strip() == name and name and name not in names,
-                "invalid or duplicate hardware register name")
-        names.add(name)
-        require(type(address) is int and address not in addresses and address % 4 == 0
-                and sum(lo <= address and address + 4 <= hi for lo, hi in extents) == 1,
-                "invalid hardware write register extent")
-        addresses.add(address)
-    return {key: value[key] for key in sorted(fields)}
+    for accesses in (registers, reads):
+        names, addresses = set(), set()
+        for register in accesses:
+            require(isinstance(register, dict) and set(register) == {"name", "address"},
+                    "invalid hardware register schema")
+            name, address = register["name"], register["address"]
+            require(isinstance(name, str) and name.strip() == name and name and name not in names,
+                    "invalid or duplicate hardware register name")
+            names.add(name)
+            require(type(address) is int and address not in addresses and address % 4 == 0
+                    and sum(lo <= address and address + 4 <= hi for lo, hi in extents) == 1,
+                    "invalid hardware register extent")
+            addresses.add(address)
+    result = {key: value[key] for key in sorted(fields)}
+    if reads:
+        result["read_registers"] = reads
+    return result
 
 
 def hardware_assumption(model):
-    return (f"hardware-model:v1:device={model['device']};pointer_bits={model['pointer_bits']};"
+    return (f"hardware-model:v{model['schema_version']}:device={model['device']};"
+            f"pointer_bits={model['pointer_bits']};"
             f"reason={model['reason']}")
 
 

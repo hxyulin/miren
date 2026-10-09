@@ -8,7 +8,7 @@ fn main() -> Result<(), String> {
         Some("stm32f407ig") => (HardwareDevice::Stm32f407ig, "GPIOH", 0x4002_1c00),
         _ => return Err("usage: stm32_model stm32h723vg|stm32f407ig".into()),
     };
-    let hardware = HardwareModel::new(
+    let mut hardware = HardwareModel::new(
         device,
         32,
         "UNVERIFIED device premise: this GPIO region supports bounded byte address transport and \
@@ -17,6 +17,23 @@ fn main() -> Result<(), String> {
     )
     .with_region(name, start, 32)
     .with_write_register(format!("{name}_BSRR"), start + 0x18);
+    match std::env::args().nth(2).as_deref() {
+        Some("rmw") => {
+            for (register, offset) in [("PUPDR", 12), ("OTYPER", 4), ("OSPEEDR", 8), ("MODER", 0)] {
+                let name = format!("{name}_{register}");
+                hardware = hardware
+                    .with_read_register(&name, start + offset)
+                    .with_write_register(name, start + offset);
+            }
+            hardware.reason = "UNVERIFIED GPIO access premise: configured exact u32 reads and \
+                writes terminate without trapping or unmodeled Rust storage changes. Each read \
+                admits an independent arbitrary word; no readback, stability, hardware readiness \
+                or executor progress is assumed."
+                .into();
+        }
+        None => {}
+        _ => return Err("optional second argument must be rmw".into()),
+    }
     let config = ContractConfig::default().with_hardware(hardware);
     config.validate()?;
     println!(

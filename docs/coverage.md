@@ -964,3 +964,14 @@ New compiler controls prove conditional writes, refute callback mutations and re
 accesses on ARM O0/O2. Host-width mismatch is UNKNOWN; native execution checks only actual Rust
 callbacks, never MMIO. All nine hardware-profile paths execute BSRR writes and reach unsupported
 PUPDR reads in the actual fleet replay. No strict proof gain or firmware boot guarantee follows.
+
+Stage 128 extends the public API with opt-in hardware schema 2 and exact independent u32 reads.
+The same initialized full-range scalar certificate supports transparent register wrappers;
+actual read-modify-write callbacks execute. Read/write permissions are independent, and every
+read is a fresh abstraction with device correlations explicitly unverified. Reads conservatively
+invalidate publication/startup histories; tracked RAM reads keep their original behavior. Native
+replay refuses configured or recorded hardware models. Schema-1 serialization stays unchanged.
+
+The nine hardware-profile fleet paths pass BSRR and PUPDR read, then reach an unsupported Rust
+fieldless enum-to-u8 transmute inside the actual setter callback. They remain UNKNOWN; no fixed
+register values, readback, hardware-ready assumptions or new completed main proof are introduced.

@@ -111,7 +111,20 @@ pub fn replay_report(report: &mut Report) {
         }) else {
             continue;
         };
-        let result = if env!("MIREN_COMPILER") != report.compiler {
+        let hardware_configured = report
+            .contract_config
+            .as_ref()
+            .is_some_and(|config| config.hardware.is_some());
+        let hardware_used = proof
+            .entry_assumptions
+            .iter()
+            .any(|assumption| assumption.starts_with("hardware-model:"));
+        let result = if hardware_configured || hardware_used {
+            ReplayResult::new(
+                ReplayStatus::Unsupported,
+                "external hardware models have no native replay implementation",
+            )
+        } else if env!("MIREN_COMPILER") != report.compiler {
             ReplayResult::new(
                 ReplayStatus::Unsupported,
                 "native replay requires the compiler recorded in the analysis",

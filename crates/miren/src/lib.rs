@@ -10,7 +10,9 @@ pub mod replay;
 pub mod smt;
 pub mod static_origins;
 pub use config::{ContractConfig, FunctionContract};
-pub use hardware::{HardwareDevice, HardwareModel, MmioRegion, MmioWriteRegister};
+pub use hardware::{
+    HardwareDevice, HardwareModel, MmioReadRegister, MmioRegion, MmioWriteRegister,
+};
 pub use limits::AnalysisLimits;
 
 use serde::{Deserialize, Serialize};
