@@ -204,6 +204,19 @@ impl<'tcx> Engine<'tcx> {
                     conditions,
                 )?;
                 projections.next();
+            } else if let MemoryProjection::Slice { offset, length } = element
+                && let Some(MemoryProjection::Index(index)) = projections.peek()
+                && self.finite_element_region(&value, offset, length, conditions)?
+            {
+                self.memory_bounds(index, length, conditions)?;
+                let absolute =
+                    symbolic::binary(&self.terms, "add", (**offset).clone(), (**index).clone())?;
+                value = self.memory_projection(
+                    value,
+                    &MemoryProjection::Index(Box::new(absolute)),
+                    conditions,
+                )?;
+                projections.next();
             } else {
                 value = self.memory_projection(value, element, conditions)?;
             }
@@ -375,7 +388,8 @@ impl<'tcx> Engine<'tcx> {
                     {
                         allocation = Some(target);
                         path = projection;
-                        writable = mutable;
+                        // Every enclosing borrow must grant ordinary mutation rights.
+                        writable &= mutable;
                         value = self.reference_value(
                             &Value::Reference {
                                 allocation: target,
@@ -476,12 +490,136 @@ impl<'tcx> Engine<'tcx> {
         Ok(Some(value))
     }
 
+    pub(super) fn validate_mutable_handle_rights(
+        &self,
+        expected: Ty<'tcx>,
+        value: &Value,
+    ) -> Result<(), String> {
+        if matches!(expected.kind(), ty::Ref(_, _, mutability) if mutability.is_mut())
+            && matches!(value, Value::Reference { mutable: false, .. })
+        {
+            return Err("readonly reference cannot be exposed as a declared mutable handle".into());
+        }
+        if let ty::Tuple(types) = expected.kind()
+            && let Value::Tuple(fields) = value
+        {
+            for (ty, value) in types.iter().zip(fields) {
+                self.validate_mutable_handle_rights(ty, value)?;
+            }
+        }
+        if let ty::Array(element, _) = expected.kind()
+            && let Value::Elements(elements) = value
+        {
+            for value in elements {
+                self.validate_mutable_handle_rights(*element, value)?;
+            }
+        }
+        if let ty::Adt(def, args) = expected.kind() {
+            if let Value::Enum { variants, .. } = value {
+                for variant in variants {
+                    self.validate_mutable_handle_rights(expected, variant)?;
+                }
+            }
+            if let Value::Adt {
+                name,
+                variant,
+                fields,
+                ..
+            } = value
+            {
+                if *name != self.tcx.def_path_str(def.did()) {
+                    return Err("mutable return aggregate has mismatched compiler identity".into());
+                }
+                let layout = def
+                    .variants()
+                    .get(rustc_abi::VariantIdx::from_usize(*variant))
+                    .ok_or("mutable return aggregate has an invalid variant")?;
+                if fields.len() != layout.fields.len() {
+                    return Err("mutable return aggregate has mismatched fields".into());
+                }
+                for (field, (_, value)) in layout.fields.iter().zip(fields.iter()) {
+                    let ty = self
+                        .tcx
+                        .try_normalize_erasing_regions(
+                            ty::TypingEnv::fully_monomorphized(),
+                            field.ty(self.tcx, args),
+                        )
+                        .map_err(|error| {
+                            format!("mutable handle field normalization failed: {error:?}")
+                        })?;
+                    self.validate_mutable_handle_rights(ty, value)?;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    pub(super) fn shared_dereference_copy(
+        &self,
+        state: &State,
+        place: Place<'tcx>,
+    ) -> Result<Option<Value>, String> {
+        let value = self.place(state, place)?;
+        if matches!(value, Value::Reference { mutable: false, .. }) {
+            // Further compiler dereference-only copies preserve the already narrowed rights.
+            return Ok(Some(value));
+        }
+        if !value.contains_mutable() {
+            return Ok(None);
+        }
+        let (_, _, writable) = self.memory_path(state, place)?;
+        if writable {
+            return Ok(None);
+        }
+        if let Value::Reference {
+            allocation,
+            projection,
+            ..
+        } = value
+        {
+            // Compiler no-retag copies traverse an enclosing shared borrow for reads. Their
+            // allocation and projection stay exact; they cannot restore mutation permission.
+            return Ok(Some(Value::Reference {
+                allocation,
+                projection,
+                mutable: false,
+            }));
+        }
+        Err("shared dereference copies require a direct reference handle".into())
+    }
+
     pub(super) fn borrow(
         &self,
         state: &mut State,
         place: Place<'tcx>,
         mutable: bool,
     ) -> Result<Value, String> {
+        if matches!(place.projection.as_ref(), [ProjectionElem::Deref]) {
+            let source = self.local(state, place.local.as_usize())?;
+            if self
+                .finite_element_slice_length(&source, &state.memory, &state.conditions)?
+                .is_some()
+                && let Value::Reference {
+                    allocation,
+                    projection,
+                    mutable: true,
+                } = source
+            {
+                self.validate_tracked_value(
+                    &Value::Reference {
+                        allocation,
+                        projection: projection.clone(),
+                        mutable: true,
+                    },
+                    state,
+                )?;
+                return Ok(Value::Reference {
+                    allocation,
+                    projection,
+                    mutable,
+                });
+            }
+        }
         let value = self.place(state, place)?;
         if let Value::TraitObject {
             source,
@@ -652,7 +790,9 @@ impl<'tcx> Engine<'tcx> {
             }
             if let Some((MemoryProjection::Index(index), tail)) = rest.split_first() {
                 // Prove the parent region before translating its element address.
-                self.memory_projection(storage.clone(), projection, conditions)?;
+                if !self.finite_element_region(storage, offset, length, conditions)? {
+                    self.memory_projection(storage.clone(), projection, conditions)?;
+                }
                 self.memory_bounds(index, length, conditions)?;
                 let absolute =
                     symbolic::binary(&self.terms, "add", (**offset).clone(), (**index).clone())?;

@@ -2345,3 +2345,41 @@ analysis configurations occur. Stage 124 compiler improvements introduce no obse
 All 243 firmware fingerprints and four artifact checkpoints per unit remain unchanged; export
 repeats byte-for-byte. The audited run bounds witness and separately frozen main evidence remain
 preserved. Raw capture: `/tmp/miren-fleet-pass18-20261009`.
+
+## Stage 125: Retained finite mutable ranges and ordered find
+
+Finite compiler-typed integer/tuple array ranges retain their original tracked allocation and
+projection through mutable iterators. Scalar widths/signs/sorts/context and recursive tuple
+arity are checked against the actual element type. Checked region/index translation preserves
+writes and source liveness, including empty/exhausted `for_each` and `fold` consumers. Existing
+allocation, shape, iteration and solver limits are unchanged.
+
+Core `Iterator::find` invokes the actual concrete predicate with a temporary shared `&Item`,
+keeps false-predicate effects before the next item, and returns the original first match.
+Retiring each temporary checks for escaped references. Storage paths preserve every enclosing
+shared restriction. Actual compiler no-retag dereference copies narrow mutable references to
+read permission while preserving identity; ordinary forged mutable exposure stays unknown.
+
+Two new compiler integration tests run positive/refuted/unknown cases on host/ARM at O0/O2,
+valid native execution, and a callback increment mutation that fails proof and native execution.
+Focused validation: 76 binary tests plus 27 affected compiler integration tests (103 total),
+formatting and cargo lint. Full required checks and actual fleet replay follow.
+Expected workspace Rust test count: 546.
+
+All 546 Rust workspace tests and 48 Python tests pass. Formatting, Clippy, release builds,
+dependency checks, documentation builds and manual hooks pass. Four affected integration tests
+also pass after refining non-byte range diagnostic names; byte diagnostics remain identical.
+Actual Sniff::saw now REFUTES at its 16-element prefix bound, with Bus::Can2 and len=24. Saved
+query and witness are SAT; adding len<=16 makes the failure UNSAT. Unchanged struct/method/Bus
+source reproduces the exact bounds panic in native O0/O2 controls. Constructor-shaped prefixes,
+appends, repeats and full capacity pass. Command::Sniff starts len=0 and saw preserves len<=16,
+so this is an audited root-input refutation, not an established firmware-entry defect. Audit:
+`/tmp/miren-stage125-sniff-audit/audit.md`; captures: `/tmp/miren-stage125/replay`.
+
+The separate normalized forged-MIR permission audit changes the old PROVED write into UNKNOWN
+on host/ARM O0/O2; valid shared reads and mutable reborrows stay PROVED. Invalid MIR is never
+executed natively. This corrects a missing capability refusal without claiming a reachable
+application bug or a complete borrow/alias model. Audit: `/tmp/miren-stage125-audit/audit.md`.
+All 72 strict/reset main obligation arrays match stage 124 exactly. Twelve isolated runtime
+wrappers retain both startup premises, unfinished weak-CAS frontiers and unsupported SEV.
+Captures: `/tmp/miren-stage125-main-{strict,reset}-20261009` and `/tmp/miren-stage125/runtime`.

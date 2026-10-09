@@ -932,3 +932,23 @@ and interior mutation do not acquire this new identity. Existing snapshot domain
 Root-local `StorageDead` preserves caller storage, while actual dead local/callee backing and opaque
 invalidation stay UNKNOWN. Shared writes remain unsupported. Host/ARM O0/O2 and failing native
 iterator mutations cover the model without application assumptions.
+
+Stage 125 adds retained checked ranges for finite integer/tuple arrays and concrete ordered
+`find` predicates. Its compiler controls cover host and ARM at O0/O2: safe prefixes, offset
+ranges, empty iterators, first-match/late effects and valid nested borrows prove; unguarded
+bounds, counter overflow and wrong update/order claims refute; dead/exhausted storage, opaque
+callbacks, unsupported aliases/payloads/whole views and forged mutable exposure remain unknown.
+The callback increment mutation refutes in the solver and fails native execution. No assumptions
+or trusted calls are introduced.
+
+The motivating source root is `bench::Sniff::saw` at dm-mc02-bringup/src/bench.rs:279, called by
+`Bench::receive` at line 476. Its selected root domain includes arbitrary `self.len`; a length
+above the 16-element backing can produce a real bounds counterexample. Such a root refutation
+would not establish reachability from the application's constructor/feed invariants. Fleet outcomes
+require separate replay and publication.
+
+Actual Sniff::saw replay now refutes at len=24 versus capacity16. Independent solver and native
+O0/O2 source controls confirm that bounds panic; constructor-shaped len<=16 controls pass.
+The source initialization/update invariant excludes this witness, without a whole-program
+reachability proof. The normalized forged-MIR permission audit now remains UNKNOWN while
+valid shared reads and mutable reborrows prove. All 546 workspace Rust and 48 Python tests pass.

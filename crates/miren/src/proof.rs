@@ -1095,6 +1095,7 @@ impl<'tcx> Engine<'tcx> {
                     } else {
                         self.local(&state, 0)?
                     };
+                    self.validate_mutable_handle_rights(body.return_ty(), &value)?;
                     self.validate_frame_escape(&value, &state, incoming_allocations)
                         .map_err(|error| {
                             format!("return from {}: {error}", self.tcx.def_path_str(id))
@@ -1681,13 +1682,25 @@ impl<'tcx> Engine<'tcx> {
     fn operand(
         &self,
         id: DefId,
-        _body: &Body<'tcx>,
+        body: &Body<'tcx>,
         state: &State,
         operand: &Operand<'tcx>,
     ) -> Result<Value, String> {
         match operand {
             Operand::Copy(place) | Operand::Move(place) => {
                 let value = self.place(state, *place)?;
+                self.validate_mutable_handle_rights(
+                    place.ty(&body.local_decls, self.tcx).ty,
+                    &value,
+                )?;
+                if value.contains_mutable() {
+                    let (_, _, writable) = self.memory_path(state, *place)?;
+                    if !writable {
+                        return Err(
+                            "mutable handles cannot be exposed through shared storage".into()
+                        );
+                    }
+                }
                 if matches!(operand, Operand::Move(_))
                     && matches!(value, Value::StaticView { .. })
                     && self.static_place_view(&value, state)?
@@ -1741,8 +1754,19 @@ impl<'tcx> Engine<'tcx> {
         value: &Rvalue<'tcx>,
     ) -> Result<Value, String> {
         match value {
-            Rvalue::Use(operand, _) => {
-                let value = self.operand(id, body, state, operand)?;
+            Rvalue::Use(operand, retag) => {
+                let narrowed = if let Operand::Copy(place) = operand
+                    && retag.no()
+                {
+                    self.shared_dereference_copy(state, *place)?
+                } else {
+                    None
+                };
+                let value = if let Some(value) = narrowed {
+                    value
+                } else {
+                    self.operand(id, body, state, operand)?
+                };
                 if matches!(value, Value::StaticView { .. }) {
                     self.record_model(
                         id,

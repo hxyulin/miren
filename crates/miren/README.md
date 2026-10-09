@@ -389,3 +389,21 @@ reborrowed views preserve the actual allocation; retiring a reference local does
 storage. Opaque memory effects still invalidate backing, and shared references grant no write
 rights.
 The model uses valid incoming Rust borrows and adds no entry assumptions or hardware facts.
+
+Checked mutable ranges over finite arrays of primitive integers and tuples of integers can
+retain their original allocation and projection through mutable slice iterators. Compiler
+receiver/output element types, integer widths/signs and tuple fields must match the stored
+values. Each element read/write proves the region and index bounds before translating its
+address; exhausted consumers still validate the original backing. Whole non-byte slice
+snapshots, whole-view assignment, arbitrary incoming non-byte slices, nested views and
+reference/interior-mutable payloads remain unsupported. Existing resource limits are unchanged.
+
+Concrete core `Iterator::find` executes its predicate in order, preserves each callback's
+memory effects and returns the original first matching item. The predicate receives a shared
+reference to a temporary item slot; that slot retires after the callback, and escaped temporary
+references are rejected. Compiler `Use(Copy(place), WithRetag::No)` dereference copies through
+shared storage retain their allocation/projection with mutation permission narrowed to false.
+Ordinary copied/moved mutable handles through shared storage remain unsupported. Compiler
+mutable-reference positions, including tuple/array/ADT fields, reject narrowed handles at
+ordinary ownership exposure and return boundaries. Shared reads and valid nested mutable
+reborrows keep their existing behavior.

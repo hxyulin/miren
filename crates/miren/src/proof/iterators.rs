@@ -130,28 +130,35 @@ impl<'tcx> Engine<'tcx> {
             let [source] = values else {
                 return Err("iterator constructor arity mismatch".to_owned());
             };
-            let snapshot = self.snapshot(source, &state.memory, &state.conditions, 0)?;
-            let (source, back) = match snapshot {
-                Value::Bytes { length, .. } => (source.clone(), *length),
-                Value::Elements(elements) => {
-                    (source.clone(), self.iterator_index(elements.len() as u128))
+            self.validate_tracked_value(source, state)?;
+            let retained_length =
+                self.finite_element_slice_length(source, &state.memory, &state.conditions)?;
+            let (source, back) = if let Some(length) = retained_length {
+                (source.clone(), length)
+            } else {
+                let snapshot = self.snapshot(source, &state.memory, &state.conditions, 0)?;
+                match snapshot {
+                    Value::Bytes { length, .. } => (source.clone(), *length),
+                    Value::Elements(elements) => {
+                        (source.clone(), self.iterator_index(elements.len() as u128))
+                    }
+                    Value::StaticSlice { ref elements, .. } => {
+                        let back = self.iterator_index(elements.len() as u128);
+                        (snapshot, back)
+                    }
+                    Value::StaticView { .. } if !mutable => {
+                        let elements = self.static_array_elements(&snapshot, state)?;
+                        let Value::StaticSlice {
+                            elements: items, ..
+                        } = &elements
+                        else {
+                            unreachable!();
+                        };
+                        let back = self.iterator_index(items.len() as u128);
+                        (elements, back)
+                    }
+                    _ => return Err("iterator needs modeled slice storage".to_owned()),
                 }
-                Value::StaticSlice { ref elements, .. } => {
-                    let back = self.iterator_index(elements.len() as u128);
-                    (snapshot, back)
-                }
-                Value::StaticView { .. } if !mutable => {
-                    let elements = self.static_array_elements(&snapshot, state)?;
-                    let Value::StaticSlice {
-                        elements: items, ..
-                    } = &elements
-                    else {
-                        unreachable!();
-                    };
-                    let back = self.iterator_index(items.len() as u128);
-                    (elements, back)
-                }
-                _ => return Err("iterator needs modeled slice storage".to_owned()),
             };
             if mutable && !matches!(source, Value::Reference { mutable: true, .. }) {
                 return Err("mutable iterator needs tracked writable slice storage".to_owned());
@@ -236,7 +243,7 @@ impl<'tcx> Engine<'tcx> {
         let clone_trait = self.tcx.lang_items().get(LangItem::Clone);
         let supported = match name.as_str() {
             "next" | "nth" | "count" | "size_hint" | "all" | "any" | "find_map" | "fold"
-            | "by_ref" | "for_each" => trait_id.is_some() && trait_id == iterator_trait,
+            | "by_ref" | "for_each" | "find" => trait_id.is_some() && trait_id == iterator_trait,
             "into_iter" => {
                 trait_id.is_some()
                     && trait_id == self.tcx.get_diagnostic_item(Symbol::intern("IntoIterator"))
@@ -280,7 +287,7 @@ impl<'tcx> Engine<'tcx> {
             callee,
             "slice iterator; ordered elements and tracked cursor",
         );
-        if matches!(name.as_str(), "all" | "any" | "find_map") {
+        if matches!(name.as_str(), "all" | "any" | "find_map" | "find") {
             return self
                 .iterator_predicate(instance, values, iterator, state, stack, site)
                 .map(Some);
@@ -593,7 +600,14 @@ impl<'tcx> Engine<'tcx> {
         if mutable && !unchecked.is_empty() {
             return Err("ordinary iteration after unchecked mutable access is unsupported".into());
         }
-        self.snapshot(&source, &memory, &conditions, 0)?;
+        // Finite element views cannot be owned snapshots. Resolve their parent storage and
+        // bounds even when exhausted, retaining the same dead-source refusal as snapshots.
+        if self
+            .finite_element_slice_length(&source, &memory, &conditions)?
+            .is_none()
+        {
+            self.snapshot(&source, &memory, &conditions, 0)?;
+        }
         let remaining = symbolic::binary(&self.terms, "sub", (*back).clone(), (*front).clone())?;
         let inside = symbolic::binary(&self.terms, "lt", skip.clone(), remaining)?.boolean()?;
         let mut results = Vec::new();
@@ -713,6 +727,7 @@ impl<'tcx> Engine<'tcx> {
         let name = self.tcx.item_name(instance.def_id());
         let all = name == Symbol::intern("all");
         let find_map = name == Symbol::intern("find_map");
+        let find = name == Symbol::intern("find");
         let mut pending = vec![(iterator, state.conditions.clone(), memory)];
         let mut returns = Vec::new();
         while let Some((iterator, conditions, memory)) = pending.pop() {
@@ -728,7 +743,7 @@ impl<'tcx> Engine<'tcx> {
                 )?;
                 let Some(item) = iteration.item else {
                     returns.push(Return {
-                        value: if find_map {
+                        value: if find_map || find {
                             self.constructed(signature.output(), 0, vec![])?
                         } else {
                             Value::Bool(self.terms.boolean(all))
@@ -738,12 +753,33 @@ impl<'tcx> Engine<'tcx> {
                     });
                     continue;
                 };
-                let arguments = if environment {
-                    vec![predicate.clone(), item]
+                let temporary = if find {
+                    if memory.len() >= super::tracked_pointers::MAX_TRACKED_ADDRESSES {
+                        return Err(
+                            "find predicate item reference exceeds allocation budget".into()
+                        );
+                    }
+                    let allocation = memory.len();
+                    memory.push(Some(item.clone()));
+                    Some(allocation)
                 } else {
-                    vec![item]
+                    None
                 };
-                for result in self.call_instance(
+                let argument = if let Some(allocation) = temporary {
+                    Value::Reference {
+                        allocation,
+                        projection: Vec::new(),
+                        mutable: false,
+                    }
+                } else {
+                    item.clone()
+                };
+                let arguments = if environment {
+                    vec![predicate.clone(), argument]
+                } else {
+                    vec![argument]
+                };
+                for mut result in self.call_instance(
                     callable,
                     arguments,
                     iteration.conditions,
@@ -751,6 +787,15 @@ impl<'tcx> Engine<'tcx> {
                     stack,
                     site,
                 )? {
+                    if let Some(allocation) = temporary {
+                        result.memory[allocation] = None;
+                        // A predicate cannot preserve its short-lived &Item in tracked storage.
+                        let post =
+                            state.continuation(result.conditions.clone(), result.memory.clone());
+                        for stored in post.memory.iter().flatten() {
+                            Self::validate_reference_graph(stored, &post, None, &mut Vec::new())?;
+                        }
+                    }
                     if find_map {
                         let Value::Adt {
                             is_option: true,
@@ -776,7 +821,11 @@ impl<'tcx> Engine<'tcx> {
                     let stopped = [result.conditions.clone(), vec![symbolic::not(&keep)]].concat();
                     if self.feasible(&stopped)? {
                         returns.push(Return {
-                            value: Value::Bool(self.terms.boolean(!all)),
+                            value: if find {
+                                self.constructed(signature.output(), 1, vec![item.clone()])?
+                            } else {
+                                Value::Bool(self.terms.boolean(!all))
+                            },
                             conditions: stopped,
                             memory: result.memory.clone(),
                         });
