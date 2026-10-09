@@ -123,7 +123,7 @@ checks the supported bit encodings.
 | Generics and static traits | Substitute/normalize concrete arguments and resolve implementations | Unresolved generic roots, dynamic dispatch and unsupported shims are UNKNOWN |
 | Dependencies | Cargo retains ordinary direct/transitive bodies at MIR level zero and executes concrete instances | Prebuilt sysroot/foreign bodies can remain missing; retained unsupported behavior is UNKNOWN |
 | Closures and function items | Tracked captures, owned FnMut state and supported generic Fn/FnMut/FnOnce calls | Unsupported call shapes remain UNKNOWN |
-| Known function pointers | Function-item coercions retain concrete instance/signature; selected targets, returns, local aggregates and Fn/FnMut/FnOnce adapters execute actual MIR with checked contracts/effects | At most 512 targets per root; unknown inputs, closure coercions, reification shims, numeric/signature-changing casts, missing bodies, arbitrary opaque static writes and induction remain UNKNOWN |
+| Known function pointers | Function-item coercions retain concrete instance/signature; selected targets, returns, local aggregates and Fn/FnMut/FnOnce adapters execute actual MIR with checked contracts/effects | At most 512 targets per root; arbitrary input calls, closure coercions, reification shims, numeric/signature-changing casts, missing bodies, arbitrary opaque static writes and induction remain UNKNOWN |
 | Array map | Actual callback bodies in order, retaining capture state and reference-valued elements | At most 16 elements; callback destructors remain UNKNOWN |
 | Array from_fn | Actual callbacks in ascending index order, retaining capture state and effects | At most 128 owned elements and 256 values; drops and identity-bearing results remain UNKNOWN |
 | Owned array iteration | Compiler ArrayIntoIter, ordered cursors, count/last, predicates and fold/rfold callbacks | At most 128 owned elements and 256 values; owned Cell/atomic identities, user destructors, clone and views remain UNKNOWN |
@@ -731,3 +731,10 @@ Compiler-identified volatile scalar loads require exact typed, initialized, live
 backing and a matching registered address. Values retain exact integer/float storage bits.
 Numeric MMIO, static payloads, projections, cursor offsets, punned or invalidated storage remain
 UNKNOWN. The model supplies no synchronization or device access guarantee.
+Arbitrary valid function-pointer input fields use bounded typed opaque witnesses. These witnesses
+retain the full compiler signature, including safety, ABI and bound regions, without a numeric
+address, concrete target or callback effects. Unused fields, lazy input arrays and exact typed
+stores are supported. Invocation, address casts, identity comparisons, contract comparisons and
+native replay remain UNKNOWN. Host/ARM tests cover ordinary and unsafe signatures, Waker tables,
+reached panics, changed guards and forged signature mutations.
+

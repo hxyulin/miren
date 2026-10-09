@@ -41,6 +41,7 @@ mod layout_intrinsics;
 mod library;
 mod membership;
 mod memory;
+mod opaque_function_inputs;
 mod owned_iterators;
 mod pointer_atomic_cas;
 mod pointer_atomic_shapes;
@@ -106,7 +107,7 @@ struct Engine<'tcx> {
     >,
     static_epoch: Option<usize>,
     static_roots: Option<usize>,
-    function_pointers: Vec<(ty::Instance<'tcx>, Ty<'tcx>)>,
+    function_pointers: std::cell::RefCell<Vec<function_pointers::Target<'tcx>>>,
     static_addresses: std::collections::HashMap<DefId, Term>,
     tracked_addresses: Vec<(tracked_pointers::AddressLocation<'tcx>, Term)>,
     steps: usize,
@@ -167,7 +168,7 @@ pub fn verify(
         static_origins: Default::default(),
         static_epoch: None,
         static_roots: None,
-        function_pointers: Vec::new(),
+        function_pointers: std::cell::RefCell::new(Vec::new()),
         static_addresses: std::collections::HashMap::new(),
         tracked_addresses: Vec::new(),
         steps: 0,
@@ -366,7 +367,7 @@ impl<'tcx> Engine<'tcx> {
         self.static_epoch = Some(memory.len());
         memory.push(Some(Value::Unit));
         self.static_roots = Some(memory.len());
-        memory.push(Some(Value::Elements(Vec::new())));
+        memory.push(Some(Value::Elements(Vec::new().into())));
         if self.induction && self.needs_induction(instance) {
             if self.startup {
                 return Err(
@@ -427,6 +428,7 @@ impl<'tcx> Engine<'tcx> {
             } => {
                 format!("local atomic allocation {allocation}; {bits}-bit signed={signed}")
             }
+            Value::FunctionPointer { .. } => self.function_pointer_input_description(value)?,
             Value::Unit => "()".to_owned(),
             Value::Elements(elements) => {
                 for (index, element) in elements.iter().enumerate() {
@@ -452,7 +454,6 @@ impl<'tcx> Engine<'tcx> {
             | Value::Uninitialized
             | Value::TraitObject { .. }
             | Value::DebugReference { .. }
-            | Value::FunctionPointer { .. }
             | Value::Function => {
                 return Err("argument binding is unsupported".to_owned());
             }
@@ -604,6 +605,9 @@ impl<'tcx> Engine<'tcx> {
         if let Some(bits) = self.float_type(ty) {
             let raw = self.fresh(Sort::BitVec(bits));
             return Ok(symbolic::float_from_bits(&self.terms, raw, bits));
+        }
+        if matches!(ty.kind(), ty::FnPtr(..)) {
+            return self.opaque_function_pointer_input(ty);
         }
         if self.thin_raw_pointer(ty) {
             let bits = u32::from(self.tcx.sess.target.pointer_width);
@@ -1701,14 +1705,18 @@ impl<'tcx> Engine<'tcx> {
                 let value = self.place(state, *place)?;
                 let length = match value {
                     Value::Bytes { length, .. } => *length,
-                    Value::Elements(elements) | Value::StaticSlice { elements, .. } => {
-                        symbolic::integer(
-                            &self.terms,
-                            elements.len() as u128,
-                            u32::from(self.tcx.sess.target.pointer_width),
-                            false,
-                        )
-                    }
+                    Value::Elements(elements) => symbolic::integer(
+                        &self.terms,
+                        elements.len() as u128,
+                        u32::from(self.tcx.sess.target.pointer_width),
+                        false,
+                    ),
+                    Value::StaticSlice { elements, .. } => symbolic::integer(
+                        &self.terms,
+                        elements.len() as u128,
+                        u32::from(self.tcx.sess.target.pointer_width),
+                        false,
+                    ),
                     _ => {
                         return Err("metadata-only pointer needs array or slice storage".to_owned());
                     }
@@ -1866,15 +1874,20 @@ impl<'tcx> Engine<'tcx> {
                     (UnOp::PtrMetadata, Value::RawSlice { length, .. }) => Ok(*length),
                     (UnOp::PtrMetadata, Value::MetadataPointer(length)) => Ok(*length),
                     (UnOp::PtrMetadata, Value::Bytes { length, .. }) => Ok(*length),
-                    (
-                        UnOp::PtrMetadata,
-                        Value::Elements(elements) | Value::StaticSlice { elements, .. },
-                    ) => Ok(symbolic::integer(
+                    (UnOp::PtrMetadata, Value::Elements(elements)) => Ok(symbolic::integer(
                         &self.terms,
                         elements.len() as u128,
                         u32::from(self.tcx.sess.target.pointer_width),
                         false,
                     )),
+                    (UnOp::PtrMetadata, Value::StaticSlice { elements, .. }) => {
+                        Ok(symbolic::integer(
+                            &self.terms,
+                            elements.len() as u128,
+                            u32::from(self.tcx.sess.target.pointer_width),
+                            false,
+                        ))
+                    }
                     _ => Err("unsupported unary operation".to_owned()),
                 }
             }

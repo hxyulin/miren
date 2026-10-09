@@ -2067,7 +2067,7 @@ fn cargo_entries_select_workspace_roots_and_missing_or_failed_roots_cannot_pass(
         assert_eq!(actual, counts, "{entries:?}: {stdout}");
         assert!(stdout.contains("not line coverage or whole-crate safety"));
         if entries.contains(&"read") {
-            assert!(stdout.contains("unsupported argument type"));
+            assert!(stdout.contains("indirect call through an arbitrary function-pointer input"));
         }
         if entries.contains(&"absent") {
             assert!(stderr.contains("entry \"absent\" has no inventoried MIR body"));

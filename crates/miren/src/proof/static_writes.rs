@@ -40,7 +40,12 @@ impl<'tcx> Engine<'tcx> {
                     Self::collect_static_store_references(field, roots)?;
                 }
             }
-            Value::Enum { variants, .. } | Value::Tuple(variants) | Value::Elements(variants) => {
+            Value::Enum { variants, .. } | Value::Tuple(variants) => {
+                for variant in variants {
+                    Self::collect_static_store_references(variant, roots)?;
+                }
+            }
+            Value::Elements(variants) => {
                 for variant in variants {
                     Self::collect_static_store_references(variant, roots)?;
                 }
@@ -218,7 +223,7 @@ impl<'tcx> Engine<'tcx> {
                 self.static_store_value(*pointee, &value, state, depth + 1, values)
             }
             (ty::FnPtr(..), Value::FunctionPointer { .. }) => {
-                self.known_function_pointer(&value, ty).map(|_| ())
+                self.validate_function_pointer(&value, ty)
             }
             (ty::Tuple(types), Value::Unit) if types.is_empty() => Ok(()),
             (ty::Tuple(types), Value::Tuple(fields)) if types.len() == fields.len() => {

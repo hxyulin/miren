@@ -1,6 +1,17 @@
 use super::*;
 use rustc_middle::ty::adjustment::PointerCoercion;
 
+#[derive(Clone, Copy, PartialEq)]
+pub(super) enum Target<'tcx> {
+    Known {
+        instance: ty::Instance<'tcx>,
+        signature: Ty<'tcx>,
+    },
+    Opaque {
+        signature: Ty<'tcx>,
+    },
+}
+
 impl<'tcx> Engine<'tcx> {
     pub(super) fn reify_function_pointer(
         &mut self,
@@ -40,21 +51,11 @@ impl<'tcx> Engine<'tcx> {
         if expected != target {
             return Err("function-pointer coercion changes the callable signature".into());
         }
-        let entry = (instance, target);
-        let id = if let Some(id) = self
-            .function_pointers
-            .iter()
-            .position(|item| *item == entry)
-        {
-            id
-        } else {
-            if self.function_pointers.len() >= 512 {
-                return Err("known function-pointer registry exceeds 512 targets".into());
-            }
-            let id = self.function_pointers.len();
-            self.function_pointers.push(entry);
-            id
+        let entry = Target::Known {
+            instance,
+            signature: target,
         };
+        let id = self.register_function_pointer(entry)?;
         Ok(Value::FunctionPointer { id })
     }
 
@@ -66,10 +67,19 @@ impl<'tcx> Engine<'tcx> {
         let Value::FunctionPointer { id } = value else {
             return Err("indirect call needs a known function-pointer target".into());
         };
-        let (instance, signature) = self
-            .function_pointers
+        let pointers = self.function_pointers.borrow();
+        let target = pointers
             .get(*id)
             .ok_or("function-pointer target is missing")?;
+        let Target::Known {
+            instance,
+            signature,
+        } = target
+        else {
+            return Err(
+                "indirect call through an arbitrary function-pointer input is unsupported".into(),
+            );
+        };
         let callable = self.tcx.erase_and_anonymize_regions(callable);
         if callable != *signature {
             return Err("indirect-call signature differs from its known target".into());

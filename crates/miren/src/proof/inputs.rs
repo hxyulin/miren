@@ -176,6 +176,10 @@ impl<'tcx> Engine<'tcx> {
                 let (bits, signed) = self.integer_type(ty).ok_or("lazy integer type mismatch")?;
                 InputKind::Integer { bits, signed }
             }
+            ty::FnPtr(..) => {
+                let id = self.opaque_function_pointer_id(ty)?;
+                InputKind::FunctionPointer { id }
+            }
             ty::Float(_) => {
                 let Some(bits) = self.float_type(ty) else {
                     return Ok(None);
@@ -259,6 +263,7 @@ impl<'tcx> Engine<'tcx> {
             | InputKind::Integer { .. }
             | InputKind::Float { .. }
             | InputKind::Unit
+            | InputKind::FunctionPointer { .. }
             | InputKind::Bytes { .. } => 1,
             InputKind::Tuple(fields) => fields.iter().try_fold(1_u32, |sum, field| {
                 sum.checked_add(field.slots)
@@ -281,6 +286,7 @@ impl<'tcx> Engine<'tcx> {
             | InputKind::Integer { .. }
             | InputKind::Float { .. }
             | InputKind::Unit
+            | InputKind::FunctionPointer { .. }
             | InputKind::Bytes { .. } => 1,
             InputKind::Tuple(fields) => {
                 1 + fields.iter().map(|field| field.height).max().unwrap_or(0)

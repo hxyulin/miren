@@ -190,3 +190,8 @@ origins, raw dereferences and unsupported reference-array selection remain UNKNO
 The [coverage guide](../../docs/coverage.md) is the maintained feature reference. The
 [proof guide](../../docs/proofs.md) explains the encoding and limitations, and the
 [development guide](../../docs/development.md) lists required checks.
+
+Arbitrary function-pointer inputs retain their exact compiler signature as opaque values, including
+unsafe callbacks and Waker table fields. Unused or copied fields do not choose a callback target.
+Calls, address casts, pointer comparisons and native replay of these inputs remain UNKNOWN.
+Concrete function-item pointers continue executing their actual bodies and effects.

@@ -364,7 +364,7 @@ pub fn shapes_cached_by_previous_fields_still_obey_depth(input: &SharedDepthProb
 
 pub struct SharedUnsupportedProbe {
     pub payloads: Shelves,
-    pub unused: fn() -> u16,
+    pub unused: &'static dyn core::fmt::Debug,
 }
 
 pub fn cached_shapes_do_not_hide_unsupported_types(input: &SharedUnsupportedProbe) {

@@ -19,6 +19,9 @@ pub enum InputKind {
         bits: u32,
     },
     Unit,
+    FunctionPointer {
+        id: usize,
+    },
     Bytes {
         count: u64,
         pointer_bits: u32,
@@ -53,6 +56,7 @@ impl InputValue {
             | InputKind::Integer { .. }
             | InputKind::Float { .. }
             | InputKind::Unit
+            | InputKind::FunctionPointer { .. }
             | InputKind::Bytes { .. } => child.materialize(),
             InputKind::Tuple(_) | InputKind::Struct { .. } | InputKind::Array { .. } => {
                 Ok(Value::Input(child))
@@ -80,6 +84,7 @@ impl InputValue {
                 *bits,
             )),
             InputKind::Unit => Ok(Value::Unit),
+            InputKind::FunctionPointer { id } => Ok(Value::FunctionPointer { id: *id }),
             InputKind::Bytes {
                 count,
                 pointer_bits,

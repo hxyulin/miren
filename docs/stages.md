@@ -1347,3 +1347,12 @@ lengths, paths, operations and malformed lists are not collapsed. The grouping i
 metadata, not semantic equivalence or proof progress. Mutation tests distinguish actual type and
 operation changes. Replaying the fourth-to-fifth comparison separates twenty changed source
 keys from nineteen compiler-display-only changes without modifying their UNKNOWN outcomes.
+
+## Stage 88: Typed opaque function-pointer inputs
+
+Valid arbitrary callback inputs retain exact compiler signatures without selecting targets,
+addresses or effects. Eager and lazy input fields, Waker tables and exact typed stores support
+unused witnesses within the existing input and registry budgets. Opaque invocation, identity
+comparisons, address casts and native replay remain UNKNOWN. Concrete known function-item targets
+retain ordinary execution and contract behavior. Compiler tests cover positive, refuted and unknown
+cases on host/ARM, unsafe signatures, signature mutations and native guard mutations.
