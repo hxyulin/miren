@@ -1122,3 +1122,13 @@ array or an array of unit-only values. Unsupported element types remain unsuppor
 length zero. Partial initialization, wrapper repetition, `array_assume_init`, raw/static access
 and reference-forming methods remain separate frontiers. The baseline now contains 35 cases in
 15 families, expecting 60 PROVED, 52 REFUTED and 28 UNKNOWN outcomes across host/ARM O0/O2.
+
+Stage 140 checks Unicode scalar validity at character formation and typed value boundaries.
+Actual core checked conversions execute and prove their integer-to-character conversion from
+existing path conditions. Invalid or unconstrained encodings return Semantics UNKNOWN; validity
+is never inserted as a premise. Refined scalar targets additionally prove their original compiler
+pattern, preserving previously supported valid conversions. Initialized static character reads
+use a domain encoding that covers every Unicode scalar without restoring the initializer or
+write history. Cached, stored and startup values require proof of validity instead. Uninitialized
+and uncertified raw access retain their separate UNKNOWN boundaries. The expanded baseline has
+38 cases across 16 families: 64 PROVED, 56 REFUTED and 32 UNKNOWN across host/ARM O0/O2.

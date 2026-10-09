@@ -119,6 +119,13 @@ children; byte arrays preserve only actual u8 values and checked length/data met
 empty arrays and unit-only arrays can have a unique zero-byte value. This does not establish
 initialization of individual raw-written fields or elements of an array of wrappers.
 
+Stage 140 distinguishes character formation from a fresh initialized character observation.
+A cast or retained value must already satisfy the Unicode scalar predicate under the current
+path conditions. Certified initialized declared-char storage may instead generate an arbitrary
+valid character: mapping an unconstrained word to itself when valid and zero otherwise preserves
+every valid character and covers the full valid domain. It restores no initializer or history,
+and never repairs a write, retained value or uncertified read.
+
 Retaining a value requires a visibility policy. Owned storage with no possible external mutation
 can retain exact values. Shared mutable statics retain at most initialization facts justified by
 the environment; their initializer is not the runtime state of an arbitrary selected root.

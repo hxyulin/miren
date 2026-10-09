@@ -183,6 +183,22 @@
       "family": "maybe_uninit",
       "expected": "unknown",
       "unknown_reason": "MaybeUninit payload is not initialized"
+    },
+    {
+      "entry": "checked_char",
+      "family": "char",
+      "expected": "proved"
+    },
+    {
+      "entry": "checked_char_wrong_claim",
+      "family": "char",
+      "expected": "refuted"
+    },
+    {
+      "entry": "char_invalid_float_bits",
+      "family": "char",
+      "expected": "unknown",
+      "unknown_reason": "char formation requires a proven Unicode scalar value"
     }
   ]
 }

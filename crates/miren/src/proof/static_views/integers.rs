@@ -90,6 +90,9 @@ impl<'tcx> Engine<'tcx> {
                 if *width != bits || *sign != signed || *expression.sort() != Sort::BitVec(bits) {
                     return Err("startup integer payload cache has an inconsistent type".into());
                 }
+                if view.ty.is_char() {
+                    self.prove_char_value(value, &state.conditions)?;
+                }
                 return Ok(Some(value.clone()));
             }
             if !state.memory.startup_initializer_available(location) {
@@ -100,24 +103,37 @@ impl<'tcx> Engine<'tcx> {
             if state.memory.startup_values.len() >= startup::MAX_STARTUP_LOCATIONS {
                 return Err("startup integer history exceeds the 128-location budget".into());
             }
-            return Ok(Some(symbolic::integer(
+            let value = symbolic::integer(
                 &self.terms,
                 self.startup_scalar_initializer(location)?,
                 bits,
                 signed,
-            )));
+            );
+            if view.ty.is_char() {
+                self.prove_char_value(&value, &state.conditions)?;
+            }
+            return Ok(Some(value));
         }
-        Ok(Some(Value::Int {
-            expression: self.fresh_abstraction(
-                Sort::BitVec(bits),
-                if self.startup {
-                    "mutable integer static reads admit arbitrary valid values; startup and \
+        let expression = self.fresh_abstraction(
+            Sort::BitVec(bits),
+            if view.ty.is_char() {
+                "initialized char observations use a Unicode scalar domain encoding; \
+                     startup and exclusion are not retained"
+            } else if self.startup {
+                "mutable integer static reads admit arbitrary valid values; startup and \
                      exclusion are invalidated"
-                } else {
-                    "mutable integer static reads admit arbitrary valid values; startup and \
+            } else {
+                "mutable integer static reads admit arbitrary valid values; startup and \
                      exclusion are unverified"
-                },
-            ),
+            },
+        );
+        let expression = if view.ty.is_char() {
+            characters::valid_char_observation(&self.terms, &expression)?
+        } else {
+            expression
+        };
+        Ok(Some(Value::Int {
+            expression,
             bits,
             signed,
         }))
@@ -129,6 +145,9 @@ impl<'tcx> Engine<'tcx> {
         value: &Value,
         state: &mut State,
     ) -> Result<bool, String> {
+        if view.ty.is_char() {
+            self.prove_char_value(value, &state.conditions)?;
+        }
         if !self.startup {
             return Ok(false);
         }

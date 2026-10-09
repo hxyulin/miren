@@ -1405,7 +1405,9 @@ impl<'tcx> Engine<'tcx> {
             integer(base),
             symbolic::integer(&self.terms, u128::from(view.offset), bits, false),
         )?;
-        symbolic::cast(&self.terms, address, target_bits, signed)
+        let value = symbolic::cast(&self.terms, address, target_bits, signed)?;
+        self.prove_scalar_target(target, &value, &state.conditions)?;
+        Ok(value)
     }
 }
 

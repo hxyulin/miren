@@ -2867,3 +2867,43 @@ Final standalone evidence: `/tmp/miren-stage139-capabilities-20261010`, with 60 
 Validation passes 589 Rust tests, 67 Python tests, formatting, cargo lint, release builds,
 cargo deny, documentation build and manual hooks. Independent review approves the array and
 zero-byte certificates, precise metadata guards and continued access-permission boundaries.
+
+
+## Stage 140: character validity and checked scalar formation
+
+Character representations require unsigned 32-bit terms in the current symbolic context and
+proved Unicode scalar validity: at most 0x10ffff, excluding 0xd800 through 0xdfff. Formation,
+operands, assignments, returns, stores and trusted-storage boundaries check existing conditions.
+Feasible invalid encodings and incomplete solver answers remain UNKNOWN. Compiler pattern types
+retain their raw metadata and additionally prove their actual refinement and base validity.
+Valid existing refined float-bit and pointer conversions remain supported.
+
+Actual core checked and guarded unchecked character conversions execute. Exact u32/i32-to-char
+and char-to-integer transmutation preserves compiler size, alignment and representation checks.
+Float bit conversion validates both the float expression and retained bit encoding before use.
+Numeric pointer exposure and static-address conversion cannot manufacture invalid characters.
+No named callee summary, validity assumption or application rewrite is added.
+
+Fresh reads from already certified initialized character storage use a Unicode domain encoding
+that is identical on every valid scalar and maps invalid abstract bit patterns to zero. This
+covers every valid character and removes spurious invalid-character witnesses without assuming
+the initializer or temporal history. Cached, startup and stored values are checked directly;
+uninitialized and uncertified storage never receives this encoding or new access permission.
+
+The audit confirmed earlier invalid float-bit character proofs on host/ARM O0/O2 and invalid
+pointer conversions on ARM. It also found false refutations caused by unrestricted initialized
+character observations. Compiler controls cover these routes, Unicode boundaries, original
+refined patterns, valid conversions and missing initialization. Native tests execute valid
+conversions only. An actual checked-conversion argument mutation refutes in all four builds and
+fails native O0/O2 tests. A symbolic unit check proves the domain encoding's validity and identity
+over the entire 32-bit domain, and rejects forged contexts, widths and float metadata.
+
+The strict capability baseline expands to 38 cases across 16 families, with 16 PROVED,
+14 REFUTED and 8 UNKNOWN per configuration. Owned `MaybeUninit<char>` payloads and arbitrary
+refined static domain encodings remain separate coverage gaps.
+
+Final standalone evidence: `/tmp/miren-stage140-capabilities-20261010`, with 64 PROVED,
+56 REFUTED and 32 UNKNOWN outcomes, unchanged frozen inputs/binaries and no collection errors.
+Validation passes 592 Rust tests, 67 Python tests, formatting, cargo lint, release builds,
+cargo deny, documentation build and manual hooks. Independent review approves the validity
+boundaries, preservation of valid refined conversions and full initialized-character domain.

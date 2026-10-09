@@ -177,6 +177,9 @@ impl<'tcx> Engine<'tcx> {
         if !ty.is_freeze(self.tcx, env) {
             return Err("typed static stores require owned freeze values".into());
         }
+        if ty.is_char() {
+            return self.prove_char_value(&value, &state.conditions);
+        }
         if let Some((bits, signed)) = self.integer_type(ty) {
             let (_, actual_bits, actual_signed) = value.integer()?;
             return if (bits, signed) == (actual_bits, actual_signed) {

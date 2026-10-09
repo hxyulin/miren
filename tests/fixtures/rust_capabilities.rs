@@ -249,6 +249,25 @@ pub fn maybe_uninit_array_uninitialized() -> [u16; 3] {
     unsafe { core::mem::MaybeUninit::<[u16; 3]>::uninit().assume_init() }
 }
 
+pub fn checked_char(value: u32) {
+    if let Some(character) = core::char::from_u32(value) {
+        assert!(character as u32 == value);
+    } else {
+        assert!(value > 0x10ffff || (0xd800 <= value && value <= 0xdfff));
+    }
+}
+
+pub fn checked_char_wrong_claim(value: u32) {
+    if let Some(character) = core::char::from_u32(value) {
+        assert!(character as u32 != value);
+    }
+}
+
+pub fn char_invalid_float_bits() -> char {
+    // Analysis-only: never execute this invalid character formation.
+    unsafe { core::mem::transmute(f32::from_bits(0xd800)) }
+}
+
 #[cfg(test)]
 mod native {
     use super::*;
@@ -262,6 +281,19 @@ mod native {
         maybe_uninit_round_trip(u32::MAX, true);
         maybe_uninit_array([0, 1, u16::MAX]);
         maybe_uninit_array([u16::MAX, 0, 7]);
+        for value in [
+            0,
+            0x41,
+            0xd7ff,
+            0xd800,
+            0xdfff,
+            0xe000,
+            0x10ffff,
+            0x110000,
+            u32::MAX,
+        ] {
+            checked_char(value);
+        }
         for index in 0..3 {
             tuple_array_choice(index);
         }

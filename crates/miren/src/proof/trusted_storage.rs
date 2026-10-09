@@ -160,6 +160,9 @@ impl<'tcx> Engine<'tcx> {
             };
             return self.trusted_owned_term(expression, &Sort::Bool);
         }
+        if ty.is_char() {
+            self.prove_char_value(value, conditions)?;
+        }
         if let Some((bits, signed)) = self.integer_type(ty) {
             let (expression, actual_bits, actual_signed) = value.integer()?;
             if bits != actual_bits || signed != actual_signed {

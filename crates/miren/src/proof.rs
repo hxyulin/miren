@@ -28,6 +28,7 @@ mod atomic_intrinsics;
 mod atomic_rmw;
 mod builtins;
 mod call_metadata;
+mod characters;
 mod constants;
 mod coroutines;
 mod enum_transmutes;
@@ -619,30 +620,9 @@ impl<'tcx> Engine<'tcx> {
                 bits: 32,
                 signed: false,
             };
-            let within = symbolic::binary(
+            conditions.push(characters::unicode_scalar(
                 &self.terms,
-                "le",
-                value.clone(),
-                symbolic::integer(&self.terms, 0x10ffff, 32, false),
-            )?
-            .boolean()?;
-            let below = symbolic::binary(
-                &self.terms,
-                "lt",
-                value.clone(),
-                symbolic::integer(&self.terms, 0xd800, 32, false),
-            )?
-            .boolean()?;
-            let above = symbolic::binary(
-                &self.terms,
-                "gt",
-                value.clone(),
-                symbolic::integer(&self.terms, 0xdfff, 32, false),
-            )?
-            .boolean()?;
-            conditions.push(self.terms.apply(
-                Op::And,
-                &[within, self.terms.apply(Op::Or, &[below, above])?],
+                &value.integer()?.0,
             )?);
             return Ok(value);
         }
@@ -1182,6 +1162,9 @@ impl<'tcx> Engine<'tcx> {
                         self.local(&state, 0)?
                     };
                     self.validate_maybe_uninit_value(body.return_ty(), &value)?;
+                    if self.restricted_scalar_target(body.return_ty()) {
+                        self.prove_scalar_target(body.return_ty(), &value, &state.conditions)?;
+                    }
                     self.validate_mutable_handle_rights(body.return_ty(), &value)?;
                     self.validate_frame_escape(&value, &state, incoming_allocations)
                         .map_err(|error| {
@@ -1576,6 +1559,13 @@ impl<'tcx> Engine<'tcx> {
                 let (place, value) = assignment.as_ref();
                 let value = self.rvalue(id, body, state, value)?;
                 self.validate_maybe_uninit_value(place.ty(&body.local_decls, self.tcx).ty, &value)?;
+                if self.restricted_scalar_target(place.ty(&body.local_decls, self.tcx).ty) {
+                    self.prove_scalar_target(
+                        place.ty(&body.local_decls, self.tcx).ty,
+                        &value,
+                        &state.conditions,
+                    )?;
+                }
                 self.write(state, *place, value)
             }
             StatementKind::SetDiscriminant {
@@ -1803,7 +1793,15 @@ impl<'tcx> Engine<'tcx> {
                 if matches!(value, Value::TraitObject { place: true, .. }) {
                     return Err("owned unsized trait payload reads remain unsupported".into());
                 }
-                self.static_view_operand(value, state)
+                let value = self.static_view_operand(value, state)?;
+                if self.restricted_scalar_target(place.ty(&body.local_decls, self.tcx).ty) {
+                    self.prove_scalar_target(
+                        place.ty(&body.local_decls, self.tcx).ty,
+                        &value,
+                        &state.conditions,
+                    )?;
+                }
+                Ok(value)
             }
             Operand::RuntimeChecks(checks) => {
                 Ok(Value::Bool(self.terms.boolean(checks.value(self.tcx.sess))))
@@ -1837,6 +1835,21 @@ impl<'tcx> Engine<'tcx> {
     }
 
     fn rvalue(
+        &mut self,
+        id: DefId,
+        body: &Body<'tcx>,
+        state: &mut State,
+        rvalue: &Rvalue<'tcx>,
+    ) -> Result<Value, String> {
+        let value = self.rvalue_inner(id, body, state, rvalue)?;
+        let target = rvalue.ty(&body.local_decls, self.tcx);
+        if self.restricted_scalar_target(target) {
+            self.prove_scalar_target(target, &value, &state.conditions)?;
+        }
+        Ok(value)
+    }
+
+    fn rvalue_inner(
         &mut self,
         id: DefId,
         body: &Body<'tcx>,
@@ -2160,7 +2173,8 @@ impl<'tcx> Engine<'tcx> {
                 }
                 if matches!(value, Value::TrackedPointer { .. }) {
                     self.validate_tracked_value(&value, state)?;
-                    let value = self.pointer_handle_cast(*kind, source, *target, value)?;
+                    let value =
+                        self.pointer_handle_cast(*kind, source, *target, value, &state.conditions)?;
                     self.record_model(id, "tracked raw address cast; no raw memory access");
                     return Ok(value);
                 }
@@ -2169,7 +2183,8 @@ impl<'tcx> Engine<'tcx> {
                     self.record_model(id, "tracked reference address; no raw memory access");
                     return Ok(value);
                 }
-                let value = self.pointer_handle_cast(*kind, source, *target, value)?;
+                let value =
+                    self.pointer_handle_cast(*kind, source, *target, value, &state.conditions)?;
                 self.record_model(id, "thin integer-derived pointer handle; no memory access");
                 Ok(value)
             }
@@ -2192,6 +2207,15 @@ impl<'tcx> Engine<'tcx> {
             Rvalue::Cast(CastKind::Transmute, operand, target) => {
                 let source = operand.ty(&body.local_decls, self.tcx);
                 let value = self.operand(id, body, state, operand)?;
+                if let Some(value) =
+                    self.char_transmute(source, *target, &value, &state.conditions)?
+                {
+                    self.record_model(
+                        id,
+                        "exact compiler char scalar representation; Unicode validity proved",
+                    );
+                    return Ok(value);
+                }
                 if let Some(value) = self.maybe_uninit_transmute(source, *target, &value)? {
                     self.record_model(
                         id,
@@ -2278,7 +2302,9 @@ impl<'tcx> Engine<'tcx> {
                     );
                     return Ok(value);
                 }
-                if let Some(value) = self.pointer_handle_transmute(source, *target, &value)? {
+                if let Some(value) =
+                    self.pointer_handle_transmute(source, *target, &value, &state.conditions)?
+                {
                     self.record_model(id, "thin pointer representation; no memory access");
                     return Ok(value);
                 }
@@ -2292,7 +2318,10 @@ impl<'tcx> Engine<'tcx> {
                     && let Some((target_bits, signed)) = self.integer_type(*target)
                     && target_bits == bits
                 {
-                    return self.float_to_bits(value, bits, signed);
+                    characters::validate_float_encoding(&self.terms, &value, bits)?;
+                    let value = self.float_to_bits(value, bits, signed)?;
+                    self.prove_scalar_target(*target, &value, &state.conditions)?;
+                    return Ok(value);
                 }
                 if let Some((source_bits, _)) = self.integer_type(source)
                     && let Some(bits) = self.float_type(*target)
@@ -2309,6 +2338,11 @@ impl<'tcx> Engine<'tcx> {
                 ))
             }
             Rvalue::Cast(CastKind::FloatToInt, operand, target) => {
+                if !matches!(target.kind(), ty::Int(_) | ty::Uint(_)) {
+                    return Err(
+                        "float-to-integer cast requires an exact Rust integer target".into(),
+                    );
+                }
                 let (bits, signed) = self
                     .integer_type(*target)
                     .ok_or("unsupported cast target")?;

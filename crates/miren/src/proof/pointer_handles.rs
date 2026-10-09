@@ -11,6 +11,7 @@ impl<'tcx> Engine<'tcx> {
         source: Ty<'tcx>,
         target: Ty<'tcx>,
         value: &Value,
+        conditions: &[Term],
     ) -> Result<Option<Value>, String> {
         let width = u32::from(self.tcx.sess.target.pointer_width);
         if !self.thin_raw_pointer(source) {
@@ -26,6 +27,7 @@ impl<'tcx> Engine<'tcx> {
                     source,
                     target,
                     value.clone(),
+                    conditions,
                 )
                 .map(Some);
         }
@@ -76,6 +78,7 @@ impl<'tcx> Engine<'tcx> {
         source: Ty<'tcx>,
         target: Ty<'tcx>,
         value: Value,
+        conditions: &[Term],
     ) -> Result<Value, String> {
         let width = u32::from(self.tcx.sess.target.pointer_width);
         match kind {
@@ -103,7 +106,7 @@ impl<'tcx> Engine<'tcx> {
                 let (bits, signed) = self
                     .integer_type(target)
                     .ok_or("pointer address exposure requires an integer target")?;
-                symbolic::cast(
+                let value = symbolic::cast(
                     &self.terms,
                     Value::Int {
                         expression: address,
@@ -112,7 +115,9 @@ impl<'tcx> Engine<'tcx> {
                     },
                     bits,
                     signed,
-                )
+                )?;
+                self.prove_scalar_target(target, &value, conditions)?;
+                Ok(value)
             }
             CastKind::PtrToPtr
                 if self.thin_raw_pointer(source) && self.thin_raw_pointer(target) =>

@@ -574,3 +574,14 @@ arrays retain exact typed elements and available float bits. Closed unique zero-
 only their exact empty or unit-only values. Whole copies and assignments preserve payload state.
 Partial initialization, raw/reference access, wrapper repeats and `array_assume_init` remain
 UNKNOWN.
+
+Character values keep their unsigned 32-bit representation, with the compiler's Unicode scalar
+validity checked against the existing path before scalar formation, assignment, use, return, or
+retained typed storage. Actual core `char::from_u32` and guarded `from_u32_unchecked` bodies execute
+through their checked integer transmute. Valid integer, float-bit, and existing numeric pointer
+representations remain supported; a surrogate, out-of-range encoding, or unproved encoding is
+`UNKNOWN` rather than silently restricting the path. Existing refined integer/character targets
+also require their original compiler scalar pattern, without erasing that metadata. Fresh reads
+of already certified initialized character statics encode arbitrary observations into the Unicode
+scalar domain, covering every valid character without restoring an initializer, history, or access
+rights. Raw/uninitialized storage and `MaybeUninit<char>` remain outside this capability.
