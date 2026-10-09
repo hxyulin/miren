@@ -1,0 +1,125 @@
+{
+  "schema_version": 1,
+  "fixture": "tests/fixtures/rust_capabilities.rs",
+  "cases": [
+    {
+      "entry": "integers",
+      "family": "integer",
+      "expected": "proved"
+    },
+    {
+      "entry": "integer_overflow",
+      "family": "integer",
+      "expected": "refuted"
+    },
+    {
+      "entry": "enum_payload",
+      "family": "enum_aggregate",
+      "expected": "proved"
+    },
+    {
+      "entry": "enum_wrong_claim",
+      "family": "enum_aggregate",
+      "expected": "refuted"
+    },
+    {
+      "entry": "array_index",
+      "family": "array_index",
+      "expected": "proved"
+    },
+    {
+      "entry": "array_out_of_bounds",
+      "family": "array_index",
+      "expected": "refuted"
+    },
+    {
+      "entry": "reference_effects",
+      "family": "reference_slice",
+      "expected": "proved"
+    },
+    {
+      "entry": "reference_wrong_claim",
+      "family": "reference_slice",
+      "expected": "refuted"
+    },
+    {
+      "entry": "generic_call",
+      "family": "generic",
+      "expected": "proved"
+    },
+    {
+      "entry": "closure_call",
+      "family": "closure",
+      "expected": "proved"
+    },
+    {
+      "entry": "closure_wrong_claim",
+      "family": "closure",
+      "expected": "refuted"
+    },
+    {
+      "entry": "iterator_effects",
+      "family": "iterator",
+      "expected": "proved"
+    },
+    {
+      "entry": "iterator_wrong_claim",
+      "family": "iterator",
+      "expected": "refuted"
+    },
+    {
+      "entry": "finite_loop",
+      "family": "finite_loop",
+      "expected": "proved"
+    },
+    {
+      "entry": "finite_loop_wrong_claim",
+      "family": "finite_loop",
+      "expected": "refuted"
+    },
+    {
+      "entry": "drop_effects",
+      "family": "drop",
+      "expected": "proved"
+    },
+    {
+      "entry": "drop_wrong_claim",
+      "family": "drop",
+      "expected": "refuted"
+    },
+    {
+      "entry": "async_poll",
+      "family": "async_poll",
+      "expected": "proved"
+    },
+    {
+      "entry": "async_wrong_claim",
+      "family": "async_poll",
+      "expected": "refuted"
+    },
+    {
+      "entry": "open_function_pointer",
+      "family": "open_dispatch",
+      "expected": "unknown",
+      "unknown_reason": "indirect call through an arbitrary function-pointer input is unsupported"
+    },
+    {
+      "entry": "open_trait_object",
+      "family": "open_dispatch",
+      "expected": "unknown",
+      "unknown_reason": "unsupported argument type dyn"
+    },
+    {
+      "entry": "open_slice",
+      "family": "unbounded_slice",
+      "expected": "unknown",
+      "unknown_reason": "only read-only byte slices and byte arrays are modeled"
+    },
+    {
+      "entry": "retained_prefix_index",
+      "family": "reference_slice",
+      "expected": "unknown",
+      "unknown_reason": "unsupported memory projection"
+    }
+  ]
+}

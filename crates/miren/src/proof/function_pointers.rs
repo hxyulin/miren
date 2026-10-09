@@ -81,9 +81,10 @@ impl<'tcx> Engine<'tcx> {
             signature,
         } = target
         else {
-            return Err(
+            return Err(self.categorized_error(
+                UnknownCategory::Semantics,
                 "indirect call through an arbitrary function-pointer input is unsupported".into(),
-            );
+            ));
         };
         let callable = self.tcx.erase_and_anonymize_regions(callable);
         if callable != *signature {

@@ -1070,7 +1070,10 @@ impl<'tcx> Engine<'tcx> {
         }
         self.require_static_initialization(view, state)?;
         if self.uninit_static_address(view)? {
-            return Err("uninitialized static payload borrowing remains unsupported".into());
+            return Err(self.categorized_error(
+                UnknownCategory::Semantics,
+                "uninitialized static payload borrowing remains unsupported".into(),
+            ));
         } else {
             if !self.certified_static_type(view)? {
                 return Err(

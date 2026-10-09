@@ -39,6 +39,7 @@ pub(super) fn cyclic_block(body: &Body<'_>, block: BasicBlock) -> bool {
 impl Engine<'_> {
     pub(super) fn record_retry_frontier(&mut self, id: DefId, span: Span) {
         self.proof.obligations.push(Obligation {
+            unknown_category: Some(UnknownCategory::ResourceLimit),
             function: self.tcx.def_path_str(id),
             source: super::super::source(self.tcx, span.source_callsite()),
             kind: ObligationKind::Unsupported,

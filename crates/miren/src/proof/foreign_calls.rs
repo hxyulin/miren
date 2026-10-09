@@ -93,7 +93,9 @@ impl<'tcx> Engine<'tcx> {
                 }
             }
         }
-        let target = unique_body(&candidates).map_err(str::to_owned)?;
+        let target = unique_body(&candidates).map_err(|reason| {
+            self.categorized_error(UnknownCategory::MissingCompilerEvidence, reason.into())
+        })?;
         let attrs = self.tcx.codegen_fn_attrs(target);
         if !strong_linkage(attrs.linkage)
             || !(attrs.flags.contains(CodegenFnAttrFlags::NO_MANGLE) || attrs.symbol_name.is_some())

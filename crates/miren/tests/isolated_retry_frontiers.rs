@@ -164,6 +164,10 @@ fn checked_returns_continue_while_unfinished_retry_paths_remain_unknown() {
                     .find(|obligation| obligation.detail.contains("weak-CAS retry frontier"))
                     .unwrap();
                 assert_eq!(unfinished.status, ProofStatus::Unknown);
+                assert_eq!(
+                    unfinished.unknown_category,
+                    Some(miren::UnknownCategory::ResourceLimit)
+                );
                 assert_eq!(unfinished.function, "retry_value");
                 assert_eq!(unfinished.call_chain, vec![name, "retry_value"]);
             }

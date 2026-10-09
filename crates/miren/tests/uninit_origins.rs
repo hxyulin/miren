@@ -166,11 +166,11 @@ fn compiler_certifies_uninitialized_container_construction_without_payload_reads
                         .proof
                         .as_ref()
                         .unwrap();
-                    assert!(
-                        proof.obligations.iter().any(|o| o.detail.contains(
+                    assert!(proof.obligations.iter().any(|o| o.unknown_category
+                        == Some(miren::UnknownCategory::Semantics)
+                        && o.detail.contains(
                             "uninitialized static payload borrowing remains unsupported"
-                        ))
-                    );
+                        )));
                 }
                 if matches!(
                     entry,

@@ -2645,3 +2645,31 @@ Final validation passes 570 Rust workspace tests and 57 Python tests, formatting
 release builds and cargo deny. Documentation build and manual hooks complete the stage checks.
 The public model API remains a declarative hardware/storage policy boundary; correlated peripheral
 state and executable emulator callbacks require later work.
+
+
+## Stage 133: Rust capability baseline and structured UNKNOWN reporting
+
+General Rust execution becomes the next priority; fleet remains a regression workload. A shared
+manifest drives a compact core-only compiler suite and a standalone retained-report survey.
+The 23 cases cover 12 families on host/ARM at O0/O2: 40 PROVED, 36 REFUTED and 16 UNKNOWN total.
+Each unsupported control checks its intended frontier, and an actual helper mutation refutes
+on all four configurations while failing the native positive control. These are capability
+examples, not percentages of language completeness.
+
+Optional public UNKNOWN categories separate explicit semantic, compiler-evidence, solver,
+resource-limit and external-environment causes. Untagged/conflicting errors remain unclassified;
+legacy reports stay readable and outcomes/premises remain unchanged. Compiler controls exercise
+these categories without changing memory behavior.
+
+Pristine portable-atomic 1.15.0 and static_cell 2.1.1 sources, original licenses and archive/file
+hashes are vendored as test inputs. Existing actual-body and temporary-mutation controls consume
+these sources; no external unsafe code is added to the host workspace. A hash test prevents
+snapshot edits from silently changing compiler evidence.
+
+The [Rust capability roadmap](rust-capabilities.md) documents intended compiler/engine/model
+boundaries, the current API limits and the next typed-memory migration. This stage establishes
+the repeatable baseline; it does not complete that migration or a pluggable emulator interface.
+Final standalone evidence: `/tmp/miren-rust-capabilities-final-20261010`, with unchanged frozen
+analyzer binaries and input hashes, exact compiler configurations, no collection errors and no
+trusted premises. Final validation passes 575 Rust tests, 67 Python tests, formatting, cargo lint,
+release builds, cargo deny, documentation build and manual hooks.

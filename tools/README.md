@@ -325,3 +325,22 @@ and atomic precision remain invalidated. Dead epochs and retired/uninitialized s
 be restored. It assumes neither zero refcounts nor unused USB storage. Its distinct effect must
 appear in the exact recorded premise for a used boundary; the ordinary-frame profiles retain
 their earlier behavior.
+
+## Rust capability survey
+
+`rust_capability_survey.py` checks `tests/capabilities/rust.json` independently of fleet.
+Build release binaries, then supply a new output directory:
+
+```sh
+python3 tools/rust_capability_survey.py --output /tmp/rust-capabilities-001 \
+  --solver "$PWD/.venv/bin/z3"
+```
+
+The manifest is shared with `cargo test -p miren --test rust_capabilities`. Each case runs on host
+and ARM at O0/O2 with overflow checks and strict premises. Full reports, commands, binary hashes
+and input hashes are retained. Exit zero means the declared P/R/U expectations and unknown
+frontiers matched, not that all cases proved. Missing roots, assumptions, changed outcomes, absent
+refutation witnesses and changed fixture/manifest inputs fail the collection. The runner does not
+execute counterexamples; valid native/mutation controls live in the Cargo integration test.
+
+See [the capability roadmap](../docs/rust-capabilities.md) for scope and extension boundaries.

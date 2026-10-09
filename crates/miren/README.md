@@ -500,3 +500,25 @@ through its exact raw access operation, without pretending its uninitialized pay
 Uninitialized payload reference validity, including `&UnsafeCell<T>` before its payload is
 initialized, remains unsupported; exact raw access requires no such reference. Native mutation
 controls execute only the valid original raw-pointer store path.
+
+UNKNOWN obligations optionally record `unknown_category`: `semantics`,
+`missing_compiler_evidence`, `solver`, `resource_limit`, `external_environment`, or
+`unclassified`. These are diagnostic causes, never assumptions or proof outcomes. Explicit
+producer tags currently cover solver decisions, query/step/depth/time budgets, retained-body
+absence, uninitialized static payload-reference refusal, incoming function-pointer/trait-object
+and non-byte slice frontiers, finite non-byte prefix projections, and Cortex-M event/wait
+instructions.
+Other propagated string errors remain `unclassified`; the transitional reporter does not infer
+causes from keywords. PROVED and REFUTED obligations omit the field. Legacy reports lacking it
+still deserialize; regenerated coverage treats missing categories as `unclassified` and groups
+gaps by category and exact reason, preserving all root names. Saved coverage gaps also accept an
+absent optional category. Existing schema version and safety statuses are unchanged.
+
+The Rust capability baseline is independent of fleet and hardware contracts. Run
+`cargo test --locked -p miren --test rust_capabilities`; its shared manifest selects 23 cases across
+12 families on host/ARM at O0/O2, with positive/refuted/unknown and actual source-mutation controls.
+The standalone [survey](../../tools/rust_capability_survey.py) retains full reports and provenance.
+See [the Rust roadmap](../../docs/rust-capabilities.md) for scope and intended model boundaries.
+Portable-atomic/static-cell integration fixtures use pristine versioned sources under
+`tests/vendor`, with upstream licenses and a checked provenance manifest. They remain analyzed
+inputs outside the host workspace, not trusted summaries or a replacement for Rust semantics.

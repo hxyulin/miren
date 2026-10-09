@@ -115,7 +115,10 @@ impl<'tcx> Engine<'tcx> {
                 continue;
             }
             if self.started.elapsed().as_secs() >= self.limits.root_timeout_secs {
-                return Err("loop translation exceeded the root time budget".into());
+                return Err(self.categorized_error(
+                    UnknownCategory::ResourceLimit,
+                    "loop translation exceeded the root time budget".into(),
+                ));
             }
             let frame = frames[frame_index].clone();
             let id = frame.instance.def_id();
@@ -276,9 +279,12 @@ impl<'tcx> Engine<'tcx> {
                         ancestor = frames[index].resume.as_ref().map(|resume| resume.caller);
                     }
                     if depth >= self.limits.max_call_depth {
-                        return Err(format!(
-                            "inductive call graph exceeds the {}-frame depth limit",
-                            self.limits.max_call_depth
+                        return Err(self.categorized_error(
+                            UnknownCategory::ResourceLimit,
+                            format!(
+                                "inductive call graph exceeds the {}-frame depth limit",
+                                self.limits.max_call_depth
+                            ),
                         ));
                     }
                     let mut values = Vec::new();
@@ -364,11 +370,19 @@ impl<'tcx> Engine<'tcx> {
                 pending.push((frame_index, target));
             }
         }
-        let query = system.smt_with_timeout(
-            &self.terms,
-            self.limits.max_query_bytes,
-            self.limits.solver_timeout_ms,
-        )?;
+        let query = system
+            .smt_with_timeout(
+                &self.terms,
+                self.limits.max_query_bytes,
+                self.limits.solver_timeout_ms,
+            )
+            .map_err(|reason| {
+                if reason == "Horn query size limit reached" {
+                    self.categorized_error(UnknownCategory::ResourceLimit, reason)
+                } else {
+                    reason
+                }
+            })?;
         let result = self.solver.borrow_mut().inductive_model(&query);
         let (status, detail) = match result {
             Ok(model) => {
@@ -381,6 +395,7 @@ impl<'tcx> Engine<'tcx> {
             Err(reason) => (ProofStatus::Unknown, reason),
         };
         self.proof.obligations.push(Obligation {
+            unknown_category: (status == ProofStatus::Unknown).then_some(UnknownCategory::Solver),
             function: self.tcx.def_path_str(instance.def_id()),
             source: super::super::source(self.tcx, self.tcx.def_span(instance.def_id())),
             kind: ObligationKind::Validity,

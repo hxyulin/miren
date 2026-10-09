@@ -44,6 +44,7 @@ export default defineConfig({
           { text: 'Development and docs', link: '/development' },
           { text: 'Analyzer redesign', link: '/analyzer-redesign' },
           { text: 'Typed storage model', link: '/storage-model' },
+          { text: 'Rust capability baseline', link: '/rust-capabilities' },
           { text: 'Implementation stages', link: '/stages' },
         ],
       },

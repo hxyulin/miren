@@ -1,6 +1,6 @@
 #![forbid(unsafe_code)]
 
-use miren::{AnalysisLimits, ProofStatus, Report};
+use miren::{AnalysisLimits, ProofStatus, Report, UnknownCategory};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -29,6 +29,16 @@ fn fixture() -> PathBuf {
 }
 
 fn check(path: &Path, entry: &str, flags: &[&str], target: Option<&str>) -> Report {
+    check_with_solver(path, entry, flags, target, None)
+}
+
+fn check_with_solver(
+    path: &Path,
+    entry: &str,
+    flags: &[&str],
+    target: Option<&str>,
+    solver: Option<&Path>,
+) -> Report {
     let directory = Directory::new();
     let mut command = Command::new(env!("CARGO_BIN_EXE_miren"));
     command
@@ -39,7 +49,11 @@ fn check(path: &Path, entry: &str, flags: &[&str], target: Option<&str>) -> Repo
         .arg("--out-dir")
         .arg(&directory.0)
         .args(["-Cpanic=abort", "-Coverflow-checks=yes"])
-        .env_remove("MIREN_LIMITS");
+        .env_remove("MIREN_LIMITS")
+        .env_remove("MIREN_Z3");
+    if let Some(solver) = solver {
+        command.env("MIREN_Z3", solver);
+    }
     if let Some(target) = target {
         command.args(["--target", target]);
     }
@@ -102,6 +116,19 @@ fn larger_budgets_complete_bounded_work_and_keep_real_failures_on_host_and_arm()
                 result.obligations
             );
             assert!(result.trusted_calls.is_empty());
+            for obligation in &result.obligations {
+                if obligation.status == ProofStatus::Unknown {
+                    assert!(obligation.unknown_category.is_some());
+                    if entry != "unsupported_callback" {
+                        assert_eq!(
+                            obligation.unknown_category,
+                            Some(UnknownCategory::ResourceLimit)
+                        );
+                    }
+                } else {
+                    assert_eq!(obligation.unknown_category, None);
+                }
+            }
         }
         let low = check(
             &fixture(),
@@ -110,12 +137,10 @@ fn larger_budgets_complete_bounded_work_and_keep_real_failures_on_host_and_arm()
             target,
         );
         assert_eq!(proof(&low, "completed_batch").status, ProofStatus::Unknown);
-        assert!(
-            proof(&low, "completed_batch")
-                .obligations
-                .iter()
-                .any(|o| { o.detail.contains("query size limit") })
-        );
+        assert!(proof(&low, "completed_batch").obligations.iter().any(|o| {
+            o.detail.contains("query size limit")
+                && o.unknown_category == Some(UnknownCategory::ResourceLimit)
+        }));
     }
 }
 
@@ -288,5 +313,37 @@ fn relaxed_limits_expose_a_mutated_callee_and_older_reports_do_not_invent_limits
             Command::new(&executable).output().unwrap().status.success(),
             succeeds
         );
+    }
+}
+
+#[test]
+fn unavailable_solver_reports_its_cause_without_a_supported_outcome() {
+    let directory = Directory::new();
+    let missing = directory.0.join("no-solver-here");
+    for target in [None, Some("thumbv7em-none-eabihf")] {
+        let report = check_with_solver(
+            &fixture(),
+            "deep_checked",
+            &["--max-call-depth=32"],
+            target,
+            Some(&missing),
+        );
+        let result = proof(&report, "deep_checked");
+        assert_eq!(result.status, ProofStatus::Unknown);
+        let gaps: Vec<_> = result
+            .obligations
+            .iter()
+            .filter(|o| o.status == ProofStatus::Unknown)
+            .collect();
+        assert!(!gaps.is_empty());
+        assert!(
+            gaps.iter()
+                .all(|o| o.unknown_category == Some(UnknownCategory::Solver))
+        );
+        assert!(
+            gaps.iter()
+                .any(|o| o.detail.contains("cannot start Z3") && o.query.is_some())
+        );
+        assert!(result.assumptions.is_empty() && result.entry_assumptions.is_empty());
     }
 }

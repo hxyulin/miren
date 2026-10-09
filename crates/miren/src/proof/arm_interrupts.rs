@@ -95,7 +95,17 @@ impl<'tcx> Engine<'tcx> {
         if !supported_target(&target.arch, target.pointer_width, &target.llvm_target) {
             return Err("interrupt-register assembly requires a supported Cortex-M target".into());
         }
-        let operation = instruction(template).ok_or_else(|| unsupported_template(template))?;
+        let operation = instruction(template).ok_or_else(|| {
+            let category = match &template[..] {
+                [InlineAsmTemplatePiece::String(text)]
+                    if text == "sev" || text == "wfe" || text == "wfi" =>
+                {
+                    UnknownCategory::ExternalEnvironment
+                }
+                _ => UnknownCategory::Semantics,
+            };
+            self.categorized_error(category, unsupported_template(template))
+        })?;
         let required =
             InlineAsmOptions::NOMEM | InlineAsmOptions::NOSTACK | InlineAsmOptions::PRESERVES_FLAGS;
         let [destination] = targets.as_ref() else {

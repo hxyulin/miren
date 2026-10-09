@@ -105,7 +105,10 @@ impl<'tcx> Engine<'tcx> {
         } else {
             "; rebuild the dependency with MIR retention enabled"
         };
-        format!("MIR body unavailable for {name}{explanation}")
+        self.categorized_error(
+            UnknownCategory::MissingCompilerEvidence,
+            format!("MIR body unavailable for {name}{explanation}"),
+        )
     }
 
     pub(super) fn resolve_function_item(

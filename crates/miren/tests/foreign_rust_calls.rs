@@ -315,6 +315,27 @@ fn missing_or_unsupported_foreign_bodies_remain_unknown() {
                 ProofStatus::Unknown,
                 "{report:?}"
             );
+            let root = report
+                .functions
+                .iter()
+                .find(|f| f.name == "returned_value")
+                .unwrap()
+                .proof
+                .as_ref()
+                .unwrap();
+            assert!(
+                root.obligations
+                    .iter()
+                    .filter(|o| o.status == ProofStatus::Unknown)
+                    .all(|o| o.unknown_category.is_some())
+            );
+            if body.is_none() {
+                assert!(
+                    root.obligations.iter().any(|o| o.unknown_category
+                        == Some(miren::UnknownCategory::MissingCompilerEvidence)),
+                    "{root:?}"
+                );
+            }
         }
     }
 }

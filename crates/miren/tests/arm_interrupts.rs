@@ -304,6 +304,12 @@ fn bare_send_event_template_is_reported_before_primask_option_checks() {
     for optimized in [false, true] {
         let report = project.verify(Some("thumbv7em-none-eabihf"), optimized);
         let proof = proof(&report, "send_event");
+        assert!(
+            proof
+                .obligations
+                .iter()
+                .any(|o| o.unknown_category == Some(miren::UnknownCategory::ExternalEnvironment))
+        );
         assert_eq!(proof.status, ProofStatus::Unknown);
         assert!(proof.assumptions.is_empty());
         assert!(proof.trusted_calls.is_empty());

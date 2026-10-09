@@ -1,0 +1,2 @@
+# Upstream compiler fixtures must retain archive bytes, including original whitespace.
+tests/vendor/** -text -whitespace

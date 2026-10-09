@@ -18,10 +18,17 @@ impl Directory {
         std::fs::write(path.join("src/lib.rs"), source).unwrap();
         std::fs::write(
             path.join("Cargo.toml"),
-            concat!(
-                "[package]\nname='portable-atomic-fixture'\nversion='0.0.0'\nedition='2024'\n",
-                "[workspace]\n[dependencies]\nportable-atomic='=1.15.0'\nstatic_cell='=2.1.1'\n",
-                "[profile.release]\noverflow-checks=true\n"
+            format!(
+                concat!(
+                    "[package]\nname='portable-atomic-fixture'\nversion='0.0.0'\nedition='2024'\n",
+                    "[workspace]\nexclude=['changed-portable']\n[dependencies]\n",
+                    "portable-atomic={{path={:?}}}\nstatic_cell={{path={:?}}}\n",
+                    "[patch.crates-io]\nportable-atomic={{path={:?}}}\n",
+                    "[profile.release]\noverflow-checks=true\n"
+                ),
+                vendor("portable-atomic-1.15.0"),
+                vendor("static_cell-2.1.1"),
+                vendor("portable-atomic-1.15.0"),
             ),
         )
         .unwrap();
@@ -33,6 +40,12 @@ impl Drop for Directory {
     fn drop(&mut self) {
         let _ = std::fs::remove_dir_all(&self.0);
     }
+}
+
+fn vendor(name: &str) -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/vendor")
+        .join(name)
 }
 
 fn fixture() -> String {
@@ -201,7 +214,12 @@ fn changed_dependency_body_is_unknown() {
     std::fs::write(source_path, changed).unwrap();
     let manifest_path = directory.0.join("Cargo.toml");
     let mut manifest = std::fs::read_to_string(&manifest_path).unwrap();
-    manifest.push_str("\n[patch.crates-io]\nportable-atomic={path='changed-portable'}\n");
+    let original = format!(
+        "portable-atomic={{path={:?}}}",
+        vendor("portable-atomic-1.15.0")
+    );
+    assert!(manifest.contains(&original));
+    manifest = manifest.replace(&original, "portable-atomic={path='changed-portable'}");
     std::fs::write(manifest_path, manifest).unwrap();
     verify_entries(
         &directory,

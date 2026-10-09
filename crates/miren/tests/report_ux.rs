@@ -381,3 +381,82 @@ fn retired_static_storage_guidance_points_to_initialization_transitions() {
     assert!(display.contains("Check the named drop and matching typed store"));
     assert!(display.contains("partial stores do not restore a whole subobject"));
 }
+
+#[test]
+fn legacy_unknown_reports_keep_status_and_default_only_coverage_categories() {
+    let report = report(ProofStatus::Unknown, "legacy unsupported operation");
+    let proof = report.functions[0].proof.as_ref().unwrap();
+    assert_eq!(proof.status, ProofStatus::Unknown);
+    assert_eq!(proof.obligations[0].unknown_category, None);
+    assert_eq!(
+        report.coverage.gaps[0].unknown_category,
+        Some(miren::UnknownCategory::Unclassified)
+    );
+    let mut json = serde_json::to_value(&report).unwrap();
+    assert!(
+        json["functions"][0]["proof"]["obligations"][0]
+            .get("unknown_category")
+            .is_none()
+    );
+    json["coverage"]["gaps"][0]
+        .as_object_mut()
+        .unwrap()
+        .remove("unknown_category");
+    let restored: Report = serde_json::from_value(json).unwrap();
+    assert_eq!(restored.coverage.gaps[0].unknown_category, None);
+    assert_eq!(miren::coverage(&restored).unknown, 1);
+}
+
+#[test]
+fn gap_categories_separate_equal_reasons_and_never_change_outcomes() {
+    let mut report = report(ProofStatus::Unknown, "same reason");
+    let mut encoded = serde_json::to_value(&report.functions[0]).unwrap();
+    for (name, category) in [
+        ("semantic", "semantics"),
+        ("solver", "solver"),
+        ("external", "external_environment"),
+        ("compiler", "missing_compiler_evidence"),
+        ("budget", "resource_limit"),
+        ("untagged", "unclassified"),
+    ] {
+        encoded["name"] = json!(name);
+        encoded["proof"]["obligations"][0]["unknown_category"] = json!(category);
+        report
+            .functions
+            .push(serde_json::from_value(encoded.clone()).unwrap());
+    }
+    // A second root with the same category/reason coalesces, while P/R add no UNKNOWN gaps.
+    for (name, status) in [
+        ("semantic_again", "unknown"),
+        ("proved", "proved"),
+        ("refuted", "refuted"),
+    ] {
+        encoded["name"] = json!(name);
+        encoded["proof"]["status"] = json!(status);
+        encoded["proof"]["obligations"][0]["status"] = json!(status);
+        encoded["proof"]["obligations"][0]["unknown_category"] = json!("semantics");
+        report
+            .functions
+            .push(serde_json::from_value(encoded.clone()).unwrap());
+    }
+    let coverage = miren::coverage(&report);
+    assert_eq!(
+        (coverage.proved, coverage.refuted, coverage.unknown),
+        (1, 1, 8)
+    );
+    assert_eq!(coverage.gaps.len(), 6);
+    let semantic = coverage
+        .gaps
+        .iter()
+        .find(|g| g.unknown_category == Some(miren::UnknownCategory::Semantics))
+        .unwrap();
+    assert_eq!(semantic.roots, ["semantic", "semantic_again"]);
+    let unclassified = coverage
+        .gaps
+        .iter()
+        .find(|g| g.unknown_category == Some(miren::UnknownCategory::Unclassified))
+        .unwrap();
+    assert_eq!(unclassified.roots, ["decode", "untagged"]);
+    let restored: Report = serde_json::from_value(serde_json::to_value(&report).unwrap()).unwrap();
+    assert_eq!(miren::coverage(&restored).gaps.len(), 6);
+}

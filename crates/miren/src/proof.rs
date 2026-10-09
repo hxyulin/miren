@@ -1,7 +1,9 @@
 use super::contracts;
 use super::solver::{Answer, Query, Solver};
 use super::symbolic::{self, Context, Op, Sort, Term, Value};
-use miren::{Contract, ContractKind, Obligation, ObligationKind, Proof, ProofStatus};
+use miren::{
+    Contract, ContractKind, Obligation, ObligationKind, Proof, ProofStatus, UnknownCategory,
+};
 use rustc_attr_ir::{HasAttrs, LangItem};
 use rustc_hir::def::DefKind;
 use rustc_middle::mir::{
@@ -101,6 +103,7 @@ struct Return {
 }
 
 struct Engine<'tcx> {
+    unknown_causes: std::cell::RefCell<BTreeMap<String, UnknownCategory>>,
     tcx: TyCtxt<'tcx>,
     terms: Context,
     next_symbol: std::cell::Cell<u32>,
@@ -193,6 +196,7 @@ pub fn verify(
         zero_sized_input_nodes: 0,
         prefer_lazy_inputs: false,
         building_mutable_input: false,
+        unknown_causes: std::cell::RefCell::new(BTreeMap::new()),
         started: std::time::Instant::now(),
         config: config.clone(),
         all_failures,
@@ -699,6 +703,10 @@ impl<'tcx> Engine<'tcx> {
             ty::Array(..) => self.element_input(id, ty, conditions),
             ty::Adt(def, _) if def.is_struct() => self.struct_input(id, ty, conditions),
             ty::Adt(def, _) if def.is_enum() => self.enum_input(id, ty, conditions),
+            ty::Dynamic(..) => Err(self.categorized_error(
+                UnknownCategory::Semantics,
+                format!("unsupported argument type {ty:?}"),
+            )),
             _ => Err(format!("unsupported argument type {ty:?}")),
         }
     }
@@ -730,6 +738,12 @@ impl<'tcx> Engine<'tcx> {
                     format!("unevaluated array length in {}", self.tcx.def_path_str(id))
                 })?;
                 symbolic::integer(&self.terms, u128::from(length), bits, false)
+            }
+            ty::Slice(_) => {
+                return Err(self.categorized_error(
+                    UnknownCategory::Semantics,
+                    format!("only read-only byte slices and byte arrays are modeled: {ty:?}"),
+                ));
             }
             _ => {
                 return Err(format!(
@@ -768,9 +782,12 @@ impl<'tcx> Engine<'tcx> {
 
     fn query(&self, conditions: &[Term], failure: &Term) -> Result<Query, String> {
         if self.started.elapsed().as_secs() >= self.limits.root_timeout_secs {
-            return Err(format!(
-                "symbolic root exceeded the {}-second execution budget",
-                self.limits.root_timeout_secs
+            return Err(self.categorized_error(
+                UnknownCategory::ResourceLimit,
+                format!(
+                    "symbolic root exceeded the {}-second execution budget",
+                    self.limits.root_timeout_secs
+                ),
             ));
         }
         let query = Query::from_terms_with_limits(
@@ -779,9 +796,19 @@ impl<'tcx> Engine<'tcx> {
             failure,
             &self.float_encodings,
             self.limits,
-        )?;
+        )
+        .map_err(|reason| {
+            if reason == "symbolic query size limit reached" {
+                self.categorized_error(UnknownCategory::ResourceLimit, reason)
+            } else {
+                reason
+            }
+        })?;
         if query.text().len() > self.limits.max_query_bytes {
-            return Err("symbolic query size limit reached".to_owned());
+            return Err(self.categorized_error(
+                UnknownCategory::ResourceLimit,
+                "symbolic query size limit reached".into(),
+            ));
         }
         Ok(query)
     }
@@ -790,6 +817,7 @@ impl<'tcx> Engine<'tcx> {
         self.solver
             .borrow_mut()
             .feasible_query(&self.query(conditions, &self.terms.boolean(true))?)
+            .map_err(|reason| self.categorized_error(UnknownCategory::Solver, reason))
     }
 
     fn require(
@@ -802,12 +830,19 @@ impl<'tcx> Engine<'tcx> {
         detail: String,
     ) -> Result<(), String> {
         let query = self.query(conditions, &symbolic::not(safe))?;
-        let (status, model, detail) = match self.solver.borrow_mut().check_query(&query) {
-            Answer::Unsat => (ProofStatus::Proved, None, detail),
-            Answer::Sat(model) => (ProofStatus::Refuted, Some(model), detail),
-            Answer::Unknown(reason) => (ProofStatus::Unknown, None, format!("{detail}: {reason}")),
-        };
+        let (status, model, detail, unknown_category) =
+            match self.solver.borrow_mut().check_query(&query) {
+                Answer::Unsat => (ProofStatus::Proved, None, detail, None),
+                Answer::Sat(model) => (ProofStatus::Refuted, Some(model), detail, None),
+                Answer::Unknown(reason) => (
+                    ProofStatus::Unknown,
+                    None,
+                    format!("{detail}: {reason}"),
+                    Some(UnknownCategory::Solver),
+                ),
+            };
         self.proof.obligations.push(Obligation {
+            unknown_category,
             function: self.tcx.def_path_str(id),
             source: super::source(self.tcx, span.source_callsite()),
             kind,
@@ -838,7 +873,10 @@ impl<'tcx> Engine<'tcx> {
             replay: None,
         });
         if status == ProofStatus::Unknown {
-            return Err("solver could not discharge an obligation".to_owned());
+            return Err(self.categorized_error(
+                UnknownCategory::Solver,
+                "solver could not discharge an obligation".into(),
+            ));
         }
         if status == ProofStatus::Refuted && !self.all_failures {
             self.proof.stopped_after_counterexample = true;
@@ -847,8 +885,35 @@ impl<'tcx> Engine<'tcx> {
         Ok(())
     }
 
+    fn categorized_error(&self, category: UnknownCategory, reason: String) -> String {
+        self.unknown_causes
+            .borrow_mut()
+            .entry(reason.clone())
+            .and_modify(|previous| {
+                if *previous != category {
+                    *previous = UnknownCategory::Unclassified;
+                }
+            })
+            .or_insert(category);
+        reason
+    }
+
     fn unknown(&mut self, id: DefId, span: Span, detail: String) {
+        // Match only errors explicitly recorded by a producer, with existing frame wrappers.
+        // Unrecognized strings are not classified by keywords or inferred from a missing query.
+        let categories = self.unknown_causes.borrow();
+        let mut matches = categories.iter().filter_map(|(reason, category)| {
+            (detail == *reason || detail.ends_with(&format!(": {reason}"))).then_some(*category)
+        });
+        let category = matches.next().unwrap_or(UnknownCategory::Unclassified);
+        let category = if matches.all(|next| next == category) {
+            category
+        } else {
+            UnknownCategory::Unclassified
+        };
+        drop(categories);
         self.proof.obligations.push(Obligation {
+            unknown_category: Some(category),
             function: self.tcx.def_path_str(id),
             source: super::source(self.tcx, span.source_callsite()),
             kind: ObligationKind::Unsupported,
@@ -931,9 +996,12 @@ impl<'tcx> Engine<'tcx> {
     ) -> Result<Vec<Return>, String> {
         let id = instance.def_id();
         if stack.len() >= self.limits.max_call_depth {
-            return Err(format!(
-                "{}-frame call-depth limit reached; recursion may require an invariant",
-                self.limits.max_call_depth
+            return Err(self.categorized_error(
+                UnknownCategory::ResourceLimit,
+                format!(
+                    "{}-frame call-depth limit reached; recursion may require an invariant",
+                    self.limits.max_call_depth
+                ),
             ));
         }
         let mut stack = stack.to_vec();
@@ -996,7 +1064,10 @@ impl<'tcx> Engine<'tcx> {
             }
             self.steps += 1;
             if self.steps > self.limits.max_steps {
-                return Err("symbolic execution step limit reached".to_owned());
+                return Err(self.categorized_error(
+                    UnknownCategory::ResourceLimit,
+                    "symbolic execution step limit reached".into(),
+                ));
             }
             state
                 .conditions

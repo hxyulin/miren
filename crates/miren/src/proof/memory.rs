@@ -344,6 +344,10 @@ impl<'tcx> Engine<'tcx> {
                 }
                 Ok(Value::Elements(chunks.into()))
             }
+            (MemoryProjection::Slice { .. }, Value::Elements(_)) => Err(self.categorized_error(
+                UnknownCategory::Semantics,
+                "unsupported memory projection".into(),
+            )),
             _ => Err("unsupported memory projection".to_owned()),
         }
     }

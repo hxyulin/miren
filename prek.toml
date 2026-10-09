@@ -1,6 +1,7 @@
 minimum_prek_version = "0.5.3"
 default_stages = ["pre-commit", "manual"]
-exclude = '(^|/)target/'
+# Preserve vendored upstream bytes; tools/test_vendor_sources.py verifies their hashes.
+exclude = '(^|/)target/|^tests/vendor/'
 
 [[repos]]
 repo = "builtin"

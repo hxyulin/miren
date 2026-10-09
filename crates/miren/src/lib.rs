@@ -2,6 +2,7 @@
 
 pub mod cli;
 mod config;
+mod gaps;
 pub mod hardware;
 pub mod invocation;
 pub mod limits;
@@ -10,6 +11,7 @@ pub mod replay;
 pub mod smt;
 pub mod static_origins;
 pub use config::{ContractConfig, FunctionContract, TrustedStorageEffect};
+pub use gaps::UnknownCategory;
 pub use hardware::{
     HardwareDevice, HardwareModel, MmioReadRegister, MmioRegion, MmioWriteRegister,
 };
@@ -60,6 +62,8 @@ pub struct Coverage {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct CoverageGap {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub unknown_category: Option<UnknownCategory>,
     pub reason: String,
     pub roots: Vec<String>,
 }
@@ -74,7 +78,7 @@ pub fn coverage(report: &Report) -> Coverage {
         ..Coverage::default()
     };
     let mut instances = BTreeSet::new();
-    let mut gaps: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+    let mut gaps: BTreeMap<(UnknownCategory, String), BTreeSet<String>> = BTreeMap::new();
     for function in &report.functions {
         let Some(proof) = &function.proof else {
             result.unselected_bodies += 1;
@@ -90,16 +94,22 @@ pub fn coverage(report: &Report) -> Coverage {
         instances.extend(proof.analyzed_bodies.iter());
         for obligation in &proof.obligations {
             if obligation.status == ProofStatus::Unknown {
-                gaps.entry(obligation.detail.clone())
-                    .or_default()
-                    .insert(function.name.clone());
+                gaps.entry((
+                    obligation
+                        .unknown_category
+                        .unwrap_or(UnknownCategory::Unclassified),
+                    obligation.detail.clone(),
+                ))
+                .or_default()
+                .insert(function.name.clone());
             }
         }
     }
     result.interpreted_instances = instances.len();
     result.gaps = gaps
         .into_iter()
-        .map(|(reason, roots)| CoverageGap {
+        .map(|((category, reason), roots)| CoverageGap {
+            unknown_category: Some(category),
             reason,
             roots: roots.into_iter().collect(),
         })
@@ -232,6 +242,9 @@ impl ProofStatus {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Obligation {
+    /// Diagnostic cause only; absent in legacy reports and non-UNKNOWN outcomes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub unknown_category: Option<UnknownCategory>,
     pub function: String,
     pub source: Source,
     pub kind: ObligationKind,
