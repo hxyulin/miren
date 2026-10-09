@@ -54,7 +54,7 @@ fn ordinary_calls_skip_unused_names_and_hints_check_both_independent_outcomes() 
         ("independent_hints", ProofStatus::Refuted),
         ("unrelated_hint", ProofStatus::Refuted),
         ("hint_pointer", ProofStatus::Unknown),
-        ("guarded_power", ProofStatus::Unknown),
+        ("guarded_power", ProofStatus::Proved),
     ];
     let entries = expected.map(|(name, _)| name);
     for target in [None, Some("thumbv7em-none-eabihf")] {
@@ -82,11 +82,6 @@ fn ordinary_calls_skip_unused_names_and_hints_check_both_independent_outcomes() 
                 .iter()
                 .any(|body| body.starts_with("core::num::<impl u8>::checked_pow "))
         );
-        assert!(power.obligations.iter().any(|obligation| {
-            obligation
-                .detail
-                .contains("unsupported transmute from core::num::NonZero<u8> to u8")
-        }));
         assert!(
             !power
                 .obligations

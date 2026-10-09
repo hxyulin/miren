@@ -1893,6 +1893,40 @@ impl<'tcx> Engine<'tcx> {
                             .pop()
                             .ok_or_else(|| "missing arithmetic result".to_owned());
                     }
+                    BinOp::ShlUnchecked => {
+                        let left_ty = operands.0.ty(&body.local_decls, self.tcx);
+                        let right_ty = operands.1.ty(&body.local_decls, self.tcx);
+                        let (left_term, bits, signed) = left.integer()?;
+                        let (amount, amount_bits, amount_signed) = right.integer()?;
+                        if !matches!(left_ty.kind(), ty::Int(_) | ty::Uint(_))
+                            || !matches!(right_ty.kind(), ty::Int(_) | ty::Uint(_))
+                            || self.integer_type(left_ty) != Some((bits, signed))
+                            || self.integer_type(right_ty) != Some((amount_bits, amount_signed))
+                            || left_term.sort() != &Sort::BitVec(bits)
+                            || amount.sort() != &Sort::BitVec(amount_bits)
+                            || !left_term.belongs_to(&self.terms)
+                            || !amount.belongs_to(&self.terms)
+                        {
+                            return Err("unchecked shift compiler scalar type mismatch".into());
+                        }
+                        // Compare the original count before shift() casts or masks it.
+                        // Negative signed counts also lie outside this unsigned range.
+                        let outside = self.terms.apply(
+                            Op::BvUnsignedGe,
+                            &[
+                                amount,
+                                self.terms.bit_vector(u128::from(bits), amount_bits)?,
+                            ],
+                        )?;
+                        if self.feasible(&[state.conditions.clone(), vec![outside]].concat())? {
+                            return Err("unchecked left shift lacks a proven in-range count".into());
+                        }
+                        self.record_model(
+                            id,
+                            "MIR unchecked left shift; proven original count in range",
+                        );
+                        return symbolic::shift(&self.terms, true, left, right);
+                    }
                     BinOp::Shl => return symbolic::shift(&self.terms, true, left, right),
                     BinOp::Shr => return symbolic::shift(&self.terms, false, left, right),
                     BinOp::Add => "add",
@@ -2045,6 +2079,15 @@ impl<'tcx> Engine<'tcx> {
                     self.record_model(
                         id,
                         "compiler-certified zero niche; exact optional NonZero integer",
+                    );
+                    return Ok(value);
+                }
+                if let Some(value) =
+                    self.nonzero_integer_transmute(source, *target, &value, &state.conditions)?
+                {
+                    self.record_model(
+                        id,
+                        "compiler-certified NonZero storage; exact primitive integer",
                     );
                     return Ok(value);
                 }

@@ -59,33 +59,7 @@ impl<'tcx> Engine<'tcx> {
         {
             return Err("optional NonZero payload identity mismatch".into());
         }
-        let inner_ty = self
-            .tcx
-            .try_normalize_erasing_regions(
-                env,
-                nonzero.non_enum_variant().fields[FieldIdx::from_usize(0)]
-                    .ty(self.tcx, nonzero_args),
-            )
-            .map_err(|error| format!("optional NonZero field normalization failed: {error:?}"))?;
-        let ty::Adt(inner, inner_args) = inner_ty.kind() else {
-            return Err("optional NonZero requires compiler scalar inner storage".into());
-        };
-        if inner.did().krate != nonzero.did().krate
-            || !inner.is_struct()
-            || inner.non_enum_variant().fields.len() != 1
-        {
-            return Err("optional NonZero inner field shape mismatch".into());
-        }
-        let scalar_ty = self
-            .tcx
-            .try_normalize_erasing_regions(
-                env,
-                inner.non_enum_variant().fields[FieldIdx::from_usize(0)].ty(self.tcx, inner_args),
-            )
-            .map_err(|error| format!("optional NonZero field normalization failed: {error:?}"))?;
-        if !matches!(scalar_ty.kind(), ty::Pat(base, _) if *base == source) {
-            return Err("optional NonZero inner integer identity mismatch".into());
-        }
+        let inner_ty = self.nonzero_integer_inner(nonzero_ty, source)?;
         let (bits, signed) = self
             .integer_type(source)
             .ok_or("optional NonZero primitive integer type")?;
@@ -93,23 +67,11 @@ impl<'tcx> Engine<'tcx> {
         let option_layout = self.static_layout(target)?;
         let nonzero_layout = self.static_layout(nonzero_ty)?;
         let inner_layout = self.static_layout(inner_ty)?;
-        let max = if bits == 128 {
-            u128::MAX
-        } else {
-            (1_u128 << bits) - 1
-        };
-        let scalar = |layout: rustc_abi::BackendRepr, start| {
-            matches!(layout,
-            BackendRepr::Scalar(Scalar::Initialized {
-                value: Primitive::Int(integer, actual_signed), valid_range,
-            }) if integer.size().bits() == u64::from(bits) && actual_signed == signed
-                && valid_range.start == start && valid_range.end == max)
-        };
         let field = FieldIdx::from_usize(0);
-        if !scalar(source_layout.backend_repr, 0)
-            || !scalar(option_layout.backend_repr, 0)
-            || !scalar(nonzero_layout.backend_repr, 1)
-            || !scalar(inner_layout.backend_repr, 1)
+        if !nonzero_integer_scalar(source_layout.backend_repr, bits, signed, 0)
+            || !nonzero_integer_scalar(option_layout.backend_repr, bits, signed, 0)
+            || !nonzero_integer_scalar(nonzero_layout.backend_repr, bits, signed, 1)
+            || !nonzero_integer_scalar(inner_layout.backend_repr, bits, signed, 1)
             || [option_layout, nonzero_layout, inner_layout]
                 .iter()
                 .any(|layout| {
@@ -147,7 +109,7 @@ impl<'tcx> Engine<'tcx> {
             || variants[some].size != source_layout.size
             || variants[some].field_offsets.len() != 1
             || variants[some].field_offsets[field].bytes() != 0
-            || !scalar(BackendRepr::Scalar(tag), 0)
+            || !nonzero_integer_scalar(BackendRepr::Scalar(tag), bits, signed, 0)
         {
             return Err("optional NonZero requires exactly None at the zero niche".into());
         }
@@ -195,4 +157,175 @@ impl<'tcx> Engine<'tcx> {
             is_option: true,
         }))
     }
+
+    pub(super) fn nonzero_integer_transmute(
+        &self,
+        source: Ty<'tcx>,
+        target: Ty<'tcx>,
+        value: &Value,
+        conditions: &[Term],
+    ) -> Result<Option<Value>, String> {
+        if !matches!(target.kind(), ty::Int(_) | ty::Uint(_)) {
+            return Ok(None);
+        }
+        let ty::Adt(nonzero, args) = source.kind() else {
+            return Ok(None);
+        };
+        if !self
+            .tcx
+            .is_diagnostic_item(rustc_span::Symbol::intern("NonZero"), nonzero.did())
+            || args.len() != 1
+            || args.type_at(0) != target
+        {
+            return Ok(None);
+        }
+        let inner_ty = self.nonzero_integer_inner(source, target)?;
+        let (bits, signed) = self
+            .integer_type(target)
+            .ok_or("NonZero primitive integer type")?;
+        let primitive = self.static_layout(target)?;
+        let outer = self.static_layout(source)?;
+        let inner = self.static_layout(inner_ty)?;
+        if !nonzero_integer_scalar(primitive.backend_repr, bits, signed, 0)
+            || !nonzero_integer_scalar(outer.backend_repr, bits, signed, 1)
+            || !nonzero_integer_scalar(inner.backend_repr, bits, signed, 1)
+            || [outer, inner].iter().any(|layout| {
+                layout.size != primitive.size
+                    || layout.align.abi != primitive.align.abi
+                    || layout.fields.offset(0).bytes() != 0
+            })
+        {
+            return Err(
+                "NonZero transmute requires exact initialized primitive scalar layout".into(),
+            );
+        }
+        let outer_name = self.tcx.def_path_str(nonzero.did());
+        let ty::Adt(inner_def, _) = inner_ty.kind() else {
+            return Err("NonZero compiler inner ADT missing".into());
+        };
+        let inner_name = self.tcx.def_path_str(inner_def.did());
+        let value = if let Value::Input(input) = value {
+            input.materialize()?
+        } else {
+            value.clone()
+        };
+        let Value::Adt {
+            name,
+            variant: 0,
+            is_option: false,
+            discriminant: 0,
+            fields,
+        } = &value
+        else {
+            return Err("NonZero transmute requires exact modeled outer storage".into());
+        };
+        let [
+            (
+                _,
+                Value::Adt {
+                    name: actual_inner,
+                    variant: 0,
+                    is_option: false,
+                    discriminant: 0,
+                    fields: inner_fields,
+                },
+            ),
+        ] = fields.as_slice()
+        else {
+            return Err("NonZero transmute requires exact modeled inner storage".into());
+        };
+        let [(field_name, scalar)] = inner_fields.as_slice() else {
+            return Err("NonZero transmute requires one modeled scalar".into());
+        };
+        if *name != outer_name
+            || *actual_inner != inner_name
+            || fields[0].0
+                != nonzero.non_enum_variant().fields[FieldIdx::from_usize(0)]
+                    .name
+                    .as_str()
+            || field_name
+                != inner_def.non_enum_variant().fields[FieldIdx::from_usize(0)]
+                    .name
+                    .as_str()
+        {
+            return Err("NonZero transmute modeled storage identity mismatch".into());
+        }
+        let (expression, actual_bits, actual_signed) = scalar.integer()?;
+        if actual_bits != bits
+            || actual_signed != signed
+            || expression.sort() != &Sort::BitVec(bits)
+            || !expression.belongs_to(&self.terms)
+        {
+            return Err("NonZero transmute modeled scalar type or context mismatch".into());
+        }
+        let zero = self
+            .terms
+            .apply(Op::Equal, &[expression, self.terms.bit_vector(0, bits)?])?;
+        if self.feasible(&[conditions.to_vec(), vec![zero]].concat())? {
+            return Err("NonZero transmute lacks proven nonzero source validity".into());
+        }
+        Ok(Some(scalar.clone()))
+    }
+
+    fn nonzero_integer_inner(
+        &self,
+        nonzero_ty: Ty<'tcx>,
+        primitive: Ty<'tcx>,
+    ) -> Result<Ty<'tcx>, String> {
+        let ty::Adt(nonzero, nonzero_args) = nonzero_ty.kind() else {
+            return Err("NonZero requires a compiler ADT".into());
+        };
+        if !self
+            .tcx
+            .is_diagnostic_item(rustc_span::Symbol::intern("NonZero"), nonzero.did())
+            || !nonzero.is_struct()
+            || nonzero_args.len() != 1
+            || nonzero_args.type_at(0) != primitive
+            || nonzero.non_enum_variant().fields.len() != 1
+            || !matches!(primitive.kind(), ty::Int(_) | ty::Uint(_))
+        {
+            return Err("NonZero primitive compiler identity mismatch".into());
+        }
+        let env = ty::TypingEnv::fully_monomorphized();
+        let inner_ty = self
+            .tcx
+            .try_normalize_erasing_regions(
+                env,
+                nonzero.non_enum_variant().fields[FieldIdx::from_usize(0)]
+                    .ty(self.tcx, nonzero_args),
+            )
+            .map_err(|error| format!("optional NonZero field normalization failed: {error:?}"))?;
+        let ty::Adt(inner, inner_args) = inner_ty.kind() else {
+            return Err("optional NonZero requires compiler scalar inner storage".into());
+        };
+        if inner.did().krate != nonzero.did().krate
+            || !inner.is_struct()
+            || inner.non_enum_variant().fields.len() != 1
+        {
+            return Err("optional NonZero inner field shape mismatch".into());
+        }
+        let scalar_ty = self
+            .tcx
+            .try_normalize_erasing_regions(
+                env,
+                inner.non_enum_variant().fields[FieldIdx::from_usize(0)].ty(self.tcx, inner_args),
+            )
+            .map_err(|error| format!("optional NonZero field normalization failed: {error:?}"))?;
+        if !matches!(scalar_ty.kind(), ty::Pat(base, _) if *base == primitive) {
+            return Err("optional NonZero inner integer identity mismatch".into());
+        }
+        Ok(inner_ty)
+    }
+}
+
+fn nonzero_integer_scalar(repr: BackendRepr, bits: u32, signed: bool, start: u128) -> bool {
+    let max = if bits == 128 {
+        u128::MAX
+    } else {
+        (1_u128 << bits) - 1
+    };
+    matches!(repr, BackendRepr::Scalar(Scalar::Initialized {
+        value: Primitive::Int(integer, actual_signed), valid_range,
+    }) if integer.size().bits() == u64::from(bits) && actual_signed == signed
+        && valid_range.start == start && valid_range.end == max)
 }

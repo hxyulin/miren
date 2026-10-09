@@ -8,6 +8,7 @@ enum IntegerIntrinsic {
     SaturatingAdd,
     SaturatingSub,
     LeadingZeros,
+    LeadingZerosNonzero,
     TrailingZeros,
     SwapBytes,
     ReverseBits,
@@ -21,6 +22,7 @@ impl IntegerIntrinsic {
             Self::SaturatingAdd => "saturating_add",
             Self::SaturatingSub => "saturating_sub",
             Self::LeadingZeros => "ctlz",
+            Self::LeadingZerosNonzero => "ctlz_nonzero",
             Self::TrailingZeros => "cttz",
             Self::SwapBytes => "bswap",
             Self::ReverseBits => "bitreverse",
@@ -30,7 +32,11 @@ impl IntegerIntrinsic {
     fn arity(self) -> usize {
         match self {
             Self::Min | Self::Max | Self::SaturatingAdd | Self::SaturatingSub => 2,
-            Self::LeadingZeros | Self::TrailingZeros | Self::SwapBytes | Self::ReverseBits => 1,
+            Self::LeadingZeros
+            | Self::LeadingZerosNonzero
+            | Self::TrailingZeros
+            | Self::SwapBytes
+            | Self::ReverseBits => 1,
         }
     }
 }
@@ -41,6 +47,7 @@ impl<'tcx> Engine<'tcx> {
         callee: DefId,
         signature: ty::FnSig<'tcx>,
         values: &[Value],
+        conditions: &[Term],
     ) -> Result<Option<Value>, String> {
         let Some(operation) = [
             IntegerIntrinsic::Min,
@@ -48,6 +55,7 @@ impl<'tcx> Engine<'tcx> {
             IntegerIntrinsic::SaturatingAdd,
             IntegerIntrinsic::SaturatingSub,
             IntegerIntrinsic::LeadingZeros,
+            IntegerIntrinsic::LeadingZerosNonzero,
             IntegerIntrinsic::TrailingZeros,
             IntegerIntrinsic::SwapBytes,
             IntegerIntrinsic::ReverseBits,
@@ -59,6 +67,19 @@ impl<'tcx> Engine<'tcx> {
         }) else {
             return Ok(None);
         };
+        if matches!(operation, IntegerIntrinsic::LeadingZerosNonzero)
+            && (self
+                .tcx
+                .lang_items()
+                .get(LangItem::Option)
+                .map(|option| option.krate)
+                != Some(callee.krate)
+                || signature.safety() != rustc_hir::Safety::Unsafe
+                || signature.abi() != rustc_abi::ExternAbi::Rust
+                || signature.c_variadic())
+        {
+            return Ok(None);
+        }
         if signature.inputs().len() != operation.arity() || values.len() != operation.arity() {
             return Err("integer intrinsic argument count mismatch".to_owned());
         }
@@ -71,7 +92,9 @@ impl<'tcx> Engine<'tcx> {
         }
         let count = matches!(
             operation,
-            IntegerIntrinsic::LeadingZeros | IntegerIntrinsic::TrailingZeros
+            IntegerIntrinsic::LeadingZeros
+                | IntegerIntrinsic::LeadingZerosNonzero
+                | IntegerIntrinsic::TrailingZeros
         );
         if (count && signature.output() != self.tcx.types.u32)
             || (!count && signature.output() != input_ty)
@@ -82,13 +105,24 @@ impl<'tcx> Engine<'tcx> {
             .iter()
             .map(|value| {
                 let (expression, actual_bits, actual_signed) = value.integer()?;
-                if (actual_bits, actual_signed) != (bits, signed) {
+                if (actual_bits, actual_signed) != (bits, signed)
+                    || expression.sort() != &Sort::BitVec(bits)
+                    || !expression.belongs_to(&self.terms)
+                {
                     return Err("integer intrinsic modeled argument type mismatch".to_owned());
                 }
                 Ok(expression)
             })
             .collect::<Result<Vec<_>, String>>()?;
         let left = &arguments[0];
+        if matches!(operation, IntegerIntrinsic::LeadingZerosNonzero) {
+            let zero = self
+                .terms
+                .apply(Op::Equal, &[left.clone(), self.terms.bit_vector(0, bits)?])?;
+            if self.feasible(&[conditions.to_vec(), vec![zero]].concat())? {
+                return Err("ctlz_nonzero requires a proven nonzero primitive operand".into());
+            }
+        }
         let expression = match operation {
             IntegerIntrinsic::Min | IntegerIntrinsic::Max => {
                 let right = &arguments[1];
@@ -111,10 +145,15 @@ impl<'tcx> Engine<'tcx> {
             IntegerIntrinsic::SaturatingAdd | IntegerIntrinsic::SaturatingSub => {
                 saturation(&self.terms, left, &arguments[1], bits, signed, operation)?
             }
-            IntegerIntrinsic::LeadingZeros | IntegerIntrinsic::TrailingZeros => {
+            IntegerIntrinsic::LeadingZeros
+            | IntegerIntrinsic::LeadingZerosNonzero
+            | IntegerIntrinsic::TrailingZeros => {
                 let mut result = self.terms.bit_vector(u128::from(bits), 32)?;
                 for offset in 0..bits {
-                    let bit = if matches!(operation, IntegerIntrinsic::LeadingZeros) {
+                    let bit = if matches!(
+                        operation,
+                        IntegerIntrinsic::LeadingZeros | IntegerIntrinsic::LeadingZerosNonzero
+                    ) {
                         offset
                     } else {
                         bits - offset - 1
@@ -189,6 +228,7 @@ fn saturation(
         IntegerIntrinsic::Min
         | IntegerIntrinsic::Max
         | IntegerIntrinsic::LeadingZeros
+        | IntegerIntrinsic::LeadingZerosNonzero
         | IntegerIntrinsic::TrailingZeros
         | IntegerIntrinsic::SwapBytes
         | IntegerIntrinsic::ReverseBits => unreachable!("only saturating arithmetic is dispatched"),

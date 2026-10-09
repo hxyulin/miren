@@ -184,7 +184,7 @@ impl<'tcx> Engine<'tcx> {
         if let Some(value) = self.core_endian_encoding(callee, args, signature, values)? {
             return Ok(Some(value));
         }
-        if let Some(value) = self.integer_intrinsic(callee, signature, values)? {
+        if let Some(value) = self.integer_intrinsic(callee, signature, values, &state.conditions)? {
             return Ok(Some(value));
         }
         if let Some(value) = self.floating_intrinsic(callee, signature, values)? {

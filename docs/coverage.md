@@ -426,6 +426,17 @@ cover all primitive integer families, zero, negative values and unwrap failures.
 types, wrappers, pointer/bool niches and an unchecked Some projection remain UNKNOWN. A mutated
 None-branch claim refutes and fails native execution. Missing constructor bodies remain UNKNOWN.
 
+Reverse NonZero-to-primitive transmutes reuse the exact compiler inner-type/scalar certificate and
+retain original bits only when source validity is proved. Compiler-identified core ctlz_nonzero
+uses the established leading-zero expression only when zero is proved infeasible. MIR
+ShlUnchecked checks the original shift count against the left width before any cast or masking;
+zero counts and values are valid, while unproved/out-of-range counts remain UNKNOWN. Actual
+checked_pow now proves the guarded-power fixture. Unchecked power still reaches missing core
+overflow-panic MIR and stays UNKNOWN. Host/ARM O0/O2 cases cover every primitive integer family,
+negative values, exact bit counts, bounds, invalid source/projection controls and lookalike bodies.
+Reverse-transmute and power-claim mutations refute and fail native execution. No fleet gain has
+been demonstrated for this extension.
+
 Repeated eligible enum input shapes can share bounded descriptors rather than eagerly expanding
 every array occurrence. Compiler variant identity, field names, exact signed tags and Option
 metadata are retained. Selector mapping covers every actual variant and prevents invalid tags;

@@ -2286,3 +2286,35 @@ and refutations remain intact. No roots were added/removed and no analysis confi
 Stage 123 lazy enums are outside this frozen run. All 243 firmware fingerprints and four artifact
 checkpoints per unit remain unchanged. Export repeats byte-for-byte. The separately frozen main
 evidence remains preserved. Raw capture: `/tmp/miren-fleet-pass16-20261009`.
+
+## Stage 124: Certified NonZero extraction and guarded bit operations
+
+Actual u8::checked_pow advances through the reverse `NonZero<u8>` to u8 MIR transmute, intrinsic
+ctlz_nonzero and ShlUnchecked. A small shared compiler inner-type/scalar certificate preserves
+stage 122 identity, range, size, alignment and field-offset checks. Reverse extraction retains the
+original scalar only when exact modeled storage agrees and zero is infeasible under existing
+conditions. No source-validity assumption is injected.
+
+Compiler-identified core ctlz_nonzero reuses exact leading-zero counting with a proven nonzero
+operand and exact primitive signature. Possibly-zero or zero operands remain UNKNOWN. MIR
+ShlUnchecked validates compiler scalar identity and proves the original count below the left width
+before any narrowing or masking; negative signed, out-of-range and unproved counts remain UNKNOWN.
+Zero shift counts/values execute normally. The guarded-power fixture becomes PROVED; unchecked
+power reaches unavailable core overflow-panic MIR and remains UNKNOWN.
+
+Two integration tests cover primitive widths/signs, guarded branches, negative values, exact count
+results, bit-position native controls, shift boundaries, invalid layouts/projections and lookalike
+bodies on host/ARM O0/O2. Mutating reverse extraction or the actual guarded-power claim refutes and
+fails native execution. Existing constructor, getter-identity and integer-intrinsic regressions
+remain checked. No direct fleet pow call site or reverse-transmute blocker was found in the saved
+survey/source audit, so no fleet outcome gain is claimed. Applied-checkout validation passes 76
+binary tests and 11 integration tests across five suites (87 total). Formatting, affected Clippy
+and diff checks pass. Full required checks and actual coverage replays follow.
+
+All 544 Rust workspace tests and 48 Python tests pass. Formatting, Clippy, release builds,
+dependency checks, documentation builds and manual hooks pass. Bench, Dr16, KeyTracker,
+Can1Bus, nominal_bit_timing and both UI proofs remain intact; encode retains its audited bounds
+refutation. Captures: `/tmp/miren-stage124/replay`. All 72 strict/reset main obligation arrays
+match stage 123 exactly. Twelve isolated runtime wrappers retain both startup premises, unfinished
+weak-CAS retry frontiers and unsupported SEV. Captures:
+`/tmp/miren-stage124-main-{strict,reset}-20261009` and `/tmp/miren-stage124/runtime`.

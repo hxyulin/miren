@@ -267,6 +267,12 @@ selects None at zero and supplies Some's payload otherwise; no nonzero assumptio
 Different primitive types, wrappers and pointer niches remain UNKNOWN. A missing constructor body
 stays UNKNOWN, and Some payload access still requires a proven variant check.
 
+The reverse core `NonZero<T>` to exact primitive T transmute requires the same compiler storage
+certificate and a proven nonzero source under existing path conditions. The intrinsic ctlz_nonzero
+reuses exact leading-zero counting only for a proven nonzero operand. MIR unchecked left shifts
+require the original count to be proved below the primitive width before casting or masking; zero
+values/counts remain valid. Unproved preconditions stay UNKNOWN without new path assumptions.
+
 Lazy input descriptors include bounded compiler-certified Freeze enums with supported payload
 shapes. A full-domain unsigned selector maps to exact valid compiler tags, including sparse signed
 tags; no enum-validity assumptions are added. Variant payload and array-occurrence symbol ranges
