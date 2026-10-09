@@ -152,6 +152,7 @@ impl<'tcx> Engine<'tcx> {
                     return Err("slice iterator needs typed storage".into());
                 }
                 Value::SliceIterator {
+                    unchecked: Vec::new(),
                     source: Box::new(receiver.clone()),
                     front: Box::new(self.iterator_index(0)),
                     back: Box::new(length),
@@ -304,10 +305,14 @@ impl<'tcx> Engine<'tcx> {
             front,
             back,
             mutable,
+            unchecked,
         } = &iterator
         else {
             return Err("inductive slice iterator cursor missing".into());
         };
+        if !unchecked.is_empty() {
+            return Err("inductive iterators cannot discard unchecked access history".into());
+        }
         self.loop_reference_bounds(state, source, system, premise)?;
         let storage = self.loop_template_snapshot(source, state)?;
         let length = self.loop_slice_length(&storage)?;
@@ -347,6 +352,7 @@ impl<'tcx> Engine<'tcx> {
                 let mut some = state.clone();
                 some.conditions.push(inside.clone());
                 let next = Value::SliceIterator {
+                    unchecked: Vec::new(),
                     source: source.clone(),
                     mutable: *mutable,
                     front: if reverse {
@@ -372,6 +378,7 @@ impl<'tcx> Engine<'tcx> {
                 self.store_iterator(
                     receiver,
                     Value::SliceIterator {
+                        unchecked: Vec::new(),
                         source: source.clone(),
                         front: end.clone(),
                         back: end,
@@ -391,6 +398,7 @@ impl<'tcx> Engine<'tcx> {
                     self.store_iterator(
                         receiver,
                         Value::SliceIterator {
+                            unchecked: Vec::new(),
                             source: source.clone(),
                             front: back.clone(),
                             back: back.clone(),

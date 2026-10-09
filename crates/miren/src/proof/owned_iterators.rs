@@ -120,6 +120,7 @@ impl<'tcx> Engine<'tcx> {
             );
             return Ok(Some(vec![Return {
                 value: Value::SliceIterator {
+                    unchecked: Vec::new(),
                     source: Box::new(source.clone()),
                     front: Box::new(self.iterator_index(0)),
                     back: Box::new(length),
@@ -172,6 +173,7 @@ impl<'tcx> Engine<'tcx> {
             front,
             back,
             mutable: false,
+            ..
         } = &cursor
         else {
             return Err("owned array iterator cursor is not modeled".to_owned());
@@ -219,6 +221,7 @@ impl<'tcx> Engine<'tcx> {
                     self.store_iterator(
                         receiver,
                         Value::SliceIterator {
+                            unchecked: Vec::new(),
                             source: source.clone(),
                             front: back.clone(),
                             back: back.clone(),
@@ -269,6 +272,7 @@ impl<'tcx> Engine<'tcx> {
                             self.store_iterator(
                                 receiver,
                                 Value::SliceIterator {
+                                    unchecked: Vec::new(),
                                     source: source.clone(),
                                     front: back.clone(),
                                     back: back.clone(),

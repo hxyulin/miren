@@ -100,6 +100,7 @@ pub enum Value {
         front: Box<Value>,
         back: Box<Value>,
         mutable: bool,
+        unchecked: Vec<Value>,
     },
     Tuple(Vec<Value>),
     Elements(Elements),

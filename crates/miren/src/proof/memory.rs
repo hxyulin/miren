@@ -871,11 +871,13 @@ impl<'tcx> Engine<'tcx> {
                 front,
                 back,
                 mutable,
+                unchecked,
             } => Ok(Value::SliceIterator {
                 source: Box::new(self.return_value(*source, state, incoming)?),
                 front,
                 back,
                 mutable,
+                unchecked,
             }),
             Value::Reference {
                 allocation,

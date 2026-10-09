@@ -64,6 +64,7 @@ mod raw_subobjects;
 mod tracked_pointers;
 mod trait_objects;
 mod typed_slices;
+mod unchecked_iterators;
 mod volatile_reads;
 mod zero_sized_inputs;
 mod zeroed_storage;

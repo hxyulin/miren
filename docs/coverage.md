@@ -756,20 +756,24 @@ obligation and returns a writable projection into the original allocation. Neste
 retain their correct offsets and lengths. Invalid bounds refute; non-byte, readonly, arbitrary raw
 and dead backing remain UNKNOWN. Host/ARM and native mutations check bounds, updates and model
 identity, including similarly named user implementations that execute their actual bodies.
+
 Compiler inventories record direct coroutine return types independently of proof outcomes.
 The fleet exporter counts future factories separately and identifies their compact root rows.
 These proofs construct futures without polling them. Explicit async-entry results remain separate;
 missing metadata in legacy inventories is unclassified rather than inferred from function names.
+
 Scalar constant tables contain at most 256 bool, integer or f32/f64 elements, including nested
 `Table<1>`-shaped arrays. Every element passes exact typed initialized decoding and retains raw
 float bits. Composite arrays keep the 128-element cap; total visits remain 2,048 and depth sixteen.
 Host/ARM and native tests check bounded lookup, bad indices, data and guard mutations, NaN payloads,
 signed zero, uninitialized storage, composite limits and 257-element scalar rejection.
+
 Origin schema 2 certifies unevaluated aggregate constant items and associated constants only
 through available monomorphized compiler MIR with exact operand and return types. Construction
 DAG edges bind every referenced definition; missing edges, obsolete schemas and unsupported
 operations remain UNKNOWN. This certifies construction provenance, not runtime values, verified
 callee behavior, initialization history or synchronization.
+
 Closed constructor dataflow checks actual aggregate arguments, initialized locals and exact
 monomorphized input/output types before reusing a construction node. Straight-line calls, moves,
 fields, aggregates and repeats retain bounded origin evidence; joins, cycles, dynamic calls,
@@ -778,3 +782,11 @@ admits only the compiler's exact `Atomic<u32>` with matching layout, and a separ
 `Atomic<usize>::new` rule checks initialized usize input and its typed scalar conversion. Folded
 constants admit only compiler `Option::None` and inhabited fieldless zero-sized structs. These rules
 supply neither selected runtime state nor synchronization, initialization history or device models.
+
+Core `__iterator_get_unchecked` retains actual iterator backing, cursor bounds and element type.
+Mutable access requires writable storage and distinct issued absolute indices, with at most 256
+issued indices per retained iterator. Ordinary element access after mutable unchecked issuance
+remains UNKNOWN; metadata queries retain their existing behavior. Bare snapshots, dead backing,
+unknown or duplicate indices and unsupported induction histories remain UNKNOWN. Host/ARM tests
+and safe native mutations exercise float zip adapters, shared reads and cursor offsets. Synthetic
+invalid custom MIR cases are checked only by the analyzer, without native undefined behavior.

@@ -206,16 +206,25 @@ clone handles separately; unsupported payloads and interior mutation remain UNKN
 Mutable byte ranges use the exact compiler `Range<usize>` SliceIndex implementation. Analysis checks
 start <= end <= slice length and preserves the backing allocation through nested projections.
 Non-byte ranges and missing writable provenance remain UNKNOWN.
+
 Compiler inventories record whether each function directly returns a coroutine. Fleet surveys
 separate those future-construction roots from function-body roots; explicit async polling remains
 a separate capture. Older inventories without this metadata remain unclassified.
+
 Initialized scalar constant arrays support up to 256 exact bool, integer or f32/f64 elements.
 Composite arrays retain the 128-element cap, with the existing total and depth budgets. Every
 constant element is decoded and validated; indices require bounds checks and float bits survive.
+
 Dependency origin schema 2 includes exact typed associated-constant construction edges. Retained
 builds use a new cache generation so prior certificates are not reused. Construction certificates
 establish origin metadata, without granting initialized payload reads or startup history.
+
 Closed constructor calls accept aggregate parameters only after checking each actual operand's
 origin, exact compiler type and monomorphized signature. Straight-line construction preserves
 whole scalar carrier origins; composition recognizes only exact compiler atomic types with
 matching layouts. This certifies construction metadata without selecting atomic values or history.
+
+Core unchecked slice iterator access requires retained live backing and proven index/cursor bounds.
+Mutable access also records distinct issued indices and rejects later conflicting ordinary access.
+Bare value snapshots do not grant unchecked liveness; unsupported backing and uncertain bounds
+remain UNKNOWN. This is a bounded adapter model, not a general raw-pointer interpreter.

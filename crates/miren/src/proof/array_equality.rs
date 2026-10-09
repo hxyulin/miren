@@ -216,6 +216,7 @@ impl<'tcx> Engine<'tcx> {
             .mk_args(&[left_element.into(), right_element.into()]);
         let inequality = self.resolve_function_item(method, args)?;
         let iterator = |source: &Value| Value::SliceIterator {
+            unchecked: Vec::new(),
             source: Box::new(source.clone()),
             front: Box::new(self.iterator_index(0)),
             back: Box::new(self.iterator_index(count as u128)),

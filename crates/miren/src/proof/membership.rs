@@ -231,6 +231,7 @@ impl<'tcx> Engine<'tcx> {
         let args = self.tcx.mk_args(&[element.into(), element.into()]);
         let equality = self.resolve_function_item(method, args)?;
         let iterator = Value::SliceIterator {
+            unchecked: Vec::new(),
             source: Box::new(slice.clone()),
             front: Box::new(self.iterator_index(0)),
             back: Box::new(self.iterator_index(count as u128)),

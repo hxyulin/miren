@@ -10,7 +10,7 @@ pub(super) struct Iteration {
 }
 
 impl<'tcx> Engine<'tcx> {
-    fn slice_iterator_kind(&self, ty: Ty<'tcx>) -> Option<bool> {
+    pub(super) fn slice_iterator_kind(&self, ty: Ty<'tcx>) -> Option<bool> {
         let ty::Adt(def, _) = ty.kind() else {
             return None;
         };
@@ -127,6 +127,7 @@ impl<'tcx> Engine<'tcx> {
             );
             return Ok(Some(vec![Return {
                 value: Value::SliceIterator {
+                    unchecked: Vec::new(),
                     source: Box::new(source),
                     front: Box::new(self.iterator_index(0)),
                     back: Box::new(back),
@@ -143,6 +144,9 @@ impl<'tcx> Engine<'tcx> {
             ty::Ref(_, ty, _) => *ty,
             _ => *first,
         };
+        if let Some(result) = self.unchecked_slice_iterator_call(instance, values, state)? {
+            return Ok(Some(vec![result]));
+        }
         if let Some(results) = self.mutable_iterator_adapter(
             instance,
             values,
@@ -169,6 +173,16 @@ impl<'tcx> Engine<'tcx> {
         };
         if matches!(source.as_ref(), Value::StaticSlice { .. }) {
             self.snapshot(source, &state.memory, &state.conditions, 0)?;
+        }
+        if let Value::SliceIterator {
+            mutable: true,
+            unchecked,
+            ..
+        } = &iterator
+            && !unchecked.is_empty()
+            && !matches!(name.as_str(), "len" | "size_hint" | "by_ref" | "into_iter")
+        {
+            return Err("iterator operation after unchecked mutable access is unsupported".into());
         }
         let trait_id = if matches!(self.tcx.def_kind(parent), DefKind::Impl { of_trait: true }) {
             Some(
@@ -255,6 +269,7 @@ impl<'tcx> Engine<'tcx> {
                 return Err("slice iterator state is not modeled".to_owned());
             };
             let exhausted = Value::SliceIterator {
+                unchecked: Vec::new(),
                 source: source.clone(),
                 front: back.clone(),
                 back: back.clone(),
@@ -530,10 +545,14 @@ impl<'tcx> Engine<'tcx> {
             front,
             back,
             mutable,
+            unchecked,
         } = iterator
         else {
             return Err("expected modeled slice iterator".to_owned());
         };
+        if mutable && !unchecked.is_empty() {
+            return Err("ordinary iteration after unchecked mutable access is unsupported".into());
+        }
         if matches!(source.as_ref(), Value::StaticSlice { .. }) {
             self.snapshot(&source, &memory, &conditions, 0)?;
         }
@@ -544,6 +563,7 @@ impl<'tcx> Engine<'tcx> {
         if self.feasible(&end)? {
             results.push(Iteration {
                 iterator: Value::SliceIterator {
+                    unchecked: Vec::new(),
                     source: source.clone(),
                     front: back.clone(),
                     back: back.clone(),
@@ -616,6 +636,7 @@ impl<'tcx> Engine<'tcx> {
             };
             results.push(Iteration {
                 iterator: Value::SliceIterator {
+                    unchecked: Vec::new(),
                     source,
                     front,
                     back,

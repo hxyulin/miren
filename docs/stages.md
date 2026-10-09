@@ -1429,3 +1429,12 @@ Compiler `Option::None` and inhabited fieldless ZST constants retain typed const
 Callback/reference/union arguments, lookalike atomics and missing graph leaves stay UNKNOWN.
 Host/ARM and native data mutations check arbitrary-state reads and constructor changes. Evidence
 certifies origins without asserting runtime values, synchronization or startup history.
+
+## Stage 96: Retained unchecked slice iterator access
+
+Exact core unchecked iterator access requires live retained backing, proven cursor/index bounds
+and matching compiler element types. Mutable access records at most 256 distinct issued absolute
+indices and rejects later conflicting ordinary access. Missing backing, bare snapshots, uncertain
+bounds, duplicates and induction histories stay UNKNOWN. Host/ARM compiler tests and safe native
+mutations check shared reads, float zip updates and cursor offsets; invalid custom MIR is analyzed
+without native undefined behavior.

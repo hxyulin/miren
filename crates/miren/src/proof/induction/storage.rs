@@ -110,12 +110,17 @@ impl<'tcx> Engine<'tcx> {
                 front,
                 back,
                 mutable,
-            } => Value::SliceIterator {
+                unchecked,
+            } if unchecked.is_empty() => Value::SliceIterator {
+                unchecked: Vec::new(),
                 source: Box::new(self.loop_fresh_value(source)?),
                 front: Box::new(self.loop_fresh_value(front)?),
                 back: Box::new(self.loop_fresh_value(back)?),
                 mutable: *mutable,
             },
+            Value::SliceIterator { .. } => {
+                return Err("induction cannot discard unchecked iterator access history".into());
+            }
             Value::MetadataPointer(length) => {
                 Value::MetadataPointer(Box::new(self.loop_fresh_value(length)?))
             }
@@ -559,14 +564,16 @@ pub(super) fn same_shape(expected: Option<&Value>, actual: Option<&Value>) -> Re
                 front: b,
                 back: c,
                 mutable: d,
+                unchecked: issued_a,
             },
             Value::SliceIterator {
                 source: e,
                 front: f,
                 back: g,
                 mutable: h,
+                unchecked: issued_b,
             },
-        ) if d == h => {
+        ) if d == h && issued_a.is_empty() && issued_b.is_empty() => {
             same_shape(Some(a), Some(e))?;
             same_shape(Some(b), Some(f))?;
             same_shape(Some(c), Some(g))
