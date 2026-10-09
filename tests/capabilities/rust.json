@@ -151,6 +151,22 @@
       "family": "tuple_array",
       "expected": "unknown",
       "unknown_reason": "array write index is not uniquely determined"
+    },
+    {
+      "entry": "maybe_uninit_round_trip",
+      "family": "maybe_uninit",
+      "expected": "proved"
+    },
+    {
+      "entry": "maybe_uninit_wrong_claim",
+      "family": "maybe_uninit",
+      "expected": "refuted"
+    },
+    {
+      "entry": "maybe_uninit_uninitialized",
+      "family": "maybe_uninit",
+      "expected": "unknown",
+      "unknown_reason": "MaybeUninit payload is not initialized"
     }
   ]
 }

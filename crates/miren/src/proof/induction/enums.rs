@@ -132,6 +132,9 @@ fn normalize(
                 *field = slot.ok_or("missing inductive element")?;
             }
         }
+        (Value::MaybeUninit { .. }, _) => {
+            return Err("MaybeUninit storage is not supported by induction".into());
+        }
         (
             Value::Bool(_)
             | Value::Int { .. }

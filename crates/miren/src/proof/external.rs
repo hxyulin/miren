@@ -206,6 +206,11 @@ impl<'tcx> Engine<'tcx> {
 
     fn invalidate_local_atomics(value: &Value, memory: &mut [Option<Value>]) -> Result<(), String> {
         match value {
+            Value::MaybeUninit { payload, .. } => {
+                if let Some(payload) = payload {
+                    Self::invalidate_local_atomics(payload, memory)?;
+                }
+            }
             Value::LocalAtomic {
                 allocation,
                 bits,

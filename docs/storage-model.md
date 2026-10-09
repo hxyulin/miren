@@ -103,6 +103,16 @@ opaque value. A MaybeUninit wrapper can exist while its payload remains uninitia
 payload store establishes payload initialization; a partial field store establishes only that
 field. A move clears initialization only for the moved subobject.
 
+Stage 138 implements a bounded owned `MaybeUninit` value domain ahead of the general allocation
+migration. An interned descriptor retains the exact compiler wrapper type; its optional payload
+records either an uninitialized container or an initialized typed value. Compiler-identified core
+construction, field types and layouts certify primitive and pure tuple payloads. Whole assignment,
+copying and snapshots retain this state. Extraction requires an initialized payload, except for
+unit-only tuples whose zero-byte type has one value. Padding is not exposed as initialized bytes.
+This state creates no allocation or temporal permission certificate: raw access, partial writes,
+reference-forming methods, arbitrary payload types and general per-subobject initialization remain
+separate work.
+
 Retaining a value requires a visibility policy. Owned storage with no possible external mutation
 can retain exact values. Shared mutable statics retain at most initialization facts justified by
 the environment; their initializer is not the runtime state of an arbitrary selected root.

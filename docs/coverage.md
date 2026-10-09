@@ -1097,3 +1097,15 @@ trees are limited to depth 16 and 512 nodes. Existing incoming shared-reference 
 values without restoring identity or reference rights. Retained handles, ADTs and Drop-bearing
 values remain excluded; symbolic composite writes still require a unique location. The expanded
 29-case/14-family baseline expects 52 PROVED, 44 REFUTED and 20 UNKNOWN outcomes across four builds.
+
+
+Stage 138 retains initialization state for compiler-identified `MaybeUninit` containers holding
+primitive bool/integer/float or pure tuple values. Actual core constructors and `assume_init`
+bodies execute; exact type, layout and `ManuallyDrop` field certificates control representation.
+Initialized extraction preserves the value and floating-point raw bits. Uninitialized nonempty
+payloads return Semantics UNKNOWN. Unit-only zero-byte tuples can extract their unique value;
+unrelated zero-sized ADTs remain unsupported. Whole assignments and copies preserve state without
+new assumptions. Raw writes, `zeroed`, reference-forming methods, pointer/reference payloads and
+arbitrary unions remain UNKNOWN. This does not establish general allocation initialization or
+raw-access permissions. The 32-case/15-family capability baseline expects 56 PROVED, 48 REFUTED
+and 24 UNKNOWN outcomes across host/ARM O0/O2.

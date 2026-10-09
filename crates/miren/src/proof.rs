@@ -46,6 +46,7 @@ mod isolated_pointer_atomics;
 mod iterators;
 mod layout_intrinsics;
 mod library;
+mod maybe_uninit;
 mod membership;
 mod memory;
 mod mutable_slice_ranges;
@@ -122,6 +123,7 @@ struct Engine<'tcx> {
     static_roots: Option<usize>,
     function_pointers: std::cell::RefCell<Vec<function_pointers::Target<'tcx>>>,
     static_addresses: std::collections::HashMap<DefId, Term>,
+    maybe_uninit_types: Vec<Ty<'tcx>>,
     tracked_addresses: Vec<(tracked_pointers::AddressLocation<'tcx>, Term)>,
     steps: usize,
     call_chain: Vec<DefId>,
@@ -187,6 +189,7 @@ pub fn verify(
         function_pointers: std::cell::RefCell::new(Vec::new()),
         static_addresses: std::collections::HashMap::new(),
         tracked_addresses: Vec::new(),
+        maybe_uninit_types: Vec::new(),
         steps: 0,
         call_chain: Vec::new(),
         failed_call_chain: None,
@@ -385,6 +388,9 @@ impl<'tcx> Engine<'tcx> {
         if !async_entry {
             self.proof.replay_inputs = Some(self.replay_arguments(id, &arguments));
         }
+        for (local, value) in body.args_iter().zip(&arguments) {
+            self.validate_maybe_uninit_value(body.local_decls[local].ty, value)?;
+        }
         let snapshots = self.snapshots(&arguments, &memory, &conditions)?;
         let instance = ty::Instance::new_raw(id, ty::GenericArgs::identity_for_item(self.tcx, id));
         let bindings = self.configured_bindings(body, &snapshots, instance)?;
@@ -474,6 +480,9 @@ impl<'tcx> Engine<'tcx> {
                 format!("local atomic allocation {allocation}; {bits}-bit signed={signed}")
             }
             Value::FunctionPointer { .. } => self.function_pointer_input_description(value)?,
+            Value::MaybeUninit { .. } => {
+                return Err("arbitrary MaybeUninit inputs are unsupported".into());
+            }
             Value::Unit => "()".to_owned(),
             Value::Elements(elements) => {
                 for (index, element) in elements.iter().enumerate() {
@@ -1172,6 +1181,7 @@ impl<'tcx> Engine<'tcx> {
                     } else {
                         self.local(&state, 0)?
                     };
+                    self.validate_maybe_uninit_value(body.return_ty(), &value)?;
                     self.validate_mutable_handle_rights(body.return_ty(), &value)?;
                     self.validate_frame_escape(&value, &state, incoming_allocations)
                         .map_err(|error| {
@@ -1565,6 +1575,7 @@ impl<'tcx> Engine<'tcx> {
             StatementKind::Assign(assignment) => {
                 let (place, value) = assignment.as_ref();
                 let value = self.rvalue(id, body, state, value)?;
+                self.validate_maybe_uninit_value(place.ty(&body.local_decls, self.tcx).ty, &value)?;
                 self.write(state, *place, value)
             }
             StatementKind::SetDiscriminant {
@@ -1648,6 +1659,7 @@ impl<'tcx> Engine<'tcx> {
                 value @ (Value::Bytes { .. }
                 | Value::Adt { .. }
                 | Value::Enum { .. }
+                | Value::MaybeUninit { .. }
                 | Value::Elements(_)
                 | Value::StaticSlice { .. }
                 | Value::Tuple(_)
@@ -1766,6 +1778,7 @@ impl<'tcx> Engine<'tcx> {
         match operand {
             Operand::Copy(place) | Operand::Move(place) => {
                 let value = self.place(state, *place)?;
+                self.validate_maybe_uninit_value(place.ty(&body.local_decls, self.tcx).ty, &value)?;
                 self.validate_mutable_handle_rights(
                     place.ty(&body.local_decls, self.tcx).ty,
                     &value,
@@ -2179,6 +2192,13 @@ impl<'tcx> Engine<'tcx> {
             Rvalue::Cast(CastKind::Transmute, operand, target) => {
                 let source = operand.ty(&body.local_decls, self.tcx);
                 let value = self.operand(id, body, state, operand)?;
+                if let Some(value) = self.maybe_uninit_transmute(source, *target, &value)? {
+                    self.record_model(
+                        id,
+                        "compiler-certified MaybeUninit extraction; initialized payload or unique zero-byte tuple",
+                    );
+                    return Ok(value);
+                }
                 if let Some(value) = self.fieldless_enum_integer_transmute(
                     source,
                     *target,

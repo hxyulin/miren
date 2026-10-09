@@ -160,6 +160,25 @@ impl<'tcx> Engine<'tcx> {
         for value in &values {
             self.validate_tracked_value(value, state)?;
         }
+        if let AggregateKind::Adt(def, variant, args, _, Some(active)) = kind {
+            let operand_types = operands
+                .iter()
+                .map(|operand| operand.ty(&body.local_decls, self.tcx))
+                .collect::<Vec<_>>();
+            if variant.as_usize() != 0 {
+                return Err("union aggregate has an invalid variant".into());
+            }
+            let wrapper = Ty::new_adt(self.tcx, self.tcx.adt_def(*def), args);
+            if let Some(value) =
+                self.maybe_uninit_aggregate(wrapper, active.as_usize(), &operand_types, &values)?
+            {
+                self.record_model(
+                    id,
+                    "compiler-certified MaybeUninit construction; explicit payload initialization",
+                );
+                return Ok(value);
+            }
+        }
         match kind {
             AggregateKind::RawPtr(pointee, mutability) => {
                 self.raw_slice_aggregate(id, *pointee, mutability.is_mut(), values, state)

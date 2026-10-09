@@ -11,21 +11,23 @@ execution at O0 and O2, positive/refuted/unknown controls, a source mutation tha
 structured UNKNOWN reporting, and passing repository checks. Completion establishes a repeatable
 baseline. It does not establish full Rust support or a completed memory-model refactor.
 
-The manifest contains 29 cases across 14 families. Each build configuration expects 13 PROVED,
-11 REFUTED and 5 UNKNOWN results. Stage 133 originally had 23 cases with 10 PROVED, 9 REFUTED
+The manifest contains 32 cases across 15 families. Each build configuration expects 14 PROVED,
+12 REFUTED and 6 UNKNOWN results. Stage 133 originally had 23 cases with 10 PROVED, 9 REFUTED
 and 4 UNKNOWN; stage 134 closed its retained-prefix projection gap. Stage 136 adds raw-pointer
 metadata P/R controls and a safe core reference-array grant that remains UNKNOWN without a
 temporal permission certificate. Stage 137 adds tuple-array P/R and unsupported symbolic-write
-controls. These additions change the denominator, not a coverage percentage.
+controls. Stage 138 adds initialized `MaybeUninit` P/R and uninitialized extraction U controls.
+These additions change the denominator, not a coverage percentage.
 Covered examples exercise arithmetic, enum payloads, array indexing, reference effects, concrete
 generics, closures, iterator callbacks, finite loops, destructors, fresh future polling and raw
-pointer metadata. Open dispatch and incoming non-byte slices retain explicit frontiers. Indexed
-retained mutable integer/tuple prefixes use checked projection snapshots with a uniquely determined
-length of at most 128. Bounded tuple reads can select symbolic offsets while preserving field
-correlation; symbolic composite writes still require a unique location. Pure tuple choices are
-bounded to depth 16 and 512 total candidate nodes, validate exact sorts/contexts and restore no
-identity or reference rights. Existing immutable incoming shared-reference snapshots can supply
-values in this domain. Retained handles, ADTs and Drop-bearing identities remain excluded.
+pointer metadata and typed initialization wrappers. Open dispatch and incoming non-byte slices
+retain explicit frontiers. Indexed retained mutable integer/tuple prefixes use checked projection
+snapshots with a uniquely determined length of at most 128. Bounded tuple reads can select symbolic
+offsets while preserving field correlation; symbolic composite writes still require a unique
+location. Pure tuple choices are bounded to depth 16 and 512 total candidate nodes, validate exact
+sorts/contexts and restore no identity or reference rights. Existing immutable incoming
+shared-reference snapshots can supply values in this domain. Retained handles, ADTs and Drop-bearing
+identities remain excluded.
 An expected UNKNOWN must reach its specified diagnostic rather than fail elsewhere.
 
 ```sh
@@ -90,7 +92,8 @@ understands volatile accesses while an STM32 package supplies the meaning of its
 Tracked volatile reads, raw byte-slice views and nonempty raw-pointer-to-reference arrays lack
 an implemented certificate for temporal access permission. These boundaries now return UNKNOWN
 before exposing a value or reference. A live allocation, matching type, aligned address and
-retained writable flag do not establish that an old pointer remains valid after competing reference access.
+retained writable flag do not establish that an old pointer remains valid after competing
+reference access.
 The [Rust pointer documentation](https://doc.rust-lang.org/std/ptr/index.html#safety)
 describes temporal permission and a limited reference-to-pointer access guarantee; precise
 aliasing rules are not fully settled. The audit is a missing-certificate finding, not a

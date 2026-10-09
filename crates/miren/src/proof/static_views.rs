@@ -820,6 +820,14 @@ impl<'tcx> Engine<'tcx> {
             return Ok(true);
         }
         match value {
+            Value::MaybeUninit { id, payload } => {
+                self.maybe_uninit_payload_type(*id)?;
+                if let Some(payload) = payload {
+                    self.contains_mutable_static_handles(payload, depth + 1)
+                } else {
+                    Ok(false)
+                }
+            }
             Value::StaticView { id, .. } => {
                 let views = self.static_views.borrow();
                 let view = views.get(*id).ok_or("static handle shape unavailable")?;

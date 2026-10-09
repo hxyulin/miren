@@ -31,6 +31,10 @@ pub enum MemoryProjection {
 #[derive(Clone, Debug)]
 pub enum Value {
     Uninitialized,
+    MaybeUninit {
+        id: usize,
+        payload: Option<Box<Value>>,
+    },
     StaticSlice {
         source: Box<Value>,
         elements: Vec<Value>,
@@ -162,7 +166,8 @@ impl Value {
                     size.checked_add(value.owned_repeat_size()?)
                         .filter(|size| *size <= MAX_REPEAT_VALUES)
                 }),
-            Self::Cell { .. }
+            Self::MaybeUninit { .. }
+            | Self::Cell { .. }
             | Self::Atomic { .. }
             | Self::LocalAtomic { .. }
             | Self::RawSlice { .. }
@@ -211,7 +216,8 @@ impl Value {
             | Self::Unit
             | Self::Elements(_)
             | Self::Adt { .. } => Some(1),
-            Self::Cell { .. }
+            Self::MaybeUninit { .. }
+            | Self::Cell { .. }
             | Self::Atomic { .. }
             | Self::LocalAtomic { .. }
             | Self::RawSlice { .. }
@@ -265,7 +271,8 @@ impl Value {
             | Self::Bytes { .. }
             | Self::RawPointer { .. }
             | Self::Unit => self.owned_repeat_size(),
-            Self::Cell { .. }
+            Self::MaybeUninit { .. }
+            | Self::Cell { .. }
             | Self::Atomic { .. }
             | Self::LocalAtomic { .. }
             | Self::RawSlice { .. }
@@ -286,6 +293,9 @@ impl Value {
 
     pub fn contains_mutable(&self) -> bool {
         match self {
+            Self::MaybeUninit { payload, .. } => {
+                payload.as_ref().is_some_and(|v| v.contains_mutable())
+            }
             Self::Input(_) => false,
             Self::Reference { mutable: true, .. } => true,
             Self::StaticSlice { mutable, .. } => *mutable,
@@ -323,6 +333,9 @@ impl Value {
 
     pub fn contains_local_atomic(&self) -> bool {
         match self {
+            Self::MaybeUninit { payload, .. } => {
+                payload.as_ref().is_some_and(|v| v.contains_local_atomic())
+            }
             Self::LocalAtomic { .. } => true,
             Self::Adt { fields, .. } => fields
                 .iter()

@@ -2793,3 +2793,41 @@ Final standalone evidence: `/tmp/miren-stage137-capabilities-final-20261010`, wi
 tests, 67 Python tests, formatting, cargo lint, release builds, cargo deny, documentation
 build and manual hooks. Independent review verifies bounds, field correlation, exact
 float payload bits and the exclusion of new identity/reference/write rights.
+
+
+## Stage 138: compiler-certified owned initialization wrappers
+
+`MaybeUninit` now has a distinct retained value with an interned exact compiler type and an
+optional initialized payload. Actual core `new`, `uninit` and `assume_init` bodies execute.
+Union and `ManuallyDrop` lang-item identities, active fields, operand types, offsets, size and
+alignment certify construction and extraction. The bounded payload domain admits primitive
+bool/integer/f32/f64 and recursive pure tuples that the compiler certifies as Copy, Freeze and
+free of drop obligations. Payload trees have depth-16 and 256-node bounds; the descriptor pool
+holds at most 128 types. It never decodes padding or infers validity from equal sizes.
+
+Compiler `assert_inhabited` uses its validity query and records a guard obligation. Initialized
+extraction preserves typed values and available float raw bits. Uninitialized nonempty extraction
+returns Semantics UNKNOWN. Unit-only zero-byte tuples have one value and can extract it without
+fabricating bytes; arbitrary zero-sized ADTs remain unsupported. Contextual validation checks
+nested descriptors against actual argument, operand, store and return types. Snapshots, returns,
+whole assignments and copies preserve initialization state. No raw access permission is added.
+
+Host/ARM O0/O2 controls cover primitive widths, tuple and float-bit round trips, unit-only tuples,
+whole assignment, nested containers, copies, refuted claims and uninitialized branches. Unrelated
+unions, type-changing extraction, restricted validity, pointer/reference payloads, `zeroed`, raw
+writes and reference-forming methods remain UNKNOWN. Native tests execute only valid initialized
+or unit-only controls. An actual constructor argument mutation refutes in all four configurations
+and fails native tests at both optimization levels.
+
+The capability manifest adds initialized P/R and uninitialized U cases, reaching 32 cases across
+15 families: 14 PROVED, 12 REFUTED and 6 UNKNOWN per compiler configuration. General per-subobject
+initialization, partial moves and temporal access validity remain separate model work.
+The vendored StaticCell `[u8; 256]` write still returns UNKNOWN; its assertion now pins the
+explicit unsupported-payload certificate diagnostic instead of the old generic union diagnostic.
+
+Final standalone evidence: `/tmp/miren-stage138-capabilities-20261010`, with 56 PROVED,
+48 REFUTED and 24 UNKNOWN outcomes, unchanged frozen inputs/binaries and no collection errors.
+Validation passes 586 Rust tests, 67 Python tests, formatting, cargo lint, release builds,
+cargo deny, documentation build and manual hooks. Independent review approves exact type
+correlation, raw pattern refusal, initialization preservation, compiler guard execution and
+continued refusal of unsupported access grants.

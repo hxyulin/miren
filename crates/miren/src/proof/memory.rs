@@ -71,6 +71,17 @@ impl<'tcx> Engine<'tcx> {
             return Err("memory snapshot nesting limit reached".to_owned());
         }
         match value {
+            Value::MaybeUninit { id, payload } => {
+                self.maybe_uninit_payload_type(*id)?;
+                Ok(Value::MaybeUninit {
+                    id: *id,
+                    payload: payload
+                        .as_ref()
+                        .map(|payload| self.snapshot(payload, memory, conditions, depth + 1))
+                        .transpose()?
+                        .map(Box::new),
+                })
+            }
             Value::StaticSlice { epoch, .. } | Value::StaticView { epoch, .. } => {
                 validate_static_epoch(memory, *epoch)?;
                 Ok(value.clone())
@@ -1140,6 +1151,16 @@ impl<'tcx> Engine<'tcx> {
             Value::StaticSlice { .. } => {
                 self.validate_tracked_value(&value, state)?;
                 Ok(value)
+            }
+            Value::MaybeUninit { id, payload } => {
+                self.maybe_uninit_payload_type(id)?;
+                Ok(Value::MaybeUninit {
+                    id,
+                    payload: payload
+                        .map(|payload| self.return_value(*payload, state, incoming))
+                        .transpose()?
+                        .map(Box::new),
+                })
             }
             Value::StaticView { .. } => self.static_view_operand(value, state),
             Value::TraitObject { place: true, .. } => {

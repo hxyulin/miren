@@ -20,6 +20,11 @@ impl<'tcx> Engine<'tcx> {
         roots: &mut Vec<Value>,
     ) -> Result<(), String> {
         match value {
+            Value::MaybeUninit { payload, .. } => {
+                if let Some(payload) = payload {
+                    Self::collect_static_store_references(payload, roots)?;
+                }
+            }
             Value::RawSlice {
                 source: reference, ..
             }

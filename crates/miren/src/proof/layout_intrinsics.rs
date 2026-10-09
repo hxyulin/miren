@@ -43,6 +43,49 @@ impl<'tcx> Engine<'tcx> {
             );
             return Ok(Some(Value::Unit));
         }
+        if self
+            .tcx
+            .is_intrinsic(callee, Symbol::intern("assert_inhabited"))
+        {
+            if self
+                .tcx
+                .lang_items()
+                .get(LangItem::MaybeUninit)
+                .map(|id| id.krate)
+                != Some(callee.krate)
+                || !signature.inputs().is_empty()
+                || !values.is_empty()
+                || !signature.output().is_unit()
+                || signature.safety() != rustc_hir::Safety::Safe
+                || signature.abi() != rustc_abi::ExternAbi::Rust
+                || signature.c_variadic()
+            {
+                return Err(
+                    "inhabitance intrinsic has an unsupported compiler identity or signature"
+                        .into(),
+                );
+            }
+            let payload = instance.args.type_at(0);
+            let inhabited = self
+                .tcx
+                .check_validity_requirement((
+                    rustc_middle::ty::layout::ValidityRequirement::Inhabited,
+                    ty::TypingEnv::fully_monomorphized().as_query_input(payload),
+                ))
+                .map_err(|error| format!("compiler inhabitance query unavailable: {error:?}"))?;
+            let safe = self.terms.boolean(inhabited);
+            self.require(
+                location.0,
+                location.1,
+                &state.conditions,
+                &safe,
+                ObligationKind::PanicSafety,
+                format!("compiler inhabitance guard for {payload:?}"),
+            )?;
+            state.conditions.push(safe);
+            self.record_model(callee, "compiler inhabitance query; guard only");
+            return Ok(Some(Value::Unit));
+        }
         let reference_api = self
             .tcx
             .is_diagnostic_item(Symbol::intern("mem_size_of_val"), callee);

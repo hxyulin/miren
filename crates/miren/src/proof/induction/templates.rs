@@ -38,6 +38,7 @@ impl<'tcx> Engine<'tcx> {
                 | Value::TrackedPointer { .. }
                 | Value::StaticSlice { .. }
                 | Value::StaticView { .. }
+                | Value::MaybeUninit { .. }
                 | Value::Uninitialized
                 | Value::TraitObject { .. }
                 | Value::DebugReference { .. }
@@ -201,6 +202,9 @@ impl<'tcx> Engine<'tcx> {
             | Value::Function
             | Value::Unit => Ok(value.clone()),
             Value::Input(_) => Err("lazy input snapshots are not supported by induction".into()),
+            Value::MaybeUninit { .. } => {
+                Err("MaybeUninit snapshots are not supported by induction".into())
+            }
         }
     }
 

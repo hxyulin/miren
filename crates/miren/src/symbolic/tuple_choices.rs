@@ -94,6 +94,7 @@ fn validate(
             Err("tuple array choice primitive has an invalid width, sort or context".into())
         }
         Value::Uninitialized
+        | Value::MaybeUninit { .. }
         | Value::StaticSlice { .. }
         | Value::StaticView { .. }
         | Value::RawPointer { .. }
@@ -229,6 +230,20 @@ mod tests {
         );
         assert!(select_element(&context, std::slice::from_ref(&unsupported), &index).is_ok());
         assert!(select_element(&context, &[unsupported.clone(), unsupported], &index).is_err());
+        let uninitialized = Value::Tuple(vec![Value::MaybeUninit {
+            id: 0,
+            payload: None,
+        }]);
+        let initialized = Value::Tuple(vec![Value::MaybeUninit {
+            id: 0,
+            payload: Some(Box::new(integer(&context, 7, 16, false))),
+        }]);
+        assert!(
+            tuple_choice(&context, std::slice::from_ref(&initialized), &index)
+                .unwrap()
+                .is_none()
+        );
+        assert!(select_element(&context, &[uninitialized, initialized], &index).is_err());
         let mut float = crate::symbolic::float(&context, 0x80000000, 32);
         if let Value::Float { raw_bits, .. } = &mut float {
             *raw_bits = Some(context.bit_vector(0, 64).unwrap());

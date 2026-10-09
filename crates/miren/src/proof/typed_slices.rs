@@ -94,6 +94,7 @@ impl<'tcx> Engine<'tcx> {
                 | Value::StaticView { .. }
                 | Value::Tuple(_)
                 | Value::Elements(_)
+                | Value::MaybeUninit { .. }
                 | Value::Uninitialized
                 | Value::TraitObject { .. }
                 | Value::DebugReference { .. }

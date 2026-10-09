@@ -524,8 +524,8 @@ gaps by category and exact reason, preserving all root names. Saved coverage gap
 absent optional category. Existing schema version and safety statuses are unchanged.
 
 The Rust capability baseline is independent of fleet and hardware contracts. Run
-`cargo test --locked -p miren --test rust_capabilities`; its shared manifest selects 29 cases across
-14 families on host/ARM at O0/O2, with positive/refuted/unknown and actual source-mutation controls.
+`cargo test --locked -p miren --test rust_capabilities`; its shared manifest selects 32 cases across
+15 families on host/ARM at O0/O2, with positive/refuted/unknown and actual source-mutation controls.
 The standalone [survey](../../tools/rust_capability_survey.py) retains full reports and provenance.
 See [the Rust roadmap](../../docs/rust-capabilities.md) for scope and intended model boundaries.
 Portable-atomic/static-cell integration fixtures use pristine versioned sources under
@@ -554,3 +554,14 @@ UNKNOWN otherwise; read support does not grant additional write or reference rig
 The conditional tuple domain does not replace existing unique-index or singleton selection
 of retained handles. Those paths keep their prior behavior; only pure values obtain new
 conditional field selections.
+
+Compiler-certified core `MaybeUninit` construction records a valid wrapper separately from its
+payload's initialization. The bounded owned value domain covers `Copy + Freeze` primitive bool,
+integer, float, unit and tuple payloads without destructors. Actual core bodies and the compiler
+inhabitance guard execute before exact retained payload extraction. An uninitialized nonempty
+payload remains UNKNOWN; only compiler-certified unit-only zero-byte tuples have a unique value
+without initialized bytes. Restricted scalar patterns are rejected before normalization. Wrapper
+copies and whole assignments preserve branch-local typed values and available float bits; aggregate
+padding is not exposed as initialized bytes. Arbitrary incoming wrappers, reference or pointer
+payloads, raw partial writes, zeroed raw writes and reference-returning APIs remain unsupported.
+This value state grants no allocation identity, liveness or raw-access rights.

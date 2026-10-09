@@ -32,6 +32,12 @@ impl<'tcx> Engine<'tcx> {
         visited: &mut Vec<usize>,
     ) -> Result<(), String> {
         match value {
+            Value::MaybeUninit { payload, .. } => {
+                if let Some(payload) = payload {
+                    Self::validate_reference_graph(payload, state, incoming, visited)?;
+                }
+                Ok(())
+            }
             Value::Reference { allocation, .. }
             | Value::Cell { allocation }
             | Value::LocalAtomic { allocation, .. } => {

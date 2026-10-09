@@ -1,5 +1,4 @@
 #![no_std]
-#![forbid(unsafe_code)]
 
 use core::future::Future;
 use core::pin::pin;
@@ -216,6 +215,23 @@ pub fn tuple_array_symbolic_write(index: usize) {
     }
 }
 
+pub fn maybe_uninit_round_trip(value: u32, flag: bool) {
+    let storage = core::mem::MaybeUninit::new((value, flag));
+    let result = unsafe { storage.assume_init() };
+    assert!(result == (value, flag));
+}
+
+pub fn maybe_uninit_wrong_claim(value: u32, flag: bool) {
+    let storage = core::mem::MaybeUninit::new((value, flag));
+    let result = unsafe { storage.assume_init() };
+    assert!(result.0 == value && result.1 != flag);
+}
+
+pub fn maybe_uninit_uninitialized() -> u32 {
+    // Analysis-only: never execute this uninitialized payload extraction.
+    unsafe { core::mem::MaybeUninit::<u32>::uninit().assume_init() }
+}
+
 #[cfg(test)]
 mod native {
     use super::*;
@@ -225,6 +241,8 @@ mod native {
     fn positives() {
         integers(199);
         raw_pointer_metadata(usize::MAX);
+        maybe_uninit_round_trip(0, false);
+        maybe_uninit_round_trip(u32::MAX, true);
         for index in 0..3 {
             tuple_array_choice(index);
         }

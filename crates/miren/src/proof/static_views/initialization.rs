@@ -89,6 +89,13 @@ impl Engine<'_> {
             return Ok(());
         }
         match value {
+            Value::MaybeUninit { id, payload } => {
+                self.maybe_uninit_payload_type(*id)?;
+                if let Some(payload) = payload {
+                    self.validate_static_initialization_graph(payload, state, visited)?;
+                }
+                Ok(())
+            }
             Value::StaticView { .. } => {
                 let view = self.static_view(value, state)?;
                 if view.kind != ViewKind::Raw {

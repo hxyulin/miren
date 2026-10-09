@@ -263,6 +263,7 @@ impl<'tcx> Engine<'tcx> {
             | Value::TrackedPointer { .. }
             | Value::StaticSlice { .. }
             | Value::StaticView { .. }
+            | Value::MaybeUninit { .. }
             | Value::Uninitialized
             | Value::TraitObject { .. }
             | Value::DebugReference { .. }

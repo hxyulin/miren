@@ -140,7 +140,8 @@ fn verify_entries(
                 proof.obligations.iter().any(|o| {
                     o.status == ProofStatus::Unknown
                         && o.detail.contains("core::mem::MaybeUninit")
-                        && o.detail.contains("unsupported aggregate kind")
+                        && o.detail
+                            .contains("MaybeUninit payload requires primitive or pure tuple types")
                 }),
                 "{:?}",
                 proof.obligations
