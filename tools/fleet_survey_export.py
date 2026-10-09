@@ -15,6 +15,7 @@ from fleet_survey import STATUSES, compare
 ROOT_COLUMNS = ["unit_index", "function", "source_function_heuristic", "status", "file_index",
                 "line", "column", "blocker_index"]
 CATEGORIES = {"source_function_heuristic", "generated_or_other"}
+ANALYSIS_SCOPES = {"function_body", "coroutine_factory", "unclassified"}
 CHECKPOINTS = ["artifact_hashes", "artifact_hashes_before_verify", "artifact_hashes_after_verify",
                "artifact_hashes_at_completion"]
 PROVENANCE = ["fleet", "analyzer_source", "analyzer_sha256", "analyzer_binaries", "toolchain",
@@ -59,6 +60,8 @@ def validate(summary, complete=True):
                 "root identity does not match a unit")
         require(root.get("status") in STATUSES, "missing or invalid root status")
         require(root.get("classification") in CATEGORIES, "invalid root classification")
+        require(root.get("analysis_scope", "unclassified") in ANALYSIS_SCOPES,
+                "invalid root analysis scope")
         source = root.get("source")
         require(isinstance(source, dict) and isinstance(source.get("file"), str),
                 "invalid root source")
@@ -283,12 +286,22 @@ def export(summary, measured_on, previous=None):
                      file_index[source["file"]], source["line"], source["column"],
                      blocker_index.get(root["first_blocker"])])
     provenance = summary["provenance"]
+    scopes = {scope: tally([r for r in roots
+                            if r.get("analysis_scope", "unclassified") == scope])
+              for scope in sorted(ANALYSIS_SCOPES)}
+    factory_indices = [index for index, root in enumerate(roots)
+                       if root.get("analysis_scope") == "coroutine_factory"]
     result = {"schema_version": 1, "measured_on": measured_on, "collection_status": "complete",
               "provenance": {key: provenance[key] for key in PROVENANCE},
               "source_files_sha256": fingerprint(provenance["source_files"]),
               "source_inputs_unchanged": True, "build_files": provenance.get("build_files", {}),
               "counts": counts, "classified_counts": classified, "units": compact_units,
               "root_columns": ROOT_COLUMNS, "files": files, "blockers": blockers, "roots": rows,
+              "analysis_scope_counts": scopes, "coroutine_factory_root_indices": factory_indices,
+              "unclassified_root_indices": [index for index, root in enumerate(roots)
+                  if root.get("analysis_scope", "unclassified") == "unclassified"],
+              "analysis_scope_meaning": "direct coroutine returns construct futures; "
+                  "async polling is a separately collected scope",
               **artifact_provenance(units)}
     if previous is not None:
         result["comparison"] = comparison(summary, previous)

@@ -242,10 +242,12 @@ def unit_matches(unit, report, cwd):
 
 def root_records(unit, inventory, verified, error, fleet, cwd):
     roots = []
-    expected = [(f["name"], f["source"]) for f in inventory["functions"]]
-    actual = [(f["name"], f["source"]) for f in verified.get("functions", [])]
+    expected = [(f["name"], f["source"], f.get("returns_coroutine"))
+                for f in inventory["functions"]]
+    actual = [(f["name"], f["source"], f.get("returns_coroutine"))
+              for f in verified.get("functions", [])]
     if actual != expected:
-        error = error or "verification roots/source spans differ from inventory"
+        error = error or "verification roots/source spans/scope differ from inventory"
     for function in inventory["functions"]:
         name = function["name"]
         source = function["source"]
@@ -276,11 +278,24 @@ def root_records(unit, inventory, verified, error, fleet, cwd):
         if status == "proved" and any(o.get("status") != "proved"
                                       for o in proof.get("obligations", [])):
             failure = failure or "proved root contains unfinished or failed obligations"
+        if (match.get("returns_coroutine") is not None
+                and type(match["returns_coroutine"]) is not bool):
+            failure = failure or "invalid verified compiler coroutine-return metadata"
+        if "async_entry" in proof and type(proof["async_entry"]) is not bool:
+            failure = failure or "invalid verified async scope metadata"
+        if proof.get("async_entry", False):
+            failure = failure or "fleet function roots cannot claim separately collected async polls"
+        coroutine = function.get("returns_coroutine")
+        scope = ("coroutine_factory" if coroutine is True else
+                 "function_body" if coroutine is False else "unclassified")
+        if coroutine is not None and type(coroutine) is not bool:
+            failure = failure or "invalid compiler coroutine-return metadata"
+            scope = "unclassified"
         blockers = [o.get("detail", "unspecified") for o in proof.get("obligations", [])
                     if o.get("status") == "unknown"]
         roots.append({"id": identity, "name": name,
                       "source": {**source, "file": file}, "classification": classification,
-                      "status": "unknown" if failure else status,
+                      "analysis_scope": scope, "status": "unknown" if failure else status,
                       "failure": failure, "first_blocker": failure or next(iter(blockers), None)})
     return roots
 

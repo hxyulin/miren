@@ -755,3 +755,7 @@ obligation and returns a writable projection into the original allocation. Neste
 retain their correct offsets and lengths. Invalid bounds refute; non-byte, readonly, arbitrary raw
 and dead backing remain UNKNOWN. Host/ARM and native mutations check bounds, updates and model
 identity, including similarly named user implementations that execute their actual bodies.
+Compiler inventories record direct coroutine return types independently of proof outcomes.
+The fleet exporter counts future factories separately and identifies their compact root rows.
+These proofs construct futures without polling them. Explicit async-entry results remain separate;
+missing metadata in legacy inventories is unclassified rather than inferred from function names.

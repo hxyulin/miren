@@ -436,6 +436,8 @@ pub fn render_report(report: &Report, verbose: bool, colored: bool) -> String {
             function.name,
             if proof.async_entry {
                 " (async construction + polls)"
+            } else if function.returns_coroutine == Some(true) {
+                " (future construction)"
             } else {
                 ""
             }

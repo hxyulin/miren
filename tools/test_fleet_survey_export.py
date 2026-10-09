@@ -201,6 +201,23 @@ class ExportTests(unittest.TestCase):
             {"before": a, "after": b, "count": 1}])
         self.assertEqual(result["changed_roots"], 0)
 
+    def test_compiler_scope_counts_and_factory_rows_do_not_change_outcomes(self):
+        result = exporter.export(self.raw, "2026-10-09")
+        self.assertEqual(result["analysis_scope_counts"]["unclassified"], result["counts"])
+        self.assertEqual(result["coroutine_factory_root_indices"], [])
+        self.assertEqual(result["unclassified_root_indices"], list(range(2336)))
+        root = self.raw["roots"][0]
+        root["analysis_scope"] = "coroutine_factory"
+        result = exporter.export(self.raw, "2026-10-09")
+        index, = result["coroutine_factory_root_indices"]
+        self.assertEqual(result["roots"][index][1], root["name"])
+        self.assertEqual(result["analysis_scope_counts"]["coroutine_factory"][root["status"]], 1)
+        self.raw["roots"].reverse()
+        self.assertEqual(result, exporter.export(self.raw, "2026-10-09"))
+        root["analysis_scope"] = "proved async body"
+        with self.assertRaises(ValueError):
+            exporter.export(self.raw, "2026-10-09")
+
 
 if __name__ == "__main__":
     unittest.main()

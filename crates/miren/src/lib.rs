@@ -148,6 +148,8 @@ pub fn render_coverage(report: &Report) -> String {
 pub struct Function {
     pub name: String,
     pub source: Source,
+    #[serde(default)]
+    pub returns_coroutine: Option<bool>,
     pub basic_blocks: usize,
     pub arguments: usize,
     pub contracts: Vec<Contract>,
@@ -462,6 +464,8 @@ pub fn render(report: &Report) -> String {
         if let Some(proof) = &function.proof {
             let scope = if proof.async_entry {
                 " (async construction + polls)"
+            } else if function.returns_coroutine == Some(true) {
+                " (future construction)"
             } else {
                 ""
             };

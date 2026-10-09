@@ -205,3 +205,6 @@ clone handles separately; unsupported payloads and interior mutation remain UNKN
 Mutable byte ranges use the exact compiler `Range<usize>` SliceIndex implementation. Analysis checks
 start <= end <= slice length and preserves the backing allocation through nested projections.
 Non-byte ranges and missing writable provenance remain UNKNOWN.
+Compiler inventories record whether each function directly returns a coroutine. Fleet surveys
+separate those future-construction roots from function-body roots; explicit async polling remains
+a separate capture. Older inventories without this metadata remain unclassified.

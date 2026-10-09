@@ -1392,3 +1392,12 @@ exact eight-call conditional policy; boot reachability remains unverified.
 All 457 Rust tests, 42 Python tool tests, formatting, Clippy, release builds, dependency checks,
 documentation builds and manual hooks pass. Compact exporters validate both complete captures
 before publication. Fleet application code remains untouched.
+
+## Stage 92: Compiler-backed root scope in fleet measurements
+
+Inventories expose direct coroutine return types as optional backward-compatible metadata.
+The fleet runner checks matching inventory/verification metadata and separates construction from
+function-body roots. Exported counts and row indices retain that distinction; legacy missing
+metadata remains unclassified. Polling proofs cannot enter a function-only capture. Compiler/native
+host/ARM tests prove construction of a panicking future and refute its reached poll; metadata and
+scope mutations fail collection without changing proof outcomes.

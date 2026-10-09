@@ -205,3 +205,10 @@ label changed diagnostics using a grouping key that ignores rustc DefId indices,
 ordering of complete `dyn` Binder entries. Different payload types, paths and operations remain
 separate. This display grouping is not semantic equivalence or proof progress; unchanged UNKNOWN
 roots remain UNKNOWN regardless of grouping. Malformed Binder lists are left unsorted.
+
+Compiler inventories optionally report direct coroutine return types. Full fleet collections check
+that inventory and verification metadata agree, label future construction separately from function
+bodies and reject a polling proof in the function-only capture. Compact exports retain scope counts
+and exact row indices for factories and unclassified legacy roots. Scope metadata changes no proof
+outcomes; missing legacy metadata is not inferred from source names. All-main polling captures
+remain separate.

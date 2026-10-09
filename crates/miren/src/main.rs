@@ -334,6 +334,7 @@ fn collect(tcx: TyCtxt<'_>, arguments: &[String]) -> Report {
         functions.push(Function {
             name: tcx.def_path_str(id.to_def_id()),
             source: source(tcx, tcx.def_span(id)),
+            returns_coroutine: Some(body.return_ty().is_coroutine()),
             basic_blocks: body.basic_blocks.len(),
             arguments: body.arg_count,
             contracts,

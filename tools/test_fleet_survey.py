@@ -40,6 +40,37 @@ class SurveyTests(unittest.TestCase):
                 self.assertEqual(root["status"], status)
                 self.assertEqual(root["classification"], "source_function_heuristic")
 
+    def test_coroutine_scope_is_compiler_metadata_and_polling_is_separate(self):
+        for metadata, scope in [(True, "coroutine_factory"), (False, "function_body"),
+                                (None, "unclassified")]:
+            self.inventory["functions"][0]["returns_coroutine"] = metadata
+            root = self.roots()[0]
+            self.assertEqual(root["analysis_scope"], scope)
+            self.assertEqual(root["status"], "proved")
+        verified = json.loads(json.dumps(self.inventory))
+        verified["functions"][0]["proof"] = {"status": "proved", "async_entry": True}
+        root = survey.root_records(self.unit, self.inventory, verified, None,
+                                   self.directory, self.directory)[0]
+        self.assertEqual(root["status"], "unknown")
+        self.assertIn("async polls", root["failure"])
+        verified["functions"][0]["proof"]["async_entry"] = False
+        verified["functions"][0]["returns_coroutine"] = True
+        root = survey.root_records(self.unit, self.inventory, verified, None,
+                                   self.directory, self.directory)[0]
+        self.assertEqual(root["status"], "unknown")
+        self.inventory["functions"][0]["returns_coroutine"] = True
+        verified["functions"][0]["returns_coroutine"] = 1
+        root = survey.root_records(self.unit, self.inventory, verified, None,
+                                   self.directory, self.directory)[0]
+        self.assertEqual(root["status"], "unknown")
+        verified["functions"][0]["returns_coroutine"] = True
+        verified["functions"][0]["proof"]["async_entry"] = 0
+        root = survey.root_records(self.unit, self.inventory, verified, None,
+                                   self.directory, self.directory)[0]
+        self.assertEqual(root["status"], "unknown")
+        self.inventory["functions"][0]["returns_coroutine"] = 1
+        self.assertEqual(self.roots()[0]["status"], "unknown")
+
     def test_failed_process_cannot_prove(self):
         self.assertEqual(self.roots(failure="compiler crashed")[0]["status"], "unknown")
 
