@@ -126,6 +126,13 @@ valid character: mapping an unconstrained word to itself when valid and zero oth
 every valid character and covers the full valid domain. It restores no initializer or history,
 and never repairs a write, retained value or uncertified read.
 
+Stage 141 extends the owned initialization certificate to exact character payloads. Initialized
+characters must satisfy the same Unicode predicate under existing current path conditions at
+construction, typed carrier boundaries and extraction, including tuple and array children.
+Their exact values are retained without domain mapping. Nonempty uninitialized character payloads
+remain unsupported; a certified empty character array has its unique empty value. Restricted
+pattern types still refuse before normalization, including at array length zero.
+
 Retaining a value requires a visibility policy. Owned storage with no possible external mutation
 can retain exact values. Shared mutable statics retain at most initialization facts justified by
 the environment; their initializer is not the runtime state of an arbitrary selected root.

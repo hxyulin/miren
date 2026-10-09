@@ -1132,3 +1132,11 @@ use a domain encoding that covers every Unicode scalar without restoring the ini
 write history. Cached, stored and startup values require proof of validity instead. Uninitialized
 and uncertified raw access retain their separate UNKNOWN boundaries. The expanded baseline has
 38 cases across 16 families: 64 PROVED, 56 REFUTED and 32 UNKNOWN across host/ARM O0/O2.
+
+Stage 141 admits exact character leaves in owned `MaybeUninit` payloads. Construction, extraction
+and recursive typed carrier validation prove Unicode validity using the current path conditions.
+Whole copies, helpers, tuples and bounded arrays retain exact initialized values. Uninitialized
+nonempty character payloads remain Semantics UNKNOWN, while an eligible empty character array
+has its unique empty value. The original type/layout, initialization and resource certificates
+remain required; raw pattern types and reference-forming operations remain unsupported. The
+41-case/16-family baseline expects 68 PROVED, 60 REFUTED and 36 UNKNOWN across four builds.

@@ -113,7 +113,7 @@ impl<'tcx> Engine<'tcx> {
             return Err("MaybeUninit payload exceeds the bounded Copy Freeze value domain".into());
         }
         match ty.kind() {
-            ty::Bool | ty::Int(_) | ty::Uint(_) | ty::Float(_) => {
+            ty::Bool | ty::Char | ty::Int(_) | ty::Uint(_) | ty::Float(_) => {
                 self.static_layout(ty)?;
                 Ok(())
             }
@@ -153,10 +153,16 @@ impl<'tcx> Engine<'tcx> {
         Ok(count)
     }
 
-    fn maybe_uninit_payload_value(&self, ty: Ty<'tcx>, value: &Value) -> Result<(), String> {
+    fn maybe_uninit_payload_value(
+        &self,
+        ty: Ty<'tcx>,
+        value: &Value,
+        conditions: &[Term],
+    ) -> Result<(), String> {
         let valid = |term: &Term, sort: Sort| term.belongs_to(&self.terms) && term.sort() == &sort;
         match (ty.kind(), value) {
             (ty::Bool, Value::Bool(term)) if valid(term, Sort::Bool) => Ok(()),
+            (ty::Char, Value::Int { .. }) => self.prove_char_value(value, conditions),
             (
                 ty::Int(_) | ty::Uint(_),
                 Value::Int {
@@ -203,7 +209,7 @@ impl<'tcx> Engine<'tcx> {
             (ty::Tuple(fields), Value::Unit) if fields.is_empty() => Ok(()),
             (ty::Tuple(fields), Value::Tuple(values)) if fields.len() == values.len() => {
                 for (field, value) in fields.iter().zip(values) {
-                    self.maybe_uninit_payload_value(field, value)?;
+                    self.maybe_uninit_payload_value(field, value, conditions)?;
                 }
                 Ok(())
             }
@@ -215,7 +221,7 @@ impl<'tcx> Engine<'tcx> {
                     );
                 }
                 for value in values.iter() {
-                    self.maybe_uninit_payload_value(*element, value)?;
+                    self.maybe_uninit_payload_value(*element, value, conditions)?;
                 }
                 Ok(())
             }
@@ -239,6 +245,7 @@ impl<'tcx> Engine<'tcx> {
         active: usize,
         operand_types: &[Ty<'tcx>],
         values: &[Value],
+        conditions: &[Term],
     ) -> Result<Option<Value>, String> {
         let ty::Adt(def, args) = wrapper.kind() else {
             return Ok(None);
@@ -307,7 +314,7 @@ impl<'tcx> Engine<'tcx> {
                     "ManuallyDrop retained field does not match its compiler identity".into(),
                 );
             }
-            self.maybe_uninit_payload_value(payload_ty, payload)?;
+            self.maybe_uninit_payload_value(payload_ty, payload, conditions)?;
             Some(Box::new(payload.clone()))
         } else {
             return Err("MaybeUninit construction has an incompatible active field value".into());
@@ -337,18 +344,20 @@ impl<'tcx> Engine<'tcx> {
         &self,
         ty: Ty<'tcx>,
         value: &Value,
+        conditions: &[Term],
     ) -> Result<(), String> {
         if !contains_wrapper(value) {
             return Ok(());
         }
         let mut nodes = 0;
-        self.validate_maybe_uninit_context(ty, value, 0, &mut nodes)
+        self.validate_maybe_uninit_context(ty, value, conditions, 0, &mut nodes)
     }
 
     fn validate_maybe_uninit_context(
         &self,
         ty: Ty<'tcx>,
         value: &Value,
+        conditions: &[Term],
         depth: usize,
         nodes: &mut usize,
     ) -> Result<(), String> {
@@ -371,7 +380,7 @@ impl<'tcx> Engine<'tcx> {
                 }
                 let payload_ty = self.maybe_uninit_payload_type(*id)?;
                 if let Some(value) = payload {
-                    self.maybe_uninit_payload_value(payload_ty, value)?;
+                    self.maybe_uninit_payload_value(payload_ty, value, conditions)?;
                 }
                 Ok(())
             }
@@ -388,7 +397,7 @@ impl<'tcx> Engine<'tcx> {
                     return Err("nested MaybeUninit tuple has a mismatched arity".into());
                 }
                 for (field, value) in fields.iter().zip(values) {
-                    self.validate_maybe_uninit_context(field, value, depth + 1, nodes)?;
+                    self.validate_maybe_uninit_context(field, value, conditions, depth + 1, nodes)?;
                 }
                 Ok(())
             }
@@ -405,7 +414,13 @@ impl<'tcx> Engine<'tcx> {
                     return Err("nested MaybeUninit array has a mismatched length".into());
                 }
                 for value in values.iter() {
-                    self.validate_maybe_uninit_context(*element, value, depth + 1, nodes)?;
+                    self.validate_maybe_uninit_context(
+                        *element,
+                        value,
+                        conditions,
+                        depth + 1,
+                        nodes,
+                    )?;
                 }
                 Ok(())
             }
@@ -455,7 +470,13 @@ impl<'tcx> Engine<'tcx> {
                         .map_err(|e| {
                             format!("nested MaybeUninit field normalization failed: {e:?}")
                         })?;
-                    self.validate_maybe_uninit_context(field_ty, value, depth + 1, nodes)?;
+                    self.validate_maybe_uninit_context(
+                        field_ty,
+                        value,
+                        conditions,
+                        depth + 1,
+                        nodes,
+                    )?;
                 }
                 Ok(())
             }
@@ -515,6 +536,7 @@ impl<'tcx> Engine<'tcx> {
         source: Ty<'tcx>,
         target: Ty<'tcx>,
         value: &Value,
+        conditions: &[Term],
     ) -> Result<Option<Value>, String> {
         let ty::Adt(def, _) = source.kind() else {
             return Ok(None);
@@ -522,7 +544,7 @@ impl<'tcx> Engine<'tcx> {
         if self.tcx.lang_items().get(LangItem::MaybeUninit) != Some(def.did()) {
             return Ok(None);
         }
-        self.validate_maybe_uninit_value(source, value)?;
+        self.validate_maybe_uninit_value(source, value, conditions)?;
         let (payload_ty, _, _) = self.maybe_uninit_shape(source)?;
         if target != payload_ty {
             return Err("MaybeUninit extraction changes the exact compiler payload type".into());
@@ -541,7 +563,7 @@ impl<'tcx> Engine<'tcx> {
                     )
                 });
         };
-        self.maybe_uninit_payload_value(target, payload)?;
+        self.maybe_uninit_payload_value(target, payload, conditions)?;
         Ok(Some((**payload).clone()))
     }
 }

@@ -268,6 +268,23 @@ pub fn char_invalid_float_bits() -> char {
     unsafe { core::mem::transmute(f32::from_bits(0xd800)) }
 }
 
+pub fn maybe_uninit_char(value: char) {
+    let storage = core::mem::MaybeUninit::new(value);
+    let result = unsafe { storage.assume_init() };
+    assert!(result == value);
+}
+
+pub fn maybe_uninit_char_wrong_claim(value: char) {
+    let storage = core::mem::MaybeUninit::new(value);
+    let result = unsafe { storage.assume_init() };
+    assert!(result != value);
+}
+
+pub fn maybe_uninit_char_uninitialized() -> char {
+    // Analysis-only: never execute this uninitialized character extraction.
+    unsafe { core::mem::MaybeUninit::<char>::uninit().assume_init() }
+}
+
 #[cfg(test)]
 mod native {
     use super::*;
@@ -281,6 +298,9 @@ mod native {
         maybe_uninit_round_trip(u32::MAX, true);
         maybe_uninit_array([0, 1, u16::MAX]);
         maybe_uninit_array([u16::MAX, 0, 7]);
+        for value in ['\0', 'A', '\u{d7ff}', '\u{e000}', '\u{10ffff}'] {
+            maybe_uninit_char(value);
+        }
         for value in [
             0,
             0x41,

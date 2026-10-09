@@ -184,7 +184,7 @@ fn char_formation_proves_unicode_validity_and_executes_actual_checked_conversion
         ("no_initializer", ProofStatus::Refuted),
         ("uninitialized", ProofStatus::Unknown),
         ("static_address", ProofStatus::Unknown),
-        ("unsupported_wrapper", ProofStatus::Unknown),
+        ("owned_wrapper", ProofStatus::Proved),
         ("float_pattern_integer", ProofStatus::Unknown),
         ("float_pattern_char", ProofStatus::Unknown),
         ("float_pattern_integer_valid", ProofStatus::Proved),

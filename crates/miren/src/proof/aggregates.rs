@@ -169,9 +169,13 @@ impl<'tcx> Engine<'tcx> {
                 return Err("union aggregate has an invalid variant".into());
             }
             let wrapper = Ty::new_adt(self.tcx, self.tcx.adt_def(*def), args);
-            if let Some(value) =
-                self.maybe_uninit_aggregate(wrapper, active.as_usize(), &operand_types, &values)?
-            {
+            if let Some(value) = self.maybe_uninit_aggregate(
+                wrapper,
+                active.as_usize(),
+                &operand_types,
+                &values,
+                &state.conditions,
+            )? {
                 self.record_model(
                     id,
                     "compiler-certified MaybeUninit construction; explicit payload initialization",

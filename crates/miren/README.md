@@ -584,4 +584,14 @@ representations remain supported; a surrogate, out-of-range encoding, or unprove
 also require their original compiler scalar pattern, without erasing that metadata. Fresh reads
 of already certified initialized character statics encode arbitrary observations into the Unicode
 scalar domain, covering every valid character without restoring an initializer, history, or access
-rights. Raw/uninitialized storage and `MaybeUninit<char>` remain outside this capability.
+rights. Raw access to uninitialized storage remains outside this capability.
+
+
+Owned `MaybeUninit` payloads now include exact compiler `char` types, retaining their original
+Unicode scalar bits. Constructors, copied wrappers, helpers, tuples, and bounded whole arrays
+validate initialized characters under the current path conditions through the existing exact
+union/type certificate. These checks add no assumptions and never map or repair stored payloads.
+Actual core construction, extraction, and inhabitance guards execute. Uninitialized nonempty
+character payloads remain `UNKNOWN`; `[char; 0]` can produce its unique empty value. Restricted
+scalar patterns, raw/reference payloads, partial initialization, and all existing budgets keep
+their earlier boundaries.

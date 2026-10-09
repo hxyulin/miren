@@ -2907,3 +2907,38 @@ Final standalone evidence: `/tmp/miren-stage140-capabilities-20261010`, with 64 
 Validation passes 592 Rust tests, 67 Python tests, formatting, cargo lint, release builds,
 cargo deny, documentation build and manual hooks. Independent review approves the validity
 boundaries, preservation of valid refined conversions and full initialized-character domain.
+
+
+## Stage 141: owned character initialization payloads
+
+Exact compiler `char` joins the bounded pure Copy/Freeze, no-drop payload certificate for
+`MaybeUninit`. Initialized payload validation uses the character predicate from stage 140 and
+the existing current path conditions. Construction, extraction, root argument validation,
+operands, assignments and returns pass those conditions through tuple, array and typed carrier
+recursion. Actual core constructors, extraction and inhabitance guards continue to execute.
+The descriptor identity, raw type, active union field and exact layout certificates remain required.
+
+No domain encoding repairs an owned payload. Whole copies, helper returns and aggregate payloads
+preserve initialized values. Nonempty uninitialized characters and aggregates remain Semantics
+UNKNOWN. An eligible empty character array has one empty value and uses the existing zero-byte
+reconstruction without materializing a character. Raw pattern types still refuse before
+normalization, including at array length zero. All count, node, depth and descriptor budgets stay
+unchanged, as do raw/static/reference access and partial-initialization frontiers.
+
+The shared capability manifest adds initialized character P/R and uninitialized extraction U
+controls: 41 cases in 16 families, expecting 17 PROVED, 15 REFUTED and 9 UNKNOWN per build.
+
+Host/ARM O0/O2 compiler controls cover symbolic characters and Unicode edges, checked conversions,
+helper returns, copied/replaced wrappers, recursive carriers, tuples and arrays, symbolic value
+selection, count 128 and empty arrays. Wrong scalar/element claims refute. Missing and conditional
+initialization, invalid scalar formation, restricted types, changed extraction types, raw/reference
+operations and count/node exhaustion retain precise UNKNOWN diagnostics. Actual core extraction
+and inhabitance model attribution are checked. Native complete-value controls pass at O0/O2;
+changing an actual helper initializer from e000 to e001 refutes in all four configurations and
+fails both native builds. The older character-wrapper control now proves under this certificate.
+
+Final standalone evidence: `/tmp/miren-stage141-capabilities-20261010`, with 68 PROVED,
+60 REFUTED and 36 UNKNOWN outcomes, unchanged frozen inputs/binaries and no collection errors.
+Validation passes 594 Rust tests, 67 Python tests, formatting, cargo lint, release builds,
+cargo deny, documentation build and manual hooks. Independent review approves current-condition
+propagation, exact character payload proofs and unchanged initialization/access boundaries.

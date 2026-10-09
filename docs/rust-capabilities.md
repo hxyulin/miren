@@ -11,14 +11,15 @@ execution at O0 and O2, positive/refuted/unknown controls, a source mutation tha
 structured UNKNOWN reporting, and passing repository checks. Completion establishes a repeatable
 baseline. It does not establish full Rust support or a completed memory-model refactor.
 
-The manifest contains 38 cases across 16 families. Each build configuration expects 16 PROVED,
-14 REFUTED and 8 UNKNOWN results. Stage 133 originally had 23 cases with 10 PROVED, 9 REFUTED
+The manifest contains 41 cases across 16 families. Each build configuration expects 17 PROVED,
+15 REFUTED and 9 UNKNOWN results. Stage 133 originally had 23 cases with 10 PROVED, 9 REFUTED
 and 4 UNKNOWN; stage 134 closed its retained-prefix projection gap. Stage 136 adds raw-pointer
 metadata P/R controls and a safe core reference-array grant that remains UNKNOWN without a
 temporal permission certificate. Stage 137 adds tuple-array P/R and unsupported symbolic-write
 controls. Stage 138 adds initialized `MaybeUninit` P/R and uninitialized extraction U controls.
 Stage 139 extends that family with bounded whole-array initialization P/R/U controls. Stage 140
-adds checked character conversion P/R and invalid character formation U controls.
+adds checked character conversion P/R and invalid character formation U controls. Stage 141 adds
+owned initialized character payload P/R and uninitialized character extraction U controls.
 These additions change the denominator, not a coverage percentage.
 Covered examples exercise arithmetic, enum payloads, array indexing, reference effects, concrete
 generics, closures, iterator callbacks, finite loops, destructors, fresh future polling and raw

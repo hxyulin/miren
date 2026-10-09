@@ -197,7 +197,7 @@ pub fn static_address() -> char {
 }
 
 #[cfg(not(test))]
-pub fn unsupported_wrapper() {
+pub fn owned_wrapper() {
     let _ = unsafe { core::mem::MaybeUninit::new('a').assume_init() };
 }
 

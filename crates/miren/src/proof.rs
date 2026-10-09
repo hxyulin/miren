@@ -390,7 +390,7 @@ impl<'tcx> Engine<'tcx> {
             self.proof.replay_inputs = Some(self.replay_arguments(id, &arguments));
         }
         for (local, value) in body.args_iter().zip(&arguments) {
-            self.validate_maybe_uninit_value(body.local_decls[local].ty, value)?;
+            self.validate_maybe_uninit_value(body.local_decls[local].ty, value, &conditions)?;
         }
         let snapshots = self.snapshots(&arguments, &memory, &conditions)?;
         let instance = ty::Instance::new_raw(id, ty::GenericArgs::identity_for_item(self.tcx, id));
@@ -1161,7 +1161,7 @@ impl<'tcx> Engine<'tcx> {
                     } else {
                         self.local(&state, 0)?
                     };
-                    self.validate_maybe_uninit_value(body.return_ty(), &value)?;
+                    self.validate_maybe_uninit_value(body.return_ty(), &value, &state.conditions)?;
                     if self.restricted_scalar_target(body.return_ty()) {
                         self.prove_scalar_target(body.return_ty(), &value, &state.conditions)?;
                     }
@@ -1558,7 +1558,11 @@ impl<'tcx> Engine<'tcx> {
             StatementKind::Assign(assignment) => {
                 let (place, value) = assignment.as_ref();
                 let value = self.rvalue(id, body, state, value)?;
-                self.validate_maybe_uninit_value(place.ty(&body.local_decls, self.tcx).ty, &value)?;
+                self.validate_maybe_uninit_value(
+                    place.ty(&body.local_decls, self.tcx).ty,
+                    &value,
+                    &state.conditions,
+                )?;
                 if self.restricted_scalar_target(place.ty(&body.local_decls, self.tcx).ty) {
                     self.prove_scalar_target(
                         place.ty(&body.local_decls, self.tcx).ty,
@@ -1768,7 +1772,11 @@ impl<'tcx> Engine<'tcx> {
         match operand {
             Operand::Copy(place) | Operand::Move(place) => {
                 let value = self.place(state, *place)?;
-                self.validate_maybe_uninit_value(place.ty(&body.local_decls, self.tcx).ty, &value)?;
+                self.validate_maybe_uninit_value(
+                    place.ty(&body.local_decls, self.tcx).ty,
+                    &value,
+                    &state.conditions,
+                )?;
                 self.validate_mutable_handle_rights(
                     place.ty(&body.local_decls, self.tcx).ty,
                     &value,
@@ -2216,7 +2224,9 @@ impl<'tcx> Engine<'tcx> {
                     );
                     return Ok(value);
                 }
-                if let Some(value) = self.maybe_uninit_transmute(source, *target, &value)? {
+                if let Some(value) =
+                    self.maybe_uninit_transmute(source, *target, &value, &state.conditions)?
+                {
                     self.record_model(
                         id,
                         "compiler-certified MaybeUninit extraction; initialized payload or unique zero-byte tuple",
