@@ -1964,3 +1964,12 @@ soundness fixes. All 72 strict/reset main obligation arrays remain identical to 
 twelve isolated wrappers retain their unfinished weak-CAS retries and unsupported SEV boundaries.
 Captures: `/tmp/miren-stage116-main-{strict,reset}-20261009` and `/tmp/miren-stage116/runtime`.
 No application or assumption changes.
+
+The complete twelfth ordinary fleet pass freezes clean stage 115 analyzer 62c944a. All 32 ARM units
+and 2,336 roots completed collection: 1,114 PROVED, 256 REFUTED and 966 UNKNOWN, without assumptions.
+Exactly referee::ui_delete_all moves UNKNOWN to PROVED; all previous proofs/refutations retain their
+outcomes, with no added/removed roots or incompatible provenance. Source-heuristic counts are
+519/232/268. Five source UNKNOWN budget-group changes retain UNKNOWN, as does ui_number's changed
+CRC query-size diagnostic. Firmware/source fingerprints and artifact checkpoints remain consistent.
+Raw capture: `/tmp/miren-fleet-pass12-20261009/summary.json`. Deterministic export validation passes
+before publication; main evidence remains separately frozen at 03e66a2.
