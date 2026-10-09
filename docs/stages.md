@@ -2040,3 +2040,14 @@ Actual referee replays retain ui_number/ui_delete_all PROVED and encode REFUTED 
 All 72 strict/reset main obligation arrays match stage 117 exactly; twelve isolated wrappers still
 record unfinished weak-CAS retries and unsupported SEV. Captures: `/tmp/miren-stage118/replay`,
 `/tmp/miren-stage118-main-{strict,reset}-20261009` and `/tmp/miren-stage118/runtime`.
+
+
+The complete thirteenth ordinary fleet pass freezes clean stage 117 analyzer 2d183c7. All 32 ARM
+units and 2,336 roots completed collection: 1,115 PROVED, 256 REFUTED and 965 UNKNOWN, without
+assumptions. Exactly referee::ui_number moves UNKNOWN to PROVED; all previous proofs/refutations
+retain outcomes, with no added/removed roots or incompatible provenance. Source-heuristic counts
+are 520/232/267. Nineteen source and 455 generated UNKNOWN diagnostics change only compiler display;
+three source solver/step/time grouping changes retain UNKNOWN. All 243 source fingerprints and
+artifact checkpoints remain consistent. Raw capture: `/tmp/miren-fleet-pass13-20261009/summary.json`.
+Repeated deterministic exports are identical before publication. Main evidence remains separately
+frozen at 03e66a2; hardware and boot validity are unverified.
