@@ -373,6 +373,14 @@ impl<'tcx> Engine<'tcx> {
                     return Err("scalar slice element carrier requires compiler array type".into());
                 }
             }
+            Value::Adt { fields, .. } if matches!(expected.kind(), ty::Closure(..)) => {
+                let types = self
+                    .closure_capture_types(expected, value)?
+                    .ok_or("closure carrier compiler type is missing")?;
+                for (ty, (_, capture)) in types.iter().zip(fields) {
+                    self.scalar_slice_typed_depth(ty, capture, memory, conditions, depth + 1)?;
+                }
+            }
             Value::Adt {
                 name,
                 variant,

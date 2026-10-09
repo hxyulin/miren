@@ -3102,3 +3102,38 @@ After integration with stage 144, the shared baseline contains 52 cases in 19 fa
 unchanged frozen inputs/binaries and no collection errors. Merged validation passes 607 Rust
 tests, 68 Python tests, formatting, cargo lint, release builds, cargo deny, documentation build
 and manual hooks. Both independently reviewed feature stages retain their original test domains.
+
+## Stage 146: exact synchronous closure captures and call adapters
+
+A shared compiler certificate checks synchronous closure identity, resolved Fn/FnMut/FnOnce kind,
+capture count and numbered fields against original compiler capture types. Read-only scalar slice
+and pure `MaybeUninit` carriers reuse it while retaining their own validity rules. Mutable capture
+handles retain their declared rights. The return path checks captured reference graphs before
+snapshot conversion, including exact enclosing aggregate metadata. Caller-owned references and
+owned move captures remain supported; borrowed local backing cannot escape.
+Primitive slice references with wholly pure tracked backing retain their existing symbolic views;
+closure discovery does not materialize them or require a uniquely determined view length.
+
+Invoking an Fn closure through FnOnce previously replaced the compiler shim with the closure body,
+passing an owned receiver where that body expected a borrow. The selected synchronous compiler
+shim now executes actual MIR, preserving receiver conversion and actual drop bodies. Both the
+original opaque-local and concrete copied-handle retirement controls prove without source or type
+normalization changes. A destructor panic refutes instead of being skipped.
+
+Dedicated compiler controls cover 26 roots per host/ARM O0/O2 configuration: 17 PROVED, 4 REFUTED
+and 5 UNKNOWN. They include direct, nested, returned, mutable and consuming captures, owned move
+arrays, first-match find, Float storage bits, decoded Char and initialized wrappers. Retired
+backing, borrowed frame escape, uninitialized extraction, missing invoked bodies and unsupported
+mutable roots refuse at their recorded frontiers. Actual captured helper index mutation refutes
+all four profiles and fails valid native O0/O2 executions. Malformed capture schema controls and
+independent semantic review approve the metadata, rights, escape and actual shim/drop paths.
+
+The shared baseline adds returned scalar-slice capture P/R and missing invoked body U controls:
+55 cases across 20 families, expecting 22 PROVED, 20 REFUTED and 13 UNKNOWN per build. Standalone
+evidence `/tmp/miren-stage146-final-capabilities-20261010` matches 88 PROVED, 80 REFUTED and
+52 UNKNOWN, with unchanged frozen inputs/binaries and no collection errors. No input-length cap,
+environment premise, raw-access permission or default proof budget is added.
+
+Final merged validation passes 611 Rust tests and 68 Python tests, formatting, cargo lint,
+release builds, cargo deny, documentation build and manual hooks. Independent review approves
+the exact capture metadata, return escape checks and execution of actual compiler call shims.

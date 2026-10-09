@@ -651,6 +651,14 @@ impl<'tcx> Engine<'tcx> {
                 self.validate_mutable_static_handle(value)?;
             }
         }
+        if let Some(types) = self.closure_capture_types(expected, value)? {
+            let Value::Adt { fields, .. } = value else {
+                return Err("closure carrier lacks retained capture storage".into());
+            };
+            for (ty, (_, capture)) in types.iter().zip(fields) {
+                self.validate_mutable_handle_rights(ty, capture)?;
+            }
+        }
         if let ty::Tuple(types) = expected.kind()
             && let Value::Tuple(fields) = value
         {

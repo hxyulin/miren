@@ -1196,3 +1196,13 @@ bodies must be available. Floating comparisons retain numeric NaN and signed-zer
 character comparisons use decoded Unicode values. Unbounded scans remain UNKNOWN. Combined with
 stage 144, the 52-case/19-family baseline expects 84 PROVED, 76 REFUTED and 48 UNKNOWN outcomes
 across host/ARM O0/O2.
+
+Stage 146 certifies supported synchronous closure captures using their exact compiler definition,
+resolved closure kind and original capture types. Primitive slice and pure initialization-wrapper
+captures retain their separate validity rules. Returned closures preserve caller-owned references;
+captured frame-owned borrows refuse before the return path can turn them into owned snapshots.
+Aggregate capture carriers validate their compiler field and variant metadata. Calls through
+`FnOnce` execute the selected compiler-generated shim and actual closure body, preserving receiver
+borrow conversion and drop execution. This does not supply an async closure state model, new raw
+rights, mutable slice roots or unbounded loop summaries. The 55-case/20-family shared baseline
+expects 88 PROVED, 80 REFUTED and 52 UNKNOWN outcomes across host/ARM O0/O2.

@@ -424,6 +424,18 @@ impl<'tcx> Engine<'tcx> {
                 }
                 Ok(())
             }
+            Value::Adt { fields, .. }
+                if matches!(ty.kind(), ty::Closure(..))
+                    && fields.iter().any(|(_, value)| contains_wrapper(value)) =>
+            {
+                let types = self
+                    .closure_capture_types(ty, value)?
+                    .ok_or("closure carrier compiler type is missing")?;
+                for (ty, (_, capture)) in types.iter().zip(fields) {
+                    self.validate_maybe_uninit_context(ty, capture, conditions, depth + 1, nodes)?;
+                }
+                Ok(())
+            }
             Value::Adt {
                 name,
                 variant,

@@ -29,6 +29,7 @@ mod atomic_rmw;
 mod builtins;
 mod call_metadata;
 mod characters;
+mod closure_captures;
 mod constants;
 mod coroutines;
 mod enum_transmutes;
@@ -959,9 +960,28 @@ impl<'tcx> Engine<'tcx> {
         }
         if !matches!(
             instance.def,
-            ty::InstanceKind::Item(_) | ty::InstanceKind::Shim(ty::ShimKind::DropGlue(_, _))
+            ty::InstanceKind::Item(_)
+                | ty::InstanceKind::Shim(
+                    ty::ShimKind::DropGlue(_, _) | ty::ShimKind::ClosureOnce { .. }
+                )
         ) {
             return Err(format!("unmodeled call adapter {:?}", instance.def));
+        }
+        if let ty::InstanceKind::Shim(ty::ShimKind::ClosureOnce { closure, .. }) = instance.def {
+            let ty::Closure(id, args) = instance.args.type_at(0).kind() else {
+                return Err("closure adapter receiver is not a closure".into());
+            };
+            if *id != closure
+                || self.tcx.coroutine_kind(*id).is_some()
+                || !matches!(
+                    args.as_closure().kind_ty().kind(),
+                    ty::Int(ty::IntTy::I8 | ty::IntTy::I16 | ty::IntTy::I32)
+                )
+            {
+                return Err(
+                    "closure adapter lacks its resolved synchronous compiler identity".into(),
+                );
+            }
         }
         if matches!(instance.def, ty::InstanceKind::Item(_))
             && !self.tcx.is_mir_available(instance.def_id())
@@ -1206,6 +1226,12 @@ impl<'tcx> Engine<'tcx> {
                         self.prove_scalar_target(body.return_ty(), &value, &state.conditions)?;
                     }
                     self.validate_mutable_handle_rights(body.return_ty(), &value)?;
+                    self.validate_closure_escape(
+                        body.return_ty(),
+                        &value,
+                        &state,
+                        incoming_allocations,
+                    )?;
                     self.validate_frame_escape(&value, &state, incoming_allocations)
                         .map_err(|error| {
                             format!("return from {}: {error}", self.tcx.def_path_str(id))
@@ -1340,21 +1366,6 @@ impl<'tcx> Engine<'tcx> {
                             _ => return Err("function-pointer arguments are not a tuple".into()),
                         };
                         pointer
-                    } else {
-                        instance
-                    };
-                    let instance = if let ty::InstanceKind::Shim(ty::ShimKind::ClosureOnce {
-                        closure,
-                        ..
-                    }) = instance.def
-                    {
-                        let ty::Closure(id, args) = instance.args.type_at(0).kind() else {
-                            return Err("closure adapter receiver is not a closure".to_owned());
-                        };
-                        if *id != closure {
-                            return Err("closure adapter identity mismatch".to_owned());
-                        }
-                        ty::Instance::new_raw(closure, args)
                     } else {
                         instance
                     };

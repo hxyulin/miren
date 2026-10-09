@@ -638,3 +638,12 @@ Floating comparisons use numeric equality, including NaN inequality and signed-z
 Char comparisons use valid decoded scalar values. Custom finite element comparisons still execute
 actual `PartialEq` bodies and retain their effects. Unbounded scalar scans remain `UNKNOWN` with a
 resource-limit diagnostic. The models add no alias roots, assumptions, or raw-access rights.
+
+Concrete synchronous closures can carry supported read-only scalar slices and initialized pure
+`MaybeUninit` values through their exact compiler capture types. Shared capture metadata checks
+validate the closure identity, kind, numbered fields and original capture types; each payload
+retains its own validity and reference policy. Captured mutable handles keep their declared rights,
+and returning a closure cannot convert frame-owned captured borrows into owned snapshots. Ordinary
+closure bodies and compiler-generated Fn-to-FnOnce and FnMut-to-FnOnce adapters execute actual MIR,
+including their receiver borrows and drops. This adds no mutable slice, raw access, asynchronous
+closure or unbounded loop proof permission.

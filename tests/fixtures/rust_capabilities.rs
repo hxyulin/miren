@@ -358,6 +358,40 @@ pub fn unbounded_scalar_contains(values: &[u16], needle: u16) -> bool {
     values.contains(&needle)
 }
 
+#[inline(never)]
+fn scalar_reader(values: &[u16], index: usize) -> impl Fn() -> u16 + '_ {
+    move || values[index]
+}
+
+pub fn scalar_slice_capture(values: &[u16], index: usize) {
+    if index < values.len() {
+        let reader = scalar_reader(values, index);
+        assert!(reader() == values[index]);
+    }
+}
+
+pub fn scalar_slice_capture_wrong_claim(values: &[u16], index: usize) {
+    if index < values.len() {
+        let reader = scalar_reader(values, index);
+        assert!(reader() == 0);
+    }
+}
+
+#[cfg(not(test))]
+unsafe extern "Rust" {
+    fn opaque_captured_word(value: u16) -> u16;
+}
+
+#[cfg(not(test))]
+pub fn scalar_slice_capture_missing_body(values: &[u16], index: usize) -> u16 {
+    if index < values.len() {
+        let reader = move || unsafe { opaque_captured_word(values[index]) };
+        reader()
+    } else {
+        0
+    }
+}
+
 #[cfg(test)]
 mod native {
     use super::*;
@@ -366,6 +400,9 @@ mod native {
     #[test]
     fn positives() {
         integers(199);
+        scalar_slice_capture(&[], usize::MAX);
+        scalar_slice_capture(&[0, 1, u16::MAX], 2);
+        scalar_slice_capture(&[u16::MAX; 129], 128);
         bounded_scalar_contains(&[]);
         bounded_scalar_contains(&[0, u16::MAX]);
         bounded_scalar_contains(&[3, 7, 11, 13]);

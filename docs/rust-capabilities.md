@@ -11,8 +11,8 @@ execution at O0 and O2, positive/refuted/unknown controls, a source mutation tha
 structured UNKNOWN reporting, and passing repository checks. Completion establishes a repeatable
 baseline. It does not establish full Rust support or a completed memory-model refactor.
 
-The manifest contains 52 cases across 19 families. Each build configuration expects 21 PROVED,
-19 REFUTED and 12 UNKNOWN results. Stage 133 originally had 23 cases with 10 PROVED, 9 REFUTED
+The manifest contains 55 cases across 20 families. Each build configuration expects 22 PROVED,
+20 REFUTED and 13 UNKNOWN results. Stage 133 originally had 23 cases with 10 PROVED, 9 REFUTED
 and 4 UNKNOWN; stage 134 closed its retained-prefix projection gap. Stage 136 adds raw-pointer
 metadata P/R controls and a safe core reference-array grant that remains UNKNOWN without a
 temporal permission certificate. Stage 137 adds tuple-array P/R and unsupported symbolic-write
@@ -26,6 +26,9 @@ P and aggregate-slice U controls. Stage 144 adds arbitrary iterator cursor P/R c
 an unrestricted fold U that reaches the default execution time budget. Stage 145 adds bounded
 primitive slice membership P/R and unrestricted membership U controls. Its comparison work bound
 is proved on the actual call path without capping incoming input lengths.
+Stage 146 adds returned scalar-slice closure capture P/R and missing invoked body U controls.
+Synchronous captures retain exact compiler types and original backing; admitting a closure does
+not summarize its body or permit a borrowed local to escape.
 These additions change the denominator, not a coverage percentage.
 Covered examples exercise arithmetic, enum payloads, array indexing, reference effects, concrete
 generics, closures, iterator callbacks, finite loops, destructors, fresh future polling and raw
