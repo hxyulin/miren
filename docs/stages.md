@@ -1311,3 +1311,12 @@ initialized raw pointer arrays to reference arrays, checking live typed projecti
 and pairwise mutable disjointness. Numeric pointers, unions, incompatible anchors, dead or escaping
 backing and unsupported symbolic reference-array selections remain UNKNOWN. Host/ARM compiler
 and native mutation tests preserve child bounds and reject overlapping or permission-forged data.
+
+## Stage 85: initialized tracked scalar volatile reads
+
+Compiler-identified volatile_load reads only initialized whole retained scalar allocations with
+an exact compiler pointee and registered location. Loads preserve integer and floating-point bits,
+including NaNs and signed zero. Numeric, static, punned, projected, offset, dead and uninitialized
+origins remain UNKNOWN. This grants no MMIO validity, synchronization or hardware effects.
+Host/ARM compiler fixtures check positive, refuted and unknown cases with native mutations and
+invalidating effects.

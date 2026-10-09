@@ -87,7 +87,8 @@ lang item; unions and uninitialized payloads remain unsupported. Each read admit
 boolean value, including after writes;
 initializers and critical sections establish no startup or shared-state history. Counterexamples
 that depend on this abstraction record its reason. Foreign storage, numeric addresses, different
-scalar types, unauthenticated interior offsets and mismatched storage origins remain UNKNOWN. Readonly pointers
+scalar types, unauthenticated interior offsets and mismatched storage origins remain UNKNOWN.
+Readonly pointers
 cannot authorize writes.
 
 Ordinary and async entry scopes differ: selecting an async constructor with `--entry` checks
@@ -111,6 +112,13 @@ displacement and allocation bounds produce explicit validity obligations. Array 
 known extent. Numeric pointer offsets, zero-sized strides, wrapping arithmetic and raw loads/stores
 outside the separately documented static-view domains remain UNKNOWN. Retained references still
 undergo liveness and frame-escape checks.
+
+Compiler-identified `volatile_load` reads initialized retained whole scalar allocations with an
+exact registered compiler pointee type, allocation identity and live backing value. It preserves
+stored floating-point bits, including NaNs and signed zero. Numeric/MMIO and static addresses,
+incoming raw pointers, type punning, projected addresses and displaced cursors remain UNKNOWN;
+volatile reads grant no synchronization or floating-point environment model. Dead, uninitialized
+or externally invalidated backing cannot supply a value.
 
 Compiler-typed `u8` MIR repeats use one constant SMT array and a target-width length. Their byte
 count does not expand host storage, and the compiler checks the target array layout. Bounds checks

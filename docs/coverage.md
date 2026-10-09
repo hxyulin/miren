@@ -726,3 +726,8 @@ Compiler-layout raw field and array-element pointers retain their containing all
 extent. The exact each_mut reference-array conversion checks initialized typed live projections
 and disjoint mutable elements. Numeric origins, unions, incompatible anchors, forged permissions
 and unsupported symbolic reference-array selection remain UNKNOWN.
+
+Compiler-identified volatile scalar loads require exact typed, initialized, live whole allocation
+backing and a matching registered address. Values retain exact integer/float storage bits.
+Numeric MMIO, static payloads, projections, cursor offsets, punned or invalidated storage remain
+UNKNOWN. The model supplies no synchronization or device access guarantee.
