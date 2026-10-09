@@ -830,3 +830,16 @@ contain only bool, integer or float fields. Stores preserve disjoint initializer
 branch-local tag choices; they do not enable payload reads. Pointer-bearing enums, publication,
 opaque calls and interrupt-mask writes retain conservative invalidation. Ordinary reads remain
 arbitrary legal tags, and later writes cannot restore invalidated startup history.
+
+Certified whole mutable primitive integer statics and exact integer payloads within core UnsafeCell
+struct/tuple paths support direct reads. Ordinary reads admit fresh arbitrary valid target-width
+bits; startup reads use checked initialized scalars and exact typed writes. Unions, arrays,
+MaybeUninit, numeric origins and mismatched declared types remain UNKNOWN. Conditional integer
+writes preserve disjoint boolean, enum and atomic history; opaque effects still invalidate it.
+
+The separate `--startup-isolated` domain conditionally retains actual typed static writes and
+local/static pointer atomic history beyond publication. Its recorded premise excludes external Rust
+storage mutations throughout the selected entry. Partial overwritten ranges cannot resurrect
+initializers, and symbolic pointer-origin merges retain address bits without pointee rights.
+Opaque calls and frame-escape checks remain conservative. Hardware and scheduler validity are not
+supplied by this premise.

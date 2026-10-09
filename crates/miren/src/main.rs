@@ -59,6 +59,7 @@ struct Checker {
     all_failures: bool,
     induction: bool,
     startup: bool,
+    isolated_startup: bool,
     limits: AnalysisLimits,
     replay: bool,
     pending_report: Option<Report>,
@@ -211,6 +212,7 @@ impl Callbacks for Checker {
                                 all_failures: self.all_failures,
                                 induction: self.induction,
                                 startup: self.startup,
+                                isolated_startup: self.isolated_startup,
                                 async_entry: self.async_entries.iter().any(|entry| {
                                     miren::entry_matches(&crate_name, &function.name, entry)
                                 }),
@@ -512,7 +514,9 @@ fn main() -> ExitCode {
         allow_assumptions: std::env::var_os("MIREN_ALLOW_ASSUMPTIONS").is_some(),
         all_failures: std::env::var_os("MIREN_ALL_FAILURES").is_some(),
         induction: std::env::var_os("MIREN_INDUCTION").is_some(),
-        startup: std::env::var_os("MIREN_STARTUP").is_some(),
+        startup: std::env::var_os("MIREN_STARTUP").is_some()
+            || std::env::var_os("MIREN_STARTUP_ISOLATED").is_some(),
+        isolated_startup: std::env::var_os("MIREN_STARTUP_ISOLATED").is_some(),
         limits,
         replay: false,
         pending_report: None,
@@ -532,7 +536,7 @@ fn main() -> ExitCode {
                 "Usage: miren [--json] [--summary] [--verify] [--entry FUNCTION] \
                 [--async-entry FACTORY] \
                 [--contracts FILE] [--allow-assumptions] [--all-failures] [--induction] \
-                [--startup] [--replay] [--verbose] [--quiet] \
+                [--startup | --startup-isolated] [--replay] [--verbose] [--quiet] \
                 [--color auto|always|never] [--jsonl FILE|-] -- \
                 <rustc arguments>\n\
                 Or: miren --verify --from-report FILE [--entry FUNCTION] [display options]\n\
@@ -543,6 +547,7 @@ fn main() -> ExitCode {
                 --verify proves panic safety for a restricted MIR subset; unknown proofs fail.\n\
                 --induction uses experimental Spacer proofs for supported cyclic root bodies.\n\
                 --startup assumes fresh statics for a zero-argument root; reports assumptions.\n\
+                --startup-isolated additionally assumes no external Rust storage changes after publication.\n\
                 Refuted roots stop at their first counterexample; --all-failures continues them.\n\
                 --replay compiles and executes supported native counterexample inputs.\n\
                 miren report <file or directory> reads saved JSON/JSONL reports.\n\n{}",
@@ -579,8 +584,14 @@ fn main() -> ExitCode {
                     checker.verify = true;
                     args.remove(1);
                 }
+                Some("--startup-isolated") => {
+                    checker.startup = true;
+                    checker.isolated_startup = true;
+                    args.remove(1);
+                }
                 Some("--startup") => {
                     checker.startup = true;
+                    checker.isolated_startup = false;
                     args.remove(1);
                 }
                 Some("--induction") => {

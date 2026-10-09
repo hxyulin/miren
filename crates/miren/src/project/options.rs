@@ -14,7 +14,8 @@ pub(super) const HELP: &str = "Usage: miren [check] [checker and cargo options]\
     Optional miren.json stores entries, Cargo arguments and explicit limit overrides.\n\
     Use --config FILE or --no-config to control project configuration.\n\
     --entry FUNCTION selects ordinary roots; --async-entry FACTORY checks construction + polls.\n\
-    --startup and --allow-assumptions stay explicit; --replay opts into native execution.\n\
+    --startup or --startup-isolated and --allow-assumptions stay explicit.\n\
+    --replay opts into native execution.\n\
     --verbose shows full details; --quiet hides progress; --jsonl FILE|- exports raw reports.\n\
     Cargo arguments such as -p, --bin, --lib, --target and --features retain their meaning.\n\
     cargo miren uses the same project workflow.\n\
@@ -39,6 +40,7 @@ struct Configuration {
     all_failures: Option<bool>,
     induction: Option<bool>,
     startup: Option<bool>,
+    startup_isolated: Option<bool>,
 }
 
 #[derive(Default, Deserialize)]
@@ -210,6 +212,11 @@ impl Configuration {
                 if verify { self.startup } else { None },
                 "--startup",
                 "--no-startup",
+            ),
+            (
+                if verify { self.startup_isolated } else { None },
+                "--startup-isolated",
+                "--no-startup-isolated",
             ),
         ] {
             if let Some(value) = value {

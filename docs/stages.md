@@ -1642,3 +1642,37 @@ in all twelve wrappers; strict runtime obligations also remain unchanged. Captur
 All 474 Rust workspace tests and 48 Python tests pass. Formatting, workspace Clippy, release builds,
 dependency checks, documentation builds and manual hooks pass; independent review found no required
 soundness fixes.
+
+## Stage 107: Explicit isolated initialization and certified integer payloads
+
+A separate opt-in startup-isolated domain records fresh static initializers and absence of external
+Rust storage mutation throughout a zero-argument entry, including after publication. Actual typed
+writes retain exact values and compiler type identities; overwritten footprints prevent initializer
+resurrection. Destructor-free retirement affects its footprint and requires exact reinitialization.
+Opaque calls remain irreversible boundaries. CLI, Cargo configuration and saved-report reanalysis
+keep domain selection explicit. Async roots and induction still reject startup premises.
+
+Compiler-identified pointer atomic operations receive original allocation-backed receivers before
+value snapshotting. Loads and stores retain actual values; strong CAS compares observed bits and
+weak CAS retains fresh spurious failures. Mixed symbolic pointer origins lose pointee rights while
+retaining selected address bits. Existing escape/lifetime and receiver validation remain in force.
+Concrete stored callbacks execute their actual bodies. No hardware instruction or MMIO validity is
+assumed.
+
+Certified primitive integer static reads additionally admit arbitrary valid bits in ordinary roots
+and checked initializers/exact writes in startup roots. Bounded UnsafeCell struct/tuple paths require
+matching declared origins. Unions, arrays, uninitialized payloads, numeric origins and type punning
+remain UNKNOWN. Disjoint scalar histories and the 128-location budget are tested.
+
+The isolated runtime probe passes Cordyceps' queue guard and pointer-CAS validation in all twelve
+wrappers. Each remains UNKNOWN when weak-CAS retry exploration reaches the query-size budget; no retry
+fairness, hardware validity or successful boot is inferred. Strict runtime obligations remain
+unchanged. Both ordinary main profiles still enter all twelve fresh application futures, with all
+72 root obligation arrays matching stage 106. Captures are
+`/tmp/miren-isolated-main-{strict,reset}-20261009` and
+`/tmp/miren-isolated-runtime-comparison`. These diagnostic captures precede the stage commit.
+
+All 490 Rust workspace tests and 48 Python tests pass. Formatting, workspace Clippy, release builds,
+dependency checks, documentation builds and manual hooks pass. Review corrected an invalidated local
+pointer store that could otherwise leave stale backing while reporting success; it now remains
+UNKNOWN, with a regression. No application code or hardware assumption profile changes.

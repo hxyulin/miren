@@ -36,6 +36,7 @@ mod input_references;
 mod inputs;
 mod integer_intrinsics;
 mod interior;
+mod isolated_pointer_atomics;
 mod iterators;
 mod layout_intrinsics;
 mod library;
@@ -130,6 +131,7 @@ struct Engine<'tcx> {
     all_failures: bool,
     induction: bool,
     startup: bool,
+    isolated_startup: bool,
     limits: miren::AnalysisLimits,
     resolved_contracts: BTreeMap<String, DefId>,
     solver: std::cell::RefCell<Solver>,
@@ -143,6 +145,7 @@ pub struct VerificationOptions {
     pub all_failures: bool,
     pub induction: bool,
     pub startup: bool,
+    pub isolated_startup: bool,
     pub async_entry: bool,
     pub limits: miren::AnalysisLimits,
 }
@@ -157,6 +160,7 @@ pub fn verify(
         all_failures,
         induction,
         startup,
+        isolated_startup,
         async_entry,
         limits,
     } = options;
@@ -189,6 +193,7 @@ pub fn verify(
         all_failures,
         induction,
         startup,
+        isolated_startup,
         limits,
         resolved_contracts: BTreeMap::new(),
         solver: std::cell::RefCell::new(Solver::with_limits(limits)),
@@ -262,8 +267,13 @@ impl<'tcx> Engine<'tcx> {
             self.proof.entry_assumptions = vec![
                 "Fresh startup: Rust statics have their declared initializer values on entry"
                     .into(),
-                "No external changes to tracked static storage before pointer publication or opaque calls"
-                    .into(),
+                if self.isolated_startup {
+                    "Isolated startup: no external task, thread or interrupt mutates tracked Rust \
+                     storage throughout this entry, including after pointer publication"
+                        .into()
+                } else {
+                    "No external changes to tracked static storage before pointer publication or opaque calls".into()
+                },
             ];
             if body.arg_count != 0 {
                 return Err("fresh startup currently requires a root with no arguments".into());
@@ -1259,6 +1269,20 @@ impl<'tcx> Engine<'tcx> {
                             self.write(&mut continuation, *destination, result.value)?;
                             queue.push_back((target, continuation));
                         }
+                        continue;
+                    }
+                    if !configured
+                        && let Some(value) = self.isolated_pointer_atomic_call(
+                            instance,
+                            &values,
+                            &mut state,
+                            (id, terminator.source_info.span),
+                        )?
+                    {
+                        self.write(&mut state, *destination, value)?;
+                        let target =
+                            target.ok_or("isolated pointer atomic call has no return edge")?;
+                        queue.push_back((target, state));
                         continue;
                     }
                     let modeled_values =

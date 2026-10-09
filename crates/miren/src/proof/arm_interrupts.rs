@@ -152,7 +152,9 @@ impl<'tcx> Engine<'tcx> {
                     return Err("PRIMASK write input has no u32 symbolic encoding".into());
                 }
                 let mut memory = state.memory.clone();
-                Self::invalidate_published_atomics(state, &mut memory)?;
+                if !self.isolated_startup {
+                    Self::invalidate_published_atomics(state, &mut memory)?;
+                }
                 state.memory = memory;
             }
             Instruction::Disable | Instruction::Enable => {
@@ -161,7 +163,9 @@ impl<'tcx> Engine<'tcx> {
                 }
                 // Interrupt mask writes do not establish an exclusion or restore startup facts.
                 let mut memory = state.memory.clone();
-                Self::invalidate_published_atomics(state, &mut memory)?;
+                if !self.isolated_startup {
+                    Self::invalidate_published_atomics(state, &mut memory)?;
+                }
                 state.memory = memory;
             }
         }

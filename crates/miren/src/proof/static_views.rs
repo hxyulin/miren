@@ -4,6 +4,8 @@ use rustc_middle::mir::interpret::GlobalAlloc;
 
 mod atomics;
 mod initialization;
+mod integers;
+mod isolated_startup;
 mod scalars;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -32,6 +34,9 @@ impl<'tcx> Engine<'tcx> {
         span: Span,
     ) -> Result<Option<Value>, String> {
         if let Some(value) = self.mutable_bool_static_constant(constant, span)? {
+            return Ok(Some(value));
+        }
+        if let Some(value) = self.mutable_integer_static_constant(constant, span)? {
             return Ok(Some(value));
         }
         let ty::Ref(_, pointee, mutability) = constant.ty().kind() else {
@@ -314,7 +319,13 @@ impl<'tcx> Engine<'tcx> {
                         "uninitialized static payload reads need an initialization model".into(),
                     );
                 }
+                if let Some(value) = self.isolated_static_read(view, state)? {
+                    return Ok(value);
+                }
                 if let Some(value) = self.mutable_bool_static_read(view, state)? {
+                    return Ok(value);
+                }
+                if let Some(value) = self.mutable_integer_static_read(view, state)? {
                     return Ok(value);
                 }
                 if self.atomic_shape(view.ty).is_some() {
@@ -392,14 +403,7 @@ impl<'tcx> Engine<'tcx> {
                 return Ok(Some((**discriminant).clone()));
             }
         }
-        if self.startup
-            && !state.memory.startup_invalidated
-            && !state
-                .memory
-                .startup_values
-                .keys()
-                .any(|other| location.overlaps(*other))
-        {
+        if self.startup && state.memory.startup_initializer_available(location) {
             let initializer =
                 self.tcx
                     .eval_static_initializer(view.static_id)
@@ -598,7 +602,9 @@ impl<'tcx> Engine<'tcx> {
                 self.static_store_value(view.ty, value, state, 0, &mut 0)?;
                 self.retain_static_store_references(value, state)?;
                 self.reinitialize_static_place(view, state);
-                if !self.store_startup_bool(view, value, state)?
+                if !self.store_isolated_static(view, value, state)?
+                    && !self.store_startup_bool(view, value, state)?
+                    && !self.store_startup_integer(view, value, state)?
                     && !self.store_startup_enum(view, value, state)?
                 {
                     state.memory.invalidate_startup();
@@ -1189,7 +1195,11 @@ impl<'tcx> Engine<'tcx> {
         }
         self.static_store_value(ty, value, state, 0, &mut 0)?;
         self.retain_static_store_references(value, state)?;
-        state.memory.invalidate_startup();
+        let mut place = view;
+        place.kind = ViewKind::Place;
+        if !self.store_isolated_static(place, value, state)? {
+            state.memory.invalidate_startup();
+        }
         Ok(())
     }
 }

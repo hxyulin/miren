@@ -103,6 +103,7 @@ their existing defaults unless explicitly overridden; reaching one still produce
 | `all_failures` | Continue refuted roots; default `false` |
 | `induction` | Select experimental supported-loop induction; default `false` |
 | `startup` | Select the explicit fresh-startup domain; default `false` |
+| `startup_isolated` | Select fresh startup with no external Rust storage mutation after publication; default `false` |
 
 Discovery starts at the current directory, or the `--manifest-path` directory, and searches its
 ancestors for the nearest file. `--config FILE` selects one explicitly; `--no-config` ignores
@@ -110,7 +111,8 @@ configuration. Unknown fields, invalid schemas and zero/invalid limits fail befo
 Native replay cannot be enabled by configuration: it always needs an explicit `--replay`.
 
 Explicit `--entry` or `--async-entry` options replace all configured roots. CLI limits and policy
-flags override configured values. `--no-startup`, `--no-induction`, `--deny-assumptions`,
+flags override configured values. `--no-startup` clears both startup domains;
+`--no-startup-isolated` clears isolation while retaining fresh startup. `--no-induction`, `--deny-assumptions`,
 `--first-failure` and `--dependency-mir` can clear the corresponding configured choices.
 Configured Cargo arguments precede CLI Cargo arguments and follow Cargo's own combination rules;
 conflicting singleton options are Cargo errors. Inventory ignores configured root selectors and
@@ -512,7 +514,7 @@ declared initializer values on entry, with no external changes to tracked static
 pointer publication or opaque calls. The terminal and JSON reports list these entry assumptions
 separately from contracts. Cargo forwards the same options.
 
-Supported integer static atomics and certified boolean static payloads retain initial values and
+Supported integer static atomics and certified boolean/integer static payloads retain initial values and
 sequential updates through branches and calls. This includes whole mutable bool statics and exact
 UnsafeCell/Cell boolean fields. Exact Copy/Freeze enum stores containing only primitive scalar
 fields retain subsequent tag observations, without enabling payload reads. Certified static pointer
@@ -528,3 +530,20 @@ or an interrupt/task execution environment.
 Saved reports preserve `functions[].proof.entry_assumptions`. Recompiling with `--from-report`
 requires selecting `--startup` again; saved compiler arguments do not silently select a proof
 domain.
+
+## Analyze an explicitly isolated initialization entry
+
+Use `--verify --startup-isolated --allow-assumptions --entry start` to assume fresh statics and no
+external task, thread or interrupt mutation of tracked Rust storage throughout that zero-argument
+entry, including after pointer publication. This is a separate conditional domain. Both assumptions
+are reported; saved compiler arguments do not enable it on reanalysis. Cargo also accepts
+`startup_isolated: true` in project configuration. A later `--startup` selects the original domain,
+and `--no-startup` returns to ordinary analysis.
+
+Exact typed stores retain values and execute concrete stored callbacks. Supported pointer atomic
+loads, stores and CAS retain actual receiver history. Weak CAS keeps possible spurious failures;
+merging different pointer origins retains only address bits and grants no pointee rights. Opaque
+calls still discard history, and retired storage needs a matching typed reinitialization. Reads
+without an exact retained value cannot reuse overwritten initializer ranges. MMIO, unsupported
+hardware instructions, async roots and startup induction remain unsupported. This mode does not
+verify boot reachability, task exclusion or scheduler correctness.

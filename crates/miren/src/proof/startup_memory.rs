@@ -22,12 +22,28 @@ pub(super) struct Memory {
     allocations: Rc<Vec<Option<Value>>>,
     pub(super) startup_values: std::collections::HashMap<StaticLocation, Value>,
     pub(super) startup_invalidated: bool,
+    pub(super) isolated_static_types: std::collections::HashMap<StaticLocation, usize>,
+    pub(super) startup_overwritten: Vec<StaticLocation>,
     pub(super) static_uninitialized: Vec<usize>,
 }
 
 impl Memory {
+    pub(super) fn startup_initializer_available(&self, location: StaticLocation) -> bool {
+        !self.startup_invalidated
+            && !self
+                .startup_overwritten
+                .iter()
+                .any(|other| location.overlaps(*other))
+            && !self
+                .startup_values
+                .keys()
+                .any(|other| location.overlaps(*other))
+    }
+
     pub(super) fn invalidate_startup(&mut self) {
         self.startup_values.clear();
+        self.isolated_static_types.clear();
+        self.startup_overwritten.clear();
         self.startup_invalidated = true;
     }
 }

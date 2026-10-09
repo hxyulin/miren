@@ -63,6 +63,10 @@ impl<'tcx> Engine<'tcx> {
         self.validate_pointer_atomic_receiver(receiver_ty, pointer_ty, receiver, state)?;
         let bits = u32::from(self.tcx.sess.target.pointer_width);
         for pointer in [expected, replacement] {
+            if self.isolated_startup && matches!(pointer, Value::StaticView { .. }) {
+                self.static_stored_address(pointer_ty, pointer, state)?;
+                continue;
+            }
             self.validate_tracked_value(pointer, state)?;
             if !matches!(pointer,
                 Value::RawPointer { address, bits: width }
@@ -91,21 +95,40 @@ impl<'tcx> Engine<'tcx> {
         {
             return Err("pointer compare-exchange result type mismatch".into());
         }
-        let old = Value::RawPointer {
+        let isolated_old = if self.isolated_startup && !state.memory.startup_invalidated {
+            match self.isolated_pointer_atomic_load(receiver, receiver_ty, pointer_ty, state)? {
+                Some(value) => Some(value),
+                None => {
+                    self.startup_pointer_atomic_load(receiver, receiver_ty, pointer_ty, state)?
+                }
+            }
+        } else {
+            None
+        };
+        let isolated = isolated_old.is_some();
+        let old = isolated_old.unwrap_or_else(|| Value::RawPointer {
             address: self.fresh_abstraction(
                 Sort::BitVec(bits),
                 "pointer compare-exchange observes arbitrary address bits without pointee \
                  provenance",
             ),
             bits,
+        });
+        let (comparison_old, comparison_expected) = if self.isolated_startup {
+            (
+                self.isolated_pointer_address(&old, pointer_ty, state)?,
+                self.isolated_pointer_address(expected, pointer_ty, state)?,
+            )
+        } else {
+            (old.clone(), expected.clone())
         };
         let equal =
-            symbolic::binary(&self.terms, "eq", old.clone(), expected.clone())?.boolean()?;
+            symbolic::binary(&self.terms, "eq", comparison_old, comparison_expected)?.boolean()?;
         let weak = name.as_str() == "compare_exchange_weak";
         let succeeds = self.compare_exchange_success(equal, weak)?;
         let variants = vec![
             self.constructed(result_ty, 0, vec![old.clone()])?,
-            self.constructed(result_ty, 1, vec![old])?,
+            self.constructed(result_ty, 1, vec![old.clone()])?,
         ];
         let (tag_bits, tag_signed) = self
             .integer_type(result_ty.discriminant_ty(self.tcx))
@@ -120,18 +143,32 @@ impl<'tcx> Engine<'tcx> {
             })
             .collect::<Result<Vec<_>, String>>()?;
         let discriminant = Value::Int {
-            expression: self
-                .terms
-                .apply(Op::Ite, &[succeeds, tags[0].clone(), tags[1].clone()])?,
+            expression: self.terms.apply(
+                Op::Ite,
+                &[succeeds.clone(), tags[0].clone(), tags[1].clone()],
+            )?,
             bits: tag_bits,
             signed: tag_signed,
         };
-        // A possible pointer publication ends the fresh-startup history premise.
-        let mut memory = state.memory.clone();
-        Self::invalidate_published_atomics(state, &mut memory)?;
-        state.memory = memory;
+        if isolated {
+            self.isolated_pointer_atomic_update(
+                receiver,
+                receiver_ty,
+                pointer_ty,
+                (&old, replacement),
+                &succeeds,
+                state,
+            )?;
+        } else {
+            // A possible pointer publication ends the fresh-startup history premise.
+            let mut memory = state.memory.clone();
+            Self::invalidate_published_atomics(state, &mut memory)?;
+            state.memory = memory;
+        }
         // Address equality establishes neither pointee provenance nor exclusive atomic history.
-        self.record_model(callee, if weak {
+        self.record_model(callee, if isolated {
+            "isolated-entry pointer CAS; exact observed pointer and conditional backing update"
+        } else if weak {
             "pointer weak CAS; matching success, possible spurious failure, arbitrary old address"
         } else {
             "pointer strong CAS; exact old-address comparison without provenance or history"

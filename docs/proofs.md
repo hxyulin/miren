@@ -888,3 +888,23 @@ local and supported startup storage retain its replacement. Compiler receiver id
 signature, widths, signedness and SMT sorts are checked. A shared access still receives an arbitrary
 old value and retains no update history. Boolean RMWs and pointer arithmetic/bitwise RMWs remain
 UNKNOWN.
+
+### Isolated startup entry
+
+`--startup-isolated` is a separately recorded execution premise. It assumes fresh static initializers
+and no external task, thread or interrupt mutation of tracked Rust storage during the entire
+zero-argument entry, including after pointer publication. Ordinary and existing startup semantics
+are unchanged. The premise supplies no unsafe memory validity, MMIO model or hardware instruction
+semantics, and is rejected for async roots and cyclic induction.
+
+Actual typed stores pass existing shape, initialization and escape checks before retaining values.
+Exact allocation/offset/size footprints retain compiler type identities, with 128-value/write-range
+budgets. Overwritten ranges cannot lazily reuse initializer bytes. Destructor-free typed retirement
+invalidates its exact footprint; access still requires matching reinitialization. Opaque calls
+invalidate all known and unseen history permanently.
+
+Supported pointer atomic operations use original allocation-backed receivers before snapshotting,
+preserving actual constructor and store values. Strong CAS compares exact old address bits; each
+weak CAS adds a fresh possible spurious failure. Symbolic updates across different pointer origins
+retain an address-bit choice without pointee provenance. Returned observations retain only already
+established rights. Publishing a frame-owned reference does not bypass frame-escape checks.

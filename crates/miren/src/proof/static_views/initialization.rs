@@ -60,7 +60,9 @@ impl<'tcx> Engine<'tcx> {
             return Err("static initialization exceeds the 128-retired-subobject budget".into());
         }
         state.memory.static_uninitialized.push(*id);
-        state.memory.invalidate_startup();
+        if !self.retire_isolated_static(view, state)? {
+            state.memory.invalidate_startup();
+        }
         Ok(true)
     }
 

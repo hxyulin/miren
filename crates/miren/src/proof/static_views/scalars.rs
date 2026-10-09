@@ -74,12 +74,7 @@ impl<'tcx> Engine<'tcx> {
             if let Some(Value::Bool(value)) = state.memory.startup_values.get(&location) {
                 return Ok(Some(Value::Bool(value.clone())));
             }
-            if !state
-                .memory
-                .startup_values
-                .keys()
-                .any(|other| location.overlaps(*other))
-            {
+            if state.memory.startup_initializer_available(location) {
                 let value = match self.startup_scalar_initializer(location)? {
                     0 => false,
                     1 => true,

@@ -50,6 +50,15 @@ impl<'tcx> Engine<'tcx> {
         state.conditions.push(safe);
         self.validate_pointer_atomic_receiver(receiver_ty, pointer_ty, receiver, state)?;
         if let Some(value) =
+            self.isolated_pointer_atomic_load(receiver, receiver_ty, pointer_ty, state)?
+        {
+            self.record_model(
+                callee,
+                "isolated-entry pointer atomic; exact initialized backing",
+            );
+            return Ok(Some(value));
+        }
+        if let Some(value) =
             self.startup_pointer_atomic_load(receiver, receiver_ty, pointer_ty, state)?
         {
             return Ok(Some(value));

@@ -36,7 +36,7 @@ fn verify(path: &Path, target: Option<&str>, optimized: bool) {
         ("already_taken", ProofStatus::Refuted),
         ("write_does_not_establish_history", ProofStatus::Refuted),
         ("separate_reads_are_not_stable", ProofStatus::Refuted),
-        ("wrong_scalar_is_unknown", ProofStatus::Unknown),
+        ("wrong_scalar_is_unknown", ProofStatus::Refuted),
         ("wrong_declared_type_is_unknown", ProofStatus::Unknown),
         ("immutable_storage_is_unknown", ProofStatus::Unknown),
         ("readonly_write_is_unknown", ProofStatus::Unknown),
@@ -48,7 +48,7 @@ fn verify(path: &Path, target: Option<&str>, optimized: bool) {
             ProofStatus::Refuted,
         ),
         ("nested_cell_already_taken", ProofStatus::Refuted),
-        ("wrong_cell_scalar_is_unknown", ProofStatus::Unknown),
+        ("wrong_cell_scalar_is_unknown", ProofStatus::Refuted),
         ("uninitialized_bool_is_unknown", ProofStatus::Unknown),
     ];
     verify_entries(path, &entries, target, optimized, false, &[]);
@@ -114,10 +114,18 @@ fn verify_entries(
             assert!(
                 proof.obligations.iter().any(|obligation| {
                     obligation.model.is_some()
-                        && obligation
-                            .abstraction_reasons
-                            .iter()
-                            .any(|reason| reason.contains("mutable boolean static"))
+                        && obligation.abstraction_reasons.iter().any(|reason| {
+                            reason.contains(
+                                if matches!(
+                                    *name,
+                                    "wrong_scalar_is_unknown" | "wrong_cell_scalar_is_unknown"
+                                ) {
+                                    "mutable integer static"
+                                } else {
+                                    "mutable boolean static"
+                                },
+                            )
+                        })
                 }),
                 "{name}: {:?}",
                 proof.obligations
@@ -193,7 +201,7 @@ fn explicit_startup_tracks_boolean_initializers_writes_and_branches() {
         ("repeated_cell_initialization", ProofStatus::Refuted),
         (
             "nonboolean_write_invalidates_boolean_history",
-            ProofStatus::Refuted,
+            ProofStatus::ProvedWithAssumptions,
         ),
         ("wrong_declared_type_is_unknown", ProofStatus::Unknown),
         ("readonly_write_is_unknown", ProofStatus::Unknown),

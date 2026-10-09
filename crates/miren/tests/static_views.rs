@@ -556,7 +556,7 @@ fn mutable_static_borrows_preserve_addresses_without_readable_or_initialization_
         ),
         (
             "a_mutable_static_borrow_does_not_retain_a_payload",
-            ProofStatus::Unknown,
+            ProofStatus::Proved,
         ),
         (
             "a_panic_after_a_mutable_static_borrow_is_reachable",

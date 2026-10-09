@@ -88,7 +88,7 @@ boolean value, including after writes, in ordinary analysis. Initializers and cr
 establish no startup or shared-state history. Explicit `--startup` records fresh initial values and
 no external changes to tracked static storage before pointer publication or opaque calls. In that
 conditional domain, certified boolean reads use initializer values and exact branch-local writes,
-sharing storage footprints and invalidation with integer atomics. Nonboolean static writes, mixed
+sharing storage footprints and invalidation with integer atomics. Unsupported static writes, mixed
 or overlapping views and opaque boundaries discard precision; later writes cannot restore it.
 Conditional first use proves, repeated initialization refutes, and unsupported pointers remain
 UNKNOWN. This does not establish reset execution or enable startup facts in async roots.
@@ -96,6 +96,16 @@ Counterexamples that depend on arbitrary-read abstraction record its reason. For
 scalar types, unauthenticated interior offsets and mismatched storage origins remain UNKNOWN.
 Readonly pointers
 cannot authorize writes.
+
+Primitive integer payloads use the same certified whole mutable static or bounded `UnsafeCell`
+field paths. Ordinary reads admit a fresh arbitrary value with the compiler's target width and
+signedness; writes establish no shared-state history. Explicit `--startup` reads checked initialized
+scalar bytes and retains exact branch-local integer writes, sharing the 128-location budget with
+other startup facts. Disjoint fields and scalar atomic histories remain independent. Incompatible
+or overlapping cached reads remain UNKNOWN; conflicting stores discard startup history. Pointer
+publication and interrupt-mask writes invalidate ordinary startup history. Opaque calls invalidate
+both startup domains, including unseen facts; subsequent writes cannot restore them. Unions, arrays, numeric pointer origins, `MaybeUninit` payloads and type
+punning remain unsupported.
 
 Ordinary and async entry scopes differ: selecting an async constructor with `--entry` checks
 construction; `--async-entry` also polls its fresh future through Pending and Ready states.
@@ -183,7 +193,8 @@ contracts are not substituted for an implementation; target contracts and the ac
 
 Exact Cortex-M PRIMASK read/write and interrupt mask instructions have a conservative model for
 supported compiler assembly shapes. Reads have arbitrary 32-bit values and do not establish stable
-interrupt state. Writes invalidate published atomic/startup history. Other assembly remains UNKNOWN;
+interrupt state. Writes invalidate published history outside isolated startup. Other assembly remains
+UNKNOWN;
 these operations do not prove critical-section exclusion or interrupt scheduling.
 
 Compiler-typed inhabited zero-sized aggregates use bounded shared input shapes, including large
@@ -264,3 +275,12 @@ Integer and pointer compare-exchange share ordering validation and the success f
 operation creates a fresh possible spurious failure. Receiver certification, primitive value types
 and storage updates remain specific to each model. Pointer equality supplies no shared-state
 history.
+
+`--startup-isolated` selects a separate conditional zero-argument entry domain: fresh Rust statics
+and no external task, thread or interrupt changes to tracked Rust storage throughout the entry,
+including after publication. Both premises appear in reports. Typed writes retain exact values;
+partial overwritten ranges cannot reuse initializer bytes. Exact destructor-free retirement affects
+its footprint and still requires matching reinitialization. Opaque calls invalidate all history.
+Supported local/static pointer atomic operations retain actual values; uncertain provenance joins
+retain address bits only. This grants no MMIO validity or hardware instruction support, and cannot
+be selected for async roots or induction. Ordinary and `--startup` domains remain separate.

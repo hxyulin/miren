@@ -43,6 +43,9 @@ impl<'tcx> Engine<'tcx> {
         if !self.startup_location_available(location, state)? {
             return Ok((self.opaque_atomic_value(bits, signed), None));
         }
+        if !state.memory.startup_initializer_available(location) {
+            return Ok((self.opaque_atomic_value(bits, signed), None));
+        }
         let value = self.startup_atomic_initializer(location, bits, signed)?;
         state.memory.startup_values.insert(location, value.clone());
         self.record_model(
@@ -67,6 +70,29 @@ impl<'tcx> Engine<'tcx> {
             return Ok(None);
         }
         let bits = u32::from(self.tcx.sess.target.pointer_width);
+        if self.isolated_startup
+            && let Some(
+                value @ Value::TrackedPointer {
+                    address,
+                    bits: width,
+                    ..
+                },
+            ) = state.memory.startup_values.get(&location)
+        {
+            if *width != bits || *address.sort() != Sort::BitVec(bits) {
+                return Err("isolated pointer atomic history has an inconsistent width".into());
+            }
+            self.validate_tracked_value(value, state)?;
+            return Ok(Some(value.clone()));
+        }
+        if self.isolated_startup
+            && let Some(value @ Value::StaticView { .. }) =
+                state.memory.startup_values.get(&location)
+        {
+            self.static_stored_address(pointer_ty, value, state)?;
+            self.validate_tracked_value(value, state)?;
+            return Ok(Some(value.clone()));
+        }
         if let Some(Value::RawPointer {
             address,
             bits: width,
@@ -85,6 +111,9 @@ impl<'tcx> Engine<'tcx> {
         }
         if location.bytes != u64::from(bits / 8) {
             return Err("startup pointer atomic initializer has an inconsistent width".into());
+        }
+        if !state.memory.startup_initializer_available(location) {
+            return Err("startup pointer initializer overlaps overwritten storage".into());
         }
         let initializer = self.startup_scalar_initializer(location)?;
         let value = Value::RawPointer {

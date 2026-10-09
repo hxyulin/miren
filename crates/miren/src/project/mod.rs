@@ -54,6 +54,7 @@ pub fn run(mut args: Vec<OsString>) -> Result<ExitCode, Box<dyn std::error::Erro
     let mut all_failures = false;
     let mut induction = false;
     let mut startup = false;
+    let mut isolated_startup = false;
     let mut replay = false;
     let mut limits = AnalysisLimits::default();
     let mut cargo_args = configured.cargo_args;
@@ -76,7 +77,11 @@ pub fn run(mut args: Vec<OsString>) -> Result<ExitCode, Box<dyn std::error::Erro
             Some("--inventory") => verify = false,
             Some("--dependency-mir") => dependency_mir = true,
             Some("--deny-assumptions") => allow_assumptions = false,
-            Some("--no-startup") => startup = false,
+            Some("--no-startup") => {
+                startup = false;
+                isolated_startup = false;
+            }
+            Some("--no-startup-isolated") => isolated_startup = false,
             Some("--no-induction") => induction = false,
             Some("--first-failure") => all_failures = false,
             Some("--summary") => verbose = false,
@@ -103,7 +108,14 @@ pub fn run(mut args: Vec<OsString>) -> Result<ExitCode, Box<dyn std::error::Erro
             Some("--allow-assumptions") => allow_assumptions = true,
             Some("--all-failures") => all_failures = true,
             Some("--induction") => induction = true,
-            Some("--startup") => startup = true,
+            Some("--startup") => {
+                startup = true;
+                isolated_startup = false;
+            }
+            Some("--startup-isolated") => {
+                startup = true;
+                isolated_startup = true;
+            }
             Some("--replay") => replay = true,
             Some("--contracts") => {
                 let path = args.next().ok_or("--contracts requires a JSON file")?;
@@ -212,9 +224,13 @@ pub fn run(mut args: Vec<OsString>) -> Result<ExitCode, Box<dyn std::error::Erro
         .env_remove("MIREN_ALLOW_ASSUMPTIONS")
         .env_remove("MIREN_ALL_FAILURES")
         .env_remove("MIREN_INDUCTION")
-        .env_remove("MIREN_STARTUP");
+        .env_remove("MIREN_STARTUP")
+        .env_remove("MIREN_STARTUP_ISOLATED");
     if startup {
         command.env("MIREN_STARTUP", "1");
+    }
+    if isolated_startup {
+        command.env("MIREN_STARTUP_ISOLATED", "1");
     }
     if induction {
         command.env("MIREN_INDUCTION", "1");

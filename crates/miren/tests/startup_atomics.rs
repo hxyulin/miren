@@ -125,7 +125,7 @@ fn fresh_startup_verifies_initializers_and_tracks_calls_branches_and_disjoint_lo
         ),
         (
             "a_static_store_invalidates_startup_history",
-            ProofStatus::Refuted,
+            ProofStatus::ProvedWithAssumptions,
         ),
         ("repeated_claim_panics", ProofStatus::Refuted),
         ("an_occupied_initializer_panics", ProofStatus::Refuted),
