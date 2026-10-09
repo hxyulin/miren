@@ -109,7 +109,10 @@ impl<'tcx> Engine<'tcx> {
             return Err("foreign symbol target lacks retained non-generic Rust MIR".into());
         }
         let target = ty::Instance::mono(self.tcx, target);
-        if self.call_signature(target)? != signature {
+        if !call_metadata::callable_signature_compatible(
+            self.call_poly_signature(target)?,
+            self.call_poly_signature(instance)?,
+        ) {
             return Err(
                 "foreign symbol target Rust signature does not match the declaration".into(),
             );

@@ -293,3 +293,44 @@ fn a_known_target_without_dependency_mir_remains_unknown() {
             .any(|obligation| obligation.detail.contains("MIR body unavailable"))
     );
 }
+
+#[test]
+fn safe_items_support_unsafe_pointer_reification_without_lifting_opaque_targets() {
+    let entries = [
+        (
+            "safe_item_can_be_reified_as_unsafe_pointer",
+            ProofStatus::Proved,
+        ),
+        ("wrong_unsafe_pointer_return_claim", ProofStatus::Refuted),
+        (
+            "safe_pointer_conversion_remains_unsupported",
+            ProofStatus::Unknown,
+        ),
+    ];
+    for target in [None, Some("thumbv7em-none-eabihf")] {
+        for optimized in [false, true] {
+            verify(&fixture(), &entries, target, optimized, None);
+        }
+    }
+    let source = std::fs::read_to_string(fixture()).unwrap();
+    let mutation = source.replacen("value & 3", "value", 1);
+    assert_ne!(source, mutation);
+    let directory = Directory::new();
+    let path = directory.0.join("unsafe_pointer_mutant.rs");
+    std::fs::write(&path, mutation).unwrap();
+    for target in [None, Some("thumbv7em-none-eabihf")] {
+        for optimized in [false, true] {
+            verify(
+                &path,
+                &[(
+                    "safe_item_can_be_reified_as_unsafe_pointer",
+                    ProofStatus::Refuted,
+                )],
+                target,
+                optimized,
+                None,
+            );
+        }
+    }
+    assert!(!native_tests(&path, &directory));
+}

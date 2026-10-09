@@ -917,3 +917,10 @@ retain their conditions and memory when propagated to the caller. This supplies 
 return, eventual-success assumption or loop proof. A later reached panic may refute the entry; a
 completed continuation still leaves the unfinished retry obligation UNKNOWN. Global analysis limits
 and ordinary/startup loop exploration remain unchanged.
+
+Known function-item reification and strong foreign Rust symbol binding share a directional callable
+signature check. Exact equality is accepted; additionally, a safe implementation can satisfy an
+unsafe declaration or pointer by changing only its safety qualifier. Normalized polymorphic
+signatures retain exact bound variables, inputs, output, ABI and variadic status. Unsafe-to-safe
+changes remain UNKNOWN. This checks compatibility and executes the retained body; it does not prove
+a foreign contract or lift an opaque pointer into a known target.

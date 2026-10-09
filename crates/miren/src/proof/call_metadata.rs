@@ -2,6 +2,19 @@ use super::*;
 
 const MAX_CALL_SIGNATURES: usize = 256;
 
+// A safe Rust body can satisfy an unsafe callable declaration. Preserve every other
+// signature component, including its bound variables, instead of rebuilding argument types.
+pub(super) fn callable_signature_compatible<'tcx>(
+    actual: ty::PolyFnSig<'tcx>,
+    expected: ty::PolyFnSig<'tcx>,
+) -> bool {
+    actual == expected
+        || (actual.skip_binder().safety() == rustc_hir::Safety::Safe
+            && expected.skip_binder().safety() == rustc_hir::Safety::Unsafe
+            && actual.map_bound(|signature| signature.set_safety(rustc_hir::Safety::Unsafe))
+                == expected)
+}
+
 impl<'tcx> Engine<'tcx> {
     pub(super) fn call_poly_signature(
         &self,
@@ -32,5 +45,24 @@ impl<'tcx> Engine<'tcx> {
     ) -> Result<ty::FnSig<'tcx>, String> {
         self.call_poly_signature(instance)
             .map(|sig| sig.skip_binder())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn callable_safety_changes_only_allow_safe_bodies_beneath_unsafe_declarations() {
+        let safe: ty::PolyFnSig<'_> = ty::Binder::dummy(ty::FnSig::dummy());
+        let unsafe_signature =
+            safe.map_bound(|signature| signature.set_safety(rustc_hir::Safety::Unsafe));
+        assert!(callable_signature_compatible(safe, safe));
+        assert!(callable_signature_compatible(
+            unsafe_signature,
+            unsafe_signature
+        ));
+        assert!(callable_signature_compatible(safe, unsafe_signature));
+        assert!(!callable_signature_compatible(unsafe_signature, safe));
     }
 }

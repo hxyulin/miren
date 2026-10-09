@@ -1,5 +1,8 @@
 #![no_std]
 #![forbid(unsafe_code)]
+#![feature(custom_mir, core_intrinsics)]
+
+use core::intrinsics::mir::*;
 
 fn low_bits(value: u8) -> u8 {
     value & 3
@@ -189,5 +192,37 @@ mod tests {
             super::pointer_call_preserves_effects(value);
         }
         super::empty_argument_tuple();
+    }
+}
+
+#[custom_mir(dialect = "runtime", phase = "optimized")]
+fn invoke_unsafe_pointer(callback: unsafe fn(u8) -> u8, value: u8) -> u8 {
+    mir! {
+        { Call(RET = callback(value), ReturnTo(done), UnwindUnreachable()) }
+        done = { Return() }
+    }
+}
+
+pub fn safe_item_can_be_reified_as_unsafe_pointer(value: u8) {
+    let callback: unsafe fn(u8) -> u8 = low_bits;
+    assert!(invoke_unsafe_pointer(callback, value) < 4);
+}
+
+pub fn wrong_unsafe_pointer_return_claim(value: u8) {
+    let callback: unsafe fn(u8) -> u8 = low_bits;
+    assert!(invoke_unsafe_pointer(callback, value) >= 4);
+}
+
+pub fn safe_pointer_conversion_remains_unsupported(value: u8) {
+    let safe: fn(u8) -> u8 = low_bits;
+    let callback: unsafe fn(u8) -> u8 = safe;
+    assert!(invoke_unsafe_pointer(callback, value) < 4);
+}
+
+#[cfg(test)]
+#[test]
+fn native_safe_item_to_unsafe_pointer_calls() {
+    for value in [0, 1, 3, 4, u8::MAX] {
+        safe_item_can_be_reified_as_unsafe_pointer(value);
     }
 }

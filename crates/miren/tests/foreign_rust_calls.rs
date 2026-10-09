@@ -59,6 +59,9 @@ enum Boundary {
     CAbi,
     NativeLibrary,
     Duplicate,
+    SafeExport,
+    SafeDeclaration,
+    WrongReturnType,
 }
 
 fn dependency(
@@ -108,6 +111,40 @@ fn dependency(
     }
     match boundary {
         Boundary::Ordinary | Boundary::Duplicate => {}
+        Boundary::SafeExport => {
+            source = source
+                .replace(
+                    "unsafe fn _critical_section_1_0_acquire",
+                    "fn _critical_section_1_0_acquire",
+                )
+                .replace(
+                    "unsafe fn _critical_section_1_0_release",
+                    "fn _critical_section_1_0_release",
+                );
+            source = replace_body(
+                &source,
+                "fn _critical_section_1_0_acquire() -> $crate::RawRestoreState {",
+                body.unwrap(),
+            );
+            source = replace_body(
+                &source,
+                "fn _critical_section_1_0_release(restore_state: $crate::RawRestoreState) {",
+                "let _ = restore_state;",
+            );
+        }
+        Boundary::SafeDeclaration => {
+            source = source
+                .replace("extern \"Rust\" {", "unsafe extern \"Rust\" {")
+                .replace(
+                    "fn _critical_section_1_0_acquire() -> RawRestoreState;",
+                    "safe fn _critical_section_1_0_acquire() -> RawRestoreState;",
+                );
+        }
+        Boundary::WrongReturnType => {
+            source = source
+                .replace("-> $crate::RawRestoreState {", "-> u8 {")
+                .replace("<$t as $crate::Impl>::acquire()", "0u8");
+        }
         Boundary::CAbi => {
             let previous = "fn _critical_section_1_0_acquire() -> $crate::RawRestoreState";
             let mutated = source.replace(
@@ -332,4 +369,87 @@ fn target_contracts_execute_and_declaration_contracts_are_not_skipped() {
             "{report:?}"
         );
     }
+}
+
+#[test]
+fn safe_exports_satisfy_unsafe_declarations_and_execute_their_actual_bodies() {
+    for target in [None, Some("thumbv7em-none-eabihf")] {
+        for optimized in [false, true] {
+            let report =
+                verify_boundary(Some("false"), target, optimized, Boundary::SafeExport, None);
+            assert_eq!(
+                status(&report, "returned_value"),
+                ProofStatus::Proved,
+                "{report:?}"
+            );
+            assert_eq!(
+                status(&report, "wrong_value"),
+                ProofStatus::Refuted,
+                "{report:?}"
+            );
+            let mutated = verify_boundary(
+                Some("panic!(\"mutated safe export\")"),
+                target,
+                optimized,
+                Boundary::SafeExport,
+                None,
+            );
+            assert_eq!(
+                status(&mutated, "returned_value"),
+                ProofStatus::Refuted,
+                "{mutated:?}"
+            );
+            for boundary in [Boundary::SafeDeclaration, Boundary::WrongReturnType] {
+                let report = verify_boundary(Some("false"), target, optimized, boundary, None);
+                assert_eq!(
+                    status(&report, "returned_value"),
+                    ProofStatus::Unknown,
+                    "{report:?}"
+                );
+            }
+        }
+    }
+}
+
+fn native_safe_export(body: &str) -> bool {
+    let directory = Directory::new();
+    dependency(&directory.0, Some(body), None, false, Boundary::SafeExport);
+    let compiler = Path::new(env!("MIREN_SYSROOT")).join("bin/rustc");
+    let artifact = directory.0.join("libcritical_section.rlib");
+    let output = Command::new(&compiler)
+        .args([
+            "--crate-name=critical_section",
+            "--crate-type=rlib",
+            "--edition=2018",
+            "--cfg=feature=\"restore-state-bool\"",
+        ])
+        .arg(directory.0.join("third_party/src/lib.rs"))
+        .arg("-o")
+        .arg(&artifact)
+        .output()
+        .unwrap();
+    assert!(output.status.success(), "{output:?}");
+    let fixture =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/foreign_rust_calls.rs");
+    let mut source = std::fs::read_to_string(fixture).unwrap();
+    source.push_str("\n#[cfg(test)] #[test] fn native_returned_value() { returned_value(); }\n");
+    let path = directory.0.join("native.rs");
+    std::fs::write(&path, source).unwrap();
+    let executable = directory.0.join("native");
+    let output = Command::new(compiler)
+        .args(["--test", "--edition=2024"])
+        .arg(path)
+        .arg(format!("--extern=critical_section={}", artifact.display()))
+        .arg("-o")
+        .arg(&executable)
+        .output()
+        .unwrap();
+    assert!(output.status.success(), "{output:?}");
+    Command::new(executable).output().unwrap().status.success()
+}
+
+#[test]
+fn safe_export_body_mutation_also_fails_native_execution() {
+    assert!(native_safe_export("false"));
+    assert!(!native_safe_export("panic!(\"mutated safe export\")"));
 }

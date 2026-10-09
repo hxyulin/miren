@@ -1704,3 +1704,31 @@ Strict and reset-profile fresh-future replays remain complete at twelve applicat
 All 494 Rust workspace tests and 48 Python tests pass. Formatting, workspace Clippy, release builds,
 dependency checks, documentation builds and manual hooks pass. No application code or hardware
 assumption profile changes.
+
+## Stage 109: Directional callable signature compatibility
+
+Foreign Rust symbol resolution and direct known function-item reification now share an exact
+polymorphic signature check. A safe implementation may satisfy an unsafe declaration or pointer;
+only the safety qualifier changes. ABI, argument/return types, variadic status and bound variables
+remain exact. Reverse changes, unknown targets and separate safe-function-pointer conversions stay
+UNKNOWN. Strong unique exports, retained MIR, lifetime, native-library and contract guards remain
+in force, and actual bodies execute.
+
+The runtime Pender mismatch came from overly strict signature comparison: its unsafe extern Rust declaration
+has the same pointer input and unit output as a safe exported implementation. This was not a
+REFUTED panic. Host/ARM and debug/optimized cases prove valid safe exports and direct reifications,
+refute bad claims and actual panicking bodies, and retain UNKNOWN for incompatible declarations.
+Body and callback mutations also fail native execution.
+
+All twelve isolated runtime wrappers now enter the actual platform __pender body. Each retains
+unfinished retry UNKNOWN and stops at unsupported assembly options for the bare SEV instruction
+(embassy-executor 0.10.0 platform/cortex_m.rs:13). SEV remains a hardware boundary before the first
+executor poll; no event semantics or boot reachability are inferred. All twelve ordinary runtime
+obligation arrays remain unchanged. Capture: `/tmp/miren-callable-runtime-comparison`.
+
+Strict and reset-profile fresh-future replays still enter all twelve applications; all 72 root
+obligation arrays match stage 108 exactly. Captures are
+`/tmp/miren-callable-main-{strict,reset}-20261009`; diagnostic captures precede the stage commit.
+All 498 Rust workspace tests and 48 Python tests pass. Formatting, workspace Clippy, release builds,
+dependency checks, documentation builds and manual hooks pass. No application code or hardware
+assumption profile changes.

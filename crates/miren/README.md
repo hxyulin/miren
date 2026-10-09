@@ -291,3 +291,10 @@ UNKNOWN and discards only the unfinished frontier. Checked returns can continue 
 but the incomplete obligation remains. Each weak operation still has a fresh spurious failure; no
 eventual success or retry fairness is assumed. Ordinary loops and other entry domains keep their
 existing exploration.
+
+Known function items can be reified directly as unsafe function pointers when the actual body is
+safe and every other normalized signature component matches. Foreign Rust symbol binding shares
+this check: a safe exported body may satisfy an unsafe declaration. ABI, argument and return types,
+variadic status and bound variables remain exact; the reverse safety change stays UNKNOWN. Actual
+retained bodies still execute, and separate safe-pointer-to-unsafe-pointer conversions remain
+unsupported.

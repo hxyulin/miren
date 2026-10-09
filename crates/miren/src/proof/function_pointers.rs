@@ -48,7 +48,12 @@ impl<'tcx> Engine<'tcx> {
             .tcx
             .erase_and_anonymize_regions(Ty::new_fn_ptr(self.tcx, signature));
         let target = self.tcx.erase_and_anonymize_regions(target);
-        if expected != target {
+        if !matches!(target.kind(), ty::FnPtr(..))
+            || !call_metadata::callable_signature_compatible(
+                expected.fn_sig(self.tcx),
+                target.fn_sig(self.tcx),
+            )
+        {
             return Err("function-pointer coercion changes the callable signature".into());
         }
         let entry = Target::Known {
