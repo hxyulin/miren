@@ -25,6 +25,10 @@ Project verification is enabled by default. An optional flat `miren.json` stores
 selectors, Cargo arguments, limits and explicit analysis policies. CLI selectors replace configured
 roots and CLI limit options override configured values. Configuration cannot enable native replay.
 There are no built-in presets or named check profiles. See the [usage guide](../../docs/usage.md).
+The fleet survey tooling has separate, opt-in STM32H723VG and STM32F407IG initialization
+hypotheses in [its README](../../tools/README.md). They use ordinary recorded trusted contracts;
+no device assumption is enabled by selecting an ARM target or by running strict verification.
+
 
 ## Build and result lifecycle
 

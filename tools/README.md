@@ -188,6 +188,40 @@ when every expected async body has a collected PROVED, PROVED_WITH_ASSUMPTIONS o
 with explicit conditional labels. UNKNOWN and incomplete or subset collections satisfy neither.
 These profiles are hypotheses, not verified hardware models; the runner creates none automatically.
 
+The repository also supplies explicit device-specific initialization hypotheses:
+
+- `docs/public/data/fleet-main-stm32h7-hypothesis.json`: STM32H723VG DM-MC02 boards.
+- `docs/public/data/fleet-main-stm32f4-hypothesis.json`: STM32F407IG RM-C boards.
+- `docs/public/data/fleet-main-stm32-hypothesis.json`: the combined exact-unit policy.
+
+Use the combined file with `--assumptions-profile` and `--allow-assumptions` as above. These
+are manually selected trusted function boundaries, not a built-in emulator or a register model.
+The device and board clock premises are recorded in every contract reason. ST documents these
+variants in [RM0468](https://www.st.com/resource/en/reference_manual/dm00603761.pdf) and
+[RM0090](https://www.st.com/en/microcontrollers-microprocessors/stm32f4-series/documentation.html).
+
+The HAL initialization boundary assumes a successful first singleton claim, the supplied board
+clock configuration, accessible hardware and completion of hardware-ready waits. This boundary
+includes software initialization and is stronger than MMIO validity alone. It does not verify
+clock setup or preserve the singleton guard as an analyzed check. Its `modifies` field is omitted:
+the existing summary mechanism conservatively invalidates tracked Rust storage instead of
+claiming initialization leaves statics unchanged. Unsupported returned ownership/alias shapes
+remain UNKNOWN. The separate H7 reset-status boundary preserves the existing narrower policy.
+There are no postconditions fixing observed register/reset values, no generic peripheral-address
+allowlist and no assumed executor progress, SEV semantics or interrupt scheduling. Registration
+and runtime scopes remain strict. Changing a device feature requires reviewing the corresponding
+profile; a contract reason is an assumed device identity, not detection of physical hardware.
+
+The initial combined replay on all twelve mains completes collection: three async bodies retain
+unconditional RTT lifecycle refutations before HAL initialization, and nine are conditional
+UNKNOWN after the initialization boundary. Eight H7 bodies reach GPIO Output::new for PC15;
+the F4 body reaches LED GPIO initialization. All nine stop at Gpio::bsrr numeric pointer
+arithmetic. Twelve registration roots remain PROVED and twelve ordinary runtime roots remain
+REFUTED. This clears initialization traversal under the listed hypotheses, but adds no completed
+async proof and does not satisfy the conditional supported-outcome milestone. Local raw evidence:
+`/tmp/miren-stage126-main-stm32-20261009`; older published reset-only evidence stays separate.
+
+
 `fleet_main_export.py` publishes compact evidence from a complete strict capture, with an optional
 separate conditional capture:
 

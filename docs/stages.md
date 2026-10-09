@@ -2383,3 +2383,37 @@ application bug or a complete borrow/alias model. Audit: `/tmp/miren-stage125-au
 All 72 strict/reset main obligation arrays match stage 124 exactly. Twelve isolated runtime
 wrappers retain both startup premises, unfinished weak-CAS frontiers and unsupported SEV.
 Captures: `/tmp/miren-stage125-main-{strict,reset}-20261009` and `/tmp/miren-stage125/runtime`.
+
+## Fleet publication 19: Retained finite ranges reach Sniff bounds
+
+The complete clean frozen 938e9af collection supports one additional root: Sniff::saw moves
+UNKNOWN to REFUTED. Totals are 1,120 PROVED, 258 REFUTED and 958 UNKNOWN. Source declarations
+are 525 PROVED, 234 REFUTED and 260 UNKNOWN. All previous supported outcomes remain intact;
+no roots are added/removed and no incompatible configurations occur. All 243 source fingerprints
+and four artifact checkpoints per unit remain unchanged. The new bounds witness is audited
+against native execution and the constructor invariant, without claiming boot reachability.
+Raw capture: `/tmp/miren-fleet-pass19-20261009`; the separate main publication remains unchanged.
+
+## Stage 126: Explicit STM32H723VG and STM32F407IG initialization hypotheses
+
+Three opt-in ordinary contract profiles target the eleven H723VG DM-MC02 mains, the F407IG
+RM-C main, and their combined twelve-unit policy. Every reason names exact device/board clocks,
+physical access and ready-poll termination premises, successful first singleton initialization
+and Rust-valid exclusively owned tokens. The H7 reset-status boundary retains its narrow
+hardware hypothesis. HAL initialization omits modifies, conservatively invalidating tracked
+Rust storage. No analyzer default, application source, instruction model or alias rule changes.
+
+The combined actual replay completes all 36 roots without collection errors. Three async bodies
+retain unconditional pre-initialization RTT refutations. Eight H7 bodies execute past trusted
+initialization into PC15 GPIO construction; the F4 body reaches LED GPIO construction. These
+nine are conditional UNKNOWN at actual Gpio::bsrr numeric pointer arithmetic. Registration
+remains twelve PROVED and ordinary runtime entry twelve REFUTED. The fresh-future entry milestone
+remains reached; neither supported-outcome milestone is reached by this broader profile.
+Existing reset-only published outcomes remain distinct. Raw evidence:
+`/tmp/miren-stage126-main-stm32-20261009`.
+
+Independent review approves exact device selectors, board-clock premises, initialization effects
+and unsupported ownership gates. All 546 Rust workspace tests and 48 Python tests pass;
+formatting, cargo lint, release builds, cargo deny, documentation build and manual hooks pass.
+The profile uses existing analyzer behavior; strict defaults and the published reset-only main
+capture remain unchanged.
