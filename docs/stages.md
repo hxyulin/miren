@@ -1446,3 +1446,24 @@ an abstract local trait associated constant. Both construction checkers now reje
 without available bodies before querying compiler MIR. A trait declaration regression checks
 continued collection, supported concrete implementations and explicit UNKNOWN for unresolved
 construction evidence. The failed capture remains separate and contributes no published outcomes.
+
+## Stage 98: Seventh fleet measurement and main replay
+
+Frozen clean `c908598` collects all 2,336 roots in 32 units without assumptions: 1,113 PROVED,
+253 REFUTED and 970 UNKNOWN. All prior 1,112 proofs and 252 refutations remain. Dr16::parse gains
+an ordinary body proof; sentry Can1Bus::receive refutes for arbitrary ESC ID 65024 overflowing
+512 + esc_id. Its actual constructor uses IDs 2, 1, 4 and 3; firmware reachability and native
+confirmation remain unverified. No future factory gains a proof in this pass.
+
+Compiler scope metadata distinguishes 2,232 function-body roots from 104 direct future factories;
+50 factory proofs do not execute task polls. Twenty-two source UNKNOWN roots reach different
+blocker keys: seventeen DMA origins to numeric MMIO, three CRC tables to byte-view limits and two
+iterator callers to retained-source liveness. Nineteen source and 455 generated diagnostic changes
+are compiler display only. The missing local associated-constant body failure is guarded and its
+incomplete attempt remains excluded. All 243 source fingerprints and four artifact checkpoints
+stay unchanged. Complete strict/reset main replays retain four strict refutations/eight unknowns
+and twelve conditional refutations under the byte-exact eight-call reset-only policy.
+
+All 464 Rust tests, 44 Python tool tests, formatting, Clippy, release builds, dependency checks,
+documentation builds and manual hooks pass. Both compact exporters validate the complete captures
+before publication. Fleet application code remains untouched.

@@ -2,12 +2,12 @@
 
 ## Current repeatable measurement
 
-The sixth 2026-10-09 pass collected all 2,336 roots from all 32 ARM library/binary units in
-fleet-2027: 1,112 PROVED, 252 REFUTED and 972 UNKNOWN, with no assumptions. All units completed
+The seventh 2026-10-09 pass collected all 2,336 roots from all 32 ARM library/binary units in
+fleet-2027: 1,113 PROVED, 253 REFUTED and 970 UNKNOWN, with no assumptions. All units completed
 collection. Counts describe selected root domains, not line coverage or whole-firmware safety.
 
-The source-function heuristic identifies 1,019 declarations: 517 PROVED, 228 REFUTED and
-274 UNKNOWN. Refutations concern arbitrary supported root state and remain runtime unconfirmed.
+The source-function heuristic identifies 1,019 declarations: 518 PROVED, 229 REFUTED and
+272 UNKNOWN. Refutations concern arbitrary supported root state and remain runtime unconfirmed.
 
 The [current JSON summary](/data/fleet-survey-current.json) records every root, first blocker,
 compilation unit and input-integrity evidence. The deterministic exporter recreates this compact
@@ -16,7 +16,7 @@ publication from complete raw collections; inventories, solver reports and logs 
 - Firmware revision: `26377371e38ed3234f972bcdf6b2f9f4d26a7f02`;
   all 243 source-input fingerprints stayed equal. The existing untracked `rust-project.json`
   remains.
-- Full-survey analyzer: `901304a`, JSON schema 9; clean working tree, frozen binaries.
+- Full-survey analyzer: `c908598`, JSON schema 9; clean working tree, frozen binaries.
 - Compiler: nightly-2026-09-22; Z3 4.15.4.
 - Target: `thumbv7em-none-eabihf`; dev profile, Cargo default features and locked dependencies.
 - Panic abort, enabled overflow checks and root/dependency MIR optimization zero in all 32 units.
@@ -25,42 +25,56 @@ publication from complete raw collections; inventories, solver reports and logs 
 - No project proof configuration, startup assumptions, trusted contracts, induction
   or native replay.
 
-Compared with the fifth pass, 28 roots gained proofs and one gained a refutation. All previous
-1,084 proofs and 251 refutations retain their outcomes. No roots were added or removed, and the
+Compared with the sixth pass, one root gained a proof and one gained a refutation. All previous
+1,112 proofs and 252 refutations retain their outcomes. No roots were added or removed, and the
 recorded analysis configurations remain compatible.
 
-Five new proofs execute ordinary helpers: balance component and LQR defaults, plus hero,
-infantry-1 and infantry-2 chassis configuration. Eleven source-heuristic proofs construct async
-task futures (USB closed, remote and referee UI); another twelve prove their generated registration
-or user-facing wrappers. These constructor results do not execute polls or prove task-body safety.
+`dr16::Dr16::parse` now proves. Sentry chassis `hardware::Can1Bus::receive` refutes when an
+arbitrary incoming wheel has ESC ID 65024: the checked u16 expression `512 + esc_id` overflows
+at 65536.
+The actual `Can1Bus::wired` constructor uses IDs 2, 1, 4 and 3, and main constructs the bus through
+`Can1Bus::new`. This receiver-domain counterexample does not establish firmware reachability or a
+confirmed firmware defect; no native replay was collected. Both outcome gains execute function
+bodies, with no new future-construction proofs.
 
-The private `referee::interaction` helper refutes for an arbitrary 20-byte content input: its
-six-byte header plus content requires range 6..26 in a 21-byte buffer. Its two current callers
-supply two bytes or a fifteen-byte Figure. This root-domain counterexample is not evidence that
-those callers fail, and native confirmation was not collected.
+Compiler return-type metadata now separates direct future construction from function bodies:
 
-Another 29 source roots reach different first-blocker keys while remaining UNKNOWN: sixteen DMA
-helpers progress from constant budgets to missing checked STATE origins; two byte-range callers
-reach the encode constant-array budget; eight Waker-containing inputs reach nested mutable-slice
-or alias restrictions; three chassis helpers reach the step limit. Nineteen additional source
-diagnostic changes only reflect compiler identities or Binder ordering. The compact comparison
-retains all raw diagnostics and reports display grouping separately from proof outcomes.
+| Root scope | Roots | PROVED | REFUTED | UNKNOWN |
+| --- | ---: | ---: | ---: | ---: |
+| Function body | 2,232 | 1,063 | 253 | 916 |
+| Direct coroutine factory | 104 | 50 | 0 | 54 |
 
-Initialized arrays now share immutable host payloads with independent copy-on-write updates.
-Constants validate every occurrence before exact typed reuse; repeats retain bounded clone costs.
-Opaque callback inputs preserve compiler signatures without choosing targets or effects. Unknown
-callback invocation, equality, address casts and replay remain unsupported. Exact mutable byte
-ranges preserve allocation provenance and check bounds; non-byte ranges and numeric MMIO remain
-distinct gaps.
+All roots have compiler-backed scope metadata. Among source-heuristic roots, 503 proofs concern
+function bodies and fifteen concern future construction. A function-body label can still describe
+a generated wrapper; it does not imply execution of a wrapped task. Explicit task polling remains
+separate from this function-only collection.
 
-Source, dependency artifacts, origin sidecars and generated build inputs stayed unchanged at every
-recorded checkpoint for every unit. These checks establish input integrity during collection, not
-hermetic capture of arbitrary custom build environment variables.
+Another 22 source roots reach different first-blocker keys while remaining UNKNOWN. Seventeen
+DMA helpers clear the missing STATE-origin barrier and reach numeric MMIO pointer offsets. Three
+referee encoding helpers clear the scalar-table cap and reach the 128-byte view-allocation cap.
+Two iterator callers reach an explicit retained-source-liveness boundary: bare snapshots cannot
+justify unchecked access. Nineteen additional source changes and all 455 changed generated
+UNKNOWN diagnostics are compiler display only. The comparison preserves raw diagnostics and
+separates display grouping from outcome progress.
+
+Initialized scalar constants support 256 elements; composites retain 128 and total/depth budgets
+stay bounded. Associated-constant origin graphs and closed constructor argument dataflow certify
+exact typed construction without selecting runtime values or granting startup history. Unchecked
+slice iterators require retained live backing, proven bounds and distinct mutable issued indices.
+The fresh fleet run also exposed a missing local trait-constant body query; the guarded regression
+now keeps that evidence unsupported. Its incomplete capture is preserved separately and excluded
+from published outcomes.
+
+Numeric MMIO, arbitrary dynamic controller inputs, mutable references and alias constraints,
+solver/resource limits, larger byte views and iterator source provenance remain current gaps.
+Source, dependency artifacts, origin sidecars and generated build inputs stayed unchanged at all
+four recorded checkpoints for every unit. These checks establish input integrity during collection,
+not hermetic capture of arbitrary custom build environment variables.
 
 ## Progress through Embassy main
 
 The separate [all-main evidence](/data/fleet-embassy-main-current.json) covers every one of the
-12 binary mains in three scopes. Its final analyzer is `901304a`, matching the full survey.
+12 binary mains in three scopes. Its final analyzer is `c908598`, matching the full survey.
 It uses the same captured fleet artifacts and default limits. Factory construction alone does not
 execute the async body; `--async-entry` constructs a fresh future and follows its reached polls.
 
@@ -99,6 +113,14 @@ strict UNKNOWN bodies still require a Rust-supported reset boundary or a separat
 conditional hardware model to progress past numeric MMIO.
 
 ## Earlier repeatable measurements
+
+The sixth 2026-10-09 pass at analyzer `901304a` collected 2,336 roots: 1,112 PROVED,
+252 REFUTED and 972 UNKNOWN. Its source subset had 517 proofs, 228 refutations and 274 unknowns.
+Five ordinary helpers, eleven async future factories and twelve generated wrappers gained proofs.
+The private referee interaction helper refuted for arbitrary 20-byte content in a 21-byte buffer
+with a six-byte header; its two current callers provide two or fifteen bytes. Firmware reachability
+and native confirmation were not established. Twenty-nine source roots reached different blocker
+keys and nineteen changed only compiler display. Strict/reset main outcomes remained unchanged.
 
 The fifth 2026-10-09 pass at analyzer `fe25949` collected 2,336 roots: 1,084 PROVED,
 251 REFUTED and 1,001 UNKNOWN. Its source subset had 501 proofs, 227 refutations and 291 unknowns.
