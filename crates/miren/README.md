@@ -305,3 +305,12 @@ reuse initializer bytes. Transparent equal-footprint fields require a real decla
 Paths are bounded to eight levels, 128 fields per aggregate and 256 visited types. Unions, arrays,
 enum paths, type punning and ambiguous overlapping identities remain UNKNOWN. Existing typed
 validity, initialization, retirement, reference escape and opaque-effect checks still apply.
+
+Core slice Iterator::for_each supports finite tracked Iter/IterMut backing and concrete function-item
+or closure callbacks. It executes actual callback bodies in source order, retains their conditions
+and memory changes, advances borrowed cursors and retires closure environments. Completion requires
+an exhausted iterator and unit callback results. Function-pointer callbacks, callback destructors,
+unsupported backing and ambiguous mutable projections remain UNKNOWN.
+
+Shared slice iterator stepping validates retained backing before exhaustion as well as element
+access, and repeats that check after callbacks. Retired empty backing remains UNKNOWN.

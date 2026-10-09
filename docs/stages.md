@@ -1758,3 +1758,44 @@ units and 2,336 roots completed collection, with unchanged outcomes: 1,113 PROVE
 removed or changed outcomes and no incompatible provenance. Raw capture:
 `/tmp/miren-fleet-pass9-20261009/summary.json`. This function-root measurement does not use isolated
 startup or establish application polling/boot.
+
+## Stage 111: Ordered slice for_each callbacks
+
+Compiler-resolved core Iterator::for_each now uses the existing tracked slice iterator protocol.
+Finite Iter/IterMut backing advances in source order and invokes each actual concrete function-item
+or closure body. Callback conditions and memory effects persist, borrowed cursors update, and
+closure environments retire only after exhaustion. Exact argument/unit signatures and destructor
+guards remain explicit; function-pointer callbacks, unsupported typed slices and ambiguous symbolic
+mutable projections stay UNKNOWN. No physical NonNull layout is inferred.
+
+Host/ARM and debug/optimized tests cover nested controller-array resets, captured state, traversal
+order, empty/shared iteration, borrowed cursor exhaustion, late-element panic, overflow and wrong
+effects. Skipping the final controller reset fails both symbolic analysis and native assertions.
+Existing fold and mutable-slice tests retain their outcomes.
+
+Diagnostic ordinary-root replays clear the previous physical NonNull blockers in both
+chassis::Chassis::update and arm::Arm::update. Chassis reaches count subtraction at chassis.rs:109:
+i32::MIN minus KEY_STEP (2) overflows before clamp. Controller Pid clamp at lib.rs:132 refutes
+negative integral_max, including the negative smallest subnormal. Actual reset callback bodies are
+entered; no reset summary or input invariant is assumed. Independent rechecks validate complete
+queries, feasible paths, reported model bindings and negated safety; adding safety makes each
+witness query UNSAT. Native O0/O2 exact key-count helper and actual controller crate reproducers
+panic, while exhaustive bounded count/button controls pass.
+
+These are valid arbitrary-root states, not confirmed application defects. Chassis::new/history
+keeps counts within ±2000; Arm::new uses nonnegative gains, although standalone public Pid builders
+permit negative limits. Full Chassis/Arm application reachability remains unverified. Audit, MIR,
+source hashes and native evidence: `/tmp/miren-for-each-stage111/replay/audit.md`. Diagnostic captures
+precede the stage commit.
+
+Independent review identified missing retained-reference backing validation before an exhausted
+iterator returned. Shared iterator stepping now validates its source against current memory before
+either branch, including after every callback continuation. Dead empty backing remains UNKNOWN
+through for_each, fold, all and next; corresponding live controls prove on host/ARM and O0/O2.
+
+All 505 Rust workspace tests and 48 Python tests pass. Formatting, workspace Clippy, release builds,
+dependency checks, documentation builds and manual hooks pass. Final strict and reset main replays
+retain all 72 obligation arrays exactly. All 12 isolated runtime wrappers retain both the unfinished
+weak-CAS retry frontier and the reached SEV hardware instruction as UNKNOWN; ordinary wrappers
+retain their conservative outcomes. Captures: `/tmp/miren-for-each-final-main-{strict,reset}-20261009`
+and `/tmp/miren-for-each-final-runtime`. No application or hardware assumption changes.

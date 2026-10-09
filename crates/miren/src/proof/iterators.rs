@@ -201,7 +201,7 @@ impl<'tcx> Engine<'tcx> {
         let clone_trait = self.tcx.lang_items().get(LangItem::Clone);
         let supported = match name.as_str() {
             "next" | "nth" | "count" | "size_hint" | "all" | "any" | "find_map" | "fold"
-            | "by_ref" => trait_id.is_some() && trait_id == iterator_trait,
+            | "by_ref" | "for_each" => trait_id.is_some() && trait_id == iterator_trait,
             "into_iter" => {
                 trait_id.is_some()
                     && trait_id == self.tcx.get_diagnostic_item(Symbol::intern("IntoIterator"))
@@ -248,6 +248,11 @@ impl<'tcx> Engine<'tcx> {
         if matches!(name.as_str(), "all" | "any" | "find_map") {
             return self
                 .iterator_predicate(instance, values, iterator, state, stack, site)
+                .map(Some);
+        }
+        if name == Symbol::intern("for_each") {
+            return self
+                .iterator_for_each(instance, values, iterator, state, stack, site)
                 .map(Some);
         }
         if matches!(name.as_str(), "fold" | "rfold") {
@@ -553,9 +558,7 @@ impl<'tcx> Engine<'tcx> {
         if mutable && !unchecked.is_empty() {
             return Err("ordinary iteration after unchecked mutable access is unsupported".into());
         }
-        if matches!(source.as_ref(), Value::StaticSlice { .. }) {
-            self.snapshot(&source, &memory, &conditions, 0)?;
-        }
+        self.snapshot(&source, &memory, &conditions, 0)?;
         let remaining = symbolic::binary(&self.terms, "sub", (*back).clone(), (*front).clone())?;
         let inside = symbolic::binary(&self.terms, "lt", skip.clone(), remaining)?.boolean()?;
         let mut results = Vec::new();

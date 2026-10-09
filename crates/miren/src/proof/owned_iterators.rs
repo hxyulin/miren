@@ -397,4 +397,79 @@ impl<'tcx> Engine<'tcx> {
         }
         Ok(returns)
     }
+
+    pub(super) fn iterator_for_each(
+        &mut self,
+        instance: ty::Instance<'tcx>,
+        values: &[Value],
+        iterator: Value,
+        state: &State,
+        stack: &[DefId],
+        site: (DefId, Span),
+    ) -> Result<Vec<Return>, String> {
+        let signature = self.call_signature(instance)?;
+        if values.len() != 2 || signature.inputs().len() != 2 || !signature.output().is_unit() {
+            return Err("iterator for_each callback signature mismatch".to_owned());
+        }
+        let callback_ty = signature.inputs()[1];
+        if callback_ty.needs_drop(self.tcx, ty::TypingEnv::fully_monomorphized()) {
+            return Err("iterator for_each callback destructors are unmodeled".to_owned());
+        }
+        let (callable, has_environment) = match callback_ty.kind() {
+            ty::Closure(id, args) => (ty::Instance::new_raw(*id, args), true),
+            ty::FnDef(id, args) => (self.resolve_function_item(*id, args.skip_binder())?, false),
+            _ => return Err("iterator for_each requires a concrete callback body".to_owned()),
+        };
+        let (callback, memory) = if has_environment {
+            self.callback_environment(&values[1], state)?
+        } else {
+            (values[1].clone(), state.memory.clone())
+        };
+        let mut pending = vec![(iterator, state.conditions.clone(), memory)];
+        let mut returns = Vec::new();
+        while let Some((iterator, conditions, memory)) = pending.pop() {
+            for iteration in
+                self.iterator_step(iterator, self.iterator_index(0), false, conditions, memory)?
+            {
+                let mut memory = iteration.memory;
+                if matches!(&values[0], Value::Reference { mutable: true, .. }) {
+                    self.store_iterator(
+                        &values[0],
+                        iteration.iterator.clone(),
+                        &mut memory,
+                        &iteration.conditions,
+                    )?;
+                }
+                let Some(item) = iteration.item else {
+                    returns.push(Return {
+                        value: Value::Unit,
+                        conditions: iteration.conditions,
+                        memory,
+                    });
+                    continue;
+                };
+                let mut arguments = vec![item];
+                if has_environment {
+                    arguments.insert(0, callback.clone());
+                }
+                for result in self.call_instance(
+                    callable,
+                    arguments,
+                    iteration.conditions,
+                    memory,
+                    stack,
+                    site,
+                )? {
+                    if !matches!(result.value, Value::Unit) {
+                        return Err("iterator for_each callback did not return unit".to_owned());
+                    }
+                    pending.push((iteration.iterator.clone(), result.conditions, result.memory));
+                }
+            }
+        }
+        if has_environment {
+            self.retire_callback_environment(&callback, &mut returns);
+        }
+        Ok(returns)
+    }
 }

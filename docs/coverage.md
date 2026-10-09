@@ -843,3 +843,9 @@ storage mutations throughout the selected entry. Partial overwritten ranges cann
 initializers, and symbolic pointer-origin merges retain address bits without pointee rights.
 Opaque calls and frame-escape checks remain conservative. Hardware and scheduler validity are not
 supplied by this premise.
+
+Core slice Iter/IterMut for_each uses tracked backing and executes concrete function-item or closure
+callbacks in order. Callback effects and branch conditions persist, borrowed cursors advance, and
+closure storage retires after exhaustion. Panicking callbacks refute the root; incomplete callbacks
+and unsupported storage remain UNKNOWN. This supports finite controller-array reset traversal
+without interpreting physical NonNull fields or assuming reset contracts.
