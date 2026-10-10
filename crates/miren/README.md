@@ -94,9 +94,17 @@ Exact `Option<bool>` and ordinary local two-variant empty/Bool enums also admit 
 one-byte niche layout. Its initialized ABI must cover exactly false, true and the reserved empty
 tag; the original Bool payload and overlapping variant layouts are checked independently. Logical
 variant selection preserves active Bool values without initializing the empty variant's latent
-payload. Char, NonZero, reference and multi-alternative niches, other core wrappers and whole sum
+payload. NonZero, reference and multi-alternative niches, other core wrappers and whole sum
 comparison summaries remain UNKNOWN. Mutable/raw/static access policies and
 owned product choice/write admission are unchanged.
+
+Exact `Option<char>` and ordinary local empty/sole-Char enums also admit their checked I32 niche
+layout. The initialized wrapping ABI reserves exactly `0xffffffff` for the empty variant, while
+the original Char field keeps its compiler range. Logical active Char observations cover every
+Unicode scalar and exclude surrogates; the ABI interval alone is never a Unicode validity proof.
+Empty values do not initialize their latent Char field. Original type, source lifetime, extent,
+layout and body gates apply before metadata, indexing or cursor success. Raw access, other niche
+families, owned enum choices/writes and whole sum comparison summaries remain unchanged.
 
 Direct-tag sums also admit ordinary local nominal struct payloads, including nested structs,
 fixed arrays and zero-sized members. The original instantiated fields, declared identities,

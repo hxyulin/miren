@@ -1593,6 +1593,46 @@ pub fn nominal_enum_slice_missing_body(values: &[NominalTaggedReading], index: u
     0
 }
 
+#[inline(never)]
+fn char_niche_selected(value: Option<char>) -> char {
+    match value {
+        Some(character) => character,
+        None => '\0',
+    }
+}
+
+pub fn char_niche_slice(values: &[Option<char>], index: usize) {
+    if index < values.len() {
+        if let Some(character) = values[index] {
+            assert!(char_niche_selected(values[index]) == character);
+        }
+    }
+}
+
+pub fn char_niche_slice_wrong_claim(values: &[Option<char>], index: usize) {
+    if index < values.len() {
+        if let Some(character) = values[index] {
+            assert!(character == 'A');
+        }
+    }
+}
+
+#[cfg(not(test))]
+unsafe extern "Rust" {
+    fn opaque_char_niche_slice(value: Option<char>) -> char;
+}
+
+#[cfg(not(test))]
+pub fn char_niche_slice_missing_body(values: &[Option<char>], index: usize) -> char {
+    if index < values.len() {
+        if let Some(character) = values[index] {
+            assert!(char_niche_selected(values[index]) == character);
+            return unsafe { opaque_char_niche_slice(values[index]) };
+        }
+    }
+    '\0'
+}
+
 #[cfg(test)]
 mod native {
     #[test]
@@ -1610,6 +1650,23 @@ mod native {
         nominal_enum_slice_wrong_claim(&[
             NominalTaggedReading::Data(NominalTaggedRecord { left: 3, right: 7 }),
         ], 0);
+    }
+
+    #[test]
+    fn char_niche_slice_controls() {
+        for index in [0, 1, 128, 129, usize::MAX] {
+            char_niche_slice(&[Some('A'); 129], index);
+        }
+        for character in ['\0', '\u{d7ff}', '\u{e000}', '\u{10ffff}'] {
+            char_niche_slice(&[None, Some(character)], 0);
+            char_niche_slice(&[None, Some(character)], 1);
+        }
+    }
+
+    #[test]
+    #[should_panic]
+    fn char_niche_slice_wrong_claim_panics() {
+        char_niche_slice_wrong_claim(&[Some('B')], 0);
     }
 
     #[test]

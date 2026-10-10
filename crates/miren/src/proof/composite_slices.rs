@@ -318,6 +318,15 @@ impl<'tcx> Engine<'tcx> {
                 ..
             }
         ) {
+            if matches!(
+                layout.backend_repr,
+                BackendRepr::Scalar(Scalar::Initialized {
+                    value: Primitive::Int(rustc_abi::Integer::I32, false),
+                    ..
+                })
+            ) {
+                return self.char_niche_sum_shape(original, def, args, depth, nodes);
+            }
             return self.bool_niche_sum_shape(original, def, args, depth, nodes);
         }
         if is_option && args.type_at(0) != self.tcx.types.u16 {
@@ -512,6 +521,118 @@ impl<'tcx> Engine<'tcx> {
                 let field = &variant.fields[rustc_abi::FieldIdx::from_usize(0)];
                 let original_field = field.ty(self.tcx, args).skip_norm_wip();
                 if original_field != self.tcx.types.bool {
+                    return Ok(None);
+                }
+                let Some(shape) =
+                    self.composite_shape_depth(original_field, depth + 1, nodes, true, true)?
+                else {
+                    return Ok(None);
+                };
+                fields.push((field.name.as_str().to_owned(), shape));
+            } else if !variant.fields.is_empty()
+                || !actual.field_offsets.is_empty()
+                || actual.size.bytes() != 0
+                || actual.backend_repr != (BackendRepr::Memory { sized: true })
+            {
+                return Ok(None);
+            }
+            inventory.push(CompositeVariant {
+                name: variant.name.as_str().to_owned(),
+                discriminant,
+                fields,
+            });
+        }
+        validate_sum_inventory(bits, &inventory)?;
+        Ok(Some(CompositeShape::Sum {
+            name: self.tcx.def_path_str(def.did()),
+            bits,
+            signed,
+            is_option,
+            variants: inventory,
+        }))
+    }
+
+    fn char_niche_sum_shape(
+        &self,
+        original: Ty<'tcx>,
+        def: ty::AdtDef<'tcx>,
+        args: ty::GenericArgsRef<'tcx>,
+        depth: usize,
+        nodes: &mut usize,
+    ) -> Result<Option<CompositeShape>, String> {
+        let is_option = self.tcx.lang_items().get(LangItem::Option) == Some(def.did());
+        if def.variants().len() != 2 || (is_option && args.type_at(0) != self.tcx.types.char) {
+            return Ok(None);
+        }
+        let layout = self.static_layout(original)?;
+        let Variants::Multiple {
+            tag,
+            tag_encoding:
+                TagEncoding::Niche {
+                    untagged_variant,
+                    niche_variants,
+                    niche_start,
+                },
+            tag_field,
+            variants,
+        } = &layout.variants
+        else {
+            return Ok(None);
+        };
+        let char_layout = self.static_layout(self.tcx.types.char)?;
+        let BackendRepr::Scalar(char_scalar) = char_layout.backend_repr else {
+            return Err("original Char lacks its initialized scalar ABI".into());
+        };
+        if !char_niche_mapping_matches(
+            *tag,
+            char_scalar,
+            untagged_variant.as_usize(),
+            niche_variants.start.as_usize(),
+            niche_variants.last.as_usize(),
+            *niche_start,
+        ) || layout.uninhabited
+            || layout.size.bytes() != 4
+            || layout.align.abi.bytes() != 4
+            || char_layout.size.bytes() != 4
+            || char_layout.align.abi.bytes() != 4
+            || layout.fields.count() != 1
+            || tag_field.as_usize() != 0
+            || layout.fields.offset(tag_field.as_usize()).bytes() != 0
+            || layout.backend_repr != BackendRepr::Scalar(*tag)
+            || variants.len() != 2
+        {
+            return Ok(None);
+        }
+        let (bits, signed) = self
+            .integer_type(original.discriminant_ty(self.tcx))
+            .ok_or("Char niche enum lacks its compiler discriminant type")?;
+        let mut inventory = Vec::new();
+        for (position, variant) in def.variants().iter_enumerated() {
+            if *nodes >= MAX_SHAPE_NODES {
+                return Err(self.categorized_error(
+                    UnknownCategory::ResourceLimit,
+                    "composite enum exceeds its expanded node budget".into(),
+                ));
+            }
+            *nodes += 1;
+            let actual = &variants[position];
+            let discriminant = def.discriminant_for_variant(self.tcx, position).val;
+            if discriminant != position.as_usize() as u128 || actual.is_uninhabited() {
+                return Ok(None);
+            }
+            let mut fields = Vec::new();
+            if position == *untagged_variant {
+                if variant.fields.len() != 1
+                    || actual.field_offsets.len() != 1
+                    || actual.field_offsets[rustc_abi::FieldIdx::from_usize(0)].bytes() != 0
+                    || actual.size != char_layout.size
+                    || actual.backend_repr != BackendRepr::Scalar(char_scalar)
+                {
+                    return Ok(None);
+                }
+                let field = &variant.fields[rustc_abi::FieldIdx::from_usize(0)];
+                let original_field = field.ty(self.tcx, args).skip_norm_wip();
+                if original_field != self.tcx.types.char {
                     return Ok(None);
                 }
                 let Some(shape) =
@@ -1022,6 +1143,38 @@ fn bool_niche_mapping_matches(
         && niche_start == 2
 }
 
+// Char's ABI interval includes surrogates, but its typed logical observation does not.
+// The singleton empty encoding is -1 at I32 width; it never becomes a Char payload.
+fn char_niche_mapping_matches(
+    tag: Scalar,
+    payload: Scalar,
+    untagged: usize,
+    first: usize,
+    last: usize,
+    niche_start: u128,
+) -> bool {
+    let char_scalar = Scalar::Initialized {
+        value: Primitive::Int(rustc_abi::Integer::I32, false),
+        valid_range: rustc_abi::WrappingRange {
+            start: 0,
+            end: 0x10ffff,
+        },
+    };
+    let enum_scalar = Scalar::Initialized {
+        value: Primitive::Int(rustc_abi::Integer::I32, false),
+        valid_range: rustc_abi::WrappingRange {
+            start: 0xffff_ffff,
+            end: 0x10ffff,
+        },
+    };
+    payload == char_scalar
+        && tag == enum_scalar
+        && untagged < 2
+        && first == last
+        && first == 1 - untagged
+        && niche_start == 0xffff_ffff
+}
+
 // The initialized tag is always present. A scalar-pair payload may be absent in a
 // fieldless variant; union/full-range ABI storage does not initialize that inactive payload.
 fn direct_enum_backend_matches(
@@ -1118,6 +1271,122 @@ mod tests {
         assert!(!bool_niche_mapping_matches(tag, tag, 1, 0, 0, 2));
     }
     use super::*;
+
+    #[test]
+    fn char_niche_requires_exact_wrapping_abi_and_empty_mapping() {
+        let payload = Scalar::Initialized {
+            value: Primitive::Int(rustc_abi::Integer::I32, false),
+            valid_range: rustc_abi::WrappingRange {
+                start: 0,
+                end: 0x10ffff,
+            },
+        };
+        let tag = Scalar::Initialized {
+            value: Primitive::Int(rustc_abi::Integer::I32, false),
+            valid_range: rustc_abi::WrappingRange {
+                start: 0xffff_ffff,
+                end: 0x10ffff,
+            },
+        };
+        for untagged in [0, 1] {
+            let empty = 1 - untagged;
+            assert!(char_niche_mapping_matches(
+                tag,
+                payload,
+                untagged,
+                empty,
+                empty,
+                0xffff_ffff
+            ));
+            for start in [0, 0xd800, 0xdfff, 0x110000, 0xffff_fffe, 0x1_ffff_ffff] {
+                assert!(!char_niche_mapping_matches(
+                    tag, payload, untagged, empty, empty, start
+                ));
+            }
+            assert!(!char_niche_mapping_matches(
+                tag,
+                payload,
+                untagged,
+                untagged,
+                untagged,
+                0xffff_ffff
+            ));
+        }
+        assert!(!char_niche_mapping_matches(
+            tag,
+            payload,
+            2,
+            0,
+            0,
+            0xffff_ffff
+        ));
+        assert!(!char_niche_mapping_matches(
+            tag,
+            payload,
+            1,
+            0,
+            1,
+            0xffff_ffff
+        ));
+        for invalid in [
+            Scalar::Initialized {
+                value: Primitive::Int(rustc_abi::Integer::I32, true),
+                valid_range: rustc_abi::WrappingRange {
+                    start: 0xffff_ffff,
+                    end: 0x10ffff,
+                },
+            },
+            Scalar::Initialized {
+                value: Primitive::Int(rustc_abi::Integer::I64, false),
+                valid_range: rustc_abi::WrappingRange {
+                    start: 0xffff_ffff,
+                    end: 0x10ffff,
+                },
+            },
+            Scalar::Initialized {
+                value: Primitive::Int(rustc_abi::Integer::I32, false),
+                valid_range: rustc_abi::WrappingRange {
+                    start: 0,
+                    end: 0x110000,
+                },
+            },
+            Scalar::Initialized {
+                value: Primitive::Int(rustc_abi::Integer::I32, false),
+                valid_range: rustc_abi::WrappingRange {
+                    start: 0xffff_fffe,
+                    end: 0x10ffff,
+                },
+            },
+            Scalar::Initialized {
+                value: Primitive::Int(rustc_abi::Integer::I32, false),
+                valid_range: rustc_abi::WrappingRange {
+                    start: 0xffff_ffff,
+                    end: 0x110000,
+                },
+            },
+            Scalar::Union {
+                value: Primitive::Int(rustc_abi::Integer::I32, false),
+            },
+        ] {
+            assert!(!char_niche_mapping_matches(
+                invalid,
+                payload,
+                1,
+                0,
+                0,
+                0xffff_ffff
+            ));
+            assert!(!char_niche_mapping_matches(
+                tag,
+                invalid,
+                1,
+                0,
+                0,
+                0xffff_ffff
+            ));
+        }
+        assert!(!char_niche_mapping_matches(tag, tag, 1, 0, 0, 0xffff_ffff));
+    }
 
     #[test]
     fn sum_payload_struct_policy_does_not_widen_external_or_special_types() {

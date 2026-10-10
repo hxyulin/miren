@@ -79,7 +79,7 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
         if *expected == ProofStatus::Unknown {
             let (category, reason) = match *name {
                 "mutable_root" | "reference_zero" | "refined_zero" | "dropped_zero"
-                | "niche_char" | "niche_nonzero" => (
+                | "niche_nonzero" => (
                     UnknownCategory::Semantics,
                     "only read-only byte slices and byte arrays are modeled",
                 ),
@@ -223,7 +223,7 @@ fn direct_tag_slices_preserve_active_payload_and_source_validity() {
         ("long_selected", ProofStatus::Proved),
         ("mutable_root", ProofStatus::Unknown),
         ("niche_bool", ProofStatus::Proved),
-        ("niche_char", ProofStatus::Unknown),
+        ("niche_char", ProofStatus::Proved),
         ("niche_nonzero", ProofStatus::Unknown),
         ("numerical_bits", ProofStatus::Proved),
         ("option_selected", ProofStatus::Proved),

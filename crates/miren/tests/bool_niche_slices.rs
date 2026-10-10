@@ -78,8 +78,8 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
         assert!(proof.entry_assumptions.is_empty());
         if *expected == ProofStatus::Unknown {
             let (category, reason) = match *name {
-                "char_niche" | "nonzero_niche" | "ref_zero" | "refined_zero" | "wrapped_niche"
-                | "multi_niche" | "mutable" | "competing" => (
+                "nonzero_niche" | "ref_zero" | "refined_zero" | "wrapped_niche" | "multi_niche"
+                | "mutable" | "competing" => (
                     UnknownCategory::Semantics,
                     "only read-only byte slices and byte arrays are modeled",
                 ),
@@ -194,7 +194,7 @@ fn bool_niche_slices_preserve_active_values_and_exact_source() {
         ("borrowed_payload", ProofStatus::Proved),
         ("bounds", ProofStatus::Refuted),
         ("competing", ProofStatus::Unknown),
-        ("char_niche", ProofStatus::Unknown),
+        ("char_niche", ProofStatus::Proved),
         ("contains", ProofStatus::Unknown),
         ("cursor", ProofStatus::Proved),
         ("cursor_metadata", ProofStatus::Proved),

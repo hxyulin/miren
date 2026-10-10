@@ -4702,3 +4702,48 @@ their original binary scope. Independent source and focused evidence review appr
 local payload policy at `/tmp/miren-stage178-source-review.md`. No assumptions, input caps or
 increased resource budgets are introduced. Stage 178 integrates after actual Stage 177 commit
 `98dfc95`.
+
+## Stage 179: readonly exact Char niche enums
+
+
+Stage 179 adds readonly exact `Option<char>` and local two-variant empty/Char niche enums.
+A separate certificate checks the original Char field, actual unsigned 32-bit layout, payload
+and tag overlap, opposite empty variant and wrapping range 0xffffffff..0x10ffff. Compiler probes
+on host/ARM O0/O2 establish the reserved niche 0xffffffff. Logical Char observations exclude the
+surrogate interval using the existing Unicode decoder, preserving all valid Unicode scalars.
+Direct-tag, Bool, nominal payload, owned storage, physical access and comparison boundaries remain
+unchanged. General NonZero, reference, wrapped Char and broader niche layouts remain UNKNOWN.
+
+The dedicated 34-root matrix yields fifteen PROVED, six REFUTED and thirteen UNKNOWN per profile.
+Exact final sources are UNKNOWN under the frozen Stage 178 build. Actual getter Char mutation
+uses only valid characters and refutes the unchanged claim in all four profiles. Eight native
+original tests pass and mutant guards exit 101 at O0/O2 with ten-second timeouts. Actual compiler
+layouts remain at `/tmp/miren-stage179-layout-initial`, with focused evidence at
+`/tmp/miren-stage179-final-evidence`. Twelve composite metadata units and the existing Unicode
+solver control validate the layout certificate and Unicode decoder.
+
+The unchanged old Bool `char_niche` and direct-tag `niche_char` controls become PROVED in all
+profiles. Both initial stale expectations remain at `/tmp/miren-stage179-old-harness-initial.log`
+before harness-only upkeep. All other focused outcomes and diagnostics remain identical;
+216 completed root/profile pairs and 448 completed queries retain exact text at
+`/tmp/miren-stage179-old-fidelity`. Global proof, counterexample and genuine missing-body controls
+plus actual getter mutation and native evidence remain at `/tmp/miren-stage179-global-evidence`.
+The manifest contains 146 cases in 50 families; selected controls do not establish a Rust coverage
+percentage. These focused captures preceded full validation and final survey comparison.
+No assumptions, input caps or increased resource budgets are introduced.
+
+
+Final validation passes all 723 Rust tests and 68 Python tests. Formatting, lint, debug/release
+builds, cargo deny, documentation and manual hooks pass. All 768 tracked main files match the
+isolated snapshot byte for byte. Fresh main builds, twenty related integration tests, twelve
+metadata tests and 68 Python tests pass. Both frozen surveys yield 228 PROVED, 204 REFUTED and
+152 UNKNOWN at `/tmp/miren-stage179-capabilities-20261010` and
+`/tmp/miren-stage179-merged-capabilities-20261010`. All 424 previously completed parent roots
+retain identical outcomes, obligation details and query text. All 584 main/isolate outcomes,
+queries, models, premises and diagnostic details match, with no diagnostic context differences.
+Source, input and release hashes are verified. Independent source and focused-evidence review
+approves the exact Char layout and Unicode validity model at
+`/tmp/miren-stage179-source-review.md`. Current global after/mutation reports remain at
+`/tmp/miren-stage179-global-final-evidence`; historical dedicated, layout and native artifacts
+retain their original binary scope. No assumptions, input caps or increased resource budgets
+are introduced. Stage 179 integrates after actual Stage 178 commit `4d692c3`.
