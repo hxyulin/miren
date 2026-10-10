@@ -60,6 +60,7 @@ mod maybe_uninit;
 mod membership;
 mod memory;
 mod mutable_slice_ranges;
+mod mutable_u16;
 mod nominal_comparisons;
 mod nonzero_options;
 mod opaque_function_inputs;
@@ -360,6 +361,25 @@ impl<'tcx> Engine<'tcx> {
                 "multiple mutable root pointees cannot contain interior mutation".to_owned(),
             );
         }
+        let mutable_u16_root = body
+            .args_iter()
+            .any(|local| self.mutable_u16_type(body.local_decls[local].ty));
+        if mutable_u16_root
+            && (mutable_inputs.len() != 1
+                || !body.args_iter().all(|local| {
+                    let original = body.local_decls[local].ty;
+                    self.mutable_u16_type(original)
+                        || matches!(
+                            original.kind(),
+                            ty::Bool | ty::Int(_) | ty::Uint(_) | ty::Float(_)
+                        )
+                }))
+        {
+            return Err(self.categorized_error(
+                UnknownCategory::Semantics,
+                "mutable u16 root requires one original borrow and owned primitive inputs".into(),
+            ));
+        }
         let immutable_input = self.immutable_root_input(body)?;
         let mut interior_root = false;
         for local in body.args_iter() {
@@ -375,6 +395,10 @@ impl<'tcx> Engine<'tcx> {
                 }
                 if memory.len() >= MAX_INPUT_VALUES {
                     return Err("memory allocation budget reached".to_owned());
+                }
+                if mutable_u16_root {
+                    arguments.push(self.mutable_u16_input(&mut memory, &mut conditions)?);
+                    continue;
                 }
                 self.building_mutable_input = true;
                 let value = self.argument(id, *element, &mut conditions)?;
@@ -495,6 +519,9 @@ impl<'tcx> Engine<'tcx> {
 
     fn input_binding(&mut self, name: &str, value: &Value) -> Result<(), String> {
         let description = match value {
+            Value::MutableU16 { id, .. } => {
+                format!("single incoming mutable u16 root {id}; full typed extent")
+            }
             Value::OwnedRegion { .. } | Value::OwnedSnapshot(_) => {
                 return Err("owned regions require their private typed protocol".into());
             }
@@ -1451,6 +1478,7 @@ impl<'tcx> Engine<'tcx> {
                         _ => return Err("unresolved indirect call".to_owned()),
                     };
                     let callee = instance.def_id();
+                    self.mutable_u16_call_allowed(body, &state, instance, args)?;
                     if super::identity::is_panic_call(self.tcx, callee)
                         || self.is_core_panic_helper(callee)
                     {
@@ -1911,6 +1939,10 @@ impl<'tcx> Engine<'tcx> {
         value: Value,
         occurrence: &StatementKind<'tcx>,
     ) -> Result<(), String> {
+        if self.mutable_u16_store(body, state, place, &value)? {
+            return Ok(());
+        }
+        self.mutable_u16_store_role(body, state, place, &value)?;
         if self.owned_constructor_store(body, state, place, &value, occurrence)? {
             return Ok(());
         }
@@ -1970,6 +2002,9 @@ impl<'tcx> Engine<'tcx> {
         place: Place<'tcx>,
         body: Option<&Body<'tcx>>,
     ) -> Result<Value, String> {
+        if let Some(value) = self.mutable_u16_read(body, state, place)? {
+            return Ok(value);
+        }
         self.check_place_initialization(state, place)?;
         let mut value = self.raw_local(state, place.local.as_usize())?;
         if let [ProjectionElem::Deref, suffix @ ..] = place.projection.as_ref()
@@ -2221,6 +2256,19 @@ impl<'tcx> Engine<'tcx> {
         match operand {
             Operand::Copy(place) | Operand::Move(place) => {
                 let value = self.read_place(state, *place, Some(body))?;
+                if matches!(
+                    value,
+                    Value::MutableU16 {
+                        role: symbolic::MutableU16Role::Root
+                            | symbolic::MutableU16Role::Ghost { .. },
+                        ..
+                    }
+                ) {
+                    return Err(self.categorized_error(
+                        UnknownCategory::Semantics,
+                        "mutable u16 root Copy/Move transport is unsupported".into(),
+                    ));
+                }
                 self.owned_box_type_value(
                     place.ty(&body.local_decls, self.tcx).ty,
                     &value,
@@ -2347,6 +2395,9 @@ impl<'tcx> Engine<'tcx> {
                 Ok(value)
             }
             Rvalue::Ref(_, BorrowKind::Shared, place) => {
+                if let Some(value) = self.mutable_u16_metadata(body, state, *place)? {
+                    return Ok(value);
+                }
                 if let Some(value) = self.owned_box_shared_borrow(state, *place, false)? {
                     return Ok(value);
                 }
@@ -2381,6 +2432,17 @@ impl<'tcx> Engine<'tcx> {
                 }
             }
             Rvalue::Ref(_, BorrowKind::Mut { .. }, place) => {
+                if !state.memory.mutable_u16.is_empty()
+                    && matches!(
+                        self.raw_local(state, place.local.as_usize())?,
+                        Value::MutableU16 { .. }
+                    )
+                {
+                    return Err(self.categorized_error(
+                        UnknownCategory::Semantics,
+                        "mutable u16 child reborrow requires child lease protocol".into(),
+                    ));
+                }
                 if let Some(value) = self.owned_box_shared_borrow(state, *place, true)? {
                     return Ok(value);
                 }
@@ -2399,6 +2461,17 @@ impl<'tcx> Engine<'tcx> {
                 kind @ (rustc_middle::mir::RawPtrKind::Const | rustc_middle::mir::RawPtrKind::Mut),
                 place,
             ) => {
+                if !state.memory.mutable_u16.is_empty()
+                    && matches!(
+                        self.raw_local(state, place.local.as_usize())?,
+                        Value::MutableU16 { .. }
+                    )
+                {
+                    return Err(self.categorized_error(
+                        UnknownCategory::Semantics,
+                        "mutable u16 root cannot issue a raw address".into(),
+                    ));
+                }
                 self.validate_owned_raw_borrow(state, *place)?;
                 let value = self.place(state, *place)?;
                 if matches!(value, Value::StaticView { .. }) {
@@ -2414,6 +2487,9 @@ impl<'tcx> Engine<'tcx> {
                 }
             }
             Rvalue::RawPtr(rustc_middle::mir::RawPtrKind::FakeForPtrMetadata, place) => {
+                if let Some(value) = self.mutable_u16_metadata(body, state, *place)? {
+                    return Ok(value);
+                }
                 let value = self.place(state, *place)?;
                 let length = match value {
                     value @ Value::CompositeSlice { .. } => {
@@ -2603,6 +2679,17 @@ impl<'tcx> Engine<'tcx> {
             }
             Rvalue::UnaryOp(operation, operand) => {
                 let value = self.evaluate_operand(id, body, state, operand)?;
+                if matches!(operation, UnOp::PtrMetadata)
+                    && matches!(
+                        value,
+                        Value::MutableU16 {
+                            role: symbolic::MutableU16Role::Metadata,
+                            ..
+                        }
+                    )
+                {
+                    return self.mutable_u16_length(&value, &state.memory);
+                }
                 let value = if matches!(operation, UnOp::PtrMetadata) {
                     self.snapshot(&value, &state.memory, &state.conditions, 0)?
                         .materialize()?

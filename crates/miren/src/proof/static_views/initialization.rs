@@ -89,6 +89,7 @@ impl Engine<'_> {
             return Ok(());
         }
         match value {
+            Value::MutableU16 { .. } => Ok(()),
             Value::OwnedRegion { .. } => self.validate_owned_region(value, &state.memory),
             Value::OwnedSnapshot(_) => {
                 Err("contract owned-region ghost is not executable storage".into())

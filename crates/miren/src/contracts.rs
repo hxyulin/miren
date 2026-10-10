@@ -343,6 +343,27 @@ fn evaluate(
             if expr.method == "len" && expr.args.is_empty() && expr.turbofish.is_none() =>
         {
             match evaluate(context, &expr.receiver, bindings, pointer_bits, None)?.materialize()? {
+                Value::MutableU16 {
+                    role: symbolic::MutableU16Role::Ghost { length, data },
+                    ..
+                } => {
+                    let (term, bits, signed) = length.integer()?;
+                    if bits != pointer_bits
+                        || signed
+                        || !term.belongs_to(context)
+                        || data.sort()
+                            != &symbolic::Sort::Array(
+                                Box::new(symbolic::Sort::BitVec(pointer_bits)),
+                                Box::new(symbolic::Sort::BitVec(16)),
+                            )
+                        || !data.belongs_to(context)
+                    {
+                        return Err(
+                            "mutable u16 ghost metadata has a different context or sort".into()
+                        );
+                    }
+                    Ok(*length)
+                }
                 Value::Bytes { length, .. } => Ok(*length),
                 Value::Elements(elements) => Ok(symbolic::integer(
                     context,

@@ -33,7 +33,7 @@ impl<'tcx> Engine<'tcx> {
 
     pub(super) fn loop_fresh_value(&mut self, value: &Value) -> Result<Value, String> {
         Ok(match value {
-            Value::OwnedRegion { .. } | Value::OwnedSnapshot(_) => {
+            Value::MutableU16 { .. } | Value::OwnedRegion { .. } | Value::OwnedSnapshot(_) => {
                 return Err("owned regions require their private typed protocol".into());
             }
             Value::Bool(_) => Value::Bool(self.fresh(Sort::Bool)),
@@ -376,7 +376,9 @@ impl<'tcx> Engine<'tcx> {
                 ProjectionElem::Field(field, _) => {
                     let index = field.as_usize();
                     value = match value {
-                        Value::OwnedRegion { .. } | Value::OwnedSnapshot(_) => {
+                        Value::MutableU16 { .. }
+                        | Value::OwnedRegion { .. }
+                        | Value::OwnedSnapshot(_) => {
                             return Err("owned regions require their private typed protocol".into());
                         }
                         Value::Tuple(fields) => fields.get(index).cloned(),
@@ -489,7 +491,7 @@ pub(super) fn same_shape(expected: Option<&Value>, actual: Option<&Value>) -> Re
         return Err("inductive storage sorts changed".into());
     }
     match (expected, actual) {
-        (Value::OwnedRegion { .. } | Value::OwnedSnapshot(_), _) => {
+        (Value::MutableU16 { .. } | Value::OwnedRegion { .. } | Value::OwnedSnapshot(_), _) => {
             Err("owned regions require their private typed protocol".into())
         }
         (Value::Bool(_), Value::Bool(_)) | (Value::Unit, Value::Unit) => Ok(()),
@@ -640,7 +642,7 @@ pub(super) fn same_shape(expected: Option<&Value>, actual: Option<&Value>) -> Re
 
 pub(super) fn static_projection(value: Value, part: &MemoryProjection) -> Result<Value, String> {
     match (part, value) {
-        (_, Value::OwnedRegion { .. } | Value::OwnedSnapshot(_)) => {
+        (_, Value::MutableU16 { .. } | Value::OwnedRegion { .. } | Value::OwnedSnapshot(_)) => {
             Err("owned regions require their private typed protocol".into())
         }
         (MemoryProjection::TypedIndex { .. }, _) => {

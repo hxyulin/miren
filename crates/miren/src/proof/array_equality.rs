@@ -130,7 +130,7 @@ impl<'tcx> Engine<'tcx> {
         state: &State,
     ) -> Result<Vec<Value>, String> {
         match value.materialize()? {
-            Value::OwnedRegion { .. } | Value::OwnedSnapshot(_) => {
+            Value::MutableU16 { .. } | Value::OwnedRegion { .. } | Value::OwnedSnapshot(_) => {
                 Err("owned regions require their private typed protocol".into())
             }
             Value::Elements(elements) if elements.len() == count => Ok(elements.to_vec()),

@@ -11,8 +11,8 @@ execution at O0 and O2, positive/refuted/unknown controls, a source mutation tha
 structured UNKNOWN reporting, and passing repository checks. Completion establishes a repeatable
 baseline. It does not establish full Rust support or a completed memory-model refactor.
 
-The manifest contains 164 cases across 56 families. Each build configuration expects 65 PROVED,
-57 REFUTED and 42 UNKNOWN results. Stage 133 originally had 23 cases with 10 PROVED, 9 REFUTED
+The manifest contains 167 cases across 57 families. Each build configuration expects 66 PROVED,
+58 REFUTED and 43 UNKNOWN results. Stage 133 originally had 23 cases with 10 PROVED, 9 REFUTED
 and 4 UNKNOWN; stage 134 closed its retained-prefix projection gap. Stage 136 adds raw-pointer
 metadata P/R controls and a safe core reference-array grant that remains UNKNOWN without a
 temporal permission certificate. Stage 137 adds tuple-array P/R and unsupported symbolic-write
@@ -866,3 +866,53 @@ captures at `/tmp/miren-stage187-main-release-final-evidence` match 128 complete
 proof objects and 248 queries after explicit source/replay path mappings. Global release captures
 at `/tmp/miren-stage187-global-final-evidence` match 20 proof objects and 80 queries. Native records
 retain their original execution scope. Source, input and release hashes are verified.
+
+Stage 184 adds one original incoming mutable u16 slice with primitive owned inputs. Branch-local
+Memory holds its current full-extent SMT array, original type, initialized storage identity,
+generation and source permissions. Direct typed element reads and stores prove bounds; each
+store evaluates its actual scalar helper once and updates current data. Rust's valid slice extent
+is retained without an analysis input cap. Detached ghost data preserves prestate; configured
+contracts observe frozen length. Private executable metadata exposes only length through the
+actual selected available core SliceLen body, with a complete signature/body/effect certificate.
+
+Root Copy/Move, aggregate role storage, retained shared data, borrowed helper calls, child reborrow,
+raw access, executable return and induction remain UNKNOWN. Existing readonly slice permissions
+are unchanged. Recursive role checks prevent metadata laundering; induction refuses the backing
+namespace rather than discarding state. No assumptions or resource budget changes are introduced.
+
+The 23-root dedicated matrix yields six PROVED, two REFUTED and fifteen UNKNOWN per host/ARM O0/O2
+profile. Separate configured ghost-length equality proves and inequality refutes. Actual selected
+scalar dependency bodies prove; genuine omission remains MissingCompilerEvidence. The actual
+replacement-helper mutation refutes the unchanged claim with body entry, query and model. Safe
+native originals pass two tests and the mutation guard exits 101 at O0/O2, using finite extent129
+and ten-second timeouts. Current parent-187 captures are at
+`/tmp/miren-stage184-parent187-final-evidence`; exact-source before captures under committed Stage
+187 are at `/tmp/miren-stage184-parent187-before-final-source`. All 96 original/mutant proof objects
+match the preserved parent-186 captures after explicit source/replay path mappings. Native records
+retain their original execution scope. Historical source and failed prototype captures remain
+under `/tmp/miren-stage184-parent186-history` and the earlier evidence directories.
+
+Historical fidelity preserves 52 unchanged entry/profile pairs and all 56 completed queries.
+Both older mutable_root cases remain Semantics UNKNOWN with the metadata-operation reason.
+The unchanged len-only scalar_slices input now proves under the actual selected length certificate;
+mutable iterator access stays UNKNOWN at the child-lease gate. Harness upkeep pins these outcomes
+and precise models or reasons. Original fixtures and claims stay unchanged. Global P/R/U controls and actual-helper mutation/native guard are at
+`/tmp/miren-stage184-global-after-evidence`. The combined manifest has 167 cases in 57 families.
+
+Final isolated validation passes 759 Rust tests and 68 Python tests; fresh-main focused validation
+passes 62 Rust tests and 68 Python tests. Formatting, lint, debug/release builds, dependency denial,
+documentation and manual hooks pass in both. All 820 tracked files match byte for byte. Both
+surveys yield 264 PROVED, 232 REFUTED and 172 UNKNOWN across four profiles. All 488 previously
+completed roots retain identical outcomes, obligation details, queries, models and premises;
+all 668 main/isolate results match with no diagnostic context differences. Fresh main release
+captures at `/tmp/miren-stage184-main-release-final-evidence` match 112 complete original/mutant,
+contract and dependency proof objects with 108 queries after explicit source/replay path mappings.
+Global release captures at `/tmp/miren-stage184-global-final-evidence` match 16 proof objects and
+32 queries. Native records retain their original execution scope. Source, input and release hashes
+are verified. Initial full validation's three stale assertions and documentation EOF-hook failure
+remain at `/tmp/miren-stage184-checks`; initial main failures and the intermediate model assertion
+failure remain at `/tmp/miren-stage184-merged-checks` and
+`/tmp/miren-stage184-corrected-merged-checks`. Corrected final checks are
+`/tmp/miren-stage184-corrected-checks` and `/tmp/miren-stage184-final-merged-checks`. The newly
+supported length-only case checks its mutable metadata model; all other readonly model assertions
+remain intact. No production semantic source correction followed the author freeze.

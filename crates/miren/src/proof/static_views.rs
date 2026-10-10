@@ -826,7 +826,9 @@ impl<'tcx> Engine<'tcx> {
         }
         match value {
             // Private Unit-region roles carry no ordinary mutable reference capability.
-            Value::OwnedRegion { .. } | Value::OwnedSnapshot(_) => Ok(false),
+            Value::MutableU16 { .. } | Value::OwnedRegion { .. } | Value::OwnedSnapshot(_) => {
+                Ok(false)
+            }
             Value::MaybeUninit { id, payload } => {
                 self.maybe_uninit_payload_type(*id)?;
                 if let Some(payload) = payload {

@@ -67,6 +67,28 @@ impl<'tcx> Engine<'tcx> {
             }
         }
         match value {
+            Value::MutableU16 { id, role } => {
+                if incoming.is_some() {
+                    return Err("private mutable u16 roles cannot escape a frame".into());
+                }
+                if !matches!(role, symbolic::MutableU16Role::Ghost { .. }) {
+                    let backing = state
+                        .memory
+                        .mutable_u16
+                        .get(*id)
+                        .ok_or("mutable u16 identity was not issued")?;
+                    state
+                        .memory
+                        .check_projection_initialization(backing.allocation, &[])?;
+                    if !matches!(
+                        state.memory.get(backing.allocation),
+                        Some(Some(Value::Unit))
+                    ) {
+                        return Err("mutable u16 backing is unavailable".into());
+                    }
+                }
+                Ok(())
+            }
             Value::OwnedRegion {
                 key,
                 certificate,

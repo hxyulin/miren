@@ -203,7 +203,7 @@ impl<'tcx> Engine<'tcx> {
         }
         let mut member = self.terms.boolean(false);
         match &slice {
-            Value::OwnedRegion { .. } | Value::OwnedSnapshot(_) => {
+            Value::MutableU16 { .. } | Value::OwnedRegion { .. } | Value::OwnedSnapshot(_) => {
                 return Err("owned regions require their private typed protocol".into());
             }
             Value::Elements(elements) => {

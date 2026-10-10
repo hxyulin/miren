@@ -168,6 +168,12 @@ impl<'tcx> Engine<'tcx> {
         conditions: Vec<Term>,
         memory: Memory,
     ) -> Result<(), String> {
+        if !memory.mutable_u16.is_empty() {
+            return Err(self.categorized_error(
+                UnknownCategory::Semantics,
+                "mutable u16 root requires separate inductive backing transport".into(),
+            ));
+        }
         let mut system = System {
             relations: Vec::new(),
             clauses: Vec::new(),
@@ -1134,7 +1140,7 @@ fn flatten(state: &State) -> Result<Vec<Term>, String> {
 
 fn flatten_value(value: &Value, result: &mut Vec<Term>) -> Result<(), String> {
     match value {
-        Value::OwnedRegion { .. } | Value::OwnedSnapshot(_) => {
+        Value::MutableU16 { .. } | Value::OwnedRegion { .. } | Value::OwnedSnapshot(_) => {
             return Err("owned regions require their private typed protocol".into());
         }
         Value::Bool(term)

@@ -54,7 +54,7 @@ fn validate(
     }
     let valid = |term: &Term, sort: Sort| term.belongs_to(context) && term.sort() == &sort;
     match value {
-        Value::OwnedRegion { .. } | Value::OwnedSnapshot(_) => {
+        Value::MutableU16 { .. } | Value::OwnedRegion { .. } | Value::OwnedSnapshot(_) => {
             Err("owned regions require their private typed protocol".into())
         }
         Value::Bool(term) if valid(term, Sort::Bool) => Ok(true),

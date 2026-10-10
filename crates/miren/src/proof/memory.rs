@@ -80,6 +80,7 @@ impl<'tcx> Engine<'tcx> {
             return Err("memory snapshot nesting limit reached".to_owned());
         }
         match value {
+            Value::MutableU16 { .. } => self.mutable_u16_snapshot(value, memory),
             Value::OwnedRegion { kind, .. } => {
                 self.validate_owned_region(value, memory)?;
                 if !matches!(
@@ -1330,6 +1331,10 @@ impl<'tcx> Engine<'tcx> {
             self.validate_static_initialization_graph(&value, state, &mut Vec::new())?;
         }
         match value {
+            Value::MutableU16 { .. } => Err(self.categorized_error(
+                UnknownCategory::Semantics,
+                "mutable u16 roles cannot return or escape".into(),
+            )),
             value @ Value::OwnedRegion { .. } => {
                 self.owned_box_return(&value, &state.memory)?;
                 Ok(value)

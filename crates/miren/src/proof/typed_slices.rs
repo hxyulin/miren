@@ -70,7 +70,7 @@ impl<'tcx> Engine<'tcx> {
         let mut value = value.clone();
         for _ in 0..16 {
             match value {
-                Value::OwnedRegion { .. } | Value::OwnedSnapshot(_) => {
+                Value::MutableU16 { .. } | Value::OwnedRegion { .. } | Value::OwnedSnapshot(_) => {
                     return Err("owned regions require their private typed protocol".into());
                 }
                 value @ Value::RawSlice { .. } => return Ok(Some(value)),

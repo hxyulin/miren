@@ -15,7 +15,7 @@ impl<'tcx> Engine<'tcx> {
                 storage::static_projection(value, part)
             }
             MemoryProjection::Index(index) => match value {
-                Value::OwnedRegion { .. } | Value::OwnedSnapshot(_) => {
+                Value::MutableU16 { .. } | Value::OwnedRegion { .. } | Value::OwnedSnapshot(_) => {
                     Err("owned regions require their private typed protocol".into())
                 }
                 Value::Bytes { data, .. } => Ok(Value::Int {
@@ -126,7 +126,7 @@ impl<'tcx> Engine<'tcx> {
             return Err("inductive snapshot depth limit".into());
         }
         match value {
-            Value::OwnedRegion { .. } | Value::OwnedSnapshot(_) => {
+            Value::MutableU16 { .. } | Value::OwnedRegion { .. } | Value::OwnedSnapshot(_) => {
                 Err("owned regions require their private typed protocol".into())
             }
             Value::Reference {

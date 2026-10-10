@@ -75,9 +75,17 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
         assert!(proof.trusted_calls.is_empty());
         assert!(proof.entry_assumptions.is_empty());
         if *expected == ProofStatus::Proved {
-            assert!(proof.models.iter().any(|model| {
-                model.contains("single incoming immutable Rust borrow; caller-owned live storage")
-            }));
+            let expected_model = if *name == "mutable_input" {
+                "mutable u16 metadata-only length; actual body certified"
+            } else {
+                "single incoming immutable Rust borrow; caller-owned live storage"
+            };
+            assert!(
+                proof
+                    .models
+                    .iter()
+                    .any(|model| model.contains(expected_model))
+            );
         }
         if matches!(*name, "nested_subviews" | "empty_at_end") {
             assert!(proof.models.iter().any(|model| {
@@ -92,7 +100,7 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
         }
         if *expected == ProofStatus::Unknown {
             let (category, reason) = match *name {
-                "mutable_input" | "raw_elements" | "pattern_elements" | "competing_inputs" => (
+                "raw_elements" | "pattern_elements" | "competing_inputs" => (
                     UnknownCategory::Semantics,
                     "only read-only byte slices and byte arrays are modeled",
                 ),
@@ -160,7 +168,7 @@ fn arbitrary_readonly_scalars_preserve_domains_correlations_and_extent() {
         ("unguarded_index", ProofStatus::Refuted),
         ("invalid_range", ProofStatus::Refuted),
         ("float_reflexivity", ProofStatus::Refuted),
-        ("mutable_input", ProofStatus::Unknown),
+        ("mutable_input", ProofStatus::Proved),
         ("raw_elements", ProofStatus::Unknown),
         ("zero_sized_elements", ProofStatus::Proved),
         ("pattern_elements", ProofStatus::Unknown),

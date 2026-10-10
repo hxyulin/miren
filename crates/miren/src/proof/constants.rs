@@ -257,7 +257,7 @@ impl<'tcx> Engine<'tcx> {
 
 fn constant_storage_key(value: &Value) -> Option<ConstantStorageKey> {
     match value {
-        Value::OwnedRegion { .. } | Value::OwnedSnapshot(_) => None,
+        Value::MutableU16 { .. } | Value::OwnedRegion { .. } | Value::OwnedSnapshot(_) => None,
         Value::Unit => Some(ConstantStorageKey::Unit),
         Value::Bool(term) => Some(ConstantStorageKey::Bool(term.clone())),
         Value::Int {

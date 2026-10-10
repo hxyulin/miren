@@ -804,6 +804,7 @@ pub(super) fn region_occurrences(
             return Err("owned occurrence traversal exceeds the existing node budget".into());
         }
         match value {
+            Value::MutableU16 { .. } => {}
             Value::OwnedRegion {
                 key,
                 certificate,

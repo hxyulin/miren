@@ -20,7 +20,7 @@ impl<'tcx> Engine<'tcx> {
         roots: &mut Vec<Value>,
     ) -> Result<(), String> {
         match value {
-            Value::OwnedRegion { .. } | Value::OwnedSnapshot(_) => {
+            Value::MutableU16 { .. } | Value::OwnedRegion { .. } | Value::OwnedSnapshot(_) => {
                 return Err("owned regions require their private typed protocol".into());
             }
             Value::MaybeUninit { payload, .. } => {

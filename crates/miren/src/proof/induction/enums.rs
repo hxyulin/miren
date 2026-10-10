@@ -47,7 +47,7 @@ impl<'tcx> Engine<'tcx> {
         frame: &Frame<'tcx>,
         state: &mut State,
     ) -> Result<(), String> {
-        if !state.memory.owned_regions.is_empty() {
+        if !state.memory.owned_regions.is_empty() || !state.memory.mutable_u16.is_empty() {
             return Err("inductive frames do not transport logical heap regions".into());
         }
         if !state.missing_places.is_empty() || !state.memory.missing_places.is_empty() {
@@ -80,7 +80,7 @@ fn normalize(
     let template = template.ok_or("missing inductive value template")?;
     let value = slot.as_mut().ok_or("missing inductive value")?;
     match (template, &mut *value) {
-        (Value::OwnedRegion { .. } | Value::OwnedSnapshot(_), _) => {
+        (Value::MutableU16 { .. } | Value::OwnedRegion { .. } | Value::OwnedSnapshot(_), _) => {
             return Err("owned regions require their private typed protocol".into());
         }
         (Value::ScalarSlice { .. } | Value::CompositeSlice { .. }, _) => {

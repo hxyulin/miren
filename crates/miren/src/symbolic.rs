@@ -51,7 +51,18 @@ pub enum OwnedRegionKind {
 }
 
 #[derive(Clone, Debug)]
+pub enum MutableU16Role {
+    Root,
+    Metadata,
+    Ghost { length: Box<Value>, data: Term },
+}
+
+#[derive(Clone, Debug)]
 pub enum Value {
+    MutableU16 {
+        id: usize,
+        role: MutableU16Role,
+    },
     OwnedRegion {
         key: u64,
         certificate: usize,
@@ -205,7 +216,8 @@ impl Value {
                     size.checked_add(value.owned_repeat_size()?)
                         .filter(|size| *size <= MAX_REPEAT_VALUES)
                 }),
-            Self::OwnedRegion { .. }
+            Self::MutableU16 { .. }
+            | Self::OwnedRegion { .. }
             | Self::OwnedSnapshot(_)
             | Self::CompositeSlice { .. }
             | Self::ScalarSlice { .. }
@@ -259,7 +271,8 @@ impl Value {
             | Self::Unit
             | Self::Elements(_)
             | Self::Adt { .. } => Some(1),
-            Self::OwnedRegion { .. }
+            Self::MutableU16 { .. }
+            | Self::OwnedRegion { .. }
             | Self::OwnedSnapshot(_)
             | Self::CompositeSlice { .. }
             | Self::ScalarSlice { .. }
@@ -318,7 +331,8 @@ impl Value {
             | Self::Bytes { .. }
             | Self::RawPointer { .. }
             | Self::Unit => self.owned_repeat_size(),
-            Self::OwnedRegion { .. }
+            Self::MutableU16 { .. }
+            | Self::OwnedRegion { .. }
             | Self::OwnedSnapshot(_)
             | Self::CompositeSlice { .. }
             | Self::ScalarSlice { .. }
@@ -347,6 +361,7 @@ impl Value {
             Self::MaybeUninit { payload, .. } => {
                 payload.as_ref().is_some_and(|v| v.contains_mutable())
             }
+            Self::MutableU16 { role, .. } => matches!(role, MutableU16Role::Root),
             Self::OwnedRegion { .. } | Self::OwnedSnapshot(_) | Self::Input(_) => false,
             Self::Reference { mutable: true, .. } => true,
             Self::StaticSlice { mutable, .. } => *mutable,
@@ -403,7 +418,8 @@ impl Value {
             | Self::DebugReference { source, .. } => source.contains_local_atomic(),
             Self::TrackedPointer { reference, .. } => reference.contains_local_atomic(),
             Self::RawSlice { source, .. } => source.contains_local_atomic(),
-            Self::OwnedRegion { .. }
+            Self::MutableU16 { .. }
+            | Self::OwnedRegion { .. }
             | Self::OwnedSnapshot(_)
             | Self::Input(_)
             | Self::Bool(_)

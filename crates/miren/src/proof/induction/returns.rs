@@ -7,6 +7,12 @@ impl<'tcx> Engine<'tcx> {
         frame: &Frame<'tcx>,
         state: &State,
     ) -> Result<(), String> {
+        if !state.memory.mutable_u16.is_empty() {
+            return Err(self.categorized_error(
+                UnknownCategory::Semantics,
+                "mutable u16 root requires separate inductive backing transport".into(),
+            ));
+        }
         if !state.memory.missing_places.is_empty() {
             return Err(self.categorized_error(
                 UnknownCategory::Semantics,

@@ -2353,3 +2353,46 @@ mod native_primitive_array_predicates {
         nominal_primitive_array_wrong_claim(&values(), 128);
     }
 }
+
+#[inline(never)]
+pub fn mutable_u16_replacement(word: u16) -> u16 {
+    word ^ 0
+}
+
+pub fn mutable_u16_store(values: &mut [u16], index: usize, word: u16) {
+    if index < values.len() {
+        values[index] = mutable_u16_replacement(word);
+        assert!(values[index] == word);
+    }
+}
+
+pub fn mutable_u16_wrong_claim(values: &mut [u16], index: usize, word: u16) {
+    if index < values.len() {
+        values[index] = mutable_u16_replacement(word);
+        assert!(values[index] != word);
+    }
+}
+
+#[inline(never)]
+pub fn mutable_u16_child(values: &mut [u16], index: usize, word: u16) {
+    values[index] = word;
+}
+
+pub fn mutable_u16_child_unknown(values: &mut [u16], index: usize, word: u16) {
+    if index < values.len() {
+        mutable_u16_child(values, index, word);
+        assert!(values[index] == word);
+    }
+}
+
+#[cfg(test)]
+mod native_mutable_u16_store {
+    use super::*;
+
+    #[test]
+    fn replacement_body_preserves_word() {
+        let mut values = [0_u16; 129];
+        mutable_u16_store(&mut values, 128, u16::MAX);
+        assert_eq!(values[128], u16::MAX);
+    }
+}

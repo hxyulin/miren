@@ -80,7 +80,7 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
             let (category, reason) = match *name {
                 "mutable_input" => (
                     UnknownCategory::Semantics,
-                    "only read-only byte slices and byte arrays are modeled",
+                    "mutable u16 child reborrow requires child lease protocol",
                 ),
                 "dead_metadata" | "dead_exhausted_hint" | "dead_count" | "dead_clone" => (
                     UnknownCategory::Unclassified,

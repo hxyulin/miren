@@ -965,3 +965,18 @@ eligibility. Char leaves reuse validated decoded Unicode observations. Every ori
 including a vacant array's child, retains the existing expanded type budgets. This adds no nominal
 MIR indexing, cast, raw transport or ownership permission. Genuine missing selected dependency
 MIR remains unknown even for empty, unequal-length and zero-leaf slices.
+
+A single original incoming `&mut [u16]` can supply direct element reads and whole-element writes
+with other inputs limited to owned primitives. Its private current backing is an SMT array across
+the full valid target extent. A write proves bounds, checks the original element type and context,
+and changes only the branch's current array. Actual scalar helper calls retain that backing.
+Detached prestate snapshots keep old terms; contract length observations never grant executable
+access, and ghost element indexing remains unsupported.
+
+Compiler length lowering uses a private metadata-only role. The actual selected core SliceLen
+body must be available and return exactly its receiver's pointer metadata. Compiler fake metadata
+pointers carry length only. These roles cannot acquire shared data or mutable access, enter
+aggregate/caller storage, ordinary borrowed helper calls, raw pointers, or returns. Root handle
+Copy/Move transport, mutable reborrows, retained shared views, multiple incoming borrows, slices
+passed to helpers, and inductive backing transport remain UNKNOWN. Existing readonly slice,
+finite mutable byte storage, ownership initialization and raw permission policies are unchanged.

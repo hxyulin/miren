@@ -29,6 +29,7 @@ pub(super) struct OwnedRegion {
 
 #[derive(Clone, Default)]
 pub(super) struct Memory {
+    pub(super) mutable_u16: Rc<Vec<super::mutable_u16::Backing>>,
     allocations: Rc<Vec<Option<Value>>>,
     pub(super) owned_regions: Rc<Vec<OwnedRegion>>,
     pub(super) missing_places: initialized_places::MissingPlaces,
@@ -44,6 +45,7 @@ impl Memory {
         self.allocations
             .len()
             .saturating_add(self.owned_regions.len())
+            .saturating_add(self.mutable_u16.len())
     }
 
     pub(super) fn owned_region(

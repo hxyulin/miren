@@ -124,7 +124,7 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
                 ),
                 "mutable_root" => (
                     UnknownCategory::Semantics,
-                    "only read-only byte slices and byte arrays are modeled",
+                    "mutable u16 roles require selected metadata-only operation",
                 ),
                 "analyzer_only::dead_capture_storage" => (
                     UnknownCategory::Unclassified,

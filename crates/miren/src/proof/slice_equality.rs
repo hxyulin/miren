@@ -258,7 +258,7 @@ impl<'tcx> Engine<'tcx> {
 
     fn equality_slice_length(&self, source: &Value, conditions: &[Term]) -> Result<Value, String> {
         match source {
-            Value::OwnedRegion { .. } | Value::OwnedSnapshot(_) => {
+            Value::MutableU16 { .. } | Value::OwnedRegion { .. } | Value::OwnedSnapshot(_) => {
                 Err("owned regions require their private typed protocol".into())
             }
             Value::CompositeSlice { .. } => Err("composite equality is unsupported".into()),
@@ -304,7 +304,7 @@ impl<'tcx> Engine<'tcx> {
         conditions: &[Term],
     ) -> Result<Value, String> {
         match value {
-            Value::OwnedRegion { .. } | Value::OwnedSnapshot(_) => {
+            Value::MutableU16 { .. } | Value::OwnedRegion { .. } | Value::OwnedSnapshot(_) => {
                 Err("owned regions require their private typed protocol".into())
             }
             Value::CompositeSlice { .. } => Err("composite equality is unsupported".into()),

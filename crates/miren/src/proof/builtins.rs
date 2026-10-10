@@ -108,6 +108,14 @@ impl<'tcx> Engine<'tcx> {
             let [receiver] = values else {
                 return Err("slice len receiver is not modeled".to_owned());
             };
+            if matches!(receiver, Value::MutableU16 { .. }) {
+                self.certify_mutable_u16_len(instance)?;
+                self.record_model(
+                    callee,
+                    "mutable u16 metadata-only length; actual body certified",
+                );
+                return Ok(Some(self.mutable_u16_length(receiver, &state.memory)?));
+            }
             self.record_model(callee, "slice length");
             let receiver = receiver.materialize()?;
             return match &receiver {

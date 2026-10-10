@@ -241,7 +241,7 @@ impl<'tcx> Engine<'tcx> {
 
     pub(super) fn loop_slice_length(&self, source: &Value) -> Result<Value, String> {
         match source {
-            Value::OwnedRegion { .. } | Value::OwnedSnapshot(_) => {
+            Value::MutableU16 { .. } | Value::OwnedRegion { .. } | Value::OwnedSnapshot(_) => {
                 Err("owned regions require their private typed protocol".into())
             }
             Value::Bytes { length, .. } => Ok((**length).clone()),

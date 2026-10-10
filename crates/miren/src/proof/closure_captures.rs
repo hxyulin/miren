@@ -50,7 +50,7 @@ fn pure_retained_slice_storage(value: &Value, depth: usize) -> bool {
         return false;
     }
     match value {
-        Value::OwnedRegion { .. } | Value::OwnedSnapshot(_) => false,
+        Value::MutableU16 { .. } | Value::OwnedRegion { .. } | Value::OwnedSnapshot(_) => false,
         Value::Bool(_) | Value::Int { .. } | Value::Float { .. } | Value::Unit => true,
         Value::Tuple(fields) => fields
             .iter()
