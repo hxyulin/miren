@@ -46,7 +46,7 @@ impl StorageLocation {
         }
     }
 
-    pub(super) fn validate(self, memory: &[Option<Value>]) -> Result<(), String> {
+    pub(super) fn validate(self, memory: &Memory) -> Result<(), String> {
         match self.identity {
             AllocationIdentity::Tracked(allocation) => {
                 tracked_storage(memory, allocation).map(|_| ())
@@ -55,7 +55,14 @@ impl StorageLocation {
         }
     }
 
-    pub(super) fn read(self, memory: &[Option<Value>]) -> Result<&Value, String> {
+    pub(super) fn read(self, memory: &Memory) -> Result<&Value, String> {
+        if let AllocationIdentity::Tracked(allocation) = self.identity {
+            memory.missing_places.check(allocation, &[])?;
+        }
+        self.read_storage(memory)
+    }
+
+    pub(super) fn read_storage(self, memory: &Memory) -> Result<&Value, String> {
         match self.identity {
             AllocationIdentity::Tracked(allocation) => tracked_storage(memory, allocation),
             AllocationIdentity::Static(_) => {
@@ -65,11 +72,12 @@ impl StorageLocation {
         }
     }
 
-    pub(super) fn write(self, memory: &mut [Option<Value>], value: Value) -> Result<(), String> {
+    pub(super) fn write(self, memory: &mut Memory, value: Value) -> Result<(), String> {
         self.require_write(memory)?;
         match self.identity {
             AllocationIdentity::Tracked(allocation) => {
                 memory[allocation] = Some(value);
+                memory.missing_places.initialize(allocation, &[]);
                 Ok(())
             }
             AllocationIdentity::Static(_) => {
@@ -78,7 +86,7 @@ impl StorageLocation {
         }
     }
 
-    pub(super) fn require_write(self, memory: &[Option<Value>]) -> Result<(), String> {
+    pub(super) fn require_write(self, memory: &Memory) -> Result<(), String> {
         self.validate(memory)?;
         match self.capability {
             AccessCapability::Writable => Ok(()),
@@ -87,14 +95,14 @@ impl StorageLocation {
     }
 }
 
-fn tracked_storage(memory: &[Option<Value>], allocation: usize) -> Result<&Value, String> {
+fn tracked_storage(memory: &Memory, allocation: usize) -> Result<&Value, String> {
     memory
         .get(allocation)
         .and_then(Option::as_ref)
         .ok_or_else(|| "reference points to dead or uninitialized storage".into())
 }
 
-pub(super) fn validate_static_epoch(memory: &[Option<Value>], epoch: usize) -> Result<(), String> {
+pub(super) fn validate_static_epoch(memory: &Memory, epoch: usize) -> Result<(), String> {
     if matches!(memory.get(epoch), Some(Some(Value::Unit))) {
         Ok(())
     } else {
@@ -115,7 +123,7 @@ mod tests {
 
     #[test]
     fn captured_commits_preserve_identity_and_require_live_write_capability() {
-        let mut memory = vec![Some(Value::Unit), Some(Value::Unit)];
+        let mut memory: Memory = vec![Some(Value::Unit), Some(Value::Unit)].into();
         StorageLocation::tracked(1, true)
             .write(&mut memory, Value::Tuple(vec![Value::Unit]))
             .unwrap();
@@ -143,7 +151,7 @@ mod tests {
 
     #[test]
     fn equal_payloads_and_validity_slots_do_not_merge_allocation_identity() {
-        let memory = vec![Some(Value::Unit), Some(Value::Unit)];
+        let memory: Memory = vec![Some(Value::Unit), Some(Value::Unit)].into();
         let first = StorageLocation::tracked(0, true);
         let second = StorageLocation::tracked(1, true);
         assert_ne!(first, second);
@@ -162,7 +170,7 @@ mod tests {
 
     #[test]
     fn access_checks_keep_capability_and_retirement_independent() {
-        let memory = vec![Some(Value::Unit), None];
+        let memory: Memory = vec![Some(Value::Unit), None].into();
         let shared = StorageLocation::tracked(0, false);
         assert!(shared.read(&memory).is_ok());
         assert!(shared.require_write(&memory).is_err());
@@ -181,7 +189,7 @@ mod tests {
 
     #[test]
     fn live_static_addresses_do_not_supply_readable_payloads() {
-        let mut memory = vec![Some(Value::Unit)];
+        let mut memory: Memory = vec![Some(Value::Unit)].into();
         let location = StorageLocation::static_view(definition(0), 0, true);
         location.validate(&memory).unwrap();
         location.require_write(&memory).unwrap();

@@ -4799,3 +4799,96 @@ historical dedicated, compiler vtable, omitted-dependency and native evidence re
 original binary scope. No assumptions, input caps or increased resource budgets are introduced.
 Stage 181 integrates after actual Stage 179 commit `eebf727`; ownership Stage 180 remains a
 separate implementation rather than an implicit part of this validated snapshot.
+
+
+## Stage 180: owned-place initialization and coroutine preservation
+
+This stage integrates after actual Stage 181 commit `38b3b45`. An explicit initialization
+ledger follows owned Move operands and actual drop calls through local and tracked storage.
+Exact writes repair covered fields without reviving a consumed ancestor. Loads and reference
+traversal check initialization before following payloads. Call destinations are captured before
+the callee operand and left-to-right arguments. Definite or unresolved overlap between a moved
+input and destination returns semantic UNKNOWN under the unresolved compiler contract.
+
+Exact compiler coroutine projections preserve move effects across suspension. Certificates hold
+weak references to the original immutable body and cannot survive body replacement or expiry.
+Typed observation snapshots scrub inactive consumed fields without modifying live storage.
+Exact compiler Pin helper packaging retains validated references while ordinary partially moved
+aggregates and escaping frame references remain unsupported. No hardware model is introduced.
+
+Inductive states may omit consumed private temporaries only after compiler liveness and a bounded
+scan of the exact future MIR establish no overlapping read before a covering write. RHS reads
+precede repairs; storage markers do not repair initialization. Unknown projections refuse this
+omission. Arguments, return storage, addressed locals and tracked memory remain strict.
+
+The repaired dedicated matrix has 33 roots with thirteen PROVED, one REFUTED and nineteen UNKNOWN
+in all host/ARM O0/O2 profiles. Actual helper mutation refutes the unchanged claim in each profile.
+Valid native companions pass at O0/O2; actual helper mutants exit 101 with ten-second timeouts.
+Compiler-only invalid MIR is never executed natively. Evidence, source and binary hashes remain
+at `/tmp/miren-stage180-repair-final-evidence` and
+`/tmp/miren-stage180-repair-core-freeze.json`.
+
+All 72 old async root/profile outcomes remain identical, including 56 completed roots and
+24 completed obligation queries. Four existing query-free UNKNOWN diagnostics change only the
+missing-field wording at the same Context::waker boundary; original details remain in
+`/tmp/miren-stage180-coroutine-fidelity/comparison.json`. All 64 old induction root/profile
+outcomes, obligations and premises remain identical, including 28 completed roots and 48 actual
+queries, at `/tmp/miren-stage180-induction-fidelity/comparison.json`. Initial implementation,
+expectation and probe failures are retained. These focused captures preceded full validation.
+
+The initial integrated full run retained four failed tests across compiler DR16 and inductive
+iterator suites. Its source remains at `/tmp/miren-stage180-initial-integrated-source`; original
+logs and surveys remain at `/tmp/miren-stage180-checks` and the initial capability directories.
+The other 731 Rust tests passed. The expected native-mutant child failure is distinct from these
+four Cargo test failures. Initial surveys both yield 236 P, 212 R and 160 U, with all 440 old
+completed roots and all 608 main/isolate outcomes, queries, models and premises identical.
+These passing selected surveys did not override the broader regression failures.
+
+Actual instantiated `Result::ok` moves the Ok payload before reading the retained tag for drop
+dispatch. The repair validates the original enum path, nominal schema and tag without reading
+consumed payloads. Ancestor and whole masks remain strict, including niche representations;
+arbitrary uninitialized discriminants receive no permission. Exact no-drop MIR Drop short-circuits
+without source observation. Compiler-backed scanner controls reject forged recorded field types.
+
+The custom iterator failed in blanket `IntoIterator::into_iter`: its by-value argument legitimately
+moves into the return value. A separate terminal adapter preserves consumed argument masks only
+for bounded original reference-free, Freeze, noDrop types without addressed storage. It emits no
+successor atom or captured terminal state. Returned values and memory stay strict; current-final
+postcondition argument reads still refuse consumed storage. The old DR16 proof and real mutants,
+Cargo parser test and custom-iterator tests pass in focused repair replay. Reference, addressed and
+current-final argument controls remain UNKNOWN. These focused captures preceded corrected full
+validation.
+
+
+The corrected full run restored DR16 and inductive iterator execution, then exposed eight stale
+expectations in six storage suites. Its 728 passing tests and eight failures remain at
+`/tmp/miren-stage180-repair-checks`. Those helpers dropped types without drop glue; optimized
+MIR specifies a complete no-op. Thirty-two unchanged-source runs across host/ARM O0/O2 and their
+original ordinary, startup, isolated or trusted modes establish the corrected expectations at
+`/tmp/miren-stage180-no-drop-probes`. Actual destructor, lifetime, permission and opaque-effect
+controls retain their conservative boundaries. A wrong sibling-value claim now correctly refutes.
+
+The original store-removal claim allowed either enum tag, so it remains a preservation control.
+A separate exact written-tag claim proves under the existing recorded startup premises; removing
+the actual store refutes the unchanged claim in every profile with the same query and model.
+Native originals pass and mutants exit 101 at O0/O2. The original fixture remains an exact byte
+prefix of the final source. Evidence remains at `/tmp/miren-stage180-no-drop-new-control`;
+the seven-path harness upkeep is frozen at `/tmp/miren-stage180-no-drop-upkeep-freeze.json`.
+Independent semantic and effect reviews cover the corrected expectations and meaningful mutation.
+
+
+Final corrected validation passes all 737 Rust tests and 68 Python tests. Formatting, lint,
+debug/release builds, cargo deny, documentation and manual hooks pass. All 777 tracked main files
+match the isolated source byte for byte. Fresh main builds and 98 relevant Rust tests pass.
+Both frozen surveys yield 236 PROVED, 212 REFUTED and 160 UNKNOWN at
+`/tmp/miren-stage180-upkeep-capabilities-20261010` and
+`/tmp/miren-stage180-upkeep-merged-capabilities-20261010`. All 440 previously completed parent
+roots retain identical outcomes, obligation details and query text. All 608 main/isolate outcomes,
+queries, models and premises match, with no diagnostic context differences. Source, input and
+release hashes are verified. Initial and repaired failing full runs remain historical evidence;
+the final passing run is `/tmp/miren-stage180-upkeep-checks`. Independent source, terminal,
+retained-tag and no-drop upkeep reviews approve the bounded changes. Current dedicated/global
+captures remain at `/tmp/miren-stage180-repair-final-evidence` and
+`/tmp/miren-stage180-repair-global-final-evidence`; their recorded binary scopes are preserved.
+The combined manifest contains 152 cases in 52 families. No assumptions, input caps, firmware
+rewrites or increased resource budgets are introduced.

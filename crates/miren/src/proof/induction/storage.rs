@@ -159,14 +159,18 @@ impl<'tcx> Engine<'tcx> {
         &mut self,
         body: &Body<'tcx>,
         arguments: &[Value],
-        incoming: &[Option<Value>],
+        incoming: &Memory,
     ) -> Result<State, String> {
+        if !incoming.missing_places.is_empty() {
+            return Err("inductive incoming storage has ownership consumption holes".into());
+        }
         if arguments.len() != body.arg_count {
             return Err("inductive arguments do not match MIR".into());
         }
         let mut used = UsedLocals(BTreeSet::new());
         used.visit_body(body);
         let mut state = State {
+            missing_places: initialized_places::MissingPlaces::default(),
             locals: Vec::new(),
             conditions: Vec::new(),
             addresses: vec![None; body.local_decls.len()],
@@ -439,7 +443,7 @@ impl<'tcx> Engine<'tcx> {
         &self,
         frame: &Frame<'tcx>,
         arguments: &[Value],
-        incoming: &[Option<Value>],
+        incoming: &Memory,
         mut captured: Vec<Term>,
     ) -> Result<Atom, String> {
         let mut state = frame.state.clone();

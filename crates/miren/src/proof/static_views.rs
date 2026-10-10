@@ -646,9 +646,14 @@ impl<'tcx> Engine<'tcx> {
         place: Place<'tcx>,
         value: &Value,
     ) -> Result<bool, String> {
-        let mut base = self.local(state, place.local.as_usize())?;
+        let mut base = self.raw_local(state, place.local.as_usize())?;
         for length in 0..=place.projection.len() {
             if matches!(base, Value::StaticView { .. }) {
+                let prefix = Place {
+                    local: place.local,
+                    projection: self.tcx.mk_place_elems(&place.projection[..length]),
+                };
+                self.check_place_initialization(state, prefix)?;
                 for projection in &place.projection[length..] {
                     base = self.static_view_projection(&base, *projection, state)?;
                 }

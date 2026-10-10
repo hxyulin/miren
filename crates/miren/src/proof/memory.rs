@@ -42,6 +42,11 @@ impl<'tcx> Engine<'tcx> {
     }
 
     pub(super) fn local(&self, state: &State, local: usize) -> Result<Value, String> {
+        self.check_local_initialization(state, local, &[])?;
+        self.raw_local(state, local)
+    }
+
+    pub(super) fn raw_local(&self, state: &State, local: usize) -> Result<Value, String> {
         let value = if let Some(allocation) = state.addresses[local] {
             state.memory.get(allocation).and_then(Option::as_ref)
         } else {
@@ -55,7 +60,7 @@ impl<'tcx> Engine<'tcx> {
     pub(super) fn snapshots(
         &self,
         values: &[Value],
-        memory: &[Option<Value>],
+        memory: &Memory,
         conditions: &[Term],
     ) -> Result<Vec<Value>, String> {
         values
@@ -67,7 +72,7 @@ impl<'tcx> Engine<'tcx> {
     pub(super) fn snapshot(
         &self,
         value: &Value,
-        memory: &[Option<Value>],
+        memory: &Memory,
         conditions: &[Term],
         depth: usize,
     ) -> Result<Value, String> {
@@ -102,20 +107,23 @@ impl<'tcx> Engine<'tcx> {
                 allocation,
                 bits,
                 signed,
-            } => match memory.get(*allocation).and_then(Option::as_ref) {
-                Some(
-                    Value::Int {
-                        bits: width,
-                        signed: sign,
-                        ..
-                    }
-                    | Value::Atomic {
-                        bits: width,
-                        signed: sign,
-                    },
-                ) if (*width, *sign) == (*bits, *signed) => Ok(value.clone()),
-                _ => Err("local atomic snapshot points to unavailable backing".into()),
-            },
+            } => {
+                memory.missing_places.check(*allocation, &[])?;
+                match memory.get(*allocation).and_then(Option::as_ref) {
+                    Some(
+                        Value::Int {
+                            bits: width,
+                            signed: sign,
+                            ..
+                        }
+                        | Value::Atomic {
+                            bits: width,
+                            signed: sign,
+                        },
+                    ) if (*width, *sign) == (*bits, *signed) => Ok(value.clone()),
+                    _ => Err("local atomic snapshot points to unavailable backing".into()),
+                }
+            }
             Value::TraitObject { source, .. } | Value::DebugReference { source, .. } => {
                 self.snapshot(source, memory, conditions, depth + 1)?;
                 Ok(value.clone())
@@ -186,7 +194,26 @@ impl<'tcx> Engine<'tcx> {
     pub(super) fn reference_value(
         &self,
         reference: &Value,
-        memory: &[Option<Value>],
+        memory: &Memory,
+        conditions: &[Term],
+    ) -> Result<Value, String> {
+        if let Value::Reference {
+            allocation,
+            projection,
+            ..
+        } = reference
+        {
+            memory
+                .check_projection_initialization(*allocation, projection)
+                .map_err(|reason| self.categorized_error(UnknownCategory::Semantics, reason))?;
+        }
+        self.reference_storage(reference, memory, conditions)
+    }
+
+    pub(super) fn reference_storage(
+        &self,
+        reference: &Value,
+        memory: &Memory,
         conditions: &[Term],
     ) -> Result<Value, String> {
         let Value::Reference {
@@ -198,7 +225,7 @@ impl<'tcx> Engine<'tcx> {
             return Err("expected an allocation reference".to_owned());
         };
         let location = StorageLocation::tracked(*allocation, *mutable);
-        let mut value = location.read(memory)?.clone();
+        let mut value = location.read_storage(memory)?.clone();
         let mut projections = projection.iter().peekable();
         while let Some(element) = projections.next() {
             if let MemoryProjection::Chunks { width, count } = element
@@ -538,12 +565,18 @@ impl<'tcx> Engine<'tcx> {
         let local = place.local.as_usize();
         let mut allocation = state.addresses[local];
         let mut path = Vec::new();
-        let mut value = self.local(state, local)?;
+        let mut value = self.raw_local(state, local)?;
         let mut writable = true;
         for projection in place.projection {
             value = value.materialize()?;
             match projection {
                 ProjectionElem::Deref => {
+                    let fields = initialized_places::field_footprint(&path).unwrap_or_default();
+                    if let Some(source) = allocation {
+                        state.memory.missing_places.check(source, &fields)?;
+                    } else {
+                        state.missing_places.check(local, &fields)?;
+                    }
                     if let Value::Reference {
                         allocation: target,
                         projection,
@@ -554,7 +587,7 @@ impl<'tcx> Engine<'tcx> {
                         path = projection;
                         // Every enclosing borrow must grant ordinary mutation rights.
                         writable &= mutable;
-                        value = self.reference_value(
+                        value = self.reference_storage(
                             &Value::Reference {
                                 allocation: target,
                                 projection: path.clone(),
@@ -910,8 +943,16 @@ impl<'tcx> Engine<'tcx> {
                 return Err("memory allocation budget reached".to_owned());
             }
             let allocation = state.memory.len();
-            let value = self.local(state, place.local.as_usize())?;
+            let value = self.raw_local(state, place.local.as_usize())?;
             state.memory.push(Some(value));
+            state
+                .missing_places
+                .transfer(
+                    place.local.as_usize(),
+                    allocation,
+                    &mut state.memory.missing_places,
+                )
+                .map_err(|reason| self.categorized_error(UnknownCategory::ResourceLimit, reason))?;
             state.addresses[place.local.as_usize()] = Some(allocation);
             allocation
         };
@@ -942,8 +983,10 @@ impl<'tcx> Engine<'tcx> {
         if place.projection.is_empty() {
             if let Some(allocation) = state.addresses[local] {
                 state.memory[allocation] = Some(value);
+                state.memory.missing_places.initialize(allocation, &[]);
             } else {
                 state.locals[local] = Some(value);
+                state.missing_places.initialize(local, &[]);
             }
             return Ok(());
         }
@@ -957,7 +1000,7 @@ impl<'tcx> Engine<'tcx> {
         let mut storage = if let Some(allocation) = allocation {
             let location = StorageLocation::tracked(allocation, writable);
             location.require_write(&state.memory)?;
-            location.read(&state.memory)?.clone()
+            location.read_storage(&state.memory)?.clone()
         } else {
             state.locals[local]
                 .clone()
@@ -966,8 +1009,14 @@ impl<'tcx> Engine<'tcx> {
         self.write_projection(&mut storage, &path, value, &state.conditions)?;
         if let Some(allocation) = allocation {
             state.memory[allocation] = Some(storage);
+            if let Some(fields) = initialized_places::field_footprint(&path) {
+                state.memory.missing_places.initialize(allocation, &fields);
+            }
         } else {
             state.locals[local] = Some(storage);
+            if let Some(fields) = initialized_places::field_footprint(&path) {
+                state.missing_places.initialize(local, &fields);
+            }
         }
         Ok(())
     }

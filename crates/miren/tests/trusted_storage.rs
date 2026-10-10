@@ -131,7 +131,6 @@ fn verify(
             proof.obligations
         );
         let diagnostic = match *name {
-            "retired_static_byte_stays_dead" => Some("overlaps retired uninitialized storage"),
             "out_of_bounds_static_byte" => Some("array read lacks a proven bounds check"),
             "dead_static_epoch_stays_dead" => Some("static storage view invalidated"),
             "oversized_static_array_is_unknown" => Some("128-element budget"),
@@ -456,7 +455,7 @@ fn static_validity_frame_preserves_only_live_typed_storage() {
                     ("static_byte_is_valid", P, true),
                     ("static_byte_is_not_zero", R, true),
                     ("static_byte_can_overflow", R, true),
-                    ("retired_static_byte_stays_dead", U, true),
+                    ("retired_static_byte_stays_dead", P, true),
                     ("out_of_bounds_static_byte", U, true),
                     ("static_precision_is_retired", R, true),
                     ("static_atomic_is_retired", R, true),

@@ -205,6 +205,7 @@ impl<'tcx> Engine<'tcx> {
                 return Err("custom slice equality needs fixed modeled element storage".into());
             };
             let state = State {
+                missing_places: initialized_places::MissingPlaces::default(),
                 conditions,
                 ..state.clone()
             };

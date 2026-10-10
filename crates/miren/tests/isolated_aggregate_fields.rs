@@ -151,10 +151,13 @@ fn isolated_actual_parent_values_support_typed_fields_and_updates() {
             "array_element_history_remains_unknown",
             ProofStatus::Unknown,
         ),
-        ("retired_child_is_unknown", ProofStatus::Unknown),
+        (
+            "retired_child_is_unknown",
+            ProofStatus::ProvedWithAssumptions,
+        ),
         (
             "retired_reference_in_parent_is_unknown",
-            ProofStatus::Unknown,
+            ProofStatus::ProvedWithAssumptions,
         ),
         (
             "matching_child_reinitialization_then_parent_store",
@@ -162,11 +165,11 @@ fn isolated_actual_parent_values_support_typed_fields_and_updates() {
         ),
         (
             "retirement_does_not_resurrect_sibling",
-            ProofStatus::Unknown,
+            ProofStatus::Refuted,
         ),
         (
             "whole_reinitialization_after_retirement",
-            ProofStatus::Unknown,
+            ProofStatus::ProvedWithAssumptions,
         ),
     ];
     for target in [None, Some("thumbv7em-none-eabihf")] {

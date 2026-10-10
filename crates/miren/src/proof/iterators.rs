@@ -606,7 +606,7 @@ impl<'tcx> Engine<'tcx> {
     fn validate_iterator_source(
         &self,
         source: &Value,
-        memory: &[Option<Value>],
+        memory: &Memory,
         conditions: &[Term],
     ) -> Result<bool, String> {
         // Retained finite views validate their parent without flattening the view.

@@ -163,7 +163,7 @@ impl<'tcx> Engine<'tcx> {
                         "PRIMASK write requires a compiler u32 general-register input".into(),
                     );
                 }
-                let value = self.operand(id, body, state, value)?;
+                let value = self.evaluate_operand(id, body, state, value)?;
                 if !matches!(
                     value,
                     Value::Int {

@@ -170,7 +170,7 @@ fn shared_pointer_loads_check_ordering_and_preserve_only_observed_address_bits()
         ),
         (
             "a_pointer_atomic_receiver_cannot_bypass_retirement",
-            ProofStatus::Unknown,
+            ProofStatus::Proved,
         ),
         (
             "user_load_methods_are_not_compiler_atomic_models",
@@ -266,7 +266,7 @@ fn explicit_startup_retains_pointer_address_bits_without_pointee_provenance() {
         ),
         (
             "a_pointer_atomic_receiver_cannot_bypass_retirement",
-            ProofStatus::Unknown,
+            ProofStatus::ProvedWithAssumptions,
         ),
         (
             "nonzero_numeric_initializers_do_not_grant_pointee_access",

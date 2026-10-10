@@ -1214,3 +1214,16 @@ pub fn pointer_bearing_enum_types_do_not_retain_startup_tags() {
     clear_pointer_option(OPTIONAL_POINTER.get().cast());
     assert!(sparse_tag(SPARSE_TAG.get()) == -9);
 }
+
+pub fn startup_no_drop_store_preserves_written_tag() {
+    let pointer = OPTIONAL_WORD.get();
+    retire_optional_word(pointer);
+    set_optional_value(pointer, Some(6));
+    assert!(optional_word_tag(pointer) == 1);
+}
+
+#[cfg(test)]
+#[test]
+fn native_no_drop_store_preserves_written_tag() {
+    startup_no_drop_store_preserves_written_tag();
+}

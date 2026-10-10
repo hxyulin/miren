@@ -866,3 +866,34 @@ resolve to their exact compiler vtable Item and execute actual available MIR. Th
 associated-type bounds, chained and second-supertrait upcasts and existing mutable receiver
 rights; it supplies no arbitrary trait-object input, physical vtable or raw pointer capability.
 Missing method bodies and dead or escaping backing storage remain UNKNOWN.
+
+Ownership consumption has a bounded initialized-place ledger carried with memory across calls and
+branches. Actual operands consume owned locals and exact active fields in evaluation order; later
+loads or borrows of those places remain UNKNOWN until an exact write repairs them. Sibling places
+and allocation identity survive, and moving a reference handle does not consume its target.
+Assignment Move handling is a conservative compiler initialization boundary: the pinned compiler
+leaves its physical deinitialization effect unsettled. Drop consumes storage only after an actual
+normal destructor return; compiler-elaborated drops of types without drop glue remain no-ops.
+An authenticated retained enum tag remains observable after exact payload consumption, including
+niche-encoded enums. This logical tag observation preserves payload masks; whole or ancestor
+consumption, payload loads and malformed nominal metadata remain UNKNOWN.
+
+Compiler coroutine state and original saved-field mappings govern active storage independently of
+retained historical payloads. State updates preserve initialization masks. Exact tracked coroutine,
+Pin, and compiler PinMacroHelper observations validate active fields and preserve source rights;
+ordinary partial aggregates receive no exemption. Ghost snapshots detach active values and scrub
+consumed inactive fields to unavailable markers, so pre-state bindings cannot observe later writes.
+Typed reference returns retain their original caller-owned allocation and validate active reference
+edges. Whole future or owned helper moves and returns with initialization holes remain UNKNOWN.
+
+Calls capture their destination before the function operand and ordered arguments. Definite or
+unresolved same-storage Move input overlap with a call's return place remains UNKNOWN under the
+pinned compiler's unresolved alias contract; ordinary Rust reassignment through distinct return
+temporaries remains supported. Induction can omit an unaddressed private temporary's consumed
+footprint only after an exact bounded scan proves no observation before a covering assignment.
+Arguments, return storage and addressed memory remain strict at inductive continuations; storage
+markers do not repair masks. A terminal return can preserve consumed, unaddressed by-value argument
+masks for an exact reference-free, Freeze, no-drop primitive or plain local product type. It
+validates
+the returned value and never encodes the consumed callee locals into a successor state. Entry ghosts
+remain immutable, while current post-state argument observations still require initialization.

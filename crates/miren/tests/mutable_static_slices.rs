@@ -103,12 +103,6 @@ fn verify(
         );
         let diagnostic = match *name {
             "ambiguous_index" => Some("non-scalar array index is not uniquely determined"),
-            "retired_parent_before_none_is_unknown"
-            | "retired_parent_before_escape_is_unknown"
-            | "retired_parent_before_exhausted_next_is_unknown" => {
-                Some("overlaps retired uninitialized storage")
-            }
-            "retired_empty_before_none_is_unknown" => Some("zero-sized static drops"),
             "oversized_array_is_unknown" => Some("128-element budget"),
             "wrong_element_is_unknown" => Some("exact whole mutable byte array"),
             "mutable_iterator_is_unknown" => Some("mutable static slice iterators remain"),
@@ -209,8 +203,8 @@ fn mutable_static_byte_slices_retain_exact_rights_and_parent_validity() {
         ("empty_returns_none", P, true),
         ("uniquely_guarded_index", P, true),
         ("ambiguous_index", U, true),
-        ("retired_parent_before_none_is_unknown", U, true),
-        ("retired_empty_before_none_is_unknown", U, true),
+        ("retired_parent_before_none_is_unknown", P, true),
+        ("retired_empty_before_none_is_unknown", P, true),
         ("oversized_array_is_unknown", U, true),
         ("wrong_element_is_unknown", U, true),
         ("mutable_iterator_is_unknown", U, true),
@@ -227,8 +221,8 @@ fn mutable_static_byte_slices_retain_exact_rights_and_parent_validity() {
         ("numeric_array_cannot_unsize_mutable", U, true),
         ("dead_epoch_before_none_is_unknown", U, true),
         ("dead_empty_epoch_before_none_is_unknown", U, true),
-        ("retired_parent_before_escape_is_unknown", U, true),
-        ("retired_parent_before_exhausted_next_is_unknown", U, true),
+        ("retired_parent_before_escape_is_unknown", P, true),
+        ("retired_parent_before_exhausted_next_is_unknown", P, true),
         ("forged_shared_tuple_write_is_unknown", U, true),
     ];
     for target in [None, Some("thumbv7em-none-eabihf")] {

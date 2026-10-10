@@ -35,7 +35,9 @@ mod characters;
 mod closure_captures;
 mod composite_slices;
 mod constants;
+mod coroutine_snapshots;
 mod coroutines;
+mod enum_tags;
 mod enum_transmutes;
 mod error_formatting;
 mod external;
@@ -44,6 +46,7 @@ mod foreign_calls;
 mod function_pointers;
 mod hardware;
 mod induction;
+mod initialized_places;
 mod input_references;
 mod input_reservations;
 mod inputs;
@@ -96,6 +99,7 @@ mod zeroed_storage;
 #[derive(Clone)]
 struct State {
     locals: Vec<Option<Value>>,
+    missing_places: initialized_places::MissingPlaces,
     conditions: Vec<Term>,
     addresses: Vec<Option<usize>>,
     memory: Memory,
@@ -105,6 +109,7 @@ impl State {
     fn continuation(&self, conditions: Vec<Term>, memory: Memory) -> Self {
         Self {
             locals: self.locals.clone(),
+            missing_places: self.missing_places.clone(),
             addresses: self.addresses.clone(),
             conditions,
             memory,
@@ -164,6 +169,8 @@ struct Engine<'tcx> {
     limits: miren::AnalysisLimits,
     resolved_contracts: BTreeMap<String, DefId>,
     solver: std::cell::RefCell<Solver>,
+    coroutine_places:
+        std::cell::RefCell<Vec<(std::rc::Weak<Body<'tcx>>, coroutines::OriginalPlace<'tcx>)>>,
     bodies:
         std::cell::RefCell<std::collections::HashMap<ty::Instance<'tcx>, std::rc::Rc<Body<'tcx>>>>,
     call_signatures:
@@ -232,6 +239,7 @@ pub fn verify(
         limits,
         resolved_contracts: BTreeMap::new(),
         solver: std::cell::RefCell::new(Solver::with_limits(limits)),
+        coroutine_places: Default::default(),
         bodies: std::cell::RefCell::new(std::collections::HashMap::new()),
         call_signatures: std::cell::RefCell::new(std::collections::HashMap::new()),
         proof: Proof {
@@ -1024,8 +1032,22 @@ impl<'tcx> Engine<'tcx> {
                 ty::EarlyBinder::bind(self.tcx, self.tcx.instance_mir(instance.def).clone()),
             )
             .map_err(|error| format!("MIR substitution failed: {error:?}"))?;
-        self.flatten_coroutine_places(&mut body)?;
+        let original_places = self.flatten_coroutine_places(&mut body)?;
         let body = std::rc::Rc::new(body);
+        let owner = std::rc::Rc::downgrade(&body);
+        let mut places = self.coroutine_places.borrow_mut();
+        if places.len() + original_places.len() > MAX_INPUT_VALUES {
+            return Err(self.categorized_error(
+                UnknownCategory::ResourceLimit,
+                "original coroutine place certificates exceed the 512-node limit".into(),
+            ));
+        }
+        places.extend(
+            original_places
+                .into_iter()
+                .map(|place| (owner.clone(), place)),
+        );
+        drop(places);
         let mut bodies = self.bodies.borrow_mut();
         if bodies.len() >= 128 {
             bodies.clear();
@@ -1089,7 +1111,12 @@ impl<'tcx> Engine<'tcx> {
                 &conditions,
             )?;
         }
-        let snapshots = self.snapshots(&arguments, &memory, &conditions)?;
+        let argument_types: Vec<_> = body
+            .args_iter()
+            .map(|local| body.local_decls[local].ty)
+            .collect();
+        let snapshots =
+            self.typed_coroutine_snapshots(&argument_types, &arguments, &memory, &conditions)?;
         let contracts = self.configured_contracts(instance)?;
         let binds_contract_names = contracts
             .iter()
@@ -1118,6 +1145,7 @@ impl<'tcx> Engine<'tcx> {
         }
         let mut state = State {
             locals: vec![None; body.local_decls.len()],
+            missing_places: initialized_places::MissingPlaces::default(),
             conditions,
             addresses: vec![None; body.local_decls.len()],
             memory,
@@ -1186,7 +1214,7 @@ impl<'tcx> Engine<'tcx> {
                     queue.push_back((*target, state, retry_path.clone()))
                 }
                 TerminatorKind::SwitchInt { discr, targets } => {
-                    let value = self.operand(id, body, &state, discr)?;
+                    let value = self.evaluate_operand(id, body, &mut state, discr)?;
                     let mut excluded = Vec::new();
                     for (number, target) in targets.iter() {
                         let condition = match &value {
@@ -1220,7 +1248,9 @@ impl<'tcx> Engine<'tcx> {
                     ..
                 } => {
                     if !msg.is_optional_overflow_check() || self.tcx.sess.overflow_checks() {
-                        let condition = self.operand(id, body, &state, cond)?.boolean()?;
+                        let condition = self
+                            .evaluate_operand(id, body, &mut state, cond)?
+                            .boolean()?;
                         let safe = if *expected {
                             condition
                         } else {
@@ -1239,6 +1269,10 @@ impl<'tcx> Engine<'tcx> {
                     queue.push_back((*target, state, retry_path.clone()));
                 }
                 TerminatorKind::Return => {
+                    self.check_place_initialization(
+                        &state,
+                        Place::from(rustc_middle::mir::RETURN_PLACE),
+                    )?;
                     let value = if body.return_ty().is_unit() {
                         Value::Unit
                     } else {
@@ -1255,16 +1289,26 @@ impl<'tcx> Engine<'tcx> {
                         self.prove_scalar_target(body.return_ty(), &value, &state.conditions)?;
                     }
                     self.validate_mutable_handle_rights(body.return_ty(), &value)?;
-                    self.validate_closure_escape(
+                    let coroutine_transport = self.validate_coroutine_transport_return(
                         body.return_ty(),
                         &value,
                         &state,
                         incoming_allocations,
                     )?;
-                    self.validate_frame_escape(&value, &state, incoming_allocations)
-                        .map_err(|error| {
-                            format!("return from {}: {error}", self.tcx.def_path_str(id))
-                        })?;
+                    if coroutine_transport {
+                        self.validate_incoming_frame_escape(&state, incoming_allocations)?;
+                    } else {
+                        self.validate_closure_escape(
+                            body.return_ty(),
+                            &value,
+                            &state,
+                            incoming_allocations,
+                        )?;
+                        self.validate_frame_escape(&value, &state, incoming_allocations)
+                            .map_err(|error| {
+                                format!("return from {}: {error}", self.tcx.def_path_str(id))
+                            })?;
+                    }
                     let mut post_bindings = bindings.clone();
                     let uses_post_state = contracts
                         .iter()
@@ -1278,8 +1322,12 @@ impl<'tcx> Engine<'tcx> {
                             .args_iter()
                             .map(|local| self.local(&state, local.as_usize()))
                             .collect::<Result<Vec<_>, _>>()?;
-                        let final_snapshots =
-                            self.snapshots(&final_arguments, &state.memory, &state.conditions)?;
+                        let final_snapshots = self.typed_coroutine_snapshots(
+                            &argument_types,
+                            &final_arguments,
+                            &state.memory,
+                            &state.conditions,
+                        )?;
                         for (name, value) in
                             self.configured_bindings(body, &final_snapshots, instance)?
                         {
@@ -1292,7 +1340,13 @@ impl<'tcx> Engine<'tcx> {
                     {
                         post_bindings.insert(
                             "result".to_owned(),
-                            self.snapshot(&value, &state.memory, &state.conditions, 0)?,
+                            self.typed_coroutine_snapshots(
+                                &[body.return_ty()],
+                                std::slice::from_ref(&value),
+                                &state.memory,
+                                &state.conditions,
+                            )?
+                            .remove(0),
                         );
                     }
                     for contract in &contracts {
@@ -1312,7 +1366,11 @@ impl<'tcx> Engine<'tcx> {
                             )?;
                         }
                     }
-                    let value = self.return_value(value, &state, incoming_allocations)?;
+                    let value = if coroutine_transport {
+                        value
+                    } else {
+                        self.return_value(value, &state, incoming_allocations)?
+                    };
                     for allocation in state.addresses.iter().flatten() {
                         state.memory[*allocation] = None;
                     }
@@ -1329,13 +1387,34 @@ impl<'tcx> Engine<'tcx> {
                     target,
                     ..
                 } => {
+                    let destination_indices =
+                        self.capture_call_destination(body, &state, *destination)?;
+                    self.reject_call_move_overlap(
+                        body,
+                        &state,
+                        *destination,
+                        destination_indices.as_ref(),
+                        func,
+                    )?;
+                    for argument in args {
+                        self.reject_call_move_overlap(
+                            body,
+                            &state,
+                            *destination,
+                            destination_indices.as_ref(),
+                            &argument.node,
+                        )?;
+                    }
                     let callable_ty = func.ty(&body.local_decls, self.tcx);
                     let instance = match *callable_ty.kind() {
                         ty::FnDef(callee, generic_args) => {
+                            if !matches!(func, Operand::Constant(_)) {
+                                self.evaluate_operand(id, body, &mut state, func)?;
+                            }
                             self.resolve_function_item(callee, generic_args.skip_binder())?
                         }
                         ty::FnPtr(..) => {
-                            let value = self.operand(id, body, &state, func)?;
+                            let value = self.evaluate_operand(id, body, &mut state, func)?;
                             self.known_function_pointer(&value, callable_ty)?
                         }
                         _ => return Err("unresolved indirect call".to_owned()),
@@ -1356,10 +1435,8 @@ impl<'tcx> Engine<'tcx> {
                     }
                     let mut values = args
                         .iter()
-                        .map(|arg| self.operand(id, body, &state, &arg.node))
+                        .map(|arg| self.evaluate_operand(id, body, &mut state, &arg.node))
                         .collect::<Result<Vec<_>, _>>()?;
-                    let destination_indices =
-                        self.capture_call_destination(body, &state, *destination)?;
                     let fn_trait = [LangItem::Fn, LangItem::FnMut, LangItem::FnOnce]
                         .iter()
                         .any(|item| {
@@ -1498,8 +1575,16 @@ impl<'tcx> Engine<'tcx> {
                         queue.push_back((target, state, retry_path.clone()));
                         continue;
                     }
-                    let modeled_values =
-                        self.snapshots(&values, &state.memory, &state.conditions)?;
+                    let argument_types: Vec<_> = args
+                        .iter()
+                        .map(|arg| arg.node.ty(&body.local_decls, self.tcx))
+                        .collect();
+                    let modeled_values = self.typed_coroutine_snapshots(
+                        &argument_types,
+                        &values,
+                        &state.memory,
+                        &state.conditions,
+                    )?;
                     if !configured
                         && let Some(value) = self.interior_call(
                             instance,
@@ -1607,7 +1692,17 @@ impl<'tcx> Engine<'tcx> {
                 }
                 TerminatorKind::Drop { place, target, .. } => {
                     let ty = place.ty(&body.local_decls, self.tcx).ty;
-                    let dropped = self.place(&state, *place);
+                    if !ty.needs_drop(self.tcx, ty::TypingEnv::fully_monomorphized()) {
+                        queue.push_back((*target, state, retry_path.clone()));
+                        continue;
+                    }
+                    let coroutine_argument =
+                        self.borrow_coroutine_carrier(body, &state, *place, true)?;
+                    let dropped = if coroutine_argument.is_some() {
+                        Ok(Value::Unit)
+                    } else {
+                        self.place(&state, *place)
+                    };
                     if !place.projection.is_empty() && dropped.is_err() {
                         dropped?;
                     } else if let Ok(value) = dropped
@@ -1619,7 +1714,25 @@ impl<'tcx> Engine<'tcx> {
                     if ty.needs_drop(self.tcx, ty::TypingEnv::fully_monomorphized())
                         && !self.is_owned_no_drop_iterator(ty)
                     {
-                        let argument = self.borrow(&mut state, *place, true)?;
+                        let argument = if let Some(value) = coroutine_argument {
+                            value
+                        } else {
+                            self.borrow(&mut state, *place, true)?
+                        };
+                        let Value::Reference {
+                            allocation: drop_allocation,
+                            projection,
+                            ..
+                        } = &argument
+                        else {
+                            return Err(
+                                "destructor consumption requires retained tracked storage".into()
+                            );
+                        };
+                        let drop_fields = initialized_places::field_footprint(projection).ok_or(
+                            "destructor consumption requires an exact fixed field footprint",
+                        )?;
+                        let drop_allocation = *drop_allocation;
                         let instance = ty::Instance::resolve_drop_glue(self.tcx, ty);
                         let results = self.call_instance(
                             instance,
@@ -1632,6 +1745,13 @@ impl<'tcx> Engine<'tcx> {
                         for result in results {
                             let mut continuation =
                                 state.continuation(result.conditions, result.memory);
+                            continuation
+                                .memory
+                                .missing_places
+                                .consume(drop_allocation, drop_fields.clone())
+                                .map_err(|reason| {
+                                    self.categorized_error(UnknownCategory::ResourceLimit, reason)
+                                })?;
                             if place.projection.is_empty() {
                                 if let Some(allocation) =
                                     continuation.addresses[place.local.as_usize()].take()
@@ -1669,7 +1789,7 @@ impl<'tcx> Engine<'tcx> {
         match statement {
             StatementKind::Intrinsic(intrinsic) => match intrinsic.as_ref() {
                 rustc_middle::mir::NonDivergingIntrinsic::Assume(operand) => {
-                    let safe = self.operand(id, body, state, operand)?.boolean()?;
+                    let safe = self.evaluate_operand(id, body, state, operand)?.boolean()?;
                     self.require(
                         id,
                         self.tcx.def_span(id),
@@ -1695,6 +1815,7 @@ impl<'tcx> Engine<'tcx> {
                 variant_index,
             } => self.set_coroutine_state(body, state, **place, variant_index.as_usize()),
             StatementKind::StorageLive(local) | StatementKind::StorageDead(local) => {
+                state.missing_places.initialize(local.as_usize(), &[]);
                 if let Some(allocation) = state.addresses[local.as_usize()].take() {
                     state.memory[allocation] = None;
                 }
@@ -1767,7 +1888,43 @@ impl<'tcx> Engine<'tcx> {
         place: Place<'tcx>,
         body: Option<&Body<'tcx>>,
     ) -> Result<Value, String> {
-        let mut value = self.local(state, place.local.as_usize())?;
+        self.check_place_initialization(state, place)?;
+        let mut value = self.raw_local(state, place.local.as_usize())?;
+        if let [ProjectionElem::Deref, suffix @ ..] = place.projection.as_ref()
+            && !suffix.is_empty()
+            && suffix.iter().all(|part| {
+                matches!(
+                    part,
+                    ProjectionElem::Field(..) | ProjectionElem::Downcast(..)
+                )
+            })
+            && let Value::Reference {
+                allocation,
+                projection,
+                mutable,
+            } = &value
+        {
+            let mut path = projection.clone();
+            path.extend(suffix.iter().filter_map(|part| match part {
+                ProjectionElem::Field(field, _) => {
+                    Some(symbolic::MemoryProjection::Field(field.as_usize()))
+                }
+                ProjectionElem::Downcast(_, variant) => {
+                    Some(symbolic::MemoryProjection::Variant(variant.as_usize()))
+                }
+                _ => None,
+            }));
+            let value = self.reference_value(
+                &Value::Reference {
+                    allocation: *allocation,
+                    projection: path,
+                    mutable: *mutable,
+                },
+                &state.memory,
+                &state.conditions,
+            )?;
+            return self.finish_place(state, value);
+        }
         for (position, projection) in place.projection.iter().enumerate() {
             if let (Some(body), ProjectionElem::Index(index)) = (body, projection)
                 && let Value::Elements(elements) = value.clone().materialize()?
@@ -2089,7 +2246,7 @@ impl<'tcx> Engine<'tcx> {
                 let value = if let Some(value) = narrowed {
                     value
                 } else {
-                    self.operand(id, body, state, operand)?
+                    self.evaluate_operand(id, body, state, operand)?
                 };
                 if matches!(value, Value::StaticView { .. }) {
                     self.record_model(
@@ -2100,6 +2257,9 @@ impl<'tcx> Engine<'tcx> {
                 Ok(value)
             }
             Rvalue::Ref(_, BorrowKind::Shared, place) => {
+                if let Some(value) = self.borrow_coroutine_carrier(body, state, *place, false)? {
+                    return Ok(value);
+                }
                 if let Some((ProjectionElem::Deref, prefix)) = place.projection.split_last() {
                     let base = Place {
                         local: place.local,
@@ -2127,7 +2287,18 @@ impl<'tcx> Engine<'tcx> {
                     Err(error) => Err(error),
                 }
             }
-            Rvalue::Ref(_, BorrowKind::Mut { .. }, place) => self.borrow(state, *place, true),
+            Rvalue::Ref(_, BorrowKind::Mut { .. }, place) => {
+                if let Some(value) = self.borrow_coroutine_carrier(body, state, *place, true)? {
+                    Ok(value)
+                } else {
+                    self.borrow(state, *place, true).map_err(|reason| {
+                        format!(
+                            "mutable borrow of compiler type {:?}: {reason}",
+                            place.ty(&body.local_decls, self.tcx).ty
+                        )
+                    })
+                }
+            }
             Rvalue::RawPtr(
                 kind @ (rustc_middle::mir::RawPtrKind::Const | rustc_middle::mir::RawPtrKind::Mut),
                 place,
@@ -2181,6 +2352,18 @@ impl<'tcx> Engine<'tcx> {
                     .integer_type(value.ty(&body.local_decls, self.tcx))
                     .ok_or("unsupported discriminant type")?;
                 let ty = place.ty(&body.local_decls, self.tcx).ty;
+                if ty.is_coroutine()
+                    && let Some(reference) =
+                        self.borrow_coroutine_carrier(body, state, *place, false)?
+                    && let Value::Adt { discriminant, .. } =
+                        self.reference_storage(&reference, &state.memory, &state.conditions)?
+                {
+                    return Ok(symbolic::integer(&self.terms, discriminant, bits, signed));
+                }
+                if let Some(tag) = self.retained_enum_tag(body, state, *place, bits, signed)? {
+                    return Ok(tag);
+                }
+                self.check_place_initialization(state, *place)?;
                 let modeled = self.place(state, *place);
                 if let Ok(modeled) = &modeled
                     && let Some(tag) =
@@ -2224,8 +2407,8 @@ impl<'tcx> Engine<'tcx> {
                 }
             }
             Rvalue::BinaryOp(operation, operands) => {
-                let left = self.operand(id, body, state, &operands.0)?;
-                let right = self.operand(id, body, state, &operands.1)?;
+                let left = self.evaluate_operand(id, body, state, &operands.0)?;
+                let right = self.evaluate_operand(id, body, state, &operands.1)?;
                 if *operation == BinOp::Offset {
                     let source = operands.0.ty(&body.local_decls, self.tcx);
                     if let Some(value) =
@@ -2322,7 +2505,7 @@ impl<'tcx> Engine<'tcx> {
                 Ok(self.materialize_float(value))
             }
             Rvalue::UnaryOp(operation, operand) => {
-                let value = self.operand(id, body, state, operand)?;
+                let value = self.evaluate_operand(id, body, state, operand)?;
                 let value = if matches!(operation, UnOp::PtrMetadata) {
                     self.snapshot(&value, &state.memory, &state.conditions, 0)?
                         .materialize()?
@@ -2394,7 +2577,7 @@ impl<'tcx> Engine<'tcx> {
                 target,
             ) => {
                 let source = operand.ty(&body.local_decls, self.tcx);
-                let value = self.operand(id, body, state, operand)?;
+                let value = self.evaluate_operand(id, body, state, operand)?;
                 if matches!(value, Value::StaticView { .. }) {
                     if *kind == CastKind::PointerExposeProvenance {
                         self.record_model(
@@ -2433,7 +2616,7 @@ impl<'tcx> Engine<'tcx> {
                 Ok(value)
             }
             Rvalue::Cast(CastKind::IntToInt, operand, target) => {
-                let value = self.operand(id, body, state, operand)?;
+                let value = self.evaluate_operand(id, body, state, operand)?;
                 let (bits, signed) = self
                     .integer_type(*target)
                     .ok_or("unsupported cast target")?;
@@ -2442,7 +2625,7 @@ impl<'tcx> Engine<'tcx> {
             Rvalue::Cast(CastKind::IntToFloat | CastKind::FloatToFloat, operand, target) => {
                 let value = symbolic::float_cast(
                     &self.terms,
-                    self.operand(id, body, state, operand)?,
+                    self.evaluate_operand(id, body, state, operand)?,
                     self.float_type(*target)
                         .ok_or("unsupported float cast target")?,
                 )?;
@@ -2450,7 +2633,7 @@ impl<'tcx> Engine<'tcx> {
             }
             Rvalue::Cast(CastKind::Transmute, operand, target) => {
                 let source = operand.ty(&body.local_decls, self.tcx);
-                let value = self.operand(id, body, state, operand)?;
+                let value = self.evaluate_operand(id, body, state, operand)?;
                 if let Some(value) =
                     self.char_transmute(source, *target, &value, &state.conditions)?
                 {
@@ -2594,14 +2777,14 @@ impl<'tcx> Engine<'tcx> {
                     .ok_or("unsupported cast target")?;
                 symbolic::cast(
                     &self.terms,
-                    self.operand(id, body, state, operand)?,
+                    self.evaluate_operand(id, body, state, operand)?,
                     bits,
                     signed,
                 )
             }
             Rvalue::Cast(CastKind::PointerCoercion(kind, _), operand, target) => {
                 if self.is_shared_debug_reference(*target) {
-                    let value = self.operand(id, body, state, operand)?;
+                    let value = self.evaluate_operand(id, body, state, operand)?;
                     let value = self.debug_reference_coercion(
                         *kind,
                         operand.ty(&body.local_decls, self.tcx),
@@ -2613,18 +2796,19 @@ impl<'tcx> Engine<'tcx> {
                     return Ok(value);
                 }
                 if matches!(target.kind(), ty::FnPtr(..)) {
+                    self.evaluate_operand(id, body, state, operand)?;
                     return self.reify_function_pointer(
                         *kind,
                         operand.ty(&body.local_decls, self.tcx),
                         *target,
                     );
                 }
-                let value = self.operand(id, body, state, operand)?;
+                let value = self.evaluate_operand(id, body, state, operand)?;
                 if let Some(value) = self.trait_object_coercion(
                     *kind,
                     operand.ty(&body.local_decls, self.tcx),
                     *target,
-                    value,
+                    value.clone(),
                     state,
                 )? {
                     self.record_model(id, "concrete compiler vtable dispatch");
@@ -2636,7 +2820,6 @@ impl<'tcx> Engine<'tcx> {
                 let ty::Slice(element) = element.kind() else {
                     return Err("only slice coercions are modeled".to_owned());
                 };
-                let value = self.operand(id, body, state, operand)?;
                 if matches!(value, Value::StaticView { .. }) {
                     let value = self.coerce_static_slice(
                         operand.ty(&body.local_decls, self.tcx),
@@ -2687,7 +2870,7 @@ impl<'tcx> Engine<'tcx> {
                 Ok(Value::Tuple(
                     fields
                         .iter()
-                        .map(|field| self.operand(id, body, state, field))
+                        .map(|field| self.evaluate_operand(id, body, state, field))
                         .collect::<Result<_, _>>()?,
                 ))
             }

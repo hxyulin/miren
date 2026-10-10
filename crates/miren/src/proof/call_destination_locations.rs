@@ -10,6 +10,17 @@ pub(super) struct CapturedTrackedDestination<'tcx> {
     path: Vec<MemoryProjection>,
 }
 
+impl CapturedTrackedDestination<'_> {
+    pub(super) fn overlaps_owned_source(
+        &self,
+        allocation: usize,
+        fields: &[initialized_places::Step],
+    ) -> bool {
+        self.location == StorageLocation::tracked(allocation, true)
+            && initialized_places::overlaps_destination(fields, &self.path)
+    }
+}
+
 impl<'tcx> Engine<'tcx> {
     pub(super) fn capture_tracked_call_destination(
         &self,

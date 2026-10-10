@@ -1633,6 +1633,50 @@ pub fn char_niche_slice_missing_body(values: &[Option<char>], index: usize) -> c
     '\0'
 }
 
+pub struct OwnedMovePacket {
+    word: u16,
+}
+
+#[inline(never)]
+fn owned_move_selected(value: OwnedMovePacket) -> u16 {
+    value.word
+}
+
+pub fn owned_move(word: u16) {
+    assert!(owned_move_selected(OwnedMovePacket { word }) == word);
+}
+
+pub fn owned_move_wrong_claim(word: u16) {
+    assert!(owned_move_selected(OwnedMovePacket { word }) == word.wrapping_add(1));
+}
+
+// Unsupported stale-load sequence is analyzer-only and never executed natively.
+#[cfg(not(test))]
+mod owned_move_analyzer_only {
+    use super::*;
+    use core::intrinsics::mir::*;
+
+    #[custom_mir(dialect = "runtime", phase = "optimized")]
+    pub fn stale(value: OwnedMovePacket) -> u16 {
+        mir! {
+            let ignored: u16;
+            {
+                Call(ignored = owned_move_selected(Move(value)),
+                    ReturnTo(done), UnwindUnreachable())
+            }
+            done = {
+                RET = value.word;
+                Return()
+            }
+        }
+    }
+}
+
+#[cfg(not(test))]
+pub fn owned_move_stale(word: u16) {
+    assert!(owned_move_analyzer_only::stale(OwnedMovePacket { word }) == word);
+}
+
 trait UpcastParent {
     fn selected(&self) -> u8;
 }
@@ -1706,6 +1750,19 @@ mod native {
         nominal_enum_slice_wrong_claim(&[
             NominalTaggedReading::Data(NominalTaggedRecord { left: 3, right: 7 }),
         ], 0);
+    }
+
+    #[test]
+    fn owned_move_controls() {
+        for word in [0, 1, 19, u16::MAX] {
+            owned_move(word);
+        }
+    }
+
+    #[test]
+    #[should_panic]
+    fn owned_move_wrong_claim_panics() {
+        owned_move_wrong_claim(19);
     }
 
     #[test]

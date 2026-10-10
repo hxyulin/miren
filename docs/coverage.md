@@ -1841,3 +1841,35 @@ historical dedicated, compiler vtable, omitted-dependency and native evidence re
 original binary scope. No assumptions, input caps or increased resource budgets are introduced.
 Stage 181 integrates after actual Stage 179 commit `eebf727`; ownership Stage 180 remains a
 separate implementation rather than an implicit part of this validated snapshot.
+
+
+Stage 180 adds a bounded initialization ledger for owned moves and actual drop calls. Exact
+writes repair only the covered place; sibling fields remain available. Stale reads, consumed
+returns and unresolved overlap between a moved call input and return storage remain UNKNOWN.
+Compiler-certified coroutine projections preserve this ledger across suspensions. Detached
+observation snapshots retain initialized active fields without restoring consumed storage.
+Induction omits private consumed temporaries only when the exact future MIR proves no read
+before a covering write. Arguments, addressed storage and tracked memory remain strict.
+This is a supported semantic boundary, not a theorem that every rejected move causes a panic.
+
+Retained nominal enum tags may be observed after a deeper payload move; whole-value and
+ancestor consumption still refuse. Exact no-drop MIR Drop is a no-op without observing storage.
+Inductive terminal returns may retain consumed unaddressed by-value argument masks only for
+bounded original reference-free types. They never become successor states or final bindings.
+
+
+Final corrected validation passes all 737 Rust tests and 68 Python tests. Formatting, lint,
+debug/release builds, cargo deny, documentation and manual hooks pass. All 777 tracked main files
+match the isolated source byte for byte. Fresh main builds and 98 relevant Rust tests pass.
+Both frozen surveys yield 236 PROVED, 212 REFUTED and 160 UNKNOWN at
+`/tmp/miren-stage180-upkeep-capabilities-20261010` and
+`/tmp/miren-stage180-upkeep-merged-capabilities-20261010`. All 440 previously completed parent
+roots retain identical outcomes, obligation details and query text. All 608 main/isolate outcomes,
+queries, models and premises match, with no diagnostic context differences. Source, input and
+release hashes are verified. Initial and repaired failing full runs remain historical evidence;
+the final passing run is `/tmp/miren-stage180-upkeep-checks`. Independent source, terminal,
+retained-tag and no-drop upkeep reviews approve the bounded changes. Current dedicated/global
+captures remain at `/tmp/miren-stage180-repair-final-evidence` and
+`/tmp/miren-stage180-repair-global-final-evidence`; their recorded binary scopes are preserved.
+The combined manifest contains 152 cases in 52 families. No assumptions, input caps, firmware
+rewrites or increased resource budgets are introduced.

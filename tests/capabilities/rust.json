@@ -824,6 +824,23 @@
       "expected": "unknown",
       "unknown_reason": "no compiler-exported Rust definition matches the foreign symbol",
       "unknown_category": "missing_compiler_evidence"
+    },
+    {
+      "entry": "owned_move",
+      "family": "owned_move",
+      "expected": "proved"
+    },
+    {
+      "entry": "owned_move_wrong_claim",
+      "family": "owned_move",
+      "expected": "refuted"
+    },
+    {
+      "entry": "owned_move_stale",
+      "family": "owned_move",
+      "expected": "unknown",
+      "unknown_reason": "place initialization is unavailable after ownership consumption",
+      "unknown_category": "semantics"
     }
   ]
 }

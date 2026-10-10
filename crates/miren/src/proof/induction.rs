@@ -4,7 +4,9 @@ use rustc_middle::mir::BasicBlock;
 use std::collections::BTreeSet;
 
 mod enums;
+mod initialization;
 mod ranges;
+mod returns;
 mod slices;
 mod storage;
 mod templates;
@@ -15,6 +17,77 @@ const MAX_BLOCKS: usize = 256;
 const MAX_STATE_VALUES: usize = 512;
 
 impl<'tcx> Engine<'tcx> {
+    fn omit_dead_loop_temporaries(
+        &self,
+        body: &Body<'tcx>,
+        state: &mut State,
+        block: BasicBlock,
+        before_terminator: bool,
+    ) -> Result<(), String> {
+        if state.missing_places.is_empty() && state.memory.missing_places.is_empty() {
+            return Ok(());
+        }
+        self.omit_proven_dead_temporaries(body, state, block, before_terminator)?;
+        if !state.missing_places.is_empty() || !state.memory.missing_places.is_empty() {
+            return Err(self.categorized_error(
+                UnknownCategory::Semantics,
+                "inductive continuation retains unavailable consumed storage".into(),
+            ));
+        }
+        Ok(())
+    }
+
+    fn omit_proven_dead_temporaries(
+        &self,
+        body: &Body<'tcx>,
+        state: &mut State,
+        block: BasicBlock,
+        before_terminator: bool,
+    ) -> Result<(), String> {
+        use rustc_mir_dataflow::Analysis;
+        let mut live = rustc_mir_dataflow::impls::MaybeLiveLocals
+            .iterate_to_fixpoint(self.tcx, body, None)
+            .into_results_cursor(body);
+        let start = if before_terminator {
+            live.seek_after_primary_effect(body.terminator_loc(block));
+            body.terminator_loc(block)
+        } else {
+            live.seek_to_block_start(block);
+            rustc_middle::mir::Location {
+                block,
+                statement_index: 0,
+            }
+        };
+        let mut removable = Vec::new();
+        for (owner, path) in state.missing_places.entries() {
+            if *owner <= body.arg_count
+                || state.addresses.get(*owner) != Some(&None)
+                || (path.is_empty()
+                    && live
+                        .get()
+                        .contains(rustc_middle::mir::Local::from_usize(*owner)))
+            {
+                continue;
+            }
+            if initialization::unobserved_until_assignment(
+                self.tcx,
+                body,
+                start,
+                *owner,
+                path,
+                self.limits.max_steps,
+            )
+            .map_err(|reason| self.categorized_error(UnknownCategory::ResourceLimit, reason))?
+            {
+                removable.push((*owner, path.clone()));
+            }
+        }
+        for (owner, path) in removable {
+            state.missing_places.initialize(owner, &path);
+        }
+        Ok(())
+    }
+
     pub(super) fn needs_induction(&self, instance: ty::Instance<'tcx>) -> bool {
         let mut pending = vec![(instance, false)];
         let mut active = std::collections::HashSet::new();
@@ -135,14 +208,21 @@ impl<'tcx> Engine<'tcx> {
                         )
                     })?;
             }
-            self.loop_normalize(&frame, &mut state)?;
             let terminator = body.basic_blocks[block].terminator();
+            if matches!(terminator.kind, TerminatorKind::Return) {
+                self.omit_proven_dead_temporaries(body, &mut state, block, true)?;
+                self.validate_terminal_arguments(&frame, &state)?;
+                self.loop_normalize_values(&frame, &mut state)?;
+            } else {
+                self.omit_dead_loop_temporaries(body, &mut state, block, true)?;
+                self.loop_normalize(&frame, &mut state)?;
+            }
             let mut edges = Vec::new();
             match &terminator.kind {
                 TerminatorKind::Goto { target } => edges.push((*target, state)),
                 TerminatorKind::SwitchInt { discr, targets } => {
                     self.loop_operand_bounds(&mut state, discr, &mut system, &premise)?;
-                    let value = self.operand(id, body, &state, discr)?;
+                    let value = self.evaluate_operand(id, body, &mut state, discr)?;
                     let mut excluded = Vec::new();
                     for (number, target) in targets.iter() {
                         let condition = match &value {
@@ -177,7 +257,9 @@ impl<'tcx> Engine<'tcx> {
                 } => {
                     if !msg.is_optional_overflow_check() || self.tcx.sess.overflow_checks() {
                         self.loop_operand_bounds(&mut state, cond, &mut system, &premise)?;
-                        let condition = self.operand(id, body, &state, cond)?.boolean()?;
+                        let condition = self
+                            .evaluate_operand(id, body, &mut state, cond)?
+                            .boolean()?;
                         let safe = if *expected {
                             condition
                         } else {
@@ -189,6 +271,12 @@ impl<'tcx> Engine<'tcx> {
                     edges.push((*target, state));
                 }
                 TerminatorKind::Return => {
+                    self.validate_terminal_arguments(&frame, &state)?;
+                    frame.check_value_shapes(&state)?;
+                    self.check_place_initialization(
+                        &state,
+                        Place::from(rustc_middle::mir::RETURN_PLACE),
+                    )?;
                     if body.return_ty().is_never() {
                         exclude_failure(
                             &mut system,
@@ -204,6 +292,14 @@ impl<'tcx> Engine<'tcx> {
                         self.local(&state, 0)?
                     };
                     for local in body.args_iter() {
+                        if state
+                            .missing_places
+                            .entries()
+                            .iter()
+                            .any(|(owner, _)| *owner == local.as_usize())
+                        {
+                            continue;
+                        }
                         let value = self.local(&state, local.as_usize())?;
                         self.loop_reference_bounds(&mut state, &value, &mut system, &premise)?;
                     }
@@ -243,6 +339,16 @@ impl<'tcx> Engine<'tcx> {
                     target,
                     ..
                 } => {
+                    self.reject_call_move_overlap(body, &state, *destination, None, func)?;
+                    for argument in args {
+                        self.reject_call_move_overlap(
+                            body,
+                            &state,
+                            *destination,
+                            None,
+                            &argument.node,
+                        )?;
+                    }
                     let ty::FnDef(callee, generics) = *func.ty(&body.local_decls, self.tcx).kind()
                     else {
                         return Err("loop induction cannot resolve an indirect call".into());
@@ -295,7 +401,7 @@ impl<'tcx> Engine<'tcx> {
                             &mut system,
                             &premise,
                         )?;
-                        values.push(self.operand(id, body, &state, &argument.node)?);
+                        values.push(self.evaluate_operand(id, body, &mut state, &argument.node)?);
                     }
                     for value in &values {
                         self.loop_reference_bounds(&mut state, value, &mut system, &premise)?;
@@ -319,6 +425,9 @@ impl<'tcx> Engine<'tcx> {
                             edges.push((target, continuation));
                         }
                     } else {
+                        if let Some(target) = target {
+                            self.omit_dead_loop_temporaries(body, &mut state, *target, false)?;
+                        }
                         let inherited = frame.captured(&frame.state)?;
                         let child = self.loop_frame(
                             callee,
@@ -361,6 +470,7 @@ impl<'tcx> Engine<'tcx> {
                 other => return Err(format!("loop induction unsupported terminator {other:?}")),
             }
             for (target, mut state) in edges {
+                self.omit_dead_loop_temporaries(body, &mut state, target, false)?;
                 self.loop_normalize(&frame, &mut state)?;
                 system.clauses.push(Clause {
                     premise: Some(premise.clone()),
@@ -417,7 +527,7 @@ impl<'tcx> Engine<'tcx> {
         resume: Option<Resume<'tcx>>,
         system: &mut System,
         arguments: &[Value],
-        incoming_memory: &[Option<Value>],
+        incoming_memory: &Memory,
     ) -> Result<Frame<'tcx>, String> {
         if self
             .specification(instance)?
@@ -961,6 +1071,13 @@ impl Frame<'_> {
     }
 
     fn check_shape(&self, state: &State) -> Result<(), String> {
+        if !state.missing_places.is_empty() || !state.memory.missing_places.is_empty() {
+            return Err("inductive edges with ownership consumption holes are unsupported".into());
+        }
+        self.check_value_shapes(state)
+    }
+
+    fn check_value_shapes(&self, state: &State) -> Result<(), String> {
         if state.addresses != self.state.addresses || state.memory.len() != self.state.memory.len()
         {
             return Err("inductive allocation layout changed".into());

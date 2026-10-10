@@ -893,7 +893,7 @@ fn changing_a_declared_static_variant_breaks_the_allowed_tag_claim() {
 }
 
 #[test]
-fn static_retirement_and_exact_reinitialization_preserve_branch_and_subobject_boundaries() {
+fn no_drop_preserves_static_branch_and_subobject_validity() {
     let entries = [
         (
             "a_matching_store_restores_an_observable_static_tag",
@@ -913,35 +913,35 @@ fn static_retirement_and_exact_reinitialization_preserve_branch_and_subobject_bo
         ),
         (
             "a_retired_static_tag_cannot_be_observed",
-            ProofStatus::Unknown,
+            ProofStatus::Proved,
         ),
         (
             "a_static_subobject_cannot_be_dropped_twice",
-            ProofStatus::Unknown,
+            ProofStatus::Proved,
         ),
         (
             "an_old_static_reference_cannot_escape_after_retirement",
-            ProofStatus::Unknown,
+            ProofStatus::Proved,
         ),
         (
             "a_partial_store_does_not_restore_a_retired_static_parent",
-            ProofStatus::Unknown,
+            ProofStatus::Proved,
         ),
         (
             "retired_static_fields_cannot_be_observed",
-            ProofStatus::Unknown,
+            ProofStatus::Proved,
         ),
         (
             "a_different_branch_cannot_restore_initialization",
-            ProofStatus::Unknown,
+            ProofStatus::Proved,
         ),
         (
             "a_single_variant_shortcut_cannot_bypass_retirement",
-            ProofStatus::Unknown,
+            ProofStatus::Proved,
         ),
         (
             "zero_sized_static_retirement_needs_typed_paths",
-            ProofStatus::Unknown,
+            ProofStatus::Proved,
         ),
     ];
     for target in [None, Some("thumbv7em-none-eabihf")] {
@@ -953,11 +953,19 @@ fn static_retirement_and_exact_reinitialization_preserve_branch_and_subobject_bo
                     &[
                         (
                             "old_atomic_references_respect_retirement",
-                            ProofStatus::Unknown,
+                            if startup {
+                                ProofStatus::ProvedWithAssumptions
+                            } else {
+                                ProofStatus::Proved
+                            },
                         ),
                         (
                             "fresh_atomic_references_respect_retirement",
-                            ProofStatus::Unknown,
+                            if startup {
+                                ProofStatus::ProvedWithAssumptions
+                            } else {
+                                ProofStatus::Proved
+                            },
                         ),
                     ],
                     target,
@@ -971,7 +979,7 @@ fn static_retirement_and_exact_reinitialization_preserve_branch_and_subobject_bo
 }
 
 #[test]
-fn removing_a_matching_store_leaves_static_initialization_unknown() {
+fn removing_a_store_preserves_the_no_drop_tag_domain() {
     let source = std::fs::read_to_string(fixture()).unwrap();
     let directory = Directory::new();
     let path = directory.0.join("mutant.rs");
@@ -984,7 +992,7 @@ fn removing_a_matching_store_leaves_static_initialization_unknown() {
                 &path,
                 &[(
                     "a_matching_store_restores_an_observable_static_tag",
-                    ProofStatus::Unknown,
+                    ProofStatus::Proved,
                 )],
                 target,
                 optimized,
@@ -1094,4 +1102,42 @@ fn mutating_a_scalar_enum_store_fails_symbolic_and_native_tag_checks() {
         assert!(String::from_utf8_lossy(&output.stdout).contains("running 1 test"));
         assert_eq!(output.status.success(), success, "{output:?}");
     }
+}
+
+#[test]
+fn removing_a_store_refutes_the_startup_written_tag_claim() {
+    let source = std::fs::read_to_string(fixture()).unwrap();
+    let directory = Directory::new();
+    let path = directory.0.join("no-drop-store-mutant.rs");
+    let original = "set_optional_value(pointer, Some(6));";
+    assert!(source.contains(original));
+    std::fs::write(&path, source.replace(original, "")).unwrap();
+    for target in [None, Some("thumbv7em-none-eabihf")] {
+        for optimized in [false, true] {
+            verify_mode(
+                &fixture(),
+                &[(
+                    "startup_no_drop_store_preserves_written_tag",
+                    ProofStatus::ProvedWithAssumptions,
+                )],
+                target,
+                optimized,
+                None,
+                true,
+            );
+            verify_mode(
+                &path,
+                &[(
+                    "startup_no_drop_store_preserves_written_tag",
+                    ProofStatus::Refuted,
+                )],
+                target,
+                optimized,
+                None,
+                true,
+            );
+        }
+    }
+    assert!(native_tests(&fixture(), &directory));
+    assert!(!native_tests(&path, &directory));
 }

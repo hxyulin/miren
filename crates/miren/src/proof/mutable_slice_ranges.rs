@@ -249,7 +249,7 @@ impl<'tcx> Engine<'tcx> {
     pub(super) fn finite_element_slice_length(
         &self,
         reference: &Value,
-        memory: &[Option<Value>],
+        memory: &Memory,
         conditions: &[Term],
     ) -> Result<Option<Value>, String> {
         let Value::Reference {

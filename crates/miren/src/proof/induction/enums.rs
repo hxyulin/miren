@@ -47,6 +47,18 @@ impl<'tcx> Engine<'tcx> {
         frame: &Frame<'tcx>,
         state: &mut State,
     ) -> Result<(), String> {
+        if !state.missing_places.is_empty() || !state.memory.missing_places.is_empty() {
+            return Err("loop normalization of ownership consumption holes is unsupported".into());
+        }
+
+        self.loop_normalize_values(frame, state)
+    }
+
+    pub(super) fn loop_normalize_values(
+        &self,
+        frame: &Frame<'tcx>,
+        state: &mut State,
+    ) -> Result<(), String> {
         for (template, value) in frame.state.locals.iter().zip(&mut state.locals) {
             normalize(&self.terms, template.as_ref(), value)?;
         }

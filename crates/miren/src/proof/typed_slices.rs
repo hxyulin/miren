@@ -116,7 +116,7 @@ impl<'tcx> Engine<'tcx> {
     pub(super) fn raw_slice_snapshot(
         &self,
         slice: &Value,
-        memory: &[Option<Value>],
+        memory: &Memory,
         conditions: &[Term],
     ) -> Result<Value, String> {
         let Value::RawSlice { source, length } = slice else {

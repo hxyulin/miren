@@ -11,8 +11,8 @@ execution at O0 and O2, positive/refuted/unknown controls, a source mutation tha
 structured UNKNOWN reporting, and passing repository checks. Completion establishes a repeatable
 baseline. It does not establish full Rust support or a completed memory-model refactor.
 
-The manifest contains 134 cases across 46 families. Each build configuration expects 53 PROVED,
-47 REFUTED and 34 UNKNOWN results. Stage 133 originally had 23 cases with 10 PROVED, 9 REFUTED
+The manifest contains 152 cases across 52 families. Each build configuration expects 59 PROVED,
+53 REFUTED and 40 UNKNOWN results. Stage 133 originally had 23 cases with 10 PROVED, 9 REFUTED
 and 4 UNKNOWN; stage 134 closed its retained-prefix projection gap. Stage 136 adds raw-pointer
 metadata P/R controls and a safe core reference-array grant that remains UNKNOWN without a
 temporal permission certificate. Stage 137 adds tuple-array P/R and unsupported symbolic-write
@@ -587,3 +587,32 @@ historical dedicated, compiler vtable, omitted-dependency and native evidence re
 original binary scope. No assumptions, input caps or increased resource budgets are introduced.
 Stage 181 integrates after actual Stage 179 commit `eebf727`; ownership Stage 180 remains a
 separate implementation rather than an implicit part of this validated snapshot.
+
+
+Stage 180 extends the capability matrix with owned-move initialization controls. Actual helper
+execution proves the valid claim and refutes its false counterpart; compiler-only stale-load
+MIR returns UNKNOWN. The dedicated matrix covers whole and field moves, repairs, drops,
+coroutine captures, consumed unit returns and call overlap. Safe ordinary reassignment remains
+supported. Invalid custom MIR is excluded from native companions. The combined manifest now
+contains 152 cases in 52 families. No assumptions, input caps or larger budgets are introduced.
+
+Retained-tag controls distinguish payload movement from whole-enum or ancestor consumption.
+Return-only induction supports owned argument transfer while retaining its consumed source mask.
+Reference arguments, addressed storage and current-final contract observations remain strict.
+
+
+Final corrected validation passes all 737 Rust tests and 68 Python tests. Formatting, lint,
+debug/release builds, cargo deny, documentation and manual hooks pass. All 777 tracked main files
+match the isolated source byte for byte. Fresh main builds and 98 relevant Rust tests pass.
+Both frozen surveys yield 236 PROVED, 212 REFUTED and 160 UNKNOWN at
+`/tmp/miren-stage180-upkeep-capabilities-20261010` and
+`/tmp/miren-stage180-upkeep-merged-capabilities-20261010`. All 440 previously completed parent
+roots retain identical outcomes, obligation details and query text. All 608 main/isolate outcomes,
+queries, models and premises match, with no diagnostic context differences. Source, input and
+release hashes are verified. Initial and repaired failing full runs remain historical evidence;
+the final passing run is `/tmp/miren-stage180-upkeep-checks`. Independent source, terminal,
+retained-tag and no-drop upkeep reviews approve the bounded changes. Current dedicated/global
+captures remain at `/tmp/miren-stage180-repair-final-evidence` and
+`/tmp/miren-stage180-repair-global-final-evidence`; their recorded binary scopes are preserved.
+The combined manifest contains 152 cases in 52 families. No assumptions, input caps, firmware
+rewrites or increased resource budgets are introduced.

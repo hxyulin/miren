@@ -18,8 +18,16 @@ impl<'tcx> Engine<'tcx> {
         incoming: usize,
     ) -> Result<(), String> {
         self.return_value(value.clone(), state, incoming)?;
+        self.validate_incoming_frame_escape(state, incoming)
+    }
+
+    pub(super) fn validate_incoming_frame_escape(
+        &self,
+        state: &State,
+        incoming: usize,
+    ) -> Result<(), String> {
         for value in state.memory[..incoming].iter().flatten() {
-            Self::validate_reference_graph(value, state, Some(incoming), &mut Vec::new())?;
+            Self::reference_graph(value, state, Some(incoming), &mut Vec::new(), false)?;
             self.validate_static_initialization_graph(value, state, &mut Vec::new())?;
         }
         Ok(())
@@ -31,26 +39,49 @@ impl<'tcx> Engine<'tcx> {
         incoming: Option<usize>,
         visited: &mut Vec<usize>,
     ) -> Result<(), String> {
-        if let Value::Reference { projection, .. } = value {
+        Self::reference_graph(value, state, incoming, visited, true)
+    }
+
+    fn reference_graph(
+        value: &Value,
+        state: &State,
+        incoming: Option<usize>,
+        visited: &mut Vec<usize>,
+        initialized: bool,
+    ) -> Result<(), String> {
+        if let Value::Reference {
+            allocation,
+            projection,
+            ..
+        } = value
+        {
+            if initialized {
+                state
+                    .memory
+                    .check_projection_initialization(*allocation, projection)?;
+            }
             for part in projection {
                 if let symbolic::MemoryProjection::TypedIndex { index, .. } = part {
-                    Self::validate_reference_graph(index, state, incoming, visited)?;
+                    Self::reference_graph(index, state, incoming, visited, initialized)?;
                 }
             }
         }
         match value {
             Value::ScalarSlice { length, .. } | Value::CompositeSlice { length, .. } => {
-                Self::validate_reference_graph(length, state, incoming, visited)
+                Self::reference_graph(length, state, incoming, visited, initialized)
             }
             Value::MaybeUninit { payload, .. } => {
                 if let Some(payload) = payload {
-                    Self::validate_reference_graph(payload, state, incoming, visited)?;
+                    Self::reference_graph(payload, state, incoming, visited, initialized)?;
                 }
                 Ok(())
             }
             Value::Reference { allocation, .. }
             | Value::Cell { allocation }
             | Value::LocalAtomic { allocation, .. } => {
+                if initialized && !matches!(value, Value::Reference { .. }) {
+                    state.memory.missing_places.check(*allocation, &[])?;
+                }
                 if matches!(value, Value::Reference { .. })
                     && incoming.is_some_and(|limit| *allocation >= limit)
                 {
@@ -58,46 +89,47 @@ impl<'tcx> Engine<'tcx> {
                         "reference to frame-owned storage cannot escape its frame".to_owned()
                     );
                 }
-                let stored = StorageLocation::tracked(*allocation, false).read(&state.memory)?;
+                let stored =
+                    StorageLocation::tracked(*allocation, false).read_storage(&state.memory)?;
                 if !visited.contains(allocation) {
                     visited.push(*allocation);
-                    Self::validate_reference_graph(stored, state, incoming, visited)?;
+                    Self::reference_graph(stored, state, incoming, visited, initialized)?;
                 }
                 Ok(())
             }
             Value::Adt { fields, .. } => {
                 for (_, value) in fields {
-                    Self::validate_reference_graph(value, state, incoming, visited)?;
+                    Self::reference_graph(value, state, incoming, visited, initialized)?;
                 }
                 Ok(())
             }
             Value::Enum { variants, .. } => {
                 for value in variants {
-                    Self::validate_reference_graph(value, state, incoming, visited)?;
+                    Self::reference_graph(value, state, incoming, visited, initialized)?;
                 }
                 Ok(())
             }
             Value::Tuple(fields) => {
                 for value in fields {
-                    Self::validate_reference_graph(value, state, incoming, visited)?;
+                    Self::reference_graph(value, state, incoming, visited, initialized)?;
                 }
                 Ok(())
             }
             Value::Elements(fields) => {
                 for value in fields {
-                    Self::validate_reference_graph(value, state, incoming, visited)?;
+                    Self::reference_graph(value, state, incoming, visited, initialized)?;
                 }
                 Ok(())
             }
             Value::TrackedPointer { reference, .. } => {
-                Self::validate_reference_graph(reference, state, incoming, visited)
+                Self::reference_graph(reference, state, incoming, visited, initialized)
             }
             Value::RawSlice { source, .. }
             | Value::SliceIterator { source, .. }
             | Value::MetadataPointer(source)
             | Value::TraitObject { source, .. }
             | Value::DebugReference { source, .. } => {
-                Self::validate_reference_graph(source, state, incoming, visited)
+                Self::reference_graph(source, state, incoming, visited, initialized)
             }
             Value::StaticSlice {
                 source,
@@ -105,10 +137,10 @@ impl<'tcx> Engine<'tcx> {
                 elements,
                 ..
             } => {
-                Self::validate_reference_graph(source, state, incoming, visited)?;
+                Self::reference_graph(source, state, incoming, visited, initialized)?;
                 validate_static_epoch(&state.memory, *epoch)?;
                 for element in elements {
-                    Self::validate_reference_graph(element, state, incoming, visited)?;
+                    Self::reference_graph(element, state, incoming, visited, initialized)?;
                 }
                 Ok(())
             }
@@ -136,6 +168,7 @@ mod tests {
 
     fn state(memory: Vec<Option<Value>>) -> State {
         State {
+            missing_places: initialized_places::MissingPlaces::default(),
             locals: Vec::new(),
             addresses: Vec::new(),
             conditions: Vec::new(),

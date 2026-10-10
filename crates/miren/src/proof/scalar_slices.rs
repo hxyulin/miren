@@ -405,7 +405,7 @@ impl<'tcx> Engine<'tcx> {
         &self,
         expected: Ty<'tcx>,
         value: &Value,
-        memory: &[Option<Value>],
+        memory: &Memory,
         conditions: &[Term],
     ) -> Result<(), String> {
         if !contains_readonly_slice(value, memory, &mut Vec::new()) {
@@ -418,7 +418,7 @@ impl<'tcx> Engine<'tcx> {
         &self,
         expected: Ty<'tcx>,
         value: &Value,
-        memory: &[Option<Value>],
+        memory: &Memory,
         conditions: &[Term],
         depth: usize,
     ) -> Result<(), String> {
@@ -843,11 +843,7 @@ impl<'tcx> Engine<'tcx> {
     }
 }
 
-fn contains_readonly_slice(
-    value: &Value,
-    memory: &[Option<Value>],
-    visited: &mut Vec<usize>,
-) -> bool {
+fn contains_readonly_slice(value: &Value, memory: &Memory, visited: &mut Vec<usize>) -> bool {
     match value {
         Value::ScalarSlice { .. } | Value::CompositeSlice { .. } => true,
         Value::Reference { allocation, .. }
@@ -1068,6 +1064,7 @@ mod tests {
             mutable: false,
         };
         let mut state = State {
+            missing_places: initialized_places::MissingPlaces::default(),
             locals: Vec::new(),
             addresses: Vec::new(),
             conditions: Vec::new(),

@@ -20,6 +20,7 @@ impl StaticLocation {
 #[derive(Clone, Default)]
 pub(super) struct Memory {
     allocations: Rc<Vec<Option<Value>>>,
+    pub(super) missing_places: initialized_places::MissingPlaces,
     pub(super) startup_values: std::collections::HashMap<StaticLocation, Value>,
     pub(super) startup_invalidated: bool,
     pub(super) isolated_static_types: std::collections::HashMap<StaticLocation, usize>,

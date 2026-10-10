@@ -146,7 +146,7 @@ fn isolated_static_history_retains_actual_writes_and_preserves_boundaries() {
         ),
         (
             "isolated_retired_payload_reads_are_unknown",
-            ProofStatus::Unknown,
+            ProofStatus::ProvedWithAssumptions,
         ),
     ];
     for target in [None, Some("thumbv7em-none-eabihf")] {

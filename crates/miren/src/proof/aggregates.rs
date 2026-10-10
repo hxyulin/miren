@@ -155,10 +155,21 @@ impl<'tcx> Engine<'tcx> {
     ) -> Result<Value, String> {
         let values = operands
             .iter()
-            .map(|value| self.operand(id, body, state, value))
+            .map(|value| self.evaluate_operand(id, body, state, value))
             .collect::<Result<Vec<_>, _>>()?;
-        for value in &values {
-            self.validate_tracked_value(value, state)?;
+        let pin = matches!(kind, AggregateKind::Adt(def, ..)
+            if self.tcx.lang_items().get(LangItem::Pin) == Some(*def));
+        for (operand, value) in operands.iter().zip(&values) {
+            if !pin
+                || !self.validate_coroutine_reference_transport(
+                    operand.ty(&body.local_decls, self.tcx),
+                    value,
+                    state,
+                    None,
+                )?
+            {
+                self.validate_tracked_value(value, state)?;
+            }
         }
         if let AggregateKind::Adt(def, variant, args, _, Some(active)) = kind {
             let operand_types = operands
@@ -436,7 +447,7 @@ impl<'tcx> Engine<'tcx> {
         &self,
         id: DefId,
         body: &Body<'tcx>,
-        state: &State,
+        state: &mut State,
         operand: &Operand<'tcx>,
         length: ty::Const<'tcx>,
     ) -> Result<Value, String> {
@@ -449,7 +460,7 @@ impl<'tcx> Engine<'tcx> {
         {
             return Err("repeated interior mutable storage is not modeled".to_owned());
         }
-        let value = self.operand(id, body, state, operand)?;
+        let value = self.evaluate_operand(id, body, state, operand)?;
         if operand.ty(body, self.tcx) != self.tcx.types.u8 {
             if count > MAX_ARRAY_BYTES {
                 return Err("array repeat exceeds the 128-element limit".to_owned());
