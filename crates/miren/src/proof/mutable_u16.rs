@@ -19,6 +19,7 @@ pub(super) struct Backing {
     pub(super) data: Term,
     pub(super) generation: u64,
     pub(super) phase: super::mutable_u16_children::Phase,
+    pub(super) interval: Option<super::mutable_interval::Descriptor>,
 }
 
 impl<'tcx> Engine<'tcx> {
@@ -189,6 +190,7 @@ impl<'tcx> Engine<'tcx> {
             data,
             generation: 0,
             phase: super::mutable_u16_children::Phase::Idle,
+            interval: None,
         });
         Ok(Value::MutableU16 {
             id,
@@ -210,7 +212,12 @@ impl<'tcx> Engine<'tcx> {
             return Err(self.mutable_u16_error("mutable u16 root backing is unavailable"));
         }
         self.mutable_u16_terms(backing.certificate, &backing.length, &backing.data)?;
+        self.validate_mutable_interval(id, backing)?;
         Ok(backing)
+    }
+
+    pub(super) fn mutable_interval_element(&self, certificate: usize) -> Result<Ty<'tcx>, String> {
+        Ok(self.mutable_integer_certificate(certificate)?.original)
     }
 
     fn mutable_u16_terms(
@@ -252,7 +259,11 @@ impl<'tcx> Engine<'tcx> {
             | MutableU16Role::Child { .. }
             | MutableU16Role::ChildMetadata { .. } => {
                 self.mutable_u16_role_live(*id, role, memory)?;
-                Ok(self.mutable_u16_backing(*id, memory)?.length.clone())
+                let backing = self.mutable_u16_backing(*id, memory)?;
+                Ok(backing
+                    .interval
+                    .as_ref()
+                    .map_or_else(|| backing.length.clone(), |view| view.length().clone()))
             }
             MutableU16Role::Ghost {
                 certificate,
@@ -288,7 +299,12 @@ impl<'tcx> Engine<'tcx> {
                         element: self
                             .mutable_integer_certificate(backing.certificate)?
                             .element,
-                        length: Box::new(backing.length.clone()),
+                        length: Box::new(
+                            backing.interval.as_ref().map_or_else(
+                                || backing.length.clone(),
+                                |view| view.length().clone(),
+                            ),
+                        ),
                         data: backing.data.clone(),
                     },
                 })
@@ -350,7 +366,7 @@ impl<'tcx> Engine<'tcx> {
             return Err("mutable u16 element differs from original compiler type".into());
         }
         let index = self.local(state, index.as_usize())?;
-        self.mutable_u16_index(&index, &backing.length, &state.conditions)?;
+        let index = self.mutable_interval_index(id, backing, index, &state.conditions)?;
         Ok(Some(super::scalar_slices::decode_scalar_element(
             &self.terms,
             self.mutable_integer_certificate(backing.certificate)?
@@ -362,7 +378,7 @@ impl<'tcx> Engine<'tcx> {
         )?))
     }
 
-    fn mutable_u16_index(
+    pub(super) fn mutable_u16_index(
         &self,
         index: &Value,
         length: &Value,
@@ -433,7 +449,7 @@ impl<'tcx> Engine<'tcx> {
         }
         let backing = self.mutable_u16_backing(id, &state.memory)?;
         let index = self.local(state, index.as_usize())?;
-        self.mutable_u16_index(&index, &backing.length, &state.conditions)?;
+        let index = self.mutable_interval_index(id, backing, index, &state.conditions)?;
         let certificate = self.mutable_integer_certificate(backing.certificate)?;
         let term = self.mutable_scalar_replacement(certificate, replacement)?;
         if certificate.original == self.tcx.types.char {

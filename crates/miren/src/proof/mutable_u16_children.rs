@@ -12,7 +12,15 @@ pub(super) enum Phase {
 pub(super) struct Staging<'tcx> {
     body: std::rc::Weak<Body<'tcx>>,
     destination: usize,
-    occurrence: usize,
+    occurrence: TipOccurrence,
+}
+
+enum TipOccurrence {
+    Assignment(usize),
+    CallResult {
+        block: rustc_middle::mir::BasicBlock,
+        occurrence: usize,
+    },
 }
 
 pub(super) fn role_live(backing: &super::mutable_u16::Backing, role: &MutableU16Role) -> bool {
@@ -68,6 +76,9 @@ impl<'tcx> Engine<'tcx> {
         memory: &Memory,
     ) -> Result<(), String> {
         for (id, backing) in memory.mutable_u16.iter().enumerate() {
+            if backing.interval.is_some() {
+                self.mutable_u16_backing(id, memory)?;
+            }
             match &backing.phase {
                 Phase::Idle => {}
                 Phase::Pending { .. } => {
@@ -155,12 +166,13 @@ impl<'tcx> Engine<'tcx> {
         }
         self.check_local_initialization(state, place.local.as_usize(), &[])?;
         self.mutable_u16_role_live(id, &role, &state.memory)?;
-        Ok(Some(
-            self.mutable_u16_backing(id, &state.memory)?.length.clone(),
-        ))
+        Ok(Some(self.mutable_u16_length(
+            &Value::MutableU16 { id, role },
+            &state.memory,
+        )?))
     }
 
-    fn mutable_u16_staging_tip(
+    pub(super) fn mutable_u16_staging_tip(
         &self,
         body: &Body<'tcx>,
         state: &State,
@@ -186,13 +198,119 @@ impl<'tcx> Engine<'tcx> {
         if !std::ptr::eq(original.as_ref(), body)
             || certificate.destination != local
             || backing.generation != generation
-            || !original.basic_blocks.iter().any(|block| {
-                block.statements.iter().any(|statement| {
-                    std::ptr::from_ref(&statement.kind) as usize == certificate.occurrence
-                })
-            })
+            || !match certificate.occurrence {
+                TipOccurrence::Assignment(occurrence) => {
+                    original.basic_blocks.iter().any(|block| {
+                        block.statements.iter().any(|statement| {
+                            std::ptr::from_ref(&statement.kind) as usize == occurrence
+                        })
+                    })
+                }
+                TipOccurrence::CallResult { block, occurrence } => {
+                    let terminator = original
+                        .basic_blocks
+                        .get(block)
+                        .map(|data| data.terminator());
+                    terminator.is_some_and(|terminator| {
+                        std::ptr::from_ref(&terminator.kind) as usize == occurrence
+                            && matches!(&terminator.kind, TerminatorKind::Call {
+                                destination, target: Some(_), ..
+                            } if destination.projection.is_empty()
+                                && destination.local.as_usize() == certificate.destination)
+                    })
+                }
+            }
         {
             return Err(self.mutable_u16_child_error("mutable u16 staging identity differs"));
+        }
+        Ok(())
+    }
+
+    pub(super) fn mutable_u16_register_call_tip(
+        &self,
+        body: &Body<'tcx>,
+        block: rustc_middle::mir::BasicBlock,
+        destination: Place<'tcx>,
+        state: &State,
+    ) -> Result<usize, String> {
+        if !destination.projection.is_empty()
+            || destination.local.as_usize() <= body.arg_count
+            || state.addresses[destination.local.as_usize()].is_some()
+        {
+            return Err(
+                self.mutable_u16_child_error("interval CallResult needs private whole local")
+            );
+        }
+        let original = self
+            .bodies
+            .borrow()
+            .values()
+            .find(|candidate| std::ptr::eq(candidate.as_ref(), body))
+            .cloned()
+            .ok_or("interval CallResult Body was not instantiated")?;
+        self.mutable_u16_body_budget(&original)?;
+        let terminator = original
+            .basic_blocks
+            .get(block)
+            .ok_or("interval CallResult block differs")?
+            .terminator();
+        if !matches!(&terminator.kind, TerminatorKind::Call {
+            destination: actual, target: Some(_), ..
+        } if *actual == destination)
+        {
+            return Err(self.mutable_u16_child_error("interval CallResult occurrence differs"));
+        }
+        let mut certificates = self.mutable_u16_staging.borrow_mut();
+        if certificates
+            .len()
+            .saturating_add(self.mutable_u16_frames.borrow().len())
+            >= MAX_INPUT_VALUES
+        {
+            return Err(self.categorized_error(
+                UnknownCategory::ResourceLimit,
+                "interval CallResult exceeds existing certificate budget".into(),
+            ));
+        }
+        let index = certificates.len();
+        certificates.push(Staging {
+            body: std::rc::Rc::downgrade(&original),
+            destination: destination.local.as_usize(),
+            occurrence: TipOccurrence::CallResult {
+                block,
+                occurrence: std::ptr::from_ref(&terminator.kind) as usize,
+            },
+        });
+        Ok(index)
+    }
+
+    pub(super) fn mutable_u16_call_tip_identity(&self, index: usize) -> Result<(), String> {
+        let certificates = self.mutable_u16_staging.borrow();
+        let certificate = certificates
+            .get(index)
+            .ok_or("interval original CallResult certificate missing")?;
+        let original = certificate
+            .body
+            .upgrade()
+            .ok_or("interval original CallResult Body expired")?;
+        self.mutable_u16_body_budget(&original)?;
+        let TipOccurrence::CallResult { block, occurrence } = certificate.occurrence else {
+            return Err(self.mutable_u16_child_error("interval issuer is not a CallResult"));
+        };
+        let terminator = original
+            .basic_blocks
+            .get(block)
+            .ok_or("interval original CallResult block missing")?
+            .terminator();
+        if std::ptr::from_ref(&terminator.kind) as usize != occurrence
+            || certificate.destination <= original.arg_count
+            || !matches!(&terminator.kind, TerminatorKind::Call {
+                destination, target: Some(_), ..
+            } if destination.projection.is_empty()
+                && destination.local.as_usize() == certificate.destination)
+        {
+            return Err(
+                self.mutable_u16_child_error("interval original CallResult identity differs")
+            );
         }
         Ok(())
     }
@@ -294,7 +412,7 @@ impl<'tcx> Engine<'tcx> {
         certificates.push(Staging {
             body: std::rc::Rc::downgrade(&original),
             destination: destination.local.as_usize(),
-            occurrence: std::ptr::from_ref(occurrence) as usize,
+            occurrence: TipOccurrence::Assignment(std::ptr::from_ref(occurrence) as usize),
         });
         drop(certificates);
         let backing = &mut std::rc::Rc::make_mut(&mut state.memory.mutable_u16)[id];
@@ -573,7 +691,9 @@ impl<'tcx> Engine<'tcx> {
                     self.mutable_u16_child_error("mutable u16 child result retains authority")
                 );
             }
-            std::rc::Rc::make_mut(&mut result.memory.mutable_u16)[id].phase = Phase::Idle;
+            let backing = &mut std::rc::Rc::make_mut(&mut result.memory.mutable_u16)[id];
+            backing.interval = None;
+            backing.phase = Phase::Idle;
         }
         Ok(Some(results))
     }
@@ -947,7 +1067,7 @@ impl<'tcx> Engine<'tcx> {
         certificates.push(Staging {
             body: std::rc::Rc::downgrade(&original),
             destination: 1,
-            occurrence: std::ptr::from_ref(occurrence) as usize,
+            occurrence: TipOccurrence::Assignment(std::ptr::from_ref(occurrence) as usize),
         });
         drop(certificates);
         std::rc::Rc::make_mut(&mut active.memory.mutable_u16)[0].phase =
@@ -1013,6 +1133,7 @@ mod tests {
                 .unwrap(),
             generation: 0,
             phase: Phase::Idle,
+            interval: None,
         });
         let sibling = memory.clone();
         let backing = &mut std::rc::Rc::make_mut(&mut memory.mutable_u16)[0];

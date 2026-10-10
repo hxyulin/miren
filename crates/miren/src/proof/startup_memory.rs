@@ -52,6 +52,13 @@ impl Memory {
             .saturating_add(
                 self.mutable_u16
                     .iter()
+                    .filter_map(|backing| backing.interval.as_ref())
+                    .map(super::mutable_interval::Descriptor::storage_slots)
+                    .sum::<usize>(),
+            )
+            .saturating_add(
+                self.mutable_u16
+                    .iter()
                     .map(|backing| match &backing.phase {
                         super::mutable_u16_children::Phase::Active { frames } => frames.len(),
                         super::mutable_u16_children::Phase::Idle

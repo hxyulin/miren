@@ -1091,3 +1091,13 @@ Logical scalar slice codecs and detached mutable ghost lengths share one compile
 The map describes Bool, integer, Char and supported Float storage sorts; it issues no compiler
 certificate or access permission. Original caller validation order, diagnostics and codec widths
 remain unchanged, including executable ghost-index refusal and unavailable-body boundaries.
+
+A checked `Range<usize>` of one incoming `&mut [u16]` may be handed immediately to one direct
+synchronous child. Complete selected core range bodies certify the guarded relation; the caller
+proves `start <= end <= original length` and authenticates its current private staging tip.
+Both compiler reborrows retain one generation and branch-local interval descriptor. Child indices
+are checked against view length and translated into the same current full array. Normal owner
+Return removes the descriptor and resumes the parent with current data. Metadata and detached
+ghost length use view extent; ghost data indexing stays unsupported. Whole-slice formulas keep
+their original terms. Retained views, nested child leases, other range types, split operations,
+raw pointers, reference returns, induction and non-u16 interval codecs remain unsupported.

@@ -5651,3 +5651,53 @@ source-path aliases only. Fingerprints, models, queries, node IDs and diagnostic
 Native evidence is adopted with verified source/executable hashes and its original execution
 scope. The initial path-only comparison failure is retained separately. Final documentation
 checks run after this prose update; no production code changes after validation.
+
+Stage 196 supports a checked `Range<usize>` of one incoming mutable u16 slice handed immediately
+to one direct synchronous child. Complete selected core range wrapper and SliceIndex bodies
+certify `start <= end <= original length`, pointer offset, view extent and the normal return.
+The original valid Rust extent prevents address-size overflow without limiting input length.
+Two actual compiler reborrows authenticate the current private staging tip and one generation.
+A branch-local descriptor binds original backing, offset, view length, certificate and owner.
+
+Child indices are proved against the view length and translated into the same current backing
+array. Normal authenticated owner Return removes the descriptor and resumes the parent with
+current data. Parent suspension, exact body identity, current initialization and storage budgets
+remain required. Pending issuance precharges seven slots under the existing 512-node limit.
+Whole-slice paths keep their original terms. Ghost metadata exposes view length; data indexing
+remains UNKNOWN. No retained view, nested interval, split, raw pointer, reference return, induction,
+other range or non-u16 interval codec is admitted. Missing actual bodies remain UNKNOWN.
+
+The current parent is committed Stage 197. All 859 other parent files match exactly; fourteen
+feature files are unchanged from the earlier Stage 195 capture, while README retains both stages.
+Focused formatting, lint, compiler lifecycle and 27 related integration tests pass. Dedicated
+host/ARM O0/O2 reports move from 1 PROVED and 12 UNKNOWN roots to 8 PROVED, 3 REFUTED and 2 UNKNOWN.
+Changing the actual child from `word ^ 0` to `word ^ 1` refutes the unchanged selected claim.
+Genuine retained dependency bodies prove; omitted selected bodies stay UNKNOWN.
+
+All 1,092 prior full proof objects and 2,124 queries match exactly, including 60 partial queries
+in UNKNOWN objects. The original direct-u16 induction flags are retained. Earlier captures and
+setup failures remain preserved with their historical scope. Safe 129-element native originals
+and unchanged mutation guards are adopted with verified source, executable and output hashes;
+the original O0/O2 exits are 0 and 101 under ten-second execution limits.
+
+Three append-only global controls bring the inventory to 194 cases in 66 families: valid child
+write, wrong claim and unsupported nested interval. Fresh actual-parent controls are UNKNOWN;
+new captures produce PROVED, REFUTED and UNKNOWN in all four profiles, plus REFUTED for the helper
+mutation. Fresh global native originals pass and the unchanged guard fails at O0/O2. The 16 global
+full objects and 72 queries match the historical capture after explicit typed source-path aliases.
+An initial missing working-directory alias assertion is retained, without changing any query.
+Root validation passes 801 Rust tests in the full worktree and 118 focused tests in main,
+plus 68 Python tests, formatting, lint, debug/release builds, dependency checks, docs and hooks.
+The initial focused lifecycle filter matched zero tests; its 117-test log and status are retained.
+The corrected named lifecycle test actually runs and passes, giving 118 total without a source
+or limit change. Both surveys retain 308 PROVED, 268 REFUTED and 200 UNKNOWN outcomes. All 568
+previously completed pairs match in both surveys. Of 776 current full objects, 774 match exactly;
+two query-free unbounded-fold timeouts differ only in their recorded call-stack/block context.
+Their UNKNOWN status, resource category and every remaining field match; no query or model exists.
+
+Fresh main release replay matches 1,172 full objects and all 2,438 queries after explicit typed
+source-path aliases only. Automatic solver mode is retained for dedicated, foreign and old codec
+captures; global captures retain their separate explicit custom mode. Fingerprints, query node
+identifiers, models and non-path fields remain exact. Native evidence is adopted separately with
+verified source, executable and output hashes and its original execution scope. Final docs and
+hooks run after this prose update; production source stays at the validated freeze.

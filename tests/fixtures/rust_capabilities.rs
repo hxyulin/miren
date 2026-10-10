@@ -2762,3 +2762,54 @@ mod native_float_slice_child {
         }
     }
 }
+
+
+#[inline(never)]
+pub fn checked_subslice_child(values: &mut [u16], index: usize, word: u16) {
+    if index < values.len() {
+        values[index] = word ^ 0;
+    }
+}
+
+pub fn checked_subslice_child_call(
+    values: &mut [u16], start: usize, end: usize, index: usize, word: u16,
+) {
+    if start <= end && end <= values.len() && index < end - start {
+        checked_subslice_child(&mut values[start..end], index, word);
+        assert!(values[start + index] == word);
+    }
+}
+
+pub fn checked_subslice_wrong_claim(
+    values: &mut [u16], start: usize, end: usize, index: usize, word: u16,
+) {
+    if start <= end && end <= values.len() && index < end - start {
+        checked_subslice_child(&mut values[start..end], index, word);
+        assert!(values[start + index] != word);
+    }
+}
+
+#[inline(never)]
+pub fn checked_subslice_nested(values: &mut [u16]) {
+    checked_subslice_child(values, 0, 19);
+}
+
+pub fn checked_subslice_nested_unknown(values: &mut [u16], start: usize, end: usize) {
+    if start <= end && end <= values.len() {
+        checked_subslice_nested(&mut values[start..end]);
+    }
+}
+
+#[cfg(test)]
+mod native_checked_subslice {
+    #[test]
+    fn translated_child_write_preserves_root_and_tail() {
+        let mut values = [7; 129];
+        super::checked_subslice_child_call(&mut values, 1, 128, 126, 19);
+        assert_eq!(values[127], 19);
+        assert_eq!(values[0], 7);
+        assert_eq!(values[128], 7);
+        super::checked_subslice_child_call(&mut values, 129, 129, 0, 31);
+        assert_eq!(values[128], 7);
+    }
+}

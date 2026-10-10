@@ -67,6 +67,7 @@ mod library;
 mod maybe_uninit;
 mod membership;
 mod memory;
+mod mutable_interval;
 mod mutable_slice_ranges;
 mod mutable_u16;
 mod mutable_u16_children;
@@ -1549,6 +1550,22 @@ impl<'tcx> Engine<'tcx> {
                         &mut state,
                     );
                     let callee = instance.def_id();
+                    if let Some((target, continuation)) = self.mutable_interval_call(
+                        &state,
+                        mutable_u16_children::ChildCall {
+                            body,
+                            block,
+                            instance,
+                            args,
+                            destination: *destination,
+                            target: *target,
+                            stack: &stack,
+                            site: (id, terminator.source_info.span),
+                        },
+                    )? {
+                        queue.push_back((target, continuation, retry_path.clone()));
+                        continue;
+                    }
                     if let Some(results) = self.mutable_u16_child_call(
                         &mut state,
                         mutable_u16_children::ChildCall {
