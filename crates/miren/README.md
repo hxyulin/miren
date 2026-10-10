@@ -673,20 +673,27 @@ lifetime and selected-body checks. Raw dynamic layout APIs, deprecated aliases a
 metadata receive no new support. Readonly shared iteration retains the same compiler type, source
 graph and original caller allocation.
 
-Local struct slice elements retain the exact original compiler type, complete declaration-ordered
-field identities and compiler layout. Zero-sized local structs remain nominal ADT values after
+Ordinary local and dependency struct slice elements retain the exact original compiler type and
+complete declaration-ordered field identities and compiler layout. Zero-sized ordinary structs
+remain nominal ADT values after
 complete recursive field certification and an empty primitive-storage inventory check. Their
 readonly slice lengths span the full target-usize domain; no physical address rights follow.
 Unit, tuple and empty-array fields remain supported. Recursive field certification rejects
 restricted patterns before normalization, including beneath empty arrays. Packed/SIMD layouts,
-external or core ADTs, enums, unions, reference/raw fields, interior mutation and destructor-bearing
-types remain unsupported. Compiler scalar validity must match the actual typed fields and offsets.
-Observations
-reconstruct exact struct metadata with every field selected at the same index; owned copies and
-caller-backed field borrows add no raw, write or padding-byte rights. Custom methods, Clone and
+core or compiler-special dependency ADTs, enums, unions, reference/raw fields, interior mutation
+and destructor-bearing types remain unsupported. Compiler scalar validity must match the actual
+typed fields and offsets. Observations reconstruct exact struct metadata with every field selected
+at the same index; owned copies and caller-backed field borrows add no raw, write or padding-byte
+rights. Custom methods, Clone and
 PartialEq receive no purity inference from Copy; whole composite comparison remains unsupported.
 
-Actual MIR Copy/Move reads can select a finite local-struct array at a symbolic checked index.
+Dependency structs use the same original-field, layout and type-budget certificates as local
+structs. The actual compiler core-crate identity and special ADT flags exclude builtin ownership,
+pinning and wrapper policies; missing core identity evidence refuses new dependency admission.
+Field privacy and constructors add no input invariant. Available ordinary dependency methods
+execute their actual MIR, and unavailable bodies remain UNKNOWN.
+
+Actual MIR Copy/Move reads can select a finite ordinary-struct array at a symbolic checked index.
 The original compiler array-prefix type certifies every candidate's exact nominal fields and
 primitive metadata before a shared-index value merge. Float storage bits survive only when all
 alternatives carry them; Char leaves require validity under the current conditions. Existing

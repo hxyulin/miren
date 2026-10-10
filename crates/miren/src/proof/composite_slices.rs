@@ -2,6 +2,8 @@
 use super::*;
 use aggregate_validity::scalar_fields_match;
 use rustc_abi::BackendRepr;
+use rustc_middle::ty::AdtFlags;
+use rustc_span::def_id::CrateNum;
 use scalar_slices::{decode_scalar_element, scalar_slice_sort};
 use symbolic::ScalarSliceElement;
 
@@ -40,7 +42,39 @@ pub(super) struct CompositeType<'tcx> {
     bytes: u64,
 }
 
+fn ordinary_external_struct_flags(flags: AdtFlags) -> bool {
+    // Accept only ordinary structural flags. Unknown future compiler-special flags fail
+    // conservatively, and tuple/fieldless constructors do not imply a value invariant.
+    flags == AdtFlags::IS_STRUCT || flags == (AdtFlags::IS_STRUCT | AdtFlags::HAS_CTOR)
+}
+
+fn ordinary_external_struct_policy(
+    defining_crate: CrateNum,
+    core_crate: Option<CrateNum>,
+    flags: AdtFlags,
+) -> bool {
+    core_crate.is_some_and(|core| defining_crate != core && ordinary_external_struct_flags(flags))
+}
+
 impl<'tcx> Engine<'tcx> {
+    pub(super) fn plain_composite_struct(&self, def: ty::AdtDef<'tcx>) -> bool {
+        if !def.is_struct() {
+            return false;
+        }
+        if def.did().is_local() {
+            // Preserve the prior local domain; only the new external domain needs this filter.
+            return true;
+        }
+        ordinary_external_struct_policy(
+            def.did().krate,
+            self.tcx
+                .lang_items()
+                .sized_trait()
+                .map(|anchor| anchor.krate),
+            def.flags(),
+        )
+    }
+
     pub(super) fn owned_struct_choice_shape(
         &self,
         ty: Ty<'tcx>,
@@ -143,7 +177,7 @@ impl<'tcx> Engine<'tcx> {
                 }
                 Ok(Some(CompositeShape::Array(shapes)))
             }
-            ty::Adt(def, args) if def.did().is_local() && def.is_struct() => {
+            ty::Adt(def, args) if self.plain_composite_struct(*def) => {
                 if def.repr().pack.is_some()
                     || matches!(
                         layout.backend_repr,
@@ -203,7 +237,7 @@ impl<'tcx> Engine<'tcx> {
         let descriptor = self.composite_slice_shape(ty)?.ok_or_else(|| {
             self.categorized_error(
                 UnknownCategory::Semantics,
-                "composite slice requires a pure tuple, array or local struct element".into(),
+                "composite slice requires a pure tuple, array or ordinary struct element".into(),
             )
         })?;
         let count = descriptor.leaves.len() + 1;
@@ -474,6 +508,58 @@ impl CompositeShape {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn dependency_struct_policy_admits_only_ordinary_structural_flags() {
+        let core = CrateNum::from_u32(1);
+        let dependency = CrateNum::from_u32(2);
+        assert!(ordinary_external_struct_policy(
+            dependency,
+            Some(core),
+            AdtFlags::IS_STRUCT
+        ));
+        assert!(!ordinary_external_struct_policy(
+            core,
+            Some(core),
+            AdtFlags::IS_STRUCT
+        ));
+        assert!(!ordinary_external_struct_policy(
+            dependency,
+            None,
+            AdtFlags::IS_STRUCT
+        ));
+        assert!(ordinary_external_struct_flags(AdtFlags::IS_STRUCT));
+        assert!(ordinary_external_struct_flags(
+            AdtFlags::IS_STRUCT | AdtFlags::HAS_CTOR
+        ));
+        for special in [
+            AdtFlags::IS_ENUM,
+            AdtFlags::IS_UNION,
+            AdtFlags::IS_PHANTOM_DATA,
+            AdtFlags::IS_FUNDAMENTAL,
+            AdtFlags::IS_BOX,
+            AdtFlags::IS_MANUALLY_DROP,
+            AdtFlags::IS_VARIANT_LIST_NON_EXHAUSTIVE,
+            AdtFlags::IS_UNSAFE_CELL,
+            AdtFlags::IS_UNSAFE_PINNED,
+            AdtFlags::IS_PIN,
+            AdtFlags::IS_PIN_PROJECT,
+            AdtFlags::IS_FIELD_REPRESENTING_TYPE,
+            AdtFlags::IS_MAYBE_DANGLING,
+        ] {
+            assert!(!ordinary_external_struct_flags(special));
+            assert!(!ordinary_external_struct_flags(
+                AdtFlags::IS_STRUCT | special
+            ));
+            assert!(!ordinary_external_struct_flags(
+                AdtFlags::IS_STRUCT | AdtFlags::HAS_CTOR | special
+            ));
+        }
+        assert!(!ordinary_external_struct_flags(AdtFlags::NO_ADT_FLAGS));
+        assert!(!ordinary_external_struct_flags(AdtFlags::from_bits_retain(
+            1 << 15
+        )));
+    }
 
     #[test]
     fn zero_sized_structs_preserve_nominal_metadata_and_reject_storage_leaves() {

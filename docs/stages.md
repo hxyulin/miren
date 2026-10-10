@@ -3634,3 +3634,55 @@ The initial full attempt inherited an obsolete parent expected-UNKNOWN entry for
 struct copy source; its failure remains at `/tmp/miren-stage158-parent-old-expectation-checks`.
 Mirroring the independently justified Stage 157 harness maintenance restores the expectation;
 no Stage 158 semantics change was needed, and the final complete rerun passes.
+
+
+## Stage 159: exact ordinary dependency struct values
+
+A shared concrete struct admission predicate serves both incoming composite shape certification
+and compiler-typed owned array choices. Local admission retains its prior policy. Newly admitted
+external structs require exact ordinary structural flags, allowing only the constructor bit,
+and an actual compiler Sized lang-item core-crate anchor. Core, compiler-special and future
+unknown flags are refused, as is a missing anchor. No name whitelist or dependency layout shortcut
+supplies eligibility.
+
+Original field types and instantiated compiler arguments remain the certificate, before
+normalization and even under zero-length arrays. Copy/Freeze/no-drop, scalar validity and physical
+offsets, exact nominal metadata, zero-byte inventories and existing type/candidate budgets remain
+checked. Field privacy and constructors supply no invariant on arbitrary valid Rust inputs.
+Caller-backed lifetime, views, cursors, layout, owned byte normalization and actual method/body
+selection reuse their prior protocols. No raw, mutable, alias, ownership or method-effect premise
+is added.
+
+A separately compiled no_std dependency rlib is supplied through --extern on host and ARM at
+O0/O2. Its 27 retained roots yield 10 PROVED, 5 REFUTED and 12 UNKNOWN per build, covering named,
+tuple-style, generic, private, nested, Float/Char and aligned nominal zero-byte values. Actual
+accessor, borrowed method, checked arithmetic and const-generic body entries are asserted. The
+same non-inline non-generic accessor rebuilt without retained MIR remains MissingCompilerEvidence
+UNKNOWN in all four profiles. Unsupported original ref/raw/restricted/core children under N=0,
+Drop, packed, mutable/competing roots, whole membership, dead empty backing and shape budgets
+retain their precise frontiers.
+
+An actual dependency getter is changed from left to right and its rlib rebuilt for each profile.
+The unchanged consumer refutes in all four builds with query/model on the same obligation; valid
+129-element native mutation guards fail at O0/O2 while original native tests pass. Complete
+commands, source hashes, reports, outputs and timeouts are retained at
+`/tmp/miren-stage159-final-evidence`. Two dedicated tests, eleven related tests, six metadata units,
+build, lint and formatting pass. Independent source and focused-evidence review approves the
+shared original-type and actual-body certificates.
+
+The core-only shared manifest remains 88 cases across 31 families, expecting 36 PROVED,
+32 REFUTED and 20 UNKNOWN per configuration. Dependency coverage is recorded by the separate
+actual rlib integration rather than synthetic core-only inventory entries.
+
+
+Full isolated validation passes 657 Rust tests and 68 Python tests, formatting, cargo lint,
+release builds, cargo deny, documentation build and manual hooks. Main's complete 609 tracked
+files match the validated snapshot byte for byte. Fresh debug/release builds, thirteen new/related
+integration tests, 68 Python tests and the remaining required checks also pass in main. Frozen
+isolated and merged core-only surveys retain 144 PROVED, 128 REFUTED and 80 UNKNOWN at
+`/tmp/miren-stage159-capabilities-20261010` and
+`/tmp/miren-stage159-merged-capabilities-20261010`, with current source/input/release hashes verified.
+All 272 earlier completed P/R roots retain identical obligation statuses, details and query text
+across four configurations. The separate actual dependency rlib matrix and native mutation ledgers
+remain at `/tmp/miren-stage159-final-evidence`. Independent review approves the exact external
+struct admission and retained-body certificates; no new conditional assumptions are used.

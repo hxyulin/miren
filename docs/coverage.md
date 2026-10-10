@@ -1360,3 +1360,16 @@ u8 type annotation survives zero length; byte carriers must match constant count
 context/sorts before observation. Bytes and Elements are normalized to bounded byte values, with
 all candidate byte nodes charged. Canonical copied byte arrays retain shared-index correlation
 and local write independence without granting source, raw or retained-reference permissions.
+
+
+Stage 159 applies the existing pure-field certificates to ordinary dependency structs, including
+private, generic, nested, zero-byte and owned byte-containing values. Actual compiler crate and
+structural flags keep core and compiler-special wrappers outside this admission. Original field
+probes, layout validity, budgets, backing lifetime and actual selected bodies retain their checks.
+
+A real separate dependency rlib matrix yields 10 PROVED, 5 REFUTED and 12 UNKNOWN per host/ARM
+O0/O2 build. Rebuilding the same accessor without retained MIR yields MissingCompilerEvidence
+UNKNOWN in each profile. Rebuilding an actual dependency getter mutation refutes every profile
+and fails native 129-element execution; original native tests pass. Constructor invariants,
+method arithmetic and const-generic claims are checked through actual bodies. The shared core-only
+88-case/31-family baseline remains unchanged; these dependency controls have their own integration.

@@ -106,8 +106,7 @@ impl<'tcx> Engine<'tcx> {
                 ))
             }
             (ty::Adt(def, args), CompositeShape::Struct { name, fields })
-                if def.did().is_local()
-                    && def.is_struct()
+                if self.plain_composite_struct(*def)
                     && self.tcx.def_path_str(def.did()) == *name
                     && def.non_enum_variant().fields.len() == fields.len() =>
             {

@@ -64,10 +64,10 @@ array behind the existing single immutable caller-root certificate. Their length
 actual target byte extent; it has no 128-element input cap. Exact pure tuple and fixed-array
 primitive elements likewise admit arbitrary runtime lengths. Their expanded type shapes retain
 node/depth limits and a 128-element array shape budget, independently of the slice length.
-Local ordinary structs with exact original pure fields also use this domain. Copy, Freeze,
+Ordinary local and dependency structs with exact original pure fields also use this domain. Copy, Freeze,
 no-drop, compiler scalar validity and original field identities are checked at every struct node.
 Zero-byte struct nodes require an empty actual primitive inventory and retain nominal values.
-Packed/vector layouts, external ADTs and identity-bearing fields remain
+Packed/vector layouts, core and compiler-special ADTs and identity-bearing fields remain
 unsupported; constructor policies do not constrain arbitrary valid input values.
 Pure zero-sized tuple/array elements are supported with an empty primitive inventory and full
 target-usize length metadata. Original inner types are certified even beneath zero-length arrays.
@@ -121,6 +121,14 @@ and context; compressed byte arrays still charge every byte against the candidat
 All bytes and sibling fields use the same index. The result is a canonical finite byte value,
 with no storage identity or new borrow permission. Bare snapshots and untyped reference reads
 retain their prior behavior. The original nested byte-array choice source now proves.
+
+Stage 159 admits ordinary structs from separately compiled dependencies under the same original
+field, Copy/Freeze/no-drop, compiler layout and source certificates. An actual compiler core-crate
+anchor and exact ordinary structural flags exclude core and compiler-special wrappers. Missing
+anchors and unknown future flags refuse the new domain. Private fields and constructors add no
+input invariant. Actual dependency method bodies remain required; unavailable MIR stays UNKNOWN.
+A dedicated dependency rlib fixture covers all four profiles, including rebuilt dependency
+mutations and genuine omitted-MIR controls. The core-only shared 88-case manifest is unchanged.
 
 ## UNKNOWN categories
 
