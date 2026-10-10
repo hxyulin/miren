@@ -11,8 +11,8 @@ execution at O0 and O2, positive/refuted/unknown controls, a source mutation tha
 structured UNKNOWN reporting, and passing repository checks. Completion establishes a repeatable
 baseline. It does not establish full Rust support or a completed memory-model refactor.
 
-The manifest contains 85 cases across 30 families. Each build configuration expects 34 PROVED,
-31 REFUTED and 20 UNKNOWN results. Stage 133 originally had 23 cases with 10 PROVED, 9 REFUTED
+The manifest contains 88 cases across 31 families. Each build configuration expects 36 PROVED,
+32 REFUTED and 20 UNKNOWN results. Stage 133 originally had 23 cases with 10 PROVED, 9 REFUTED
 and 4 UNKNOWN; stage 134 closed its retained-prefix projection gap. Stage 136 adds raw-pointer
 metadata P/R controls and a safe core reference-array grant that remains UNKNOWN without a
 temporal permission certificate. Stage 137 adds tuple-array P/R and unsupported symbolic-write
@@ -113,6 +113,14 @@ symbolic index, and Float storage bits survive only with certificates from every
 Generic operation types come from compiler MIR, rather than names or matching scalar widths.
 Untyped retained reference projections and ambiguous writes remain separate frontiers. User
 methods still execute their actual bodies, and no constructor invariant constrains input fields.
+
+Stage 158 extends the same actual MIR owned-choice path to exact original fixed byte arrays.
+A private original-type annotation preserves u8 identity even at zero length, after the existing
+complete pure type certificate. Bytes and Elements carriers require exact count, byte metadata
+and context; compressed byte arrays still charge every byte against the candidate budget.
+All bytes and sibling fields use the same index. The result is a canonical finite byte value,
+with no storage identity or new borrow permission. Bare snapshots and untyped reference reads
+retain their prior behavior. The original nested byte-array choice source now proves.
 
 ## UNKNOWN categories
 

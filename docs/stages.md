@@ -3582,3 +3582,55 @@ Two earlier full attempts exposed obsolete expected-UNKNOWN harness entries for 
 struct copies. Their failures remain at `/tmp/miren-stage157-old-expectation-checks` and
 `/tmp/miren-stage157-second-old-expectation-checks`. Actual four-profile probes and native mutation
 controls justify expectation-only maintenance; the final complete rerun passes.
+
+
+## Stage 158: compiler-certified finite byte-array choices
+
+The actual typed Copy/Move array selector now uses a private owned-shape annotation with explicit
+ByteArray nodes. It walks original compiler types alongside the complete existing pure certificate,
+retaining exact u8 identity even at N=0 and original instantiated struct field types. Incoming
+composite shapes and observations retain their representation. Earlier constant/primitive/unique
+selection, bounds, source and solver checks retain their order; no generic Bytes selector changes.
+
+ByteArray candidates require exact count, unsigned target-usize constant length, byte data sort
+and Context before any Select. Elements candidates require complete unsigned BV8 leaves. Every
+candidate byte consumes the unchanged node budget, including compressed Bytes. All byte and
+sibling primitive columns share the same index; canonical ConstArray/Store copies retain only the
+finite logical bytes. Typed annotation and copied values add no source identity or raw/borrow
+permission. The neutral exact byte-metadata predicate is extracted from MaybeUninit unchanged;
+its initialization policy, original type gates and diagnostic remain in that separate domain.
+
+The dedicated 21-root matrix yields 10 PROVED, 3 REFUTED and 8 UNKNOWN per host/ARM O0/O2 build.
+Local Bytes versus incoming Elements rows, nested structs/tuples with Float/Char siblings, exact
+empty u8 versus empty nonbyte arrays, owned writes preserving source and actual helper entries
+are covered. Actual byte-position mutation refutes all four profiles and fails valid native
+129-element inputs at O0/O2; five native original controls pass with durable logs and timeouts.
+Incoming untyped Elements selection was already supported and remains an explicit control.
+Distinct local Bytes retained borrows, raw/ref/Drop/restricted original N=0 children, ambiguous
+stores, resource and missing-body boundaries retain their honest producer categories.
+
+Original Stage 150 byte_array_choices and Stage 157 byte_choices sources now prove; only harness
+expectations change. Six final focused tests, six related MaybeUninit/composite tests, two private
+owned-certificate units and the preserved byte-validity unit pass, along with build/lint/fmt.
+Independent source and focused-evidence review approves the exact owned type and copy protocol.
+
+The unchanged original shared nested_byte_array_choice source advances from UNKNOWN to PROVED.
+Three new typed byte-choice P/R and missing invoked body U controls yield 88 cases across
+31 families, expecting 36 PROVED, 32 REFUTED and 20 UNKNOWN per configuration. Both shared
+baseline integration tests pass.
+
+
+Full isolated validation passes 654 Rust tests and 68 Python tests, formatting, cargo lint,
+release builds, cargo deny, documentation build and manual hooks. Main's complete 606 tracked
+files match the validated snapshot byte for byte. Fresh debug/release builds, ten new/related
+integration tests, 68 Python tests and the remaining required checks also pass in main. Frozen
+isolated and merged surveys each record 144 PROVED, 128 REFUTED and 80 UNKNOWN at
+`/tmp/miren-stage158-capabilities-20261010` and
+`/tmp/miren-stage158-merged-capabilities-20261010`, with current source/input/release hashes verified.
+All 260 earlier completed P/R roots retain identical obligation statuses, details and query text
+across four configurations. Independent review approves exact byte metadata and owned-copy effects.
+
+The initial full attempt inherited an obsolete parent expected-UNKNOWN entry for the unchanged
+struct copy source; its failure remains at `/tmp/miren-stage158-parent-old-expectation-checks`.
+Mirroring the independently justified Stage 157 harness maintenance restores the expectation;
+no Stage 158 semantics change was needed, and the final complete rerun passes.

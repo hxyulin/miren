@@ -1354,3 +1354,9 @@ shared-index merge; nominal fields, Float storage bits and valid Char values ret
 Constant, singleton and solver-unique identity-bearing selection retain their existing paths.
 Untyped retained reference projections and ambiguous stores remain unsupported; owned copies add
 no raw, alias, custom-method purity or constructor-invariant assumptions.
+
+The compiler-typed owned array choice also accepts exact fixed u8-array descendants. An original
+u8 type annotation survives zero length; byte carriers must match constant count and exact
+context/sorts before observation. Bytes and Elements are normalized to bounded byte values, with
+all candidate byte nodes charged. Canonical copied byte arrays retain shared-index correlation
+and local write independence without granting source, raw or retained-reference permissions.

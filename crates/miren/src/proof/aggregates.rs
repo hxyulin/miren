@@ -344,7 +344,7 @@ impl<'tcx> Engine<'tcx> {
         }
         if let Some(original) = original
             && let Some(selected) =
-                self.typed_struct_array_choice(original, elements, index, conditions)?
+                self.typed_owned_array_choice(original, elements, index, conditions)?
         {
             return Ok(selected);
         }

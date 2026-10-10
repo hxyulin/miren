@@ -651,22 +651,7 @@ fn validate_byte_payload(
     length: &Value,
     data: &Term,
 ) -> Result<(), String> {
-    let (length, bits, signed) = length.integer()?;
-    if bits != pointer_bits
-        || signed
-        || !length.belongs_to(context)
-        || length.sort() != &Sort::BitVec(pointer_bits)
-        || symbolic::constant(&length)
-            != Some(symbolic::Constant::BitVec {
-                value: u128::from(count),
-                bits: pointer_bits,
-            })
-        || !data.belongs_to(context)
-        || data.sort()
-            != &Sort::Array(
-                Box::new(Sort::BitVec(pointer_bits)),
-                Box::new(Sort::BitVec(8)),
-            )
+    if !aggregate_validity::byte_array_payload_matches(context, pointer_bits, count, length, data)?
     {
         return Err(
             "MaybeUninit initialized byte array has invalid length, sort or context".into(),

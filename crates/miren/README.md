@@ -693,6 +693,12 @@ alternatives carry them; Char leaves require validity under the current conditio
 constant, singleton and solver-unique handle reads retain their prior behavior. Untyped retained
 reference projection chains and ambiguous writes gain no support; this owned-value operation
 adds no reference, raw address, method-purity or constructor-invariant assumptions.
+An original compiler `u8` array annotation also permits finite owned byte-array alternatives,
+including empty arrays. Exact Elements and Bytes carriers share the same checked byte domain;
+length, target-usize sorts and analysis context must agree with the original fixed array.
+Every byte counts toward the existing candidate budget. Selected arrays rebuild canonical owned
+byte values, while incoming composite observations and generic byte-slice selection remain
+unchanged. Untyped views cannot supply this original compiler array certificate.
 
 Concrete synchronous closures can carry supported read-only scalar slices and initialized pure
 `MaybeUninit` values through their exact compiler capture types. Shared capture metadata checks

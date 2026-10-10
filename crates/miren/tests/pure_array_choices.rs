@@ -84,7 +84,7 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
         }
         if *expected == ProofStatus::Unknown {
             let (category, reason) = match *name {
-                "ambiguous_references" | "byte_array_choices" => (
+                "ambiguous_references" => (
                     UnknownCategory::Unclassified,
                     "non-scalar array index is not uniquely determined on this path",
                 ),
@@ -174,7 +174,7 @@ fn pure_nested_array_choices_preserve_correlations_and_existing_rights() {
         ("ambiguous_references", ProofStatus::Unknown),
         ("ambiguous_adt", ProofStatus::Proved),
         ("ambiguous_drop", ProofStatus::Unknown),
-        ("byte_array_choices", ProofStatus::Unknown),
+        ("byte_array_choices", ProofStatus::Proved),
         ("symbolic_mutation", ProofStatus::Unknown),
     ];
     for target in [None, Some("thumbv7em-none-eabihf")] {

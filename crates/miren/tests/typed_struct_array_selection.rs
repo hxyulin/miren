@@ -89,7 +89,6 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
                 | "ambiguous_reference"
                 | "raw_record"
                 | "refined_zero_array"
-                | "byte_choices"
                 | "analyzer_only::untyped_retained" => (
                     UnknownCategory::Unclassified,
                     "non-scalar array index is not uniquely determined on this path",
@@ -209,7 +208,7 @@ fn typed_array_selection_preserves_nominal_fields_and_correlations() {
         ("raw_record", ProofStatus::Unknown),
         ("refined_zero_array", ProofStatus::Unknown),
         ("dropped_record", ProofStatus::Unknown),
-        ("byte_choices", ProofStatus::Unknown),
+        ("byte_choices", ProofStatus::Proved),
         ("oversized_shape", ProofStatus::Unknown),
         ("full_contains", ProofStatus::Unknown),
         ("full_equality", ProofStatus::Unknown),

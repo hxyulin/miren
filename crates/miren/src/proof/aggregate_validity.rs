@@ -1,4 +1,5 @@
-//! Exact aggregate scalar validity correlation with actual compiler field layouts.
+//! Exact aggregate metadata and scalar validity correlation with compiler field layouts.
+use super::{Context, Sort, Term, Value, symbolic};
 use rustc_abi::BackendRepr;
 
 pub(super) fn scalar_fields_match(
@@ -32,4 +33,29 @@ pub(super) fn scalar_fields_match(
         BackendRepr::SimdVector { .. } | BackendRepr::SimdScalableVector { .. } => false,
         BackendRepr::Memory { .. } => true,
     }
+}
+
+pub(super) fn byte_array_payload_matches(
+    context: &Context,
+    pointer_bits: u32,
+    count: u64,
+    length: &Value,
+    data: &Term,
+) -> Result<bool, String> {
+    let (length, bits, signed) = length.integer()?;
+    Ok(bits == pointer_bits
+        && !signed
+        && length.belongs_to(context)
+        && length.sort() == &Sort::BitVec(pointer_bits)
+        && symbolic::constant(&length)
+            == Some(symbolic::Constant::BitVec {
+                value: u128::from(count),
+                bits: pointer_bits,
+            })
+        && data.belongs_to(context)
+        && data.sort()
+            == &Sort::Array(
+                Box::new(Sort::BitVec(pointer_bits)),
+                Box::new(Sort::BitVec(8)),
+            ))
 }

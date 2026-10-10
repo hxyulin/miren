@@ -344,9 +344,7 @@
     {
       "entry": "nested_byte_array_choice",
       "family": "nested_array_choice",
-      "expected": "unknown",
-      "unknown_reason": "non-scalar array index is not uniquely determined on this path",
-      "unknown_category": "unclassified"
+      "expected": "proved"
     },
     {
       "entry": "composite_iterator_nth",
@@ -463,6 +461,23 @@
     {
       "entry": "typed_struct_array_missing_body",
       "family": "typed_struct_array_choice",
+      "expected": "unknown",
+      "unknown_reason": "no compiler-exported Rust definition matches the foreign symbol",
+      "unknown_category": "missing_compiler_evidence"
+    },
+    {
+      "entry": "typed_byte_array_choice",
+      "family": "typed_byte_array_choice",
+      "expected": "proved"
+    },
+    {
+      "entry": "typed_byte_array_wrong_claim",
+      "family": "typed_byte_array_choice",
+      "expected": "refuted"
+    },
+    {
+      "entry": "typed_byte_array_missing_body",
+      "family": "typed_byte_array_choice",
       "expected": "unknown",
       "unknown_reason": "no compiler-exported Rust definition matches the foreign symbol",
       "unknown_category": "missing_compiler_evidence"

@@ -639,6 +639,37 @@ pub fn typed_struct_array_missing_body(index: usize) -> u16 {
     }
 }
 
+pub fn typed_byte_array_choice(index: usize) {
+    let values = [[3_u8, 7], [11, 13]];
+    if index < values.len() {
+        let selected = values[index];
+        assert!(selected[0] == if index == 0 { 3 } else { 11 });
+        assert!(selected[1] == if index == 0 { 7 } else { 13 });
+    }
+}
+
+pub fn typed_byte_array_wrong_claim(index: usize) {
+    let values = [[3_u8, 7], [11, 13]];
+    if index < values.len() {
+        assert!(values[index][0] == 0);
+    }
+}
+
+#[cfg(not(test))]
+unsafe extern "Rust" {
+    fn opaque_typed_byte(value: u8) -> u8;
+}
+
+#[cfg(not(test))]
+pub fn typed_byte_array_missing_body(index: usize) -> u8 {
+    let values = [[3_u8, 7], [11, 13]];
+    if index < values.len() {
+        unsafe { opaque_typed_byte(values[index][0]) }
+    } else {
+        0
+    }
+}
+
 #[cfg(test)]
 mod native {
     use super::*;
@@ -647,6 +678,9 @@ mod native {
     #[test]
     fn positives() {
         integers(199);
+        typed_byte_array_choice(0);
+        typed_byte_array_choice(1);
+        typed_byte_array_choice(usize::MAX);
         typed_struct_array_choice(0);
         typed_struct_array_choice(1);
         typed_struct_array_choice(usize::MAX);
@@ -795,5 +829,10 @@ mod native {
     #[should_panic]
     fn typed_struct_array_wrong_claim_panics() {
         typed_struct_array_wrong_claim(1);
+    }
+    #[test]
+    #[should_panic]
+    fn typed_byte_array_wrong_claim_panics() {
+        typed_byte_array_wrong_claim(1);
     }
 }
