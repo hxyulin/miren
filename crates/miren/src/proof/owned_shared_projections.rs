@@ -3,33 +3,90 @@ use super::*;
 use memory::MAX_ALLOCATIONS;
 use storage_locations::StorageLocation;
 use symbolic::MemoryProjection;
-use typed_array_choices::MAX_CHOICE_NODES;
+use typed_array_choices::{MAX_CHOICE_DEPTH, MAX_CHOICE_NODES};
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) struct OwnedProjectionCertificate<'tcx> {
+    original: Ty<'tcx>,
+    fields: Vec<usize>,
+}
 
 impl<'tcx> Engine<'tcx> {
-    pub(super) fn owned_array_projection_type(
-        &self,
-        certificate: usize,
-    ) -> Result<Ty<'tcx>, String> {
-        self.owned_array_projection_types
-            .get(certificate)
-            .copied()
-            .ok_or_else(|| "typed owned projection has no compiler certificate".into())
-    }
-
-    fn owned_array_projection_certificate(&mut self, original: Ty<'tcx>) -> Result<usize, String> {
+    fn owned_projection_certificate(
+        &mut self,
+        original: Ty<'tcx>,
+        fields: Vec<usize>,
+    ) -> Result<usize, String> {
+        validate_projection_prefix(&fields)?;
+        let certificate = OwnedProjectionCertificate { original, fields };
         if let Some(id) = self
-            .owned_array_projection_types
+            .owned_projection_certificates
             .iter()
-            .position(|ty| *ty == original)
+            .position(|issued| *issued == certificate)
         {
             return Ok(id);
         }
-        if self.owned_array_projection_types.len() >= MAX_CHOICE_NODES {
+        if self.owned_projection_certificates.len() >= MAX_CHOICE_NODES {
             return Err("typed owned projection certificate budget exceeded".into());
         }
-        let id = self.owned_array_projection_types.len();
-        self.owned_array_projection_types.push(original);
+        let id = self.owned_projection_certificates.len();
+        self.owned_projection_certificates.push(certificate);
         Ok(id)
+    }
+
+    pub(super) fn read_typed_owned_projection(
+        &self,
+        certificate: usize,
+        value: Value,
+        index: &Value,
+        conditions: &[Term],
+    ) -> Result<Value, String> {
+        let certificate = self
+            .owned_projection_certificates
+            .get(certificate)
+            .ok_or("typed owned projection has no compiler certificate")?;
+        // Keep prior direct-array reads, including their query construction, unchanged.
+        if certificate.fields.is_empty() {
+            return self.read_typed_owned_index(certificate.original, value, index, conditions);
+        }
+        validate_projection_prefix(&certificate.fields)?;
+        if !matches!(certificate.original.kind(), ty::Tuple(_) | ty::Adt(..)) {
+            return Err("typed field projection lacks original compiler product".into());
+        }
+        let shape = self
+            .owned_product_shape(certificate.original)?
+            .ok_or("typed field projection requires a pure original compiler root")?;
+        let mut value = self.prepare_typed_product(certificate.original, &shape, &value, 0)?;
+        self.validate_owned_product(certificate.original, &value, conditions)?;
+        let mut original = certificate.original;
+        for field in &certificate.fields {
+            let child = self.owned_projection_field_type(original, *field)?;
+            value = self.memory_projection(value, &MemoryProjection::Field(*field), conditions)?;
+            original = child;
+        }
+        self.read_typed_owned_index(original, value, index, conditions)
+    }
+
+    fn owned_projection_field_type(
+        &self,
+        original: Ty<'tcx>,
+        field: usize,
+    ) -> Result<Ty<'tcx>, String> {
+        match original.kind() {
+            ty::Tuple(fields) => {
+                validate_projection_field(field, fields.len())?;
+                fields.get(field).copied()
+            }
+            ty::Adt(def, args) if self.plain_composite_struct(*def) => {
+                let fields = &def.non_enum_variant().fields;
+                validate_projection_field(field, fields.len())?;
+                fields
+                    .get(rustc_abi::FieldIdx::from_usize(field))
+                    .map(|field| field.ty(self.tcx, args).skip_norm_wip())
+            }
+            _ => None,
+        }
+        .ok_or_else(|| "typed owned projection field has no original compiler identity".into())
     }
 
     pub(super) fn read_typed_owned_index(
@@ -70,7 +127,7 @@ impl<'tcx> Engine<'tcx> {
         }
     }
 
-    pub(super) fn borrow_typed_owned_array(
+    pub(super) fn borrow_typed_owned_projection(
         &mut self,
         body: &Body<'tcx>,
         state: &mut State,
@@ -78,8 +135,15 @@ impl<'tcx> Engine<'tcx> {
     ) -> Result<Option<Value>, String> {
         let local = place.local.as_usize();
         let original = body.local_decls[place.local].ty;
-        if !matches!(original.kind(), ty::Array(..))
-            || !matches!(place.projection.first(), Some(ProjectionElem::Index(_)))
+        let field_root = matches!(original.kind(), ty::Tuple(_) | ty::Adt(..))
+            && matches!(place.projection.first(), Some(ProjectionElem::Field(..)))
+            && place
+                .projection
+                .iter()
+                .any(|part| matches!(part, ProjectionElem::Index(_)));
+        let array_root = matches!(original.kind(), ty::Array(..))
+            && matches!(place.projection.first(), Some(ProjectionElem::Index(_)));
+        if (!array_root && !field_root)
             || place.projection.iter().any(|part| {
                 !matches!(
                     part,
@@ -100,9 +164,18 @@ impl<'tcx> Engine<'tcx> {
         let source = self.local(state, local)?;
         self.validate_tracked_value(&source, state)?;
         self.validate_owned_product(original, &source, &state.conditions)?;
-        let mut value = source.clone();
+        let mut value = if field_root {
+            let shape = self
+                .owned_product_shape(original)?
+                .ok_or("typed field borrow requires an original pure product")?;
+            self.prepare_typed_product(original, &shape, &source, 0)?
+        } else {
+            source.clone()
+        };
         let mut ty = original;
         let mut path = Vec::new();
+        let mut leading_fields = Vec::new();
+        let mut before_index = field_root;
         for part in place.projection {
             match part {
                 ProjectionElem::Index(index) => {
@@ -111,7 +184,12 @@ impl<'tcx> Engine<'tcx> {
                     }
                     let index = self.local(state, index.as_usize())?;
                     value = self.read_typed_owned_index(ty, value, &index, &state.conditions)?;
-                    let certificate = self.owned_array_projection_certificate(ty)?;
+                    let certificate = if before_index {
+                        self.owned_projection_certificate(original, leading_fields.clone())?
+                    } else {
+                        self.owned_projection_certificate(ty, Vec::new())?
+                    };
+                    before_index = false;
                     let ty::Array(inner, _) = ty.kind() else {
                         unreachable!();
                     };
@@ -144,7 +222,12 @@ impl<'tcx> Engine<'tcx> {
                         false,
                     );
                     value = self.read_typed_owned_index(ty, value, &index, &state.conditions)?;
-                    let certificate = self.owned_array_projection_certificate(ty)?;
+                    let certificate = if before_index {
+                        self.owned_projection_certificate(original, leading_fields.clone())?
+                    } else {
+                        self.owned_projection_certificate(ty, Vec::new())?
+                    };
+                    before_index = false;
                     ty = *inner;
                     path.push(MemoryProjection::TypedIndex {
                         index: Box::new(index),
@@ -152,23 +235,19 @@ impl<'tcx> Engine<'tcx> {
                     });
                 }
                 ProjectionElem::Field(index, recorded) => {
-                    let child = match ty.kind() {
-                        ty::Tuple(fields) => fields.get(index.as_usize()).copied(),
-                        ty::Adt(def, args) if self.plain_composite_struct(*def) => def
-                            .non_enum_variant()
-                            .fields
-                            .get(index)
-                            .map(|field| field.ty(self.tcx, args).skip_norm_wip()),
-                        _ => None,
-                    }
-                    .ok_or("typed owned projection field has no original compiler identity")?;
+                    let child = self.owned_projection_field_type(ty, index.as_usize())?;
                     if child != recorded {
                         return Err("typed owned field differs from compiler type".into());
                     }
                     let projection = MemoryProjection::Field(index.as_usize());
                     value = self.memory_projection(value, &projection, &state.conditions)?;
                     ty = child;
-                    path.push(projection);
+                    if before_index {
+                        leading_fields.push(index.as_usize());
+                        validate_projection_prefix(&leading_fields)?;
+                    } else {
+                        path.push(projection);
+                    }
                 }
                 _ => return Ok(None),
             }
@@ -186,7 +265,12 @@ impl<'tcx> Engine<'tcx> {
             state.addresses[local] = Some(allocation);
             allocation
         };
-        let model = "compiler-certified retained owned array shared projection".to_owned();
+        let model = if field_root {
+            "compiler-certified retained owned field-array shared projection"
+        } else {
+            "compiler-certified retained owned array shared projection"
+        }
+        .to_owned();
         if !self.proof.models.contains(&model) {
             self.proof.models.push(model);
         }
@@ -196,6 +280,20 @@ impl<'tcx> Engine<'tcx> {
             mutable: false,
         }))
     }
+}
+
+fn validate_projection_prefix(fields: &[usize]) -> Result<(), String> {
+    if fields.len() > MAX_CHOICE_DEPTH {
+        return Err("typed owned field prefix exceeds its depth budget".into());
+    }
+    Ok(())
+}
+
+fn validate_projection_field(field: usize, count: usize) -> Result<(), String> {
+    if count > MAX_CHOICE_NODES || field >= count {
+        return Err("typed owned projection field exceeds its compiler inventory".into());
+    }
+    Ok(())
 }
 
 fn validate_projection_index(
@@ -235,5 +333,17 @@ mod tests {
         };
         assert!(validate_projection_index(&context, 32, &forged).is_err());
         assert!(validate_projection_index(&context, 32, &Value::Unit).is_err());
+    }
+
+    #[test]
+    fn retained_field_metadata_checks_full_inventory_and_prefix_budget() {
+        validate_projection_field(0, 1).unwrap();
+        validate_projection_field(3, 4).unwrap();
+        for (field, count) in [(0, 0), (4, 4), (usize::MAX, 4), (0, MAX_CHOICE_NODES + 1)] {
+            assert!(validate_projection_field(field, count).is_err());
+        }
+        validate_projection_prefix(&[]).unwrap();
+        validate_projection_prefix(&[0; MAX_CHOICE_DEPTH]).unwrap();
+        assert!(validate_projection_prefix(&[0; MAX_CHOICE_DEPTH + 1]).is_err());
     }
 }

@@ -4295,3 +4295,52 @@ corrected formatting and its two affected compiler tests pass. Both surveys reta
 identical status, obligation details and query text across four profiles. Independent review
 approves final source, actual helper mutation and valid native evidence. No assumptions, input
 caps or resource-budget changes are introduced.
+
+
+## Stage 171: retained shared array projections behind owned fields
+
+A direct owned-array certificate cannot validate the original enclosing tuple or ordinary struct
+when a retained projection starts with Field. The proposed extension records the original pure
+root type and bounded field path in the private certificate. Every observation must validate the
+complete current live root before field materialization and selected array reading. Empty paths
+preserve earlier direct-array behavior, with unchanged owner, lifetime and reference checks.
+
+Three shared controls retain actual three-root 64-element arrays within ordinary structs,
+selected-field and wrong-root claims, and actual shared getter body entry. Before probes return
+UNKNOWN at the projected-borrow boundary in all four profiles, including the missing-body control
+which has not yet reached its call. Commands, source/analyzer hashes and original reports remain
+at `/tmp/miren-stage171-shared-expanded-before`. Final implementation and validation are pending.
+
+
+Initial shared after-probes yield PROVED for the selected and repeated-field claims, REFUTED for
+the independent-root claim, and missing-actual-getter-body UNKNOWN across host/ARM O0/O2 with
+empty assumptions. Complete commands, hashes and reports remain at
+`/tmp/miren-stage171-shared-expanded-after`; immutable final recapture and validation are pending.
+
+
+The final dedicated 32-root matrix yields 19 PROVED, 4 REFUTED and 9 UNKNOWN per profile.
+Eight eager/byte/primitive/Char/static paths already succeed before the extension; their original
+sources remain unchanged and acquire no new-model attribution. Eight pre-existing entries retain
+exact completed query text in every profile: 32 entry/profile comparisons and 80 obligations in
+total. Four older direct-array callee/equality/byte/float roots also retain exact queries in all
+four configurations: 16 entry/profile comparisons and 40 obligations in total.
+
+The actual shared getter changes field 0 to field 1; unchanged caller claims refute in every build
+with actual body entry and the same failing query/model. Originals pass seven valid native tests
+at O0/O2; mutant guards exit 101. Complete reports, commands, hashes, outputs and ten-second
+timeouts remain at `/tmp/miren-stage171-final-evidence`. Two dedicated compiler tests, two
+metadata tests, eight reference-graph tests and seventeen related integration tests pass.
+The initial obsolete model-label assertion failure remains preserved. Final shared recapture
+retains P/R/missing-body U under the frozen binary and empty assumptions. Full validation pending.
+
+
+Final frozen validation passes all 698 Rust tests and 68 Python tests in the isolated workspace.
+All 636 tracked main files match that snapshot byte for byte. Fresh main debug/release builds,
+twenty-nine new/related integration tests, 68 Python tests and every remaining required check
+pass. Both surveys retain 200 PROVED, 176 REFUTED and 124 UNKNOWN, with source/input/release hashes
+verified, at `/tmp/miren-stage171-capabilities-20261010` and
+`/tmp/miren-stage171-merged-capabilities-20261010`. All 368 earlier completed roots preserve
+identical status, obligation details and query text across four profiles. Independent review
+approves final source, actual getter mutation, valid native evidence and 48 entry/profile
+comparisons of old paths. Initial obsolete model-label failures remain preserved. No assumptions,
+input caps or resource-budget changes are introduced.

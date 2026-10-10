@@ -143,7 +143,7 @@ struct Engine<'tcx> {
     input_depth: usize,
     input_values: usize,
     input_reservations: Vec<input_reservations::IssuedInput<'tcx>>,
-    owned_array_projection_types: Vec<Ty<'tcx>>,
+    owned_projection_certificates: Vec<owned_shared_projections::OwnedProjectionCertificate<'tcx>>,
     input_shapes: std::collections::HashMap<Ty<'tcx>, std::rc::Rc<symbolic::input::InputShape>>,
     zero_sized_inputs:
         std::collections::HashMap<Ty<'tcx>, std::rc::Rc<symbolic::input::InputShape>>,
@@ -212,7 +212,7 @@ pub fn verify(
         input_depth: 0,
         input_values: 0,
         input_reservations: Vec::new(),
-        owned_array_projection_types: Vec::new(),
+        owned_projection_certificates: Vec::new(),
         input_shapes: std::collections::HashMap::new(),
         zero_sized_inputs: std::collections::HashMap::new(),
         zero_sized_input_nodes: 0,
@@ -2057,7 +2057,7 @@ impl<'tcx> Engine<'tcx> {
                             == "non-scalar array index is not uniquely determined on this path" =>
                     {
                         Ok(self
-                            .borrow_typed_owned_array(body, state, *place)?
+                            .borrow_typed_owned_projection(body, state, *place)?
                             .ok_or(error)?)
                     }
                     Err(error) => Err(error),

@@ -256,8 +256,7 @@ impl<'tcx> Engine<'tcx> {
         conditions: &[Term],
     ) -> Result<Value, String> {
         if let MemoryProjection::TypedIndex { index, certificate } = projection {
-            let original = self.owned_array_projection_type(*certificate)?;
-            return self.read_typed_owned_index(original, value, index, conditions);
+            return self.read_typed_owned_projection(*certificate, value, index, conditions);
         }
         match (projection, value.materialize()?) {
             (MemoryProjection::Field(index), Value::Adt { fields, .. }) => fields

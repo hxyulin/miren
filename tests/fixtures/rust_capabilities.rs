@@ -1240,6 +1240,59 @@ pub fn owned_product_array_missing_body(
     }
 }
 
+#[inline(never)]
+fn retained_owned_field_getter(record: &ReservedRecord) -> u16 {
+    record.left
+}
+
+pub fn retained_owned_field_read(
+    first: OwnedArrayProduct,
+    _second: OwnedArrayProduct,
+    _third: OwnedArrayProduct,
+    index: usize,
+) {
+    if index < first.rows.len() {
+        let borrowed = &first.rows[index];
+        let repeated = &first.rows[index];
+        let selected = first.rows[index];
+        assert!(retained_owned_field_getter(borrowed) == selected.left);
+        assert!(borrowed.right == repeated.right);
+    }
+}
+
+pub fn retained_owned_field_wrong_claim(
+    first: OwnedArrayProduct,
+    second: OwnedArrayProduct,
+    _third: OwnedArrayProduct,
+    index: usize,
+) {
+    if index < first.rows.len() {
+        let borrowed = &first.rows[index];
+        let different = second.rows[index];
+        assert!(retained_owned_field_getter(borrowed) == different.left);
+    }
+}
+
+#[cfg(not(test))]
+unsafe extern "Rust" {
+    fn opaque_retained_owned_field_getter(record: &ReservedRecord) -> u16;
+}
+
+#[cfg(not(test))]
+pub fn retained_owned_field_missing_body(
+    first: OwnedArrayProduct,
+    _second: OwnedArrayProduct,
+    _third: OwnedArrayProduct,
+    index: usize,
+) -> u16 {
+    if index < first.rows.len() {
+        let borrowed = &first.rows[index];
+        unsafe { opaque_retained_owned_field_getter(borrowed) }
+    } else {
+        0
+    }
+}
+
 #[cfg(test)]
 mod native {
     use super::*;
@@ -1275,6 +1328,7 @@ mod native {
         let product = OwnedArrayProduct { rows: records, ready: true };
         for index in [0, 63, 64, usize::MAX] {
             owned_product_array_write(product, product, product, index, u16::MAX);
+            retained_owned_field_read(product, product, product, index);
         }
         safe_sized_alignment(SizedLayoutZero);
         deferred_zero_owned_write([DeferredZero; 2], 0);
@@ -1462,6 +1516,17 @@ mod native {
         let first = [ReservedRecord { left: 3, right: 7 }; 64];
         let second = [ReservedRecord { left: 5, right: 11 }; 64];
         registered_product_wrong_claim(first, second, first, 63);
+    }
+    #[test]
+    #[should_panic]
+    fn retained_owned_field_wrong_claim_panics() {
+        let first = OwnedArrayProduct {
+            rows: [ReservedRecord { left: 3, right: 7 }; 64], ready: true,
+        };
+        let second = OwnedArrayProduct {
+            rows: [ReservedRecord { left: 5, right: 11 }; 64], ready: false,
+        };
+        retained_owned_field_wrong_claim(first, second, first, 63);
     }
     #[test]
     #[should_panic]

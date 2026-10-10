@@ -1545,3 +1545,11 @@ The dedicated 29-root matrix yields 14 PROVED, 5 REFUTED and 10 UNKNOWN per conf
 Actual index mutation refutes in all profiles and fails valid native execution. Shared root
 products retain their actual 195-slot input descriptors and produce P/R/missing-body U with empty
 assumptions. Frozen host/ARM O0/O2 surveys and all required validation pass.
+
+
+Stage 171 adds a compiler root-and-field-path certificate for retained shared array projections
+behind owned pure tuple and ordinary struct fields. Complete current root preparation must precede
+field materialization on every read; compiler type evidence grants no additional access rights.
+The existing direct-array path and raw, mutable, static and frame-escape frontiers remain required.
+Before probes retain UNKNOWN across all four profiles; frozen after-probes retain P/R/missing-body
+U with empty assumptions. Frozen surveys and all required validation pass.

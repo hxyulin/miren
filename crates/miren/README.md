@@ -780,6 +780,14 @@ Scalar-bearing deferred products retain their issued reservation requirements. C
 preserves source identity and observes later owner updates. Ordinary calls and comparison bodies
 retain their existing execution and body-availability rules. These projections cannot grant mutable
 access or raw addresses, and frame-owned borrows cannot escape through returns or closure captures.
+Owned tuple and ordinary-struct field prefixes can use the same retained projection. Its immutable
+certificate records the complete original root type and declaration-ordered field path. Every
+observation certifies and prepares the live complete root before materializing any leading field;
+array inventory, index bounds and exact scalar metadata remain checked. The reference keeps the
+same owner allocation, rather than a detached selected copy. Empty-prefix array certificates keep
+the earlier reader and query construction. Field-prefix certificates supply no mutable, raw-address
+or frame-escape permission, and unsupported siblings remain unsupported even when the target field
+is pure.
 Existing eager, constant and uniquely determined borrows keep their prior paths. Raw, static,
 reference-source and mutable destinations gain no new borrow support.
 
