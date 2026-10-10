@@ -3468,6 +3468,7 @@ The shared manifest adds local struct read P/R and whole membership U controls: 
 28 families, expecting 32 PROVED, 29 REFUTED and 18 UNKNOWN per configuration. Both baseline
 integration tests pass.
 
+
 Final isolated and merged validation each passes 645 Rust tests and 68 Python tests, formatting,
 cargo lint, release builds, cargo deny, documentation build and manual hooks. Frozen evidence at
 `/tmp/miren-stage155-capabilities-20261010` and
@@ -3482,3 +3483,50 @@ Cargo freshness checks; its failures are preserved at
 `/tmp/miren-stage155-merged-stale-binary-checks`. A fresh explicit binary build restores the
 struct cases and the complete rerun passes. Later copied snapshots use fresh file timestamps and
 validation builds analyzer binaries explicitly before compiler integration tests.
+
+
+## Stage 156: exact nominal zero-sized local struct slices
+
+The local struct certificate now admits zero-byte nodes at every shape level after complete
+original field/type probes, unchanged budgets and compiler scalar validity checks. A per-node
+consistency gate requires no actual primitive storage leaves for zero layout size. Top-level
+eligibility keeps the same local ordinary struct policy without its prior size-only exclusion.
+Exact named Adt observations retain zero variant/discriminant, false Option identity and ordered
+fields; no struct is replaced by unit. Restricted or unsupported original children remain refused
+beneath empty arrays. Source, typed carrier, body and layout protocols retain their behavior.
+
+Existing zero-stride extent and ordered cursor models cover the full target-usize length domain,
+including aligned zero-byte structs. Metadata, empty views and exhausted results still validate
+live backing. Custom Clone, PartialEq and methods execute actual bodies and retain effects.
+Whole membership/equality and untyped ambiguous struct choices remain unsupported. No raw,
+alias, padding-byte or conditional identity permission is added.
+
+The dedicated 29-root matrix yields 9 PROVED, 7 REFUTED and 13 UNKNOWN per host/ARM O0/O2 build.
+It checks exact nominal values, generic/nested/aligned zero-byte structs, returned fields,
+owned-copy behavior, layout, MAX cursors and same-obligation exact-MAX counterexamples. Actual
+method and custom trait body entry is asserted; a panicking Clone and false custom comparison
+refute. Actual nth-offset mutation refutes every profile and fails valid native 129-element
+executions. Native MAX copy/method/aligned-cursor controls pass; finite native count cases pass.
+An optional native MAX by-reference count entered the real linear implementation and was stopped;
+its unchanged analyzer claim remains checked, without claiming native MAX-count execution.
+Durable original/mutated native outputs and the stopped experiment are retained separately.
+
+Three original Stage 155 whole/nested/N=0 zero-struct sources now prove with harness-only
+expectation maintenance. Four focused and thirteen related tests pass, as do metadata units and
+warning-free build/lint/fmt. Independent source and focused-evidence review approves the nominal
+certificate and retained source protocol.
+
+The shared manifest adds nominal zero-struct cursor P/R and missing invoked body U controls:
+82 cases across 29 families, expecting 33 PROVED, 30 REFUTED and 19 UNKNOWN per configuration.
+Its two baseline integration tests pass, including a valid native MAX named-zero negative witness.
+
+Full isolated validation passes 648 Rust tests and 68 Python tests, formatting, cargo lint,
+release builds, cargo deny, documentation build and manual hooks. Main's complete 601 tracked
+files match that validated snapshot byte for byte. Fresh debug/release builds, 12 new/related
+compiler integration tests, 68 Python tests and the remaining required checks also pass in main.
+Frozen isolated and merged evidence at `/tmp/miren-stage156-capabilities-20261010` and
+`/tmp/miren-stage156-merged-capabilities-20261010` each records 132 PROVED, 120 REFUTED and
+76 UNKNOWN, with current source/input/release hashes verified and no collection errors. All 244
+previously completed P/R roots retain identical obligation statuses, details and query text across
+four configurations. Independent review approves exact nominal zero-byte values and unchanged
+body, lifetime, original-type and extent certificates.

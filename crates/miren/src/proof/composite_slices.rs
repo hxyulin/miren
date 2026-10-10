@@ -53,9 +53,6 @@ impl<'tcx> Engine<'tcx> {
             return Ok(None);
         };
         let bytes = self.static_layout(ty)?.size.bytes();
-        if bytes == 0 && matches!(ty.kind(), ty::Adt(..)) {
-            return Ok(None);
-        }
         let mut leaves = Vec::new();
         shape.leaves(&mut leaves);
         if bytes == 0 && !leaves.is_empty() {
@@ -138,8 +135,7 @@ impl<'tcx> Engine<'tcx> {
                 Ok(Some(CompositeShape::Array(shapes)))
             }
             ty::Adt(def, args) if def.did().is_local() && def.is_struct() => {
-                if layout.size.bytes() == 0
-                    || def.repr().pack.is_some()
+                if def.repr().pack.is_some()
                     || matches!(
                         layout.backend_repr,
                         BackendRepr::SimdVector { .. } | BackendRepr::SimdScalableVector { .. }
@@ -172,10 +168,12 @@ impl<'tcx> Engine<'tcx> {
                         "composite struct validity exceeds its original typed fields".into(),
                     );
                 }
-                Ok(Some(CompositeShape::Struct {
+                let shape = CompositeShape::Struct {
                     name: self.tcx.def_path_str(def.did()),
                     fields,
-                }))
+                };
+                shape.validate_zero_storage(layout.size.bytes())?;
+                Ok(Some(shape))
             }
             _ => Ok(None),
         }
@@ -381,6 +379,25 @@ fn validate_terms(
 }
 
 impl CompositeShape {
+    fn validate_zero_storage(&self, bytes: u64) -> Result<(), String> {
+        if bytes == 0 && self.has_primitive_storage() {
+            return Err("zero-sized composite shape has primitive storage leaves".into());
+        }
+        Ok(())
+    }
+
+    fn has_primitive_storage(&self) -> bool {
+        match self {
+            Self::Primitive(_) => true,
+            Self::Tuple(fields) | Self::Array(fields) => {
+                fields.iter().any(Self::has_primitive_storage)
+            }
+            Self::Struct { fields, .. } => fields
+                .iter()
+                .any(|(_, field)| field.has_primitive_storage()),
+        }
+    }
+
     fn leaves(&self, output: &mut Vec<ScalarSliceElement>) {
         match self {
             Self::Primitive(leaf) => output.push(*leaf),
@@ -448,6 +465,69 @@ impl CompositeShape {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn zero_sized_structs_preserve_nominal_metadata_and_reject_storage_leaves() {
+        let shape = CompositeShape::Struct {
+            name: "fixture::Outer".into(),
+            fields: vec![
+                ("marker".into(), CompositeShape::Tuple(vec![])),
+                (
+                    "inner".into(),
+                    CompositeShape::Struct {
+                        name: "fixture::Inner".into(),
+                        fields: vec![("empty".into(), CompositeShape::Array(vec![]))],
+                    },
+                ),
+            ],
+        };
+        shape.validate_zero_storage(0).unwrap();
+        let context = Context::default();
+        let index = context.bit_vector(u64::MAX as u128, 64).unwrap();
+        let mut cursor = 0;
+        let Value::Adt {
+            name,
+            variant,
+            discriminant,
+            is_option,
+            fields,
+        } = shape.observe(&context, &[], &index, &mut cursor).unwrap()
+        else {
+            panic!("a nominal zero-sized struct must not collapse to Unit");
+        };
+        assert_eq!(
+            (name.as_str(), variant, discriminant, is_option),
+            ("fixture::Outer", 0, 0, false)
+        );
+        assert_eq!(fields[0].0, "marker");
+        assert!(matches!(fields[0].1, Value::Unit));
+        let Value::Adt {
+            name,
+            variant,
+            discriminant,
+            is_option,
+            fields,
+        } = &fields[1].1
+        else {
+            panic!("nested nominal metadata must remain intact");
+        };
+        assert_eq!(
+            (name.as_str(), *variant, *discriminant, *is_option),
+            ("fixture::Inner", 0, 0, false)
+        );
+        assert_eq!(fields[0].0, "empty");
+        assert!(matches!(&fields[0].1, Value::Elements(values) if values.is_empty()));
+        assert_eq!(cursor, 0);
+        let invalid = CompositeShape::Struct {
+            name: "fixture::Invalid".into(),
+            fields: vec![(
+                "nested".into(),
+                CompositeShape::Array(vec![CompositeShape::Primitive(ScalarSliceElement::Bool)]),
+            )],
+        };
+        assert!(invalid.validate_zero_storage(0).is_err());
+        invalid.validate_zero_storage(1).unwrap();
+    }
 
     #[test]
     fn struct_observation_preserves_named_fields_and_independent_same_index_leaves() {

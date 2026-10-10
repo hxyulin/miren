@@ -580,6 +580,34 @@ pub fn local_struct_slice_membership(values: &[SliceSample], needle: SliceSample
     values.contains(&needle)
 }
 
+#[derive(Clone, Copy)]
+pub struct NominalZero;
+
+pub fn local_zero_struct_cursor(values: &[NominalZero], index: usize) {
+    let mut iter = values.iter();
+    if index < values.len() {
+        assert!(iter.nth(index).is_some());
+        assert!(iter.len() == values.len() - index - 1);
+    } else {
+        assert!(iter.nth(index).is_none());
+        assert!(iter.len() == 0);
+    }
+}
+
+pub fn local_zero_struct_wrong_claim(values: &[NominalZero]) {
+    assert!(values.len() <= isize::MAX as usize);
+}
+
+#[cfg(not(test))]
+unsafe extern "Rust" {
+    fn opaque_local_zero_struct_length(length: usize) -> usize;
+}
+
+#[cfg(not(test))]
+pub fn local_zero_struct_missing_body(values: &[NominalZero]) -> usize {
+    unsafe { opaque_local_zero_struct_length(values.iter().count()) }
+}
+
 #[cfg(test)]
 mod native {
     use super::*;
@@ -588,6 +616,9 @@ mod native {
     #[test]
     fn positives() {
         integers(199);
+        local_zero_struct_cursor(&[], usize::MAX);
+        local_zero_struct_cursor(&[NominalZero; 129], 128);
+        local_zero_struct_cursor(&[NominalZero; usize::MAX], usize::MAX - 1);
         local_struct_slice_read(&[], usize::MAX);
         local_struct_slice_read(&[SliceSample { left: 3, right: 7 }; 129], 128);
         slice_dynamic_alignment(&[]);
@@ -720,5 +751,10 @@ mod native {
     #[should_panic]
     fn local_struct_slice_wrong_claim_panics() {
         local_struct_slice_wrong_claim(&[SliceSample { left: 3, right: 7 }; 129]);
+    }
+    #[test]
+    #[should_panic]
+    fn local_zero_struct_wrong_claim_panics() {
+        local_zero_struct_wrong_claim(&[NominalZero; usize::MAX]);
     }
 }

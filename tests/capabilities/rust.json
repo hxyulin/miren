@@ -432,6 +432,23 @@
       "expected": "unknown",
       "unknown_reason": "whole composite slice membership is unsupported",
       "unknown_category": "semantics"
+    },
+    {
+      "entry": "local_zero_struct_cursor",
+      "family": "local_zero_struct_slice",
+      "expected": "proved"
+    },
+    {
+      "entry": "local_zero_struct_wrong_claim",
+      "family": "local_zero_struct_slice",
+      "expected": "refuted"
+    },
+    {
+      "entry": "local_zero_struct_missing_body",
+      "family": "local_zero_struct_slice",
+      "expected": "unknown",
+      "unknown_reason": "no compiler-exported Rust definition matches the foreign symbol",
+      "unknown_category": "missing_compiler_evidence"
     }
   ]
 }

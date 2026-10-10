@@ -99,7 +99,6 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
             let (category, reason) = match *name {
                 "mutable_root" | "competing_roots" | "reference_field" | "raw_field"
                 | "nonzero_field" | "core_wrapper" | "drop_field" | "packed"
-                | "whole_zero_struct" | "nested_zero_struct" | "empty_zero_struct"
                 | "refined_zero_array" | "enum_field" | "union_field" => (
                     UnknownCategory::Semantics,
                     "only read-only byte slices and byte arrays are modeled",
@@ -218,9 +217,9 @@ fn local_struct_slices_preserve_fields_layout_and_source_rights() {
         ("core_wrapper", ProofStatus::Unknown),
         ("drop_field", ProofStatus::Unknown),
         ("packed", ProofStatus::Unknown),
-        ("whole_zero_struct", ProofStatus::Unknown),
-        ("nested_zero_struct", ProofStatus::Unknown),
-        ("empty_zero_struct", ProofStatus::Unknown),
+        ("whole_zero_struct", ProofStatus::Proved),
+        ("nested_zero_struct", ProofStatus::Proved),
+        ("empty_zero_struct", ProofStatus::Proved),
         ("refined_zero_array", ProofStatus::Unknown),
         ("oversized_shape", ProofStatus::Unknown),
         ("ambiguous_nested_struct", ProofStatus::Unknown),

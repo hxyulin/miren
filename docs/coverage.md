@@ -1331,3 +1331,19 @@ native 129-element tests. Packed layouts, external ADTs, zero-size struct nodes,
 identity-bearing fields, raw access and retired sources retain their actual UNKNOWNs. Whole
 membership/equality and ambiguous nested array-of-struct choices remain separate boundaries.
 The shared 79-case/28-family baseline expects 128 PROVED, 116 REFUTED and 72 UNKNOWN across builds.
+
+
+Stage 156 extends exact local struct slice shapes to zero-byte nodes after the same original
+field/N=0 and scalar-layout certificates. Zero size requires no actual primitive storage leaves.
+Nominal Adt names, tags and ordered fields are retained; unit replacement supplies no success.
+The existing full-usize zero-stride domain, source lifetime, selected body and ordered cursor
+checks apply equally to aligned zero-sized local structs.
+
+The 29-root host/ARM O0/O2 matrix yields 9 PROVED, 7 REFUTED and 13 UNKNOWN per build. MAX witnesses,
+nominal copies, returned fields, methods and actual custom Clone/PartialEq bodies are checked.
+A real cursor-offset mutation refutes and fails native 129-element tests. Native MAX copies,
+methods and aligned cursors pass; native count is checked on finite inputs. The optional linear
+MAX by-reference native count was stopped and is not claimed as completed. Three unchanged prior
+zero-struct sources now prove. Unsupported original children, missing bodies, dead backing,
+whole comparisons and ambiguous struct choices retain their actual UNKNOWNs. The shared
+82-case/29-family baseline expects 132 PROVED, 120 REFUTED and 76 UNKNOWN across builds.

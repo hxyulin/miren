@@ -674,11 +674,14 @@ metadata receive no new support. Readonly shared iteration retains the same comp
 graph and original caller allocation.
 
 Local struct slice elements retain the exact original compiler type, complete declaration-ordered
-field identities and compiler layout. Every struct node must be nonzero-sized; unit, tuple and
-empty-array fields remain supported. Recursive field certification rejects restricted patterns
-before normalization, including beneath empty arrays. Packed/SIMD layouts, external or core ADTs,
-enums, unions, reference/raw fields, interior mutation and destructor-bearing types remain
-unsupported. Compiler scalar validity must match the actual typed fields and offsets. Observations
+field identities and compiler layout. Zero-sized local structs remain nominal ADT values after
+complete recursive field certification and an empty primitive-storage inventory check. Their
+readonly slice lengths span the full target-usize domain; no physical address rights follow.
+Unit, tuple and empty-array fields remain supported. Recursive field certification rejects
+restricted patterns before normalization, including beneath empty arrays. Packed/SIMD layouts,
+external or core ADTs, enums, unions, reference/raw fields, interior mutation and destructor-bearing
+types remain unsupported. Compiler scalar validity must match the actual typed fields and offsets.
+Observations
 reconstruct exact struct metadata with every field selected at the same index; owned copies and
 caller-backed field borrows add no raw, write or padding-byte rights. Custom methods, Clone and
 PartialEq receive no purity inference from Copy; whole composite comparison remains unsupported.
