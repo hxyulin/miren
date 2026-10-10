@@ -28,63 +28,65 @@ fn reference_family(definition: &str, encoded: &str) -> Option<BoxTemplateFamily
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 enum ProtocolInput {
-    UnitPayload,
-    OwnedUnit,
-    OwnedUnitReference,
-    UnitReference,
+    Payload,
+    Owner,
+    OwnerReference,
+    PayloadReference,
     ZeroLayout,
-    NonNullUnitAlignment,
-    UnitAlignment,
-    ZeroSizeUnitAlignment,
+    NonNullAlignment,
+    Alignment,
+    ZeroSizeAlignment,
 }
 
 fn reached_blocks(
     family: BoxTemplateFamily,
     input: ProtocolInput,
-    bits: u32,
+    layout: owned_box_payloads::ZeroLayout,
 ) -> Result<&'static [usize], String> {
+    let bits = layout.bits();
+    let alignment = layout.alignment();
     if !matches!(bits, 32 | 64) {
         return Err("Box protocol requires a certified target word width".into());
     }
     match (family, input) {
-        // BoxNew forwards the actual compiler Layout(0,1), writes the Unit payload,
+        // BoxNew forwards the original compiler zero Layout and writes the certified payload.
         // then returns the very pointer received from that allocation. Its cleanup
         // edge is excluded only after the zero allocation and no-drop Unit are certified.
-        (BoxTemplateFamily::BoxNew, ProtocolInput::UnitPayload) => Ok(&[0, 1]),
+        (BoxTemplateFamily::BoxNew, ProtocolInput::Payload) => Ok(&[0, 1]),
         // Global's matched return is Ok(NonNull(slice(alignment, 0))). Therefore the
         // exact discriminant test at bb4 chooses Ok bb3, not OOM bb2 or impossible bb1.
         (BoxTemplateFamily::BoxNewUninit, ProtocolInput::ZeroLayout) => Ok(&[0, 4, 3]),
-        // _3 = layout.size = 0, so bb0 selects bb2. _15 = layout.align = 1.
+        // _3 = layout.size = 0, so bb0 selects bb2. _15 = the original compiler alignment.
         // Both UbChecks branches converge on the same zero-length Ok allocation.
         // No allocator, failure Result, or nonzero-only Assume block is reachable.
         (BoxTemplateFamily::GlobalAllocate, ProtocolInput::ZeroLayout) => {
             Ok(&[0, 2, 8, 9, 10, 6, 7])
         }
-        (BoxTemplateFamily::MemDrop, ProtocolInput::OwnedUnit) => Ok(&[0, 1]),
-        (BoxTemplateFamily::UnitBoxDropGlue, ProtocolInput::OwnedUnitReference) => Ok(&[0, 2, 1]),
-        (BoxTemplateFamily::UnitDropGlue, ProtocolInput::UnitReference) => Ok(&[0]),
-        // size_of_val::<()> = 0 and align_of_val::<()> = 1. Both UbChecks settings
-        // are covered. The exact final size switch chooses bb3, excluding deallocate.
-        (BoxTemplateFamily::BoxDrop, ProtocolInput::OwnedUnitReference) => {
+        (BoxTemplateFamily::MemDrop, ProtocolInput::Owner) => Ok(&[0, 1]),
+        (BoxTemplateFamily::UnitBoxDropGlue, ProtocolInput::OwnerReference) => Ok(&[0, 2, 1]),
+        (BoxTemplateFamily::UnitDropGlue, ProtocolInput::PayloadReference) => Ok(&[0]),
+        // Original size_of_val is zero and align_of_val is the certified alignment.
+        // Both UbChecks settings are covered; size selects bb3, excluding deallocate.
+        (BoxTemplateFamily::BoxDrop, ProtocolInput::OwnerReference) => {
             Ok(&[0, 4, 5, 6, 7, 8, 9, 3])
         }
-        // ctpop(1) = 1, so the matched equality chooses successful return bb1.
-        (BoxTemplateFamily::AlignmentPrecondition, ProtocolInput::UnitAlignment)
-            if 1_u128.count_ones() == 1 =>
+        // The power-of-two compiler alignment has ctpop one, selecting successful return bb1.
+        (BoxTemplateFamily::AlignmentPrecondition, ProtocolInput::Alignment)
+            if alignment.count_ones() == 1 =>
         {
             Ok(&[0, 3, 1])
         }
-        // The concrete target-width predicate is 0 <= (1 << (bits-1)) - 1.
+        // The concrete target-width predicate is 0 <= (1 << (bits-1)) - alignment.
         // It selects the successful return; no missing panic body is required.
-        (BoxTemplateFamily::LayoutPrecondition, ProtocolInput::ZeroSizeUnitAlignment)
-            if layout_predicate(0, 1, bits)? =>
+        (BoxTemplateFamily::LayoutPrecondition, ProtocolInput::ZeroSizeAlignment)
+            if layout_predicate(0, alignment, bits)? =>
         {
             Ok(&[0, 1])
         }
-        // The matched pointer is the compiler alignment sentinel 1, never null.
+        // The matched pointer is the compiler alignment sentinel, never null.
         // This is template-only arithmetic, not a runtime numeric access grant.
-        (BoxTemplateFamily::NonNullPrecondition, ProtocolInput::NonNullUnitAlignment)
-            if 1_u128 != 0 =>
+        (BoxTemplateFamily::NonNullPrecondition, ProtocolInput::NonNullAlignment)
+            if alignment != 0 =>
         {
             Ok(&[0, 2])
         }
@@ -118,10 +120,32 @@ pub(super) fn compiler_unit_layout<'tcx>(
     tcx: TyCtxt<'tcx>,
     operand: &Operand<'tcx>,
 ) -> Result<(), String> {
+    compiler_zero_layout(
+        tcx,
+        operand,
+        owned_box_payloads::ZeroLayout::for_type(tcx, tcx.types.unit)?,
+    )
+}
+
+pub(super) fn compiler_zero_layout<'tcx>(
+    tcx: TyCtxt<'tcx>,
+    operand: &Operand<'tcx>,
+    layout: owned_box_payloads::ZeroLayout,
+) -> Result<(), String> {
     use rustc_const_eval::const_eval::mk_eval_cx_for_const_val;
     let Operand::Constant(operand) = operand else {
         return Err("BoxNew did not pass its compiler Layout constant".into());
     };
+    let expected = tcx
+        .lang_items()
+        .alloc_layout()
+        .ok_or("Box compiler Layout lang identity is unavailable")?;
+    if !matches!(operand.const_.ty().kind(), ty::Adt(def, args)
+        if def.did() == expected && args.is_empty())
+        || layout.bits() != u32::from(tcx.sess.target.pointer_width)
+    {
+        return Err("Box constant lacks the exact compiler Layout and target context".into());
+    }
     let env = ty::TypingEnv::fully_monomorphized();
     let value = operand
         .const_
@@ -133,7 +157,7 @@ pub(super) fn compiler_unit_layout<'tcx>(
     if value.layout.fields.count() != 2 {
         return Err("Box compiler Layout differs from its certified two fields".into());
     }
-    for (index, expected) in [(0, 0_u128), (1, 1_u128)] {
+    for (index, expected) in [(0, 0_u128), (1, layout.alignment())] {
         let field = ecx
             .project_field(&value, rustc_abi::FieldIdx::from_usize(index))
             .discard_err()
@@ -142,12 +166,17 @@ pub(super) fn compiler_unit_layout<'tcx>(
             .read_scalar(&field)
             .discard_err()
             .ok_or("Box Layout field is not a scalar")?;
+        if field.layout.size.bits() != u64::from(layout.bits()) {
+            return Err("Box compiler Layout field has a different target word width".into());
+        }
         let actual = scalar
             .to_bits(field.layout.size)
             .discard_err()
             .ok_or("Box Layout field lacks concrete integer bits")?;
         if actual != expected {
-            return Err("Box passed Layout differs from original Unit size/alignment".into());
+            return Err(
+                "Box passed Layout differs from original compiler zero size/alignment".into(),
+            );
         }
     }
     Ok(())
@@ -216,23 +245,21 @@ fn certify_protocol<'tcx>(
             "Box protocol must begin at its constructor or exact owned drop boundary".into(),
         );
     }
-    let layout = tcx
-        .layout_of(ty::TypingEnv::fully_monomorphized().as_query_input(original))
-        .map_err(|error| format!("Box payload layout is unavailable: {error:?}"))?;
-    let bits = u32::from(tcx.sess.target.pointer_width);
-    let align = u128::from(layout.align.abi.bytes());
-    if layout.size.bytes() != 0 || align != 1 || align > (u128::MAX >> (128 - bits)) {
-        return Err("Box zero branch lacks a concrete nonzero target alignment".into());
+    let layout = owned_box_payloads::ZeroLayout::for_type(tcx, original)?;
+    if nominal.is_some_and(|certificate| certificate.layout() != layout) {
+        return Err(
+            "Box protocol zero layout differs from its original payload certificate".into(),
+        );
     }
     if core == owned.krate {
         return Err("Box alloc identity is not distinct from core".into());
     }
     let root_input = if outer.def_id() == constructor {
-        ProtocolInput::UnitPayload
+        ProtocolInput::Payload
     } else if matches!(outer.def, ty::InstanceKind::Shim(_)) {
-        ProtocolInput::OwnedUnitReference
+        ProtocolInput::OwnerReference
     } else {
-        ProtocolInput::OwnedUnit
+        ProtocolInput::Owner
     };
     let mut pending = vec![(outer, root_input, None)];
     let mut seen = std::collections::HashSet::new();
@@ -314,7 +341,7 @@ fn certify_protocol<'tcx>(
         if expected_family.is_some_and(|expected| expected != family) {
             return Err("Box selected delegate differs from the certified child family".into());
         }
-        for index in reached_blocks(family, input, bits)? {
+        for index in reached_blocks(family, input, layout)? {
             let block = body
                 .basic_blocks
                 .get(rustc_middle::mir::BasicBlock::from_usize(*index))
@@ -355,7 +382,7 @@ fn certify_protocol<'tcx>(
                     }
                     let (child_family, child_input) = match (family, *index) {
                         (BoxTemplateFamily::BoxNew, 0) => {
-                            compiler_unit_layout(tcx, &args[0].node)?;
+                            compiler_zero_layout(tcx, &args[0].node, layout)?;
                             (BoxTemplateFamily::BoxNewUninit, ProtocolInput::ZeroLayout)
                         }
                         (BoxTemplateFamily::BoxNewUninit, 0) => {
@@ -366,21 +393,18 @@ fn certify_protocol<'tcx>(
                             local_argument(args, 0, 19)?;
                             (
                                 BoxTemplateFamily::NonNullPrecondition,
-                                ProtocolInput::NonNullUnitAlignment,
+                                ProtocolInput::NonNullAlignment,
                             )
                         }
                         (BoxTemplateFamily::UnitBoxDropGlue, 2) => {
                             local_argument(args, 0, 2)?;
-                            (
-                                BoxTemplateFamily::BoxDrop,
-                                ProtocolInput::OwnedUnitReference,
-                            )
+                            (BoxTemplateFamily::BoxDrop, ProtocolInput::OwnerReference)
                         }
                         (BoxTemplateFamily::BoxDrop, 6) => {
                             local_argument(args, 0, 10)?;
                             (
                                 BoxTemplateFamily::AlignmentPrecondition,
-                                ProtocolInput::UnitAlignment,
+                                ProtocolInput::Alignment,
                             )
                         }
                         (BoxTemplateFamily::BoxDrop, 8) => {
@@ -388,7 +412,7 @@ fn certify_protocol<'tcx>(
                             local_argument(args, 1, 9)?;
                             (
                                 BoxTemplateFamily::LayoutPrecondition,
-                                ProtocolInput::ZeroSizeUnitAlignment,
+                                ProtocolInput::ZeroSizeAlignment,
                             )
                         }
                         _ => {
@@ -411,12 +435,12 @@ fn certify_protocol<'tcx>(
                     let (child_family, child_input, expected) = match family {
                         BoxTemplateFamily::MemDrop => (
                             BoxTemplateFamily::UnitBoxDropGlue,
-                            ProtocolInput::OwnedUnitReference,
+                            ProtocolInput::OwnerReference,
                             box_type,
                         ),
                         BoxTemplateFamily::UnitBoxDropGlue => (
                             BoxTemplateFamily::UnitDropGlue,
-                            ProtocolInput::UnitReference,
+                            ProtocolInput::PayloadReference,
                             original,
                         ),
                         _ => return Err("Box reached an uncertified drop edge".into()),

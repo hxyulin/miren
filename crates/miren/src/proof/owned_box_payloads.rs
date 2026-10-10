@@ -1,15 +1,60 @@
-//! Exact original payloads for the private alignment-one zero-sized Box region.
+//! Exact original payloads for the private compiler-aligned zero-sized Box region.
 use super::*;
 use typed_array_choices::OwnedChoiceShape;
 
 /// Issued only after the complete ordinary product and original zero-leaf checks.
 pub(super) struct Certificate<'tcx> {
     original: Ty<'tcx>,
+    layout: ZeroLayout,
+}
+
+/// Concrete arithmetic facts derived from the original compiler layout, never pointer rights.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(super) struct ZeroLayout {
+    alignment: u128,
+    bits: u32,
+}
+
+impl ZeroLayout {
+    pub(super) fn for_type<'tcx>(tcx: TyCtxt<'tcx>, original: Ty<'tcx>) -> Result<Self, String> {
+        let layout = tcx
+            .layout_of(ty::TypingEnv::fully_monomorphized().as_query_input(original))
+            .map_err(|error| format!("owned Box payload layout is unavailable: {error:?}"))?;
+        if layout.size.bytes() != 0 {
+            return Err("owned nominal Box payload requires compiler size zero".into());
+        }
+        Self::new(
+            u128::from(layout.align.abi.bytes()),
+            u32::from(tcx.sess.target.pointer_width),
+        )
+    }
+
+    fn new(alignment: u128, bits: u32) -> Result<Self, String> {
+        if !matches!(bits, 32 | 64)
+            || !alignment.is_power_of_two()
+            || (1_u128 << (bits - 1)).checked_sub(alignment).is_none()
+        {
+            return Err("Box zero layout lacks exact target-valid compiler alignment".into());
+        }
+        Ok(Self { alignment, bits })
+    }
+
+    pub(super) fn alignment(self) -> u128 {
+        self.alignment
+    }
+
+    pub(super) fn bits(self) -> u32 {
+        self.bits
+    }
 }
 
 impl<'tcx> Certificate<'tcx> {
     pub(super) fn original(&self) -> Ty<'tcx> {
         self.original
+    }
+
+    pub(super) fn layout(&self) -> ZeroLayout {
+        self.layout
     }
 }
 
@@ -20,14 +65,7 @@ pub(super) fn certify_nominal_type<'tcx>(
     if !matches!(original.kind(), ty::Adt(def, _) if def.is_struct() && def.did().is_local()) {
         return Err("owned Box payload requires an exact local nominal zero-sized struct".into());
     }
-    let layout = tcx
-        .layout_of(ty::TypingEnv::fully_monomorphized().as_query_input(original))
-        .map_err(|error| format!("owned Box payload layout is unavailable: {error:?}"))?;
-    if layout.size.bytes() != 0 || layout.align.abi.bytes() != 1 {
-        return Err(
-            "owned nominal Box payload requires compiler size zero and alignment one".into(),
-        );
-    }
+    ZeroLayout::for_type(tcx, original)?;
     let mut nodes = 0;
     original_children(tcx, original, 0, &mut nodes)?;
     Ok(nodes)
@@ -125,7 +163,10 @@ impl<'tcx> Engine<'tcx> {
             return owned_box_templates::certify_unit_protocol(self.tcx, instance);
         }
         self.nominal_box_shape(original)?;
-        let certificate = Certificate { original };
+        let certificate = Certificate {
+            original,
+            layout: ZeroLayout::for_type(self.tcx, original)?,
+        };
         owned_box_templates::certify_nominal_protocol(self.tcx, instance, &certificate)
     }
 
@@ -155,6 +196,24 @@ impl<'tcx> Engine<'tcx> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn zero_layout_uses_exact_target_alignment_and_checked_rounding() {
+        for bits in [32, 64] {
+            for exponent in 0..bits {
+                let alignment = 1_u128 << exponent;
+                let layout = ZeroLayout::new(alignment, bits).unwrap();
+                assert_eq!(layout.alignment(), alignment);
+                assert_eq!(layout.bits(), bits);
+            }
+            for alignment in [0, 3, (1_u128 << bits)] {
+                assert!(ZeroLayout::new(alignment, bits).is_err());
+            }
+        }
+        for bits in [0, 16, 128] {
+            assert!(ZeroLayout::new(1, bits).is_err());
+        }
+    }
 
     #[test]
     fn exact_nominal_box_payload_and_complete_glue_refuse_mutations() {
@@ -247,7 +306,10 @@ mod tests {
                     }
                     let symbol = tcx.item_name(local.to_def_id());
                     let name = symbol.as_str();
-                    if !matches!(name, "marker" | "nested" | "restricted") {
+                    if !matches!(
+                        name,
+                        "marker" | "nested" | "restricted" | "aligned" | "large"
+                    ) {
                         continue;
                     }
                     let payload = tcx
@@ -260,8 +322,67 @@ mod tests {
                         continue;
                     }
                     let (shape, _) = engine.nominal_box_shape(payload).unwrap();
-                    let certificate = Certificate { original: payload };
+                    let certificate = Certificate {
+                        original: payload,
+                        layout: ZeroLayout::for_type(tcx, payload).unwrap(),
+                    };
                     let owner = engine.original_box_type(payload).unwrap();
+                    let constructor = tcx
+                        .get_diagnostic_item(rustc_span::Symbol::intern("box_new"))
+                        .unwrap();
+                    let constructor = ty::Instance::try_resolve(
+                        tcx,
+                        ty::TypingEnv::fully_monomorphized(),
+                        constructor,
+                        tcx.mk_args(&[payload.into()]),
+                    )
+                    .unwrap()
+                    .unwrap();
+                    let constructor_body = constructor
+                        .try_instantiate_mir_and_normalize_erasing_regions(
+                            tcx,
+                            ty::TypingEnv::fully_monomorphized(),
+                            ty::EarlyBinder::bind(tcx, tcx.instance_mir(constructor.def).clone()),
+                        )
+                        .unwrap();
+                    let TerminatorKind::Call { args, .. } = &constructor_body.basic_blocks
+                        [rustc_middle::mir::BasicBlock::from_usize(0)]
+                    .terminator()
+                    .kind
+                    else {
+                        unreachable!()
+                    };
+                    assert!(
+                        owned_box_templates::compiler_zero_layout(
+                            tcx,
+                            &args[0].node,
+                            certificate.layout,
+                        )
+                        .is_ok()
+                    );
+                    if matches!(name, "aligned" | "large") {
+                        assert_eq!(
+                            certificate.layout.alignment(),
+                            if name == "aligned" { 8 } else { 4096 }
+                        );
+                        let changed = Certificate {
+                            original: payload,
+                            layout: ZeroLayout::for_type(tcx, tcx.types.unit).unwrap(),
+                        };
+                        assert!(
+                            owned_box_templates::compiler_zero_layout(
+                                tcx,
+                                &args[0].node,
+                                changed.layout,
+                            )
+                            .is_err()
+                        );
+                        let instance = ty::Instance::resolve_drop_glue(tcx, owner);
+                        assert!(
+                            owned_box_templates::certify_nominal_protocol(tcx, instance, &changed)
+                                .is_err()
+                        );
+                    }
                     let instance = ty::Instance::resolve_drop_glue(tcx, owner);
                     let generic = tcx.instance_mir(instance.def);
                     let body = instance
@@ -444,7 +565,7 @@ mod tests {
 
                     checked += 1;
                 }
-                assert_eq!(checked, 2);
+                assert_eq!(checked, 4);
                 self.checked = true;
                 rustc_driver::Compilation::Stop
             }
@@ -461,6 +582,9 @@ mod tests {
                 "#[derive(Clone,Copy)]pub struct Restricted{pub a:[&'static u16;0]}\n",
                 "pub fn marker(_:Marker){} pub fn nested(_:Nested){}\n",
                 "pub fn restricted(_:Restricted){}\n",
+                "#[repr(align(8))]#[derive(Clone,Copy)]pub struct Aligned;\n",
+                "#[repr(align(4096))]#[derive(Clone,Copy)]pub struct Large;\n",
+                "pub fn aligned(_:Aligned){} pub fn large(_:Large){}\n",
             ),
         )
         .unwrap();
@@ -468,23 +592,34 @@ mod tests {
             .args(["--print", "sysroot"])
             .output()
             .unwrap();
-        let mut check = Check { checked: false };
-        rustc_driver::run_compiler(
-            &[
-                "rustc".into(),
-                source.to_str().unwrap().into(),
-                "--crate-type=lib".into(),
-                "--edition=2024".into(),
-                "-Zmir-opt-level=0".into(),
-                "-Cpanic=abort".into(),
-                "--out-dir".into(),
-                directory.to_str().unwrap().into(),
-                "--sysroot".into(),
-                String::from_utf8(sysroot.stdout).unwrap().trim().into(),
-            ],
-            &mut check,
-        );
-        assert!(check.checked);
+        for target in [None, Some("thumbv7em-none-eabihf")] {
+            for optimized in [false, true] {
+                let mut arguments = vec![
+                    "rustc".into(),
+                    source.to_str().unwrap().into(),
+                    "--crate-type=lib".into(),
+                    "--edition=2024".into(),
+                    "-Zmir-opt-level=0".into(),
+                    "-Cpanic=abort".into(),
+                    "--out-dir".into(),
+                    directory.to_str().unwrap().into(),
+                    "--sysroot".into(),
+                    String::from_utf8(sysroot.stdout.clone())
+                        .unwrap()
+                        .trim()
+                        .into(),
+                ];
+                if let Some(target) = target {
+                    arguments.extend(["--target".into(), target.into()]);
+                }
+                if optimized {
+                    arguments.push("-Copt-level=2".into());
+                }
+                let mut check = Check { checked: false };
+                rustc_driver::run_compiler(&arguments, &mut check);
+                assert!(check.checked);
+            }
+        }
         std::fs::remove_dir_all(directory).unwrap();
     }
 }

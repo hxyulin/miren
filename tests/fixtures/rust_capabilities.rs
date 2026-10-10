@@ -2480,3 +2480,50 @@ mod native_scoped_mutable_child {
         assert_eq!(values[128], u16::MAX);
     }
 }
+
+#[repr(align(4096))]
+#[derive(Clone, Copy)]
+pub struct AlignedZeroBoxMarker;
+
+impl AlignedZeroBoxMarker {
+    #[inline(never)]
+    pub fn tag(&self) -> u16 {
+        17
+    }
+}
+
+#[inline(never)]
+pub fn aligned_zero_box_selected(owner: alloc::boxed::Box<AlignedZeroBoxMarker>) -> u16 {
+    let tag = owner.tag();
+    core::mem::drop(owner);
+    tag
+}
+
+pub fn aligned_zero_box() {
+    assert!(aligned_zero_box_selected(alloc::boxed::Box::new(AlignedZeroBoxMarker)) == 17);
+}
+
+pub fn aligned_zero_box_wrong_claim() {
+    assert!(aligned_zero_box_selected(alloc::boxed::Box::new(AlignedZeroBoxMarker)) == 18);
+}
+
+#[repr(align(4096))]
+pub struct AlignedZeroBoxDrop;
+
+impl Drop for AlignedZeroBoxDrop {
+    fn drop(&mut self) {}
+}
+
+pub fn aligned_zero_box_drop_unknown() {
+    let _owner = alloc::boxed::Box::new(AlignedZeroBoxDrop);
+}
+
+#[cfg(test)]
+mod native_aligned_zero_box {
+    use super::*;
+
+    #[test]
+    fn selected_tag_body_preserves_claim() {
+        aligned_zero_box();
+    }
+}

@@ -11,8 +11,8 @@ execution at O0 and O2, positive/refuted/unknown controls, a source mutation tha
 structured UNKNOWN reporting, and passing repository checks. Completion establishes a repeatable
 baseline. It does not establish full Rust support or a completed memory-model refactor.
 
-The manifest contains 173 cases across 59 families. Each build configuration expects 69 PROVED,
-60 REFUTED and 44 UNKNOWN results. Stage 133 originally had 23 cases with 10 PROVED, 9 REFUTED
+The manifest contains 176 cases across 60 families. Each build configuration expects 71 PROVED,
+61 REFUTED and 44 UNKNOWN results. Stage 133 originally had 23 cases with 10 PROVED, 9 REFUTED
 and 4 UNKNOWN; stage 134 closed its retained-prefix projection gap. Stage 136 adds raw-pointer
 metadata P/R controls and a safe core reference-array grant that remains UNKNOWN without a
 temporal permission certificate. Stage 137 adds tuple-array P/R and unsupported symbolic-write
@@ -1019,3 +1019,52 @@ objects match exactly; one query-free
 30-second UNKNOWN resource refusal differs only in its active call-stack context. All 829
 tracked files are byte-identical.
 Checks and ledgers retain their precise scopes under `/tmp/miren-stage189-*`.
+
+Stage 190 derives one immutable private zero-sized layout fact from original nominal T,
+recording exact compiler alignment A and target width. Complete Box/Global constructor and drop
+certificates authenticate that fact against original types, Layout fields, arithmetic, ctpop,
+nonnull sentinel and selected-body reachability. Size zero must pass checked target Layout
+rounding, with nonzero power-of-two alignment. The Unit inline path keeps its exact A=1 fact.
+The zero-size Global branch invokes no allocator or deallocator. No numeric address, raw
+provenance, new borrowing right or allocation-success premise follows from the private region.
+
+Ordinary local zero-leaf Copy/Freeze/noDrop type certificates, original const identity, complete
+typed glue, occurrence checks, generations, liveness and weighted 512-storage accounting remain
+mandatory. Nested shared-field access, nonzero payloads, external/enum/Drop/reference/raw/pattern
+payloads and unsupported ownership transport remain UNKNOWN. No assumptions, input caps,
+firmware changes or increased limits are introduced.
+
+The 22-root dedicated matrix yields ten PROVED, four REFUTED and eight UNKNOWN per host/ARM
+O0/O2 profile. The identical sources are all UNKNOWN under committed Stage 189. Positives cover
+alignment 2/8/4096, natural alignment from zero-length u32 arrays, generic/nested owned copies,
+transfer and drop. Actual custom Clone and Eq bodies execute and refute their false claims.
+Changing Marker::tag from 17 to 18 refutes the original assertion, with actual selected/tag body
+entries and a query/model on the same obligation. Safe native originals pass and unchanged
+mutation guards exit 101 at O0/O2 with ten-second timeouts. Genuine retained/omitted foreign
+helper MIR distinguishes PROVED from MissingCompilerEvidence; external payload policy remains
+separate. Actual-parent evidence is `/tmp/miren-stage190-parent189-final-evidence`.
+
+Historical scopes remain immutable, including actual-188 and pending-189 snapshots and binaries.
+The actual-189 fidelity ledger preserves 348 of 356 old entry/profile outcomes, with all 156
+previously completed pairs and 196 queries exact. Eight intended alignment promotions and sixteen
+query-free UNKNOWN detail changes are recorded separately. The old Unit aligned_zero lacks Copy
+and stays UNKNOWN; its original fixture is unchanged. The Copy-derived old nominal/global aligned
+controls advance to PROVED. Narrow harness upkeep follows only those captured frontiers.
+
+Global controls add an aligned Box assertion, its wrong claim and a Drop-payload UNKNOWN control.
+Changing their actual tag helper refutes the original assertion and fails its native guard.
+Commands, hashes and native/proof scopes are at `/tmp/miren-stage190-global-after-evidence`.
+The combined manifest has 176 cases in 60 families.
+
+Root validation passes 772 workspace Rust tests and 84 focused Rust tests, with 68 Python
+checks in each workspace. Formatting, Clippy, debug/release builds, deny, docs and manual hooks
+pass. The initial author old-nominal reason failure remains in its original log; narrow root
+harness upkeep follows actual four-profile evidence and leaves original fixtures unchanged.
+The fresh main release matches 108 dedicated proof objects and 20 queries, plus 16 new global
+proof objects and eight queries. Native executions retain their final author scope explicitly.
+All 516 previously completed global pairs preserve status, inputs, models, premises and queries;
+append-only replay fingerprints are excluded from that historical comparison. Of 704 current
+global pairs, 702 normalized proof objects match exactly. Two query-free 30-second UNKNOWN
+resource refusals differ only in their active call-stack context and are explicitly recorded.
+All 831 tracked files are byte-identical between main and the isolated workspace. Checks and
+ledgers retain their precise scopes under `/tmp/miren-stage190-*`.

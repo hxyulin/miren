@@ -77,10 +77,7 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
                     UnknownCategory::Semantics,
                     "exact local nominal zero-sized struct",
                 ),
-                "aligned_zero" => (
-                    UnknownCategory::Semantics,
-                    "compiler size zero and alignment one",
-                ),
+                "aligned_zero" => (UnknownCategory::Semantics, "Copy, Freeze and no drop glue"),
                 "analyzer_only::copied_owner" => (
                     UnknownCategory::Semantics,
                     "executable owned Box Copy needs",

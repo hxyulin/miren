@@ -929,8 +929,8 @@ Exact `Box<(), Global>` construction now uses a complete compiler-backed semanti
 selected Box, Global and drop bodies. The certificate matches every executable MIR byte, checks
 actual core/alloc identities and original signatures, and derives the zero-size, alignment-one
 branches and their unreachable allocator/panic edges. Reported models distinguish this certificate
-from the actual user helper bodies that execute. Other payloads, including aligned zero-sized types,
-remain UNKNOWN.
+from the actual user helper bodies that execute. Nominal payloads require the separate complete
+original-type certificate described below.
 
 The resulting logical owned region has a distinct lifecycle from frame allocations and numeric
 addresses. Move transport preserves its identity; ordinary executable owner copies are refused.
@@ -982,7 +982,7 @@ and inductive backing transport remain UNKNOWN. Existing readonly slice,
 finite mutable byte storage, ownership initialization and raw permission policies are unchanged.
 
 The private zero-sized Box protocol also accepts exact local ordinary nominal payloads with
-compiler size zero, alignment one, Copy/Freeze/no-drop eligibility and no observable scalar
+compiler size zero, exact ABI alignment, Copy/Freeze/no-drop eligibility and no observable scalar
 leaves. Original child types are checked even under zero-length arrays. The immutable payload
 certificate retains the original type, nominal field identity and bounded product shape across
 construction, readonly access, snapshots, owner transfer and retirement. Region storage charges
@@ -993,8 +993,8 @@ A separate exhaustive typed synthesized-glue certificate checks every local type
 receiver projection and selected delegate for the original nominal payload. Its successful report
 labels describe a certified semantic model, without claiming that summarized library bodies were
 stepped. User methods and custom Clone/PartialEq bodies execute normally. Unit protocol labels and
-completed queries are preserved. Nominal inlined constructor lowering, external payloads, aligned
-payloads and shared dereference-plus-field borrowing remain unsupported. A copied nested nominal
+completed queries are preserved. Nominal inlined constructor lowering, external payloads and
+shared dereference-plus-field borrowing remain unsupported. A copied nested nominal
 payload can be read through ordinary owned field projections; this grants no shared field rights.
 
 Tracked raw-local, iterator-find temporary and async-factory storage growth also charge the
@@ -1017,3 +1017,10 @@ under original mutable-slice, initialization, generation and current-source chec
 ghosts remain detached. Nested mutable children, shared views, role-bearing aggregates,
 reference returns, stale aliases, unwinding and missing selected bodies remain UNKNOWN.
 Private backing, frame entries and ordinary allocations share the existing storage budget.
+
+The zero-sized nominal Box protocol accepts the exact original compiler ABI alignment.
+A single immutable zero-layout certificate authenticates constructor Layout fields, target-width
+rounding, power-of-two alignment, nonnull zero-branch sentinel and typed drop arithmetic.
+The complete selected zero-size Global branch needs no allocator-success premise. Logical
+region ownership remains separate from numeric dangling addresses; no raw, mutable or shared
+field access is added. Original payload/shape budgets, lifetimes and Unit inline lowering remain.

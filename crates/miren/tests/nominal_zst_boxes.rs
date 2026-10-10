@@ -93,13 +93,10 @@ fn verify_dependency(
                     UnknownCategory::Unclassified,
                     "unsupported memory projection",
                 ),
-                "core_zero" => (
+                "core_zero" | "ref_zero" | "raw_zero" | "pat_zero" => (
                     UnknownCategory::Semantics,
                     "unsupported original child type",
                 ),
-                "ref_zero" | "raw_zero" | "pat_zero" | "aligned" => {
-                    (UnknownCategory::Semantics, "size zero and alignment one")
-                }
                 "drop_payload" => (UnknownCategory::Semantics, "Copy, Freeze and no drop glue"),
                 "enum_payload" | "external_payload" => (
                     UnknownCategory::Semantics,
@@ -199,7 +196,7 @@ fn nominal_zero_boxes_preserve_original_payload_and_retirement() {
         ("raw_zero", ProofStatus::Unknown),
         ("pat_zero", ProofStatus::Unknown),
         ("core_zero", ProofStatus::Unknown),
-        ("aligned", ProofStatus::Unknown),
+        ("aligned", ProofStatus::Proved),
         ("drop_payload", ProofStatus::Unknown),
         ("enum_payload", ProofStatus::Unknown),
         ("arbitrary_input", ProofStatus::Unknown),
