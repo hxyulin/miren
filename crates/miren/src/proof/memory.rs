@@ -1,5 +1,6 @@
 use super::storage_locations::{StorageLocation, validate_static_epoch};
 use super::*;
+use call_destinations::CapturedDestinationIndices;
 use symbolic::MemoryProjection;
 
 pub(super) const MAX_ALLOCATIONS: usize = 512;
@@ -525,6 +526,15 @@ impl<'tcx> Engine<'tcx> {
         state: &State,
         place: Place<'tcx>,
     ) -> Result<(Option<usize>, Vec<MemoryProjection>, bool), String> {
+        self.memory_path_with_indices(state, place, None)
+    }
+
+    pub(super) fn memory_path_with_indices(
+        &self,
+        state: &State,
+        place: Place<'tcx>,
+        indices: Option<&CapturedDestinationIndices>,
+    ) -> Result<(Option<usize>, Vec<MemoryProjection>, bool), String> {
         let local = place.local.as_usize();
         let mut allocation = state.addresses[local];
         let mut path = Vec::new();
@@ -568,8 +578,9 @@ impl<'tcx> Engine<'tcx> {
                     path.push(element);
                 }
                 ProjectionElem::Index(index) => {
-                    let element =
-                        MemoryProjection::Index(Box::new(self.local(state, index.as_usize())?));
+                    let element = MemoryProjection::Index(Box::new(
+                        self.destination_index(state, index, indices)?,
+                    ));
                     value = self.memory_projection(value, &element, &state.conditions)?;
                     path.push(element);
                 }
@@ -917,6 +928,16 @@ impl<'tcx> Engine<'tcx> {
         place: Place<'tcx>,
         value: Value,
     ) -> Result<(), String> {
+        self.write_with_indices(state, place, value, None)
+    }
+
+    pub(super) fn write_with_indices(
+        &self,
+        state: &mut State,
+        place: Place<'tcx>,
+        value: Value,
+        indices: Option<&CapturedDestinationIndices>,
+    ) -> Result<(), String> {
         let local = place.local.as_usize();
         if place.projection.is_empty() {
             if let Some(allocation) = state.addresses[local] {
@@ -929,7 +950,7 @@ impl<'tcx> Engine<'tcx> {
         if self.write_static_place(state, place, &value)? {
             return Ok(());
         }
-        let (allocation, path, writable) = self.memory_path(state, place)?;
+        let (allocation, path, writable) = self.memory_path_with_indices(state, place, indices)?;
         if allocation.is_none() && !writable {
             return Err("write through a shared snapshot is unsupported".to_owned());
         }

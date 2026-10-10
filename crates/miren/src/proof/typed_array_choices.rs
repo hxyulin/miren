@@ -1,5 +1,6 @@
 //! Owned finite choices and whole-element writes certified by actual MIR array types.
 use super::*;
+use call_destinations::CapturedDestinationIndices;
 use composite_slices::CompositeShape;
 use storage_locations::StorageLocation;
 use symbolic::ScalarSliceElement;
@@ -160,12 +161,14 @@ impl<'tcx> Engine<'tcx> {
         state: &mut State,
         place: Place<'tcx>,
         replacement: &Value,
+        indices: Option<&CapturedDestinationIndices>,
     ) -> Result<bool, String> {
         self.write_owned_array_element_mode(
             body,
             state,
             place,
             replacement,
+            indices,
             OwnedWriteMode::Nonunique,
         )
     }
@@ -210,8 +213,16 @@ impl<'tcx> Engine<'tcx> {
         state: &mut State,
         place: Place<'tcx>,
         replacement: &Value,
+        indices: Option<&CapturedDestinationIndices>,
     ) -> Result<bool, String> {
-        self.write_owned_array_element_mode(body, state, place, replacement, OwnedWriteMode::Known)
+        self.write_owned_array_element_mode(
+            body,
+            state,
+            place,
+            replacement,
+            indices,
+            OwnedWriteMode::Known,
+        )
     }
 
     pub(super) fn owned_field_array_write_candidate(
@@ -246,6 +257,7 @@ impl<'tcx> Engine<'tcx> {
         state: &mut State,
         place: Place<'tcx>,
         replacement: &Value,
+        indices: Option<&CapturedDestinationIndices>,
     ) -> Result<bool, String> {
         if !self.owned_field_array_write_candidate(body, place) {
             return Ok(false);
@@ -254,8 +266,14 @@ impl<'tcx> Engine<'tcx> {
         let Some(shape) = self.owned_product_shape(original)? else {
             return Ok(false);
         };
-        let Some(ProductWritePlan::Indexed { index, targets }) =
-            self.owned_product_write_plan(body, state, original, &shape, place.projection)?
+        let Some(ProductWritePlan::Indexed { index, targets }) = self.owned_product_write_plan(
+            body,
+            state,
+            original,
+            &shape,
+            place.projection,
+            indices,
+        )?
         else {
             return Ok(false);
         };
@@ -314,6 +332,7 @@ impl<'tcx> Engine<'tcx> {
         state: &mut State,
         place: Place<'tcx>,
         replacement: &Value,
+        indices: Option<&CapturedDestinationIndices>,
         mode: OwnedWriteMode,
     ) -> Result<bool, String> {
         let Some((outer, fields)) = place.projection.split_first() else {
@@ -378,7 +397,7 @@ impl<'tcx> Engine<'tcx> {
                 {
                     return Err("known owned outer index requires compiler usize".into());
                 }
-                self.local(state, index_local.as_usize())?
+                self.destination_index(state, *index_local, indices)?
             }
             ProjectionElem::ConstantIndex {
                 offset,
@@ -439,7 +458,8 @@ impl<'tcx> Engine<'tcx> {
         let Some(shape) = self.owned_product_shape(*element)? else {
             return Ok(false);
         };
-        let Some(plan) = self.owned_product_write_plan(body, state, *element, &shape, fields)?
+        let Some(plan) =
+            self.owned_product_write_plan(body, state, *element, &shape, fields, indices)?
         else {
             return Ok(false);
         };
@@ -548,6 +568,7 @@ impl<'tcx> Engine<'tcx> {
         original: Ty<'tcx>,
         shape: &OwnedChoiceShape,
         projections: &[rustc_middle::mir::PlaceElem<'tcx>],
+        indices: Option<&CapturedDestinationIndices>,
     ) -> Result<Option<ProductWritePlan<'tcx>>, String> {
         let bits = u32::from(self.tcx.sess.target.pointer_width);
         for (position, projection) in projections.iter().enumerate() {
@@ -557,7 +578,7 @@ impl<'tcx> Engine<'tcx> {
             if body.local_decls[*local].ty != self.tcx.types.usize {
                 return Err("owned nested array index requires compiler usize".into());
             }
-            let value = self.local(state, local.as_usize())?;
+            let value = self.destination_index(state, *local, indices)?;
             if fixed_index_value(&self.terms, &value, bits)?.is_some() {
                 continue;
             }
@@ -567,6 +588,7 @@ impl<'tcx> Engine<'tcx> {
                 original,
                 shape,
                 &projections[..position],
+                indices,
             )?
             else {
                 return Ok(None);
@@ -597,6 +619,7 @@ impl<'tcx> Engine<'tcx> {
                     child_ty,
                     &child_shape,
                     &projections[position + 1..],
+                    indices,
                 )?
                 else {
                     return Ok(None);
@@ -642,7 +665,7 @@ impl<'tcx> Engine<'tcx> {
             }));
         }
         Ok(self
-            .owned_product_path_target(body, state, original, shape, projections)?
+            .owned_product_path_target(body, state, original, shape, projections, indices)?
             .map(ProductWritePlan::Single))
     }
 
@@ -653,6 +676,7 @@ impl<'tcx> Engine<'tcx> {
         mut original: Ty<'tcx>,
         shape: &OwnedChoiceShape,
         projections: &[rustc_middle::mir::PlaceElem<'tcx>],
+        indices: Option<&CapturedDestinationIndices>,
     ) -> Result<Option<ProductPathTarget<'tcx>>, String> {
         let mut shape = shape.clone();
         let mut start = 0_usize;
@@ -705,7 +729,7 @@ impl<'tcx> Engine<'tcx> {
                     if body.local_decls[*local].ty != self.tcx.types.usize {
                         return Err("owned nested array index requires compiler usize".into());
                     }
-                    let value = self.local(state, local.as_usize())?;
+                    let value = self.destination_index(state, *local, indices)?;
                     let Some(index) = fixed_index_value(
                         &self.terms,
                         &value,

@@ -1553,3 +1553,18 @@ field materialization on every read; compiler type evidence grants no additional
 The existing direct-array path and raw, mutable, static and frame-escape frontiers remain required.
 Before probes retain UNKNOWN across all four profiles; frozen after-probes retain P/R/missing-body
 U with empty assumptions. Frozen surveys and all required validation pass.
+
+
+Stage 173 extracts assignment storage into one concrete method, preserving rvalue evaluation,
+validation order and writer selection. Function-result destinations retain their existing policy.
+
+Stage 174 fixes call-result destination timing for direct owned arrays and pure product fields.
+Rust evaluates the destination before the callee: changing its index inside the callee must not
+redirect the returned value. A private certificate records the original indices and owner,
+validates the complete original root and pre-call bounds, then stores into the current live owner.
+The actual callee runs once; its sibling updates remain intact. Changed owner identity, expired
+storage, unsupported types and unavailable bodies remain UNKNOWN. Any dereference destination
+requires separate pre-call location capture and returns explicit UNKNOWN, including destinations
+without an index. Native controls confirm both previous false proofs and their corrected outcomes.
+The nineteen-root compiler matrix yields eight PROVED, three REFUTED and eight UNKNOWN per profile.
+Full final validation is recorded in the stage log.

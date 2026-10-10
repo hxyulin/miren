@@ -90,13 +90,8 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
         }
         if *expected == ProofStatus::Unknown {
             let (category, reason) = match *name {
-                "dynamic_twice"
-                | "retained"
-                | "reference_zero"
-                | "refined_zero"
-                | "drop_zero"
-                | "core_zero"
-                | "analyzer_only::call_destination" => (
+                "dynamic_twice" | "retained" | "reference_zero" | "refined_zero" | "drop_zero"
+                | "core_zero" => (
                     UnknownCategory::Semantics,
                     "array write index is not uniquely determined",
                 ),
@@ -204,7 +199,7 @@ fn product_roots_preserve_owned_sibling_spans() {
         ("oversized", ProofStatus::Unknown),
         ("analyzer_only::missing_body", ProofStatus::Unknown),
         ("analyzer_only::raw", ProofStatus::Unknown),
-        ("analyzer_only::call_destination", ProofStatus::Unknown),
+        ("analyzer_only::call_destination", ProofStatus::Proved),
     ];
     for target in [None, Some("thumbv7em-none-eabihf")] {
         for optimized in [false, true] {

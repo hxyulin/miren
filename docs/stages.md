@@ -4374,3 +4374,58 @@ status, obligation details and query text. All 500 main/isolate selected results
 and premises match. Independent review approves the exact extraction and unchanged call stores.
 No assumptions, input caps or resource-budget changes are introduced. Stage 173 follows Stage 171;
 composite comparison Stage 172 remains an independent implementation.
+
+
+## Stage 174: pre-call indices for direct owned result destinations
+
+A function-result destination was re-evaluated after its callee returned. Actual native execution
+of `Call(values[index] = advance(&mut index))` selects the original index. The existing analyzer
+instead selected the changed index: it refuted the valid pre-call claim and proved the incorrect
+post-call claim in all four profiles. Host O0/O2 execution passes the former and fails the latter.
+The unchanged source, commands, queries and binary hashes remain preserved at
+`/tmp/miren-stage174-destination-both-directions`.
+
+A private certificate now captures distinct original compiler-usize indices and caller owner
+identity before call execution. It validates the complete pure root, declared field types, fixed
+indices, original array counts, pre-call bounds and write rights. The same immutable indices feed
+the existing generic and typed writers using each returned continuation's current owner memory.
+Current liveness, unchanged owner identity, complete root and exact replacement are checked again.
+Whole-local result stores retain their original policy; dereference destinations, including
+static and raw bases, require a separate pre-call base-location certificate and remain unsupported.
+Calls and effects are executed once; a callback cannot retroactively establish destination bounds.
+
+The unchanged timing pair now yields PROVED/REFUTED in all four profiles with empty assumptions.
+The final nineteen-root matrix yields eight PROVED, three REFUTED and eight UNKNOWN per profile.
+Actual replacement mutation refutes unchanged caller claims; five valid native originals pass
+at O0/O2 and mutant guards fail. Two original older call-destination sources advance from UNKNOWN
+to PROVED across all four profiles, preserving actual replacement body entry. Initial obsolete
+UNKNOWN expectation failures remain saved before harness-only upkeep. New global valid, wrong
+and missing-body controls yield P/R/U; original native controls pass and actual advance mutation
+fails. All 376 previously completed global roots keep identical status, details and query text.
+Evidence remains beneath `/tmp/miren-stage174-destination-both-directions-after`,
+`/tmp/miren-stage174-old-call-destination`, `/tmp/miren-stage174-old-known-call-destination`,
+`/tmp/miren-stage174-native-final` and `/tmp/miren-stage174-global-initial-after`.
+Parent integration, immutable final evidence and full required checks remain pending.
+
+
+The base-location audit finds the same confirmed false positive without any Index projection:
+a callee redirects a reference used in `Call(*pointer = redirect(...))`. Native execution stores
+through the original pointer, while the old analyzer re-resolves its changed base. All four
+profiles refute the valid claim and prove the wrong one before correction. Until base-location
+capture is implemented, any dereference Call destination returns explicit Semantics UNKNOWN
+before model or callee execution. Both unchanged claims retain honest UNKNOWN, with native
+pass/fail evidence preserved at `/tmp/miren-stage174-deref-destination-evidence`.
+
+
+Final validation passes all 700 Rust tests and 68 Python tests in the isolated workspace.
+The full-test source ledger verifies identical semantic and test bytes after actual Stage 173
+parent adoption; only documentation changed. All 639 tracked main files match the final snapshot
+byte for byte. Fresh main debug/release builds, fourteen related integration tests, 68 Python
+tests and every remaining required check pass. Both frozen surveys yield 204 PROVED, 180 REFUTED
+and 128 UNKNOWN at `/tmp/miren-stage174-capabilities-20261010` and
+`/tmp/miren-stage174-merged-capabilities-20261010`, with source/input/release hashes verified.
+All 376 earlier completed roots retain identical status, obligation details and query text; all
+512 main/isolate selected results, queries, models and premises match. Independent source review
+approves the nineteen-root matrix, actual replacement mutation, valid native controls and mandatory
+dereference refusal. No assumptions, input caps or resource-budget changes are introduced.
+This correctness stage follows Stage 173 independently of composite comparison Stage 172.

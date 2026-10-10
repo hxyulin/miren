@@ -731,14 +731,14 @@ same owner allocation. Untouched rows retain their exact values; only the proven
 jointly correlated inner updates. Existing successful byte stores and their queries run first and
 remain unchanged. The rvalue and destination validity checks execute once. Missing bodies,
 permission failures and solver/resource errors cannot trigger this fallback. Reference/raw/static
-and call destinations gain no support.
+destinations gain no support through this assignment fallback.
 Owned tuple and ordinary-struct roots can also update an array reached through leading compiler
 field projections. This uses the same exact unsupported-boundary fallback after the old writer.
 The complete original root and replacement share one validation budget; original field types
 resolve disjoint logical target spans. One symbolic index controls all leaves in each selected
 subtree, and untouched sibling terms survive the complete nominal rebuild and same-owner commit.
 Existing successful field and byte writes retain their earlier paths and queries. This adds no
-symbolic second index, dereference, retained-reference, raw, static or call-destination writes.
+symbolic second index, dereference, retained-reference, raw or static writes.
 Assignment targets retain complete parent and replacement validation, including siblings and
 zero-leaf fields. Deferred input products with no observable scalar leaves can be reconstructed
 after exact original-type and descriptor validation. Nominal zero-sized structs
@@ -799,3 +799,16 @@ and returning a closure cannot convert frame-owned captured borrows into owned s
 closure bodies and compiler-generated Fn-to-FnOnce and FnMut-to-FnOnce adapters execute actual MIR,
 including their receiver borrows and drops. This adds no mutable slice, raw access, asynchronous
 closure or unbounded loop proof permission.
+
+Function results can be stored into direct pure owned array, tuple and ordinary-struct paths with
+symbolic indices. Rust evaluates these destination indices before the callee executes. An
+immutable certificate records their values and the caller owner identity; no caller locals are
+overwritten to simulate this timing. Original field types, fixed indices, complete root metadata,
+pre-call bounds and current write rights are checked before execution. Each returned continuation
+uses those captured indices with the current complete owner and exact replacement validation.
+The existing writer runs first; only its precise unsupported-index frontier can invoke the
+existing typed transaction. Callee effects run once, untouched fields retain the returned state,
+and unsupported siblings remain unsupported even when empty. No-return calls still execute their
+actual bodies for certified destinations. Dereference destinations, including static and raw
+bases, need a separate pre-call base-location certificate and remain unsupported. Whole-local
+result stores retain their existing policy.

@@ -1,4 +1,6 @@
 #![no_std]
+#![cfg_attr(not(test), feature(custom_mir, core_intrinsics))]
+#![cfg_attr(not(test), allow(internal_features))]
 
 use core::future::Future;
 use core::pin::pin;
@@ -1293,8 +1295,80 @@ pub fn retained_owned_field_missing_body(
     }
 }
 
+#[inline(never)]
+fn owned_call_advance(index: &mut usize) -> u16 {
+    *index ^= 1;
+    19
+}
+#[cfg(not(test))]
+#[custom_mir(dialect = "runtime", phase = "optimized")]
+fn owned_call_update(mut values: ([u16; 2], u16), mut index: usize) -> (([u16; 2], u16), usize) {
+    use core::intrinsics::mir::*;
+    mir! {
+        let pointer: &mut usize;
+        {
+            pointer = &mut index;
+            Call(values.0[index] = owned_call_advance(pointer), ReturnTo(done), UnwindUnreachable())
+        }
+        done = { RET = (values, index); Return() }
+    }
+}
+#[cfg(test)]
+fn owned_call_update(mut values: ([u16; 2], u16), mut index: usize) -> (([u16; 2], u16), usize) {
+    let selected = index;
+    let result = owned_call_advance(&mut index);
+    values.0[selected] = result;
+    (values, index)
+}
+pub fn owned_call_destination(values: ([u16; 2], u16), index: usize) {
+    if index < 2 {
+        let (changed, advanced) = owned_call_update(values, index);
+        assert!(changed.0[index] == 19);
+        assert!(changed.0[index ^ 1] == values.0[index ^ 1]);
+        assert!(changed.1 == values.1);
+        assert!(advanced == index ^ 1);
+    }
+}
+pub fn owned_call_destination_wrong_claim(values: ([u16; 2], u16), index: usize) {
+    if index < 2 {
+        let (changed, _) = owned_call_update(values, index);
+        assert!(changed.0[index] == 20);
+    }
+}
+#[cfg(not(test))]
+unsafe extern "Rust" {
+    fn owned_call_unavailable() -> u16;
+}
+#[cfg(not(test))]
+#[custom_mir(dialect = "runtime", phase = "optimized")]
+fn owned_call_missing_update(mut values: ([u16; 2], u16), index: usize) {
+    use core::intrinsics::mir::*;
+    mir! {
+        { Call(values.0[index] = owned_call_unavailable(), ReturnTo(done), UnwindUnreachable()) }
+        done = { Return() }
+    }
+}
+#[cfg(not(test))]
+pub fn owned_call_destination_missing_body(values: ([u16; 2], u16), index: usize) {
+    if index < 2 {
+        owned_call_missing_update(values, index);
+    }
+}
+
 #[cfg(test)]
 mod native {
+    #[test]
+    fn owned_call_destination_controls() {
+        for index in [0, 1, 2, usize::MAX] {
+            owned_call_destination(([3, 7], 11), index);
+        }
+    }
+    #[test]
+    #[should_panic]
+    fn owned_call_destination_wrong_claim_panics() {
+        owned_call_destination_wrong_claim(([3, 7], 11), 0);
+    }
+
     use super::*;
     use core::task::Waker;
 

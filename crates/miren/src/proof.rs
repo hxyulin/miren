@@ -28,6 +28,7 @@ mod async_entries;
 mod atomic_intrinsics;
 mod atomic_rmw;
 mod builtins;
+mod call_destinations;
 mod call_metadata;
 mod characters;
 mod closure_captures;
@@ -1354,6 +1355,8 @@ impl<'tcx> Engine<'tcx> {
                         .iter()
                         .map(|arg| self.operand(id, body, &state, &arg.node))
                         .collect::<Result<Vec<_>, _>>()?;
+                    let destination_indices =
+                        self.capture_destination_indices(body, &state, *destination)?;
                     let fn_trait = [LangItem::Fn, LangItem::FnMut, LangItem::FnOnce]
                         .iter()
                         .any(|item| {
@@ -1406,7 +1409,13 @@ impl<'tcx> Engine<'tcx> {
                         for result in results {
                             let mut continuation =
                                 state.continuation(result.conditions, result.memory);
-                            self.write(&mut continuation, *destination, result.value)?;
+                            self.store_call_result(
+                                body,
+                                &mut continuation,
+                                *destination,
+                                destination_indices.as_ref(),
+                                result.value,
+                            )?;
                             queue.push_back((target, continuation, retry_path.clone()));
                         }
                         continue;
@@ -1425,7 +1434,13 @@ impl<'tcx> Engine<'tcx> {
                         for result in results {
                             let mut continuation =
                                 state.continuation(result.conditions, result.memory);
-                            self.write(&mut continuation, *destination, result.value)?;
+                            self.store_call_result(
+                                body,
+                                &mut continuation,
+                                *destination,
+                                destination_indices.as_ref(),
+                                result.value,
+                            )?;
                             queue.push_back((target, continuation, retry_path.clone()));
                         }
                         continue;
@@ -1443,7 +1458,13 @@ impl<'tcx> Engine<'tcx> {
                         for result in results {
                             let mut continuation =
                                 state.continuation(result.conditions, result.memory);
-                            self.write(&mut continuation, *destination, result.value)?;
+                            self.store_call_result(
+                                body,
+                                &mut continuation,
+                                *destination,
+                                destination_indices.as_ref(),
+                                result.value,
+                            )?;
                             queue.push_back((target, continuation, retry_path.clone()));
                         }
                         continue;
@@ -1462,7 +1483,13 @@ impl<'tcx> Engine<'tcx> {
                         {
                             retry_path.note(block);
                         }
-                        self.write(&mut state, *destination, value)?;
+                        self.store_call_result(
+                            body,
+                            &mut state,
+                            *destination,
+                            destination_indices.as_ref(),
+                            value,
+                        )?;
                         let target =
                             target.ok_or("isolated pointer atomic call has no return edge")?;
                         queue.push_back((target, state, retry_path.clone()));
@@ -1478,7 +1505,13 @@ impl<'tcx> Engine<'tcx> {
                             (id, terminator.source_info.span),
                         )?
                     {
-                        self.write(&mut state, *destination, value)?;
+                        self.store_call_result(
+                            body,
+                            &mut state,
+                            *destination,
+                            destination_indices.as_ref(),
+                            value,
+                        )?;
                         let target = target.ok_or("interior call has no return edge")?;
                         queue.push_back((target, state, retry_path.clone()));
                         continue;
@@ -1497,7 +1530,13 @@ impl<'tcx> Engine<'tcx> {
                         for result in results {
                             let mut continuation =
                                 state.continuation(result.conditions, result.memory);
-                            self.write(&mut continuation, *destination, result.value)?;
+                            self.store_call_result(
+                                body,
+                                &mut continuation,
+                                *destination,
+                                destination_indices.as_ref(),
+                                result.value,
+                            )?;
                             queue.push_back((target, continuation, retry_path.clone()));
                         }
                         continue;
@@ -1512,7 +1551,13 @@ impl<'tcx> Engine<'tcx> {
                             terminator.source_info.span,
                         )?
                     {
-                        self.write(&mut state, *destination, value)?;
+                        self.store_call_result(
+                            body,
+                            &mut state,
+                            *destination,
+                            destination_indices.as_ref(),
+                            value,
+                        )?;
                         let target = target.ok_or("modeled call has no return edge")?;
                         queue.push_back((target, state, retry_path.clone()));
                         continue;
@@ -1547,7 +1592,13 @@ impl<'tcx> Engine<'tcx> {
                     let target = target.ok_or("local call has no return edge")?;
                     for result in results {
                         let mut continuation = state.continuation(result.conditions, result.memory);
-                        self.write(&mut continuation, *destination, result.value)?;
+                        self.store_call_result(
+                            body,
+                            &mut continuation,
+                            *destination,
+                            destination_indices.as_ref(),
+                            result.value,
+                        )?;
                         queue.push_back((target, continuation, retry_path.clone()));
                     }
                 }
@@ -1681,15 +1732,15 @@ impl<'tcx> Engine<'tcx> {
                 &state.conditions,
             )?;
         }
-        if self.write_owned_array_element(body, state, place, &value)? {
+        if self.write_owned_array_element(body, state, place, &value, None)? {
             Ok(())
         } else if self.known_owned_array_write_candidate(body, place)
             || self.owned_field_array_write_candidate(body, place)
         {
             match self.write(state, place, value.clone()) {
                 Err(error) if typed_array_choices::known_owned_write_frontier(&error) => {
-                    if self.write_known_owned_array_element(body, state, place, &value)?
-                        || self.write_owned_field_array(body, state, place, &value)?
+                    if self.write_known_owned_array_element(body, state, place, &value, None)?
+                        || self.write_owned_field_array(body, state, place, &value, None)?
                     {
                         Ok(())
                     } else {
