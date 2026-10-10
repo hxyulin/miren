@@ -1,4 +1,5 @@
 use super::*;
+use crate::symbolic::ScalarSliceElement;
 use rustc_middle::mir::Local;
 use rustc_span::Symbol;
 
@@ -46,6 +47,12 @@ impl<'tcx> Engine<'tcx> {
             let children: Vec<_> = match original.kind() {
                 ty::Tuple(fields) => fields.iter().collect(),
                 ty::Array(child, _) => vec![*child],
+                ty::Adt(_, _) => self
+                    .nominal_comparison_fields(original)?
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(|(_, original)| original)
+                    .collect(),
                 _ => Vec::new(),
             };
             for child in children {
@@ -62,6 +69,24 @@ impl<'tcx> Engine<'tcx> {
             }
             if seen.len() > 512 {
                 return Err("pure comparison body traversal exceeds its node budget".into());
+            }
+            if arithmetic.is_none() {
+                let mut nominal = false;
+                for original in &types {
+                    if self.nominal_comparison_fields(*original)?.is_some() {
+                        let args = self.tcx.mk_args(&[(*original).into(), (*original).into()]);
+                        if instance == self.resolve_function_item(eq, args)?
+                            || instance == self.resolve_function_item(ne, args)?
+                        {
+                            self.certify_nominal_comparison(*original, instance)?;
+                            nominal = true;
+                            break;
+                        }
+                    }
+                }
+                if nominal {
+                    continue;
+                }
             }
             if instance.def_id().krate != core {
                 return Err("pure comparison has a non-core selected definition".into());
@@ -548,6 +573,10 @@ pub(super) enum PureComparison<'tcx> {
         count: usize,
         child: Box<PureComparison<'tcx>>,
     },
+    Struct {
+        original: Ty<'tcx>,
+        fields: Vec<(String, PureComparison<'tcx>)>,
+    },
 }
 
 impl<'tcx> Engine<'tcx> {
@@ -621,6 +650,20 @@ impl<'tcx> Engine<'tcx> {
                     child: Box::new(child),
                 }))
             }
+            ty::Adt(_, _) => {
+                let Some(original_fields) = self.nominal_comparison_fields(original)? else {
+                    return Ok(None);
+                };
+                let mut fields = Vec::new();
+                for (name, original) in original_fields {
+                    let Some(field) = self.pure_comparison_depth(original, depth + 1, nodes)?
+                    else {
+                        return Ok(None);
+                    };
+                    fields.push((name, field));
+                }
+                Ok(Some(PureComparison::Struct { original, fields }))
+            }
             _ => Ok(None),
         }
     }
@@ -670,7 +713,150 @@ impl<'tcx> Engine<'tcx> {
                 }
                 Ok(result)
             }
+            PureComparison::Struct { original, fields } => {
+                self.validate_nominal_comparison_observation(plan, left)?;
+                self.validate_nominal_comparison_observation(plan, right)?;
+                let left = self.pure_comparison_struct(*original, fields, left)?;
+                let right = self.pure_comparison_struct(*original, fields, right)?;
+                let mut result = self.terms.boolean(true);
+                for (((_, plan), (_, left)), (_, right)) in fields.iter().zip(left).zip(right) {
+                    let equal = self.pure_comparison_equal(plan, left, right)?;
+                    result = self.terms.apply(Op::And, &[result, equal])?;
+                }
+                Ok(result)
+            }
         }
+    }
+
+    fn validate_nominal_comparison_observation(
+        &self,
+        plan: &PureComparison<'tcx>,
+        value: &Value,
+    ) -> Result<(), String> {
+        match plan {
+            PureComparison::Primitive(original) => {
+                let kind = self
+                    .scalar_slice_element(*original)?
+                    .ok_or("nominal comparison leaf has no exact primitive type")?;
+                let valid = match (kind, value) {
+                    (ScalarSliceElement::Bool, Value::Bool(term)) => {
+                        term.sort() == &Sort::Bool && term.belongs_to(&self.terms)
+                    }
+                    (
+                        ScalarSliceElement::Integer { bits, signed },
+                        Value::Int {
+                            expression,
+                            bits: actual,
+                            signed: sign,
+                        },
+                    ) => {
+                        bits == *actual
+                            && signed == *sign
+                            && expression.sort() == &Sort::BitVec(bits)
+                            && expression.belongs_to(&self.terms)
+                    }
+                    (
+                        ScalarSliceElement::Char,
+                        Value::Int {
+                            expression,
+                            bits: 32,
+                            signed: false,
+                        },
+                    ) => {
+                        expression.sort() == &Sort::BitVec(32) && expression.belongs_to(&self.terms)
+                    }
+                    (
+                        ScalarSliceElement::Float { bits },
+                        Value::Float {
+                            expression,
+                            bits: actual,
+                            ..
+                        },
+                    ) => {
+                        let (exponent, significand) = if bits == 32 { (8, 24) } else { (11, 53) };
+                        bits == *actual
+                            && expression.sort()
+                                == &Sort::Float {
+                                    exponent,
+                                    significand,
+                                }
+                            && expression.belongs_to(&self.terms)
+                    }
+                    _ => false,
+                };
+                // Incoming/needle certificates already establish Unicode validity using their
+                // actual free conditions. This is metadata validation, never a new char premise.
+                if !valid {
+                    return Err("nominal comparison primitive carrier differs from its type".into());
+                }
+            }
+            PureComparison::Tuple(plans) if plans.is_empty() => {
+                if !matches!(value, Value::Unit) {
+                    return Err("nominal comparison unit has a different carrier".into());
+                }
+            }
+            PureComparison::Tuple(plans) => {
+                let Value::Tuple(values) = value else {
+                    return Err("nominal comparison tuple has a different carrier".into());
+                };
+                if plans.len() != values.len() {
+                    return Err("nominal comparison tuple has a different field count".into());
+                }
+                for (plan, value) in plans.iter().zip(values) {
+                    self.validate_nominal_comparison_observation(plan, value)?;
+                }
+            }
+            PureComparison::Array {
+                original,
+                count,
+                child,
+            } => {
+                for value in self.pure_comparison_array(*original, *count, value)? {
+                    self.validate_nominal_comparison_observation(child, &value)?;
+                }
+            }
+            PureComparison::Struct { original, fields } => {
+                let values = self.pure_comparison_struct(*original, fields, value)?;
+                for ((_, plan), (_, value)) in fields.iter().zip(values) {
+                    self.validate_nominal_comparison_observation(plan, value)?;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn pure_comparison_struct<'a>(
+        &self,
+        original: Ty<'tcx>,
+        expected: &[(String, PureComparison<'tcx>)],
+        value: &'a Value,
+    ) -> Result<&'a [(String, Value)], String> {
+        let ty::Adt(definition, _) = original.kind() else {
+            return Err("nominal comparison plan lacks its original struct type".into());
+        };
+        let Value::Adt {
+            name,
+            variant,
+            is_option,
+            discriminant,
+            fields,
+        } = value
+        else {
+            return Err("nominal comparison has a different struct carrier".into());
+        };
+        if *name != self.tcx.def_path_str(definition.did())
+            || *variant != 0
+            || *is_option
+            || *discriminant != 0
+            || fields.len() != expected.len()
+            || fields
+                .iter()
+                .zip(expected)
+                .any(|((actual, _), (expected, _))| actual != expected)
+        {
+            return Err("nominal comparison struct identity or fields differ".into());
+        }
+        Ok(fields)
     }
 
     fn pure_comparison_array(

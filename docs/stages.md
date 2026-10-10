@@ -4892,3 +4892,64 @@ captures remain at `/tmp/miren-stage180-repair-final-evidence` and
 `/tmp/miren-stage180-repair-global-final-evidence`; their recorded binary scopes are preserved.
 The combined manifest contains 152 cases in 52 families. No assumptions, input caps, firmware
 rewrites or increased resource budgets are introduced.
+
+
+Stage 183 certifies the actually selected structural `PartialEq` body for local ordinary structs
+in full-domain read-only slice membership and equality. The original type remains Copy, Freeze
+and without drop glue. Exact shared receiver paths, recorded field types, local initialization,
+Move consumption, child comparisons, all reachable effects and the complete Boolean result must
+establish equality of every corresponding field. Derived markers and method names grant no proof.
+Float fields use numeric equality, including NaN and signed zero; Char keeps its existing validity
+checks. Source lifetime and extent checks precede empty and unequal-length shortcuts. Certificates
+are revalidated against instantiated MIR without a cache. Array-field casts, external nominal
+comparers, custom effects and missing selected bodies remain conservative boundaries.
+
+The dedicated 22-root matrix yields 11 PROVED, three REFUTED and eight UNKNOWN per host/ARM O0/O2
+profile. Changing the actual data helper refutes the unchanged claim, with its body entered and
+query/model retained on the failing obligation. Changing a comparator to compare the wrong field
+returns UNKNOWN. Safe native originals pass and data mutants exit 101 at O0/O2 with ten-second
+limits. Commands, source and binary hashes, reports and native outputs remain at
+`/tmp/miren-stage183-final-evidence`. Its missing-body control invokes a foreign helper after the
+comparison; it is not evidence of omitted selected-comparator MIR. Global controls and their
+independent actual-helper mutation remain at `/tmp/miren-stage183-global-after-evidence`.
+
+Two unchanged `struct_slices` roots advance from UNKNOWN to PROVED in all four profiles. Three old
+nonstructural or panicking comparator roots remain UNKNOWN with a more precise certificate refusal.
+The initial stale diagnostic expectation failure remains at
+`/tmp/miren-stage183-related-initial.log`. Harness upkeep changes no original fixture or claim.
+The focused fidelity ledger retains 56 query-bearing completed root/profile pairs and all 96 query
+texts. Twelve additional completed pairs are query-free; 68 outcome/detail pairs are unchanged. The
+eight promotions and twelve query-free diagnostic
+changes are recorded separately at `/tmp/miren-stage183-query-fidelity`. Final integrated repository
+validation and the combined frozen surveys follow these focused captures. No assumptions, input
+length caps, write permissions or increased resource budgets are introduced.
+
+
+The initial full run passed 737 Rust tests and failed four Cargo tests. Two solver-unit failures
+came from the root validator setting `MIREN_Z3`, which selects custom solver behavior rather than
+the default persistent session those tests inspect. The other failures were stale expectations in
+typed-struct arrays and zero-sized struct slices. The expected native-mutant child failure is
+separate. Original logs remain at `/tmp/miren-stage183-checks`; the environment correction is
+recorded at `/tmp/miren-stage183-validation-environment-correction.json`.
+
+Sixteen unchanged-source before/after runs verify two typed-struct-array roots advancing from
+UNKNOWN to PROVED in all four profiles. Two zero-sized struct roots remain UNKNOWN because their
+original array fields fall outside the nominal structural grammar, including zero-length fields.
+The actual categories and reasons remain at `/tmp/miren-stage183-extra-frontiers`. Two additional
+harness updates preserve every fixture and claim, pin the promoted producer models and keep the
+unsupported array-field cases strict. Corrected full validation follows this recorded first run.
+
+
+Final corrected validation passes all 741 Rust tests and 68 Python tests. Formatting, lint,
+debug/release builds, cargo deny, documentation and manual hooks pass. Fresh main validation passes
+30 relevant Rust tests and 68 Python tests. All 780 tracked files match the isolated source byte
+for byte. Both corrected surveys yield 244 PROVED, 216 REFUTED and 160 UNKNOWN across four profiles:
+`/tmp/miren-stage183-corrected-capabilities-20261010` and
+`/tmp/miren-stage183-corrected-merged-capabilities-20261010`. All 448 previously completed parent
+roots retain identical outcomes, obligation details and query text. All 620 main/isolate outcomes,
+queries, models and premises match. One query-free host-optimized resource refusal has a different
+context prefix; its unchanged 30-second limit and original diagnostics remain in the comparison
+ledger. Source, input and release hashes are verified. The manifest contains 155 cases in 53
+families. Current release global captures remain at `/tmp/miren-stage183-global-final-evidence`;
+the native evidence retains its original binary scope. Initial failures remain preserved, and no
+assumptions, input caps, firmware rewrites or increased resource budgets are introduced.

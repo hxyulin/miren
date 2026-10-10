@@ -105,6 +105,14 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
                 model.contains("slice iterator; ordered elements and tracked cursor")
             }));
         }
+        if matches!(*name, "full_contains" | "full_equality") {
+            let model = if *name == "full_contains" {
+                "full-domain pure composite slice membership"
+            } else {
+                "full-domain pure composite slice equality"
+            };
+            assert!(proof.models.iter().any(|observed| observed.contains(model)));
+        }
         if *expected == ProofStatus::Unknown {
             let (category, reason) = match *name {
                 "mutable_root" | "competing_roots" | "reference_field" | "raw_field"
@@ -116,14 +124,6 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
                 "oversized_shape" => (
                     UnknownCategory::ResourceLimit,
                     "composite slice type array exceeds the 128-element shape budget",
-                ),
-                "full_contains" => (
-                    UnknownCategory::Semantics,
-                    "whole composite slice membership is unsupported",
-                ),
-                "full_equality" => (
-                    UnknownCategory::Semantics,
-                    "whole composite slice equality is unsupported",
                 ),
                 "analyzer_only::missing_body" => (
                     UnknownCategory::MissingCompilerEvidence,
@@ -231,8 +231,8 @@ fn local_struct_slices_preserve_fields_layout_and_source_rights() {
         ("ambiguous_nested_struct", ProofStatus::Refuted),
         ("enum_field", ProofStatus::Proved),
         ("union_field", ProofStatus::Unknown),
-        ("full_contains", ProofStatus::Unknown),
-        ("full_equality", ProofStatus::Unknown),
+        ("full_contains", ProofStatus::Proved),
+        ("full_equality", ProofStatus::Proved),
         ("analyzer_only::missing_body", ProofStatus::Unknown),
         ("analyzer_only::raw_source", ProofStatus::Unknown),
         ("analyzer_only::dead_empty", ProofStatus::Unknown),

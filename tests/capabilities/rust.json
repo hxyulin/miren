@@ -425,9 +425,7 @@
     {
       "entry": "local_struct_slice_membership",
       "family": "local_struct_slice",
-      "expected": "unknown",
-      "unknown_reason": "whole composite slice membership is unsupported",
-      "unknown_category": "semantics"
+      "expected": "proved"
     },
     {
       "entry": "local_zero_struct_cursor",
@@ -840,6 +838,23 @@
       "family": "owned_move",
       "expected": "unknown",
       "unknown_reason": "place initialization is unavailable after ownership consumption",
+      "unknown_category": "semantics"
+    },
+    {
+      "entry": "nominal_struct_predicates",
+      "family": "nominal_struct_predicates",
+      "expected": "proved"
+    },
+    {
+      "entry": "nominal_struct_wrong_claim",
+      "family": "nominal_struct_predicates",
+      "expected": "refuted"
+    },
+    {
+      "entry": "nominal_struct_comparator_unknown",
+      "family": "nominal_struct_predicates",
+      "expected": "unknown",
+      "unknown_reason": "nominal comparison does not compute all corresponding field equalities",
       "unknown_category": "semantics"
     }
   ]

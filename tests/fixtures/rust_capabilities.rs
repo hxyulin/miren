@@ -2136,3 +2136,60 @@ mod native {
         owned_array_field_wrong_claim(records, records, records, 63, 0);
     }
 }
+
+
+#[inline(never)]
+fn nominal_struct_selected_needle(values: &[SliceSample], index: usize) -> SliceSample {
+    let mut selected = values[index];
+    selected.right = selected.right.wrapping_add(0);
+    selected
+}
+
+pub fn nominal_struct_predicates(values: &[SliceSample], index: usize) {
+    if index < values.len() {
+        let needle = nominal_struct_selected_needle(values, index);
+        assert!(values.contains(&needle));
+    }
+}
+
+pub fn nominal_struct_wrong_claim(values: &[SliceSample], index: usize) {
+    if index < values.len() {
+        let needle = nominal_struct_selected_needle(values, index);
+        assert!(!values.contains(&needle));
+    }
+}
+
+#[derive(Clone, Copy)]
+pub struct NonstructuralComparison {
+    pub left: u16,
+    pub right: u16,
+}
+
+impl PartialEq for NonstructuralComparison {
+    fn eq(&self, other: &Self) -> bool {
+        self.left == other.left
+    }
+}
+
+pub fn nominal_struct_comparator_unknown(
+    values: &[NonstructuralComparison],
+    needle: NonstructuralComparison,
+) -> bool {
+    values.contains(&needle)
+}
+
+#[cfg(test)]
+mod native_nominal_struct_predicates {
+    use super::*;
+
+    #[test]
+    fn selected_struct_body_preserves_member() {
+        nominal_struct_predicates(&[SliceSample { left: 3, right: 7 }; 129], 128);
+    }
+
+    #[test]
+    #[should_panic]
+    fn false_struct_member_claim_panics() {
+        nominal_struct_wrong_claim(&[SliceSample { left: 3, right: 7 }; 129], 128);
+    }
+}

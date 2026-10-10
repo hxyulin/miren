@@ -60,6 +60,7 @@ mod maybe_uninit;
 mod membership;
 mod memory;
 mod mutable_slice_ranges;
+mod nominal_comparisons;
 mod nonzero_options;
 mod opaque_function_inputs;
 mod owned_iterators;

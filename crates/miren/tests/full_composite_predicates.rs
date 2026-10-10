@@ -83,13 +83,13 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
                     UnknownCategory::Semantics,
                     "only read-only byte slices and byte arrays are modeled",
                 ),
-                "nominal_contains" | "nominal_panicking" => (
+                "nominal_contains" | "nominal_equality" => (
                     UnknownCategory::Semantics,
-                    "whole composite slice membership is unsupported",
+                    "nominal comparison does not compute all corresponding field equalities",
                 ),
-                "nominal_equality" => (
+                "nominal_panicking" => (
                     UnknownCategory::Semantics,
-                    "whole composite slice equality is unsupported",
+                    "nominal comparison contains an unsupported terminator or effect",
                 ),
                 "one_byte_membership" => (
                     UnknownCategory::Semantics,

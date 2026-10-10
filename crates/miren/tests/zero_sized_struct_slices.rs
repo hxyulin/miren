@@ -117,13 +117,9 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
                     UnknownCategory::Unclassified,
                     "non-scalar array index is not uniquely determined on this path",
                 ),
-                "full_contains" => (
+                "full_contains" | "full_equality" => (
                     UnknownCategory::Semantics,
-                    "whole composite slice membership is unsupported",
-                ),
-                "full_equality" => (
-                    UnknownCategory::Semantics,
-                    "whole composite slice equality is unsupported",
+                    "nominal comparison field type is outside its structural grammar",
                 ),
                 "analyzer_only::missing_body" => (
                     UnknownCategory::MissingCompilerEvidence,
