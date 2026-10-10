@@ -1,6 +1,6 @@
 #![forbid(unsafe_code)]
 
-use miren::{ProofStatus, Report, UnknownCategory};
+use miren::{ProofStatus, Report};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -81,13 +81,6 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
                     .contains("non-scalar array index is not uniquely determined on this path")
             }));
         }
-        if *name == "symbolic_write" {
-            assert!(proof.obligations.iter().any(|o| {
-                o.unknown_category == Some(UnknownCategory::Semantics)
-                    && o.detail
-                        .contains("array write index is not uniquely determined")
-            }));
-        }
         assert!(proof.entry_assumptions.is_empty());
         if *expected == ProofStatus::Refuted {
             assert!(proof.obligations.iter().any(|o| o.model.is_some()));
@@ -129,7 +122,7 @@ fn pure_tuple_selection_preserves_correlated_fields_and_rejects_identity_values(
         ("references", ProofStatus::Unknown),
         ("structs", ProofStatus::Proved),
         ("drop_zst", ProofStatus::Unknown),
-        ("symbolic_write", ProofStatus::Unknown),
+        ("symbolic_write", ProofStatus::Proved),
     ];
     for target in [None, Some("thumbv7em-none-eabihf")] {
         for optimized in [false, true] {

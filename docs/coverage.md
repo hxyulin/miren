@@ -1373,3 +1373,20 @@ UNKNOWN in each profile. Rebuilding an actual dependency getter mutation refutes
 and fails native 129-element execution; original native tests pass. Constructor invariants,
 method arithmetic and const-generic claims are checked through actual bodies. The shared core-only
 88-case/31-family baseline remains unchanged; these dependency controls have their own integration.
+
+
+Stage 160 supports compiler-typed whole-element symbolic writes to direct owned finite arrays.
+Original pure type and scalar layout checks certify all candidates and the replacement, with
+unchanged depth/node limits. One index condition selects every leaf of each updated element;
+Float bits require both-branch evidence and Char values remain validated. Existing live allocated
+owners commit once to the same allocation. Constant and solver-unique writes retain their paths.
+Nested projected stores, reference/raw destinations and deferred lazy nominal inputs stay outside
+this new writer.
+
+The 21-root host/ARM O0/O2 matrix yields 11 PROVED, 4 REFUTED and 6 UNKNOWN per build. Primitive,
+tuple, nested array, byte, struct, Float/Char, sequential and allocated-owner writes are checked.
+An actual by-value helper destination-index mutation refutes all four profiles and fails valid
+native O0/O2 execution; original native tests pass. The unchanged nominal zero-struct source
+remains UNKNOWN because its old candidate is a deferred lazy input, while its replacement retains
+nominal identity. The unchanged tuple whole-write source now proves. The shared 91-case/32-family
+baseline expects 152 PROVED, 132 REFUTED and 80 UNKNOWN across four configurations.

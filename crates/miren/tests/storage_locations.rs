@@ -132,7 +132,7 @@ fn checked_storage_locations_preserve_aliases_and_failure_paths_on_host_and_arm(
         ),
         (
             "a_nonunique_array_write_location_remains_unknown",
-            ProofStatus::Unknown,
+            ProofStatus::Proved,
         ),
     ];
     for target in [None, Some("thumbv7em-none-eabihf")] {

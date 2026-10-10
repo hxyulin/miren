@@ -137,8 +137,6 @@ fn merge(
     selected: &Value,
     otherwise: &Value,
 ) -> Result<Value, String> {
-    let ite =
-        |a: &Term, b: &Term| context.apply(Op::Ite, &[condition.clone(), a.clone(), b.clone()]);
     match (selected, otherwise) {
         (Value::Unit, Value::Unit) => Ok(Value::Unit),
         (Value::Tuple(a), Value::Tuple(b)) if a.len() == b.len() => Ok(Value::Tuple(
@@ -154,6 +152,28 @@ fn merge(
                 .collect::<Result<Vec<_>, _>>()?
                 .into(),
         )),
+        _ => scalar_conditional(context, condition, selected, otherwise),
+    }
+}
+
+pub(super) fn scalar_conditional(
+    context: &Context,
+    condition: &Term,
+    selected: &Value,
+    otherwise: &Value,
+) -> Result<Value, String> {
+    for value in [selected, otherwise] {
+        if !matches!(
+            value,
+            Value::Bool(_) | Value::Int { .. } | Value::Float { .. }
+        ) || !validate(context, value, 0, &mut 0)?
+        {
+            return Err("conditional scalar requires certified primitive values".into());
+        }
+    }
+    let ite =
+        |a: &Term, b: &Term| context.apply(Op::Ite, &[condition.clone(), a.clone(), b.clone()]);
+    match (selected, otherwise) {
         (Value::Bool(a), Value::Bool(b)) => Ok(Value::Bool(ite(a, b)?)),
         (
             Value::Int {
@@ -202,6 +222,73 @@ fn merge(
 mod tests {
     use super::*;
     use crate::symbolic::{integer, select_element};
+
+    #[test]
+    fn shared_scalar_conditionals_preserve_selection_terms_and_float_certificates() {
+        let context = Context::default();
+        let foreign = Context::default();
+        let condition = context.symbol(801, Sort::Bool).unwrap();
+        let old = integer(&context, 3, 16, false);
+        let selected = integer(&context, 9, 16, false);
+        let result = scalar_conditional(&context, &condition, &selected, &old).unwrap();
+        assert_eq!(
+            result.integer().unwrap().0,
+            context
+                .apply(
+                    Op::Ite,
+                    &[
+                        condition.clone(),
+                        selected.integer().unwrap().0,
+                        old.integer().unwrap().0
+                    ],
+                )
+                .unwrap()
+        );
+        assert!(
+            scalar_conditional(
+                &context,
+                &condition,
+                &selected,
+                &integer(&context, 3, 16, true)
+            )
+            .is_err()
+        );
+        assert!(scalar_conditional(&context, &foreign.boolean(true), &selected, &old).is_err());
+        assert!(
+            scalar_conditional(
+                &context,
+                &context.bit_vector(1, 8).unwrap(),
+                &selected,
+                &old
+            )
+            .is_err()
+        );
+        assert!(scalar_conditional(&context, &condition, &Value::Unit, &Value::Unit).is_err());
+        let selected = crate::symbolic::float(&context, 0x80000000, 32);
+        let old = crate::symbolic::float(&context, 0x7fc00001, 32);
+        assert!(matches!(
+            scalar_conditional(&context, &condition, &selected, &old).unwrap(),
+            Value::Float {
+                raw_bits: Some(_),
+                ..
+            }
+        ));
+        let Value::Float {
+            expression, bits, ..
+        } = old
+        else {
+            panic!("float fixture");
+        };
+        let old = Value::Float {
+            expression,
+            bits,
+            raw_bits: None,
+        };
+        assert!(matches!(
+            scalar_conditional(&context, &condition, &selected, &old).unwrap(),
+            Value::Float { raw_bits: None, .. }
+        ));
+    }
 
     #[test]
     fn nested_array_choices_preserve_carriers_correlations_and_identity_fallback() {

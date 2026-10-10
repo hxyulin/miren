@@ -670,6 +670,44 @@ pub fn typed_byte_array_missing_body(index: usize) -> u8 {
     }
 }
 
+#[inline(never)]
+fn owned_array_replacement(value: u32) -> (u32, u32) {
+    (value, value.wrapping_add(1))
+}
+
+pub fn owned_array_whole_write(index: usize, value: u32) {
+    let mut values = [(3_u32, 7_u32), (5, 11)];
+    if index < values.len() {
+        values[index] = owned_array_replacement(value);
+        let selected = values[index];
+        assert!(selected.0 == value);
+        assert!(selected.1 == value.wrapping_add(1));
+    }
+}
+
+pub fn owned_array_whole_wrong_claim(index: usize, value: u32) {
+    let mut values = [(3_u32, 7_u32), (5, 11)];
+    if index < values.len() {
+        values[index] = owned_array_replacement(value);
+        assert!(values[index].0 == value.wrapping_add(1));
+    }
+}
+
+#[cfg(not(test))]
+unsafe extern "Rust" {
+    fn opaque_owned_array_replacement(value: u32) -> u32;
+}
+
+#[cfg(not(test))]
+pub fn owned_array_whole_missing_body(index: usize, value: u32) {
+    let mut values = [(3_u32, 7_u32), (5, 11)];
+    if index < values.len() {
+        let replacement = unsafe { opaque_owned_array_replacement(value) };
+        values[index] = (replacement, value);
+        assert!(values[index].1 == value);
+    }
+}
+
 #[cfg(test)]
 mod native {
     use super::*;
@@ -678,6 +716,9 @@ mod native {
     #[test]
     fn positives() {
         integers(199);
+        owned_array_whole_write(0, 0);
+        owned_array_whole_write(1, u32::MAX);
+        owned_array_whole_write(usize::MAX, 7);
         typed_byte_array_choice(0);
         typed_byte_array_choice(1);
         typed_byte_array_choice(usize::MAX);
@@ -834,5 +875,10 @@ mod native {
     #[should_panic]
     fn typed_byte_array_wrong_claim_panics() {
         typed_byte_array_wrong_claim(1);
+    }
+    #[test]
+    #[should_panic]
+    fn owned_array_whole_wrong_claim_panics() {
+        owned_array_whole_wrong_claim(1, u32::MAX);
     }
 }

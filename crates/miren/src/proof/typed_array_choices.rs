@@ -1,6 +1,7 @@
-//! Owned finite choices certified by the actual MIR array-prefix type.
+//! Owned finite choices and whole-element writes certified by actual MIR array types.
 use super::*;
 use composite_slices::CompositeShape;
+use storage_locations::StorageLocation;
 use symbolic::ScalarSliceElement;
 
 #[derive(Clone, Debug)]
@@ -32,10 +33,9 @@ impl<'tcx> Engine<'tcx> {
         if count.try_to_target_usize(self.tcx) != Some(elements.len() as u64) {
             return Err("typed struct array choice inventory differs from compiler length".into());
         }
-        let Some(shape) = self.owned_struct_choice_shape(*element)? else {
+        let Some(shape) = self.owned_product_shape(*element)? else {
             return Ok(None);
         };
-        let shape = self.annotate_owned_shape(*element, &shape)?;
         if !contains_owned_choice(&shape) {
             return Ok(None);
         }
@@ -73,6 +73,129 @@ impl<'tcx> Engine<'tcx> {
         }
         Ok(Some(result))
     }
+    fn owned_product_shape(&self, original: Ty<'tcx>) -> Result<Option<OwnedChoiceShape>, String> {
+        if let Some(kind) = self.scalar_slice_element(original)? {
+            return Ok(Some(OwnedChoiceShape::Primitive(kind)));
+        }
+        self.owned_struct_choice_shape(original)?
+            .map(|shape| self.annotate_owned_shape(original, &shape))
+            .transpose()
+    }
+
+    pub(super) fn write_owned_array_element(
+        &self,
+        body: &Body<'tcx>,
+        state: &mut State,
+        place: Place<'tcx>,
+        replacement: &Value,
+    ) -> Result<bool, String> {
+        if place.projection.len() != 1 {
+            return Ok(false);
+        }
+        let ProjectionElem::Index(index_local) = place.projection[0] else {
+            return Ok(false);
+        };
+        let original = body.local_decls[place.local].ty;
+        let ty::Array(element, count) = original.kind() else {
+            return Ok(false);
+        };
+        let local = place.local.as_usize();
+        let allocation = state.addresses[local];
+        let storage = if let Some(allocation) = allocation {
+            let location = StorageLocation::tracked(allocation, true);
+            location.require_write(&state.memory)?;
+            location.read(&state.memory)?.clone()
+        } else {
+            self.local(state, local)?
+        };
+        let Value::Elements(elements) = storage.materialize()? else {
+            return Ok(false);
+        };
+        if count.try_to_target_usize(self.tcx) != Some(elements.len() as u64) {
+            return Err("owned array write inventory differs from compiler length".into());
+        }
+        let index = self.local(state, index_local.as_usize())?;
+        let (term, bits, signed) = index.integer()?;
+        if signed
+            || bits != u32::from(self.tcx.sess.target.pointer_width)
+            || term.sort() != &Sort::BitVec(bits)
+            || !term.belongs_to(&self.terms)
+        {
+            return Err("owned array write requires exact target usize".into());
+        }
+        // Keep all old known-index stores, including identity-bearing elements, unchanged.
+        if symbolic::constant(&term).is_some() {
+            return Ok(false);
+        }
+        for position in 0..elements.len() {
+            let equal = self.terms.apply(
+                Op::Equal,
+                &[term.clone(), self.terms.bit_vector(position as u128, bits)?],
+            )?;
+            if !self.feasible(&[state.conditions.clone(), vec![symbolic::not(&equal)]].concat())? {
+                return Ok(false);
+            }
+        }
+        let Some(shape) = self.owned_product_shape(*element)? else {
+            return Ok(false);
+        };
+        self.memory_bounds(
+            &index,
+            &symbolic::integer(&self.terms, elements.len() as u128, bits, false),
+            &state.conditions,
+        )?;
+        let mut nodes = 0;
+        let replacement = self
+            .product_leaves(bits, &shape, replacement, &state.conditions, &mut nodes)
+            .map_err(|error| format!("owned array write replacement: {error}"))?;
+        let mut updated = Vec::new();
+        for (position, value) in elements.iter().enumerate() {
+            let old = self
+                .product_leaves(bits, &shape, value, &state.conditions, &mut nodes)
+                .map_err(|error| format!("owned array write candidate {position}: {error}"))?;
+            let condition = self.terms.apply(
+                Op::Equal,
+                &[term.clone(), self.terms.bit_vector(position as u128, bits)?],
+            )?;
+            updated.push(conditional_product(
+                &self.terms,
+                bits,
+                &shape,
+                &condition,
+                &replacement,
+                &old,
+            )?);
+        }
+        let updated = Value::Elements(updated.into());
+        if let Some(allocation) = allocation {
+            state.memory[allocation] = Some(updated);
+        } else {
+            state.locals[local] = Some(updated);
+        }
+        Ok(true)
+    }
+
+    fn product_leaves(
+        &self,
+        bits: u32,
+        shape: &OwnedChoiceShape,
+        value: &Value,
+        conditions: &[Term],
+        nodes: &mut usize,
+    ) -> Result<Vec<Value>, String> {
+        let mut leaves = Vec::new();
+        flatten(&self.terms, bits, shape, value, 0, nodes, &mut leaves)?;
+        leaves
+            .into_iter()
+            .map(|(kind, value)| {
+                if kind == ScalarSliceElement::Char {
+                    self.prove_char_value(&value, conditions)?;
+                }
+                Ok(value)
+            })
+            .collect()
+    }
+
     fn annotate_owned_shape(
         &self,
         original: Ty<'tcx>,
@@ -363,6 +486,35 @@ fn flatten(
     Ok(())
 }
 
+fn conditional_product(
+    context: &Context,
+    pointer_bits: u32,
+    shape: &OwnedChoiceShape,
+    condition: &Term,
+    replacement: &[Value],
+    old: &[Value],
+) -> Result<Value, String> {
+    if condition.sort() != &Sort::Bool || !condition.belongs_to(context) {
+        return Err("owned array write condition has invalid sort or context".into());
+    }
+    if old.len() != replacement.len() {
+        return Err("owned array write differs in certified leaf count".into());
+    }
+    let selected = old
+        .iter()
+        .zip(replacement)
+        .map(|(old, replacement)| {
+            symbolic::conditional_scalar(context, condition, replacement, old)
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let mut cursor = 0;
+    let result = rebuild(context, pointer_bits, shape, &selected, &mut cursor)?;
+    if cursor != selected.len() {
+        return Err("owned array write omitted certified leaves".into());
+    }
+    Ok(result)
+}
+
 fn rebuild(
     context: &Context,
     pointer_bits: u32,
@@ -450,6 +602,112 @@ fn rebuild(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn conditional_owned_products_preserve_nominal_bytes_and_complete_leaf_inventory() {
+        let context = Context::default();
+        let shape = OwnedChoiceShape::Struct {
+            name: "Record".into(),
+            fields: vec![
+                ("bytes".into(), OwnedChoiceShape::ByteArray(2)),
+                ("empty".into(), OwnedChoiceShape::Tuple(Vec::new())),
+            ],
+        };
+        let bytes = |a, b| {
+            vec![
+                symbolic::integer(&context, a, 8, false),
+                symbolic::integer(&context, b, 8, false),
+            ]
+        };
+        let old = bytes(3, 7);
+        let replacement = bytes(9, 19);
+        for (condition, expected) in [(false, &old), (true, &replacement)] {
+            let result = conditional_product(
+                &context,
+                32,
+                &shape,
+                &context.boolean(condition),
+                &replacement,
+                &old,
+            )
+            .unwrap();
+            let mut nodes = 0;
+            let mut leaves = Vec::new();
+            flatten(&context, 32, &shape, &result, 0, &mut nodes, &mut leaves).unwrap();
+            assert_eq!(leaves.len(), 2);
+            for ((_, actual), expected) in leaves.iter().zip(expected) {
+                assert_eq!(actual.integer().unwrap().0, expected.integer().unwrap().0);
+            }
+            assert!(matches!(
+                result,
+                Value::Adt {
+                    variant: 0,
+                    discriminant: 0,
+                    is_option: false,
+                    ..
+                }
+            ));
+        }
+        assert!(
+            conditional_product(
+                &context,
+                32,
+                &shape,
+                &context.boolean(true),
+                &replacement[..1],
+                &old,
+            )
+            .is_err()
+        );
+        assert!(
+            conditional_product(
+                &context,
+                32,
+                &shape,
+                &context.boolean(true),
+                &bytes(9, 19),
+                &bytes(3, 7)[..1],
+            )
+            .is_err()
+        );
+        let empty = OwnedChoiceShape::Struct {
+            name: "Empty".into(),
+            fields: Vec::new(),
+        };
+        assert!(
+            conditional_product(
+                &context,
+                32,
+                &empty,
+                &Context::default().boolean(true),
+                &[],
+                &[]
+            )
+            .is_err()
+        );
+        assert!(
+            conditional_product(
+                &context,
+                32,
+                &empty,
+                &context.bit_vector(1, 8).unwrap(),
+                &[],
+                &[]
+            )
+            .is_err()
+        );
+        assert!(
+            conditional_product(
+                &context,
+                32,
+                &OwnedChoiceShape::ByteArray(1),
+                &context.boolean(true),
+                &replacement,
+                &old,
+            )
+            .is_err()
+        );
+    }
 
     #[test]
     fn byte_candidates_require_typed_annotations_exact_carriers_and_expanded_budgets() {

@@ -1645,7 +1645,11 @@ impl<'tcx> Engine<'tcx> {
                         &state.conditions,
                     )?;
                 }
-                self.write(state, *place, value)
+                if self.write_owned_array_element(body, state, *place, &value)? {
+                    Ok(())
+                } else {
+                    self.write(state, *place, value)
+                }
             }
             StatementKind::SetDiscriminant {
                 place,

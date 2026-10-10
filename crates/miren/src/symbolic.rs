@@ -682,6 +682,15 @@ pub fn shift(
     })
 }
 
+pub(crate) fn conditional_scalar(
+    context: &Context,
+    condition: &Term,
+    selected: &Value,
+    otherwise: &Value,
+) -> Result<Value, String> {
+    aggregate_choices::scalar_conditional(context, condition, selected, otherwise)
+}
+
 pub fn select_element(
     context: &Context,
     elements: &[Value],

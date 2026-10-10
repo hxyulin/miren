@@ -3686,3 +3686,67 @@ All 272 earlier completed P/R roots retain identical obligation statuses, detail
 across four configurations. The separate actual dependency rlib matrix and native mutation ledgers
 remain at `/tmp/miren-stage159-final-evidence`. Independent review approves the exact external
 struct admission and retained-body certificates; no new conditional assumptions are used.
+
+
+## Stage 160: compiler-certified owned whole-element array writes
+
+Actual MIR Assign executes its rvalue and existing destination validators before a narrow typed
+write hook. Exactly one Index on an original owned array local is admitted; original count must
+match materialized Elements and the index must be exact target usize in the active context.
+Constant and solver-unique stores retain the existing writer. Reference/Deref destinations,
+post-Index fields, call destinations and generic memory projections acquire no new write rule.
+
+A shared original product certificate reuses pure primitive/composite type checks and explicit
+byte-array annotations. The replacement and every candidate are flattened with cumulative
+512-node and depth-16 budgets, exact scalar/context/nominal metadata and Char validity checks.
+Actual bounds must follow from current path conditions. Each position uses one index comparison
+for every replacement-versus-old leaf; reconstruction completes before committing. Live allocated
+owners reuse existing require_write/read checks and commit to the same slot; unallocated owners
+update the same local. Neither path invents source identity or access permission.
+
+The scalar conditional helper is extracted from aggregate choices without changing ITE argument
+order. It is shared by product reads and writes, retains Float physical bits only with evidence
+from both branches, and refuses invalid conditions even for zero-leaf products. Byte copies,
+nominal field order, original type probes beneath N=0 and prior struct admission remain certified.
+Metadata units check condition context/sort, leaf inventories and nominal byte reconstruction.
+
+The dedicated 21-root matrix yields 11 PROVED, 4 REFUTED and 6 UNKNOWN per host/ARM O0/O2 build.
+Whole primitive, tuple, nested-array, Bytes, ordinary struct and Float/Char replacements,
+sequential equal/different indices, untouched siblings, copy independence, allocated owners and
+pure zero-byte products are covered. A real by-value noinline helper assignment index is changed
+to index XOR 1. Unchanged claims refute in all four profiles, with query/model on the same
+obligation and actual helper entry; valid native original tests pass and the rebuilt mutants fail
+at O0/O2. Commands, hashes, full outputs and timeouts are retained at
+`/tmp/miren-stage160-final-evidence`.
+
+The unchanged nominal zero-struct root remains UNKNOWN at candidate 0: its old zero-sized input
+array retains deferred Struct InputValue children, while the replacement is a correctly decoded
+nominal constant. Exact flattening refuses that unmaterialized candidate. This is a missing
+bounded materialization path, not evidence that the source assertion is false. No Unit-to-Struct
+shortcut or source rewrite is added. Retained reference/raw stores, nested field stores and
+resource limits keep their actual categorized frontiers.
+
+The unchanged earlier tuple whole-write source proves in all four profiles before its harness
+expectation is maintained. Shared tuple_array_symbolic_write also proves without source changes;
+three new whole-write P/R/missing actual replacement body U controls yield 91 cases across
+32 families, expecting 38 PROVED, 33 REFUTED and 20 UNKNOWN per configuration. The two shared
+baseline integration tests pass. Independent source and focused-evidence review checks the
+original type certificate, transaction and actual helper mutation.
+
+The unchanged primitive whole-write source in storage_locations also proves on host/ARM O0/O2;
+its expected status is maintained only after actual four-profile probes and all three original
+storage tests pass. The initial full run found this obsolete expectation and is preserved at
+`/tmp/miren-stage160-old-expectation-checks`; no engine or source-claim change is required.
+
+
+Full isolated validation passes 661 Rust tests and 68 Python tests, formatting, cargo lint,
+release builds, cargo deny, documentation build and manual hooks. Main's complete 611 tracked
+files match the validated snapshot byte for byte. Fresh debug/release builds, nineteen new/related
+integration tests, three additional storage compatibility tests, 68 Python tests and the remaining
+required checks also pass in main. Frozen isolated and merged surveys retain 152 PROVED,
+132 REFUTED and 80 UNKNOWN at `/tmp/miren-stage160-capabilities-20261010` and
+`/tmp/miren-stage160-merged-capabilities-20261010`, with current source/input/release hashes verified.
+All 272 earlier completed P/R roots retain identical obligation statuses, details and query text
+across four configurations. Actual by-value helper mutation and native execution ledgers remain
+at `/tmp/miren-stage160-final-evidence`. Independent review approves the original-type write
+certificate and unchanged-source expectation maintenance; no conditional assumptions are added.

@@ -11,8 +11,8 @@ execution at O0 and O2, positive/refuted/unknown controls, a source mutation tha
 structured UNKNOWN reporting, and passing repository checks. Completion establishes a repeatable
 baseline. It does not establish full Rust support or a completed memory-model refactor.
 
-The manifest contains 88 cases across 31 families. Each build configuration expects 36 PROVED,
-32 REFUTED and 20 UNKNOWN results. Stage 133 originally had 23 cases with 10 PROVED, 9 REFUTED
+The manifest contains 91 cases across 32 families. Each build configuration expects 38 PROVED,
+33 REFUTED and 20 UNKNOWN results. Stage 133 originally had 23 cases with 10 PROVED, 9 REFUTED
 and 4 UNKNOWN; stage 134 closed its retained-prefix projection gap. Stage 136 adds raw-pointer
 metadata P/R controls and a safe core reference-array grant that remains UNKNOWN without a
 temporal permission certificate. Stage 137 adds tuple-array P/R and unsupported symbolic-write
@@ -129,6 +129,15 @@ anchors and unknown future flags refuse the new domain. Private fields and const
 input invariant. Actual dependency method bodies remain required; unavailable MIR stays UNKNOWN.
 A dedicated dependency rlib fixture covers all four profiles, including rebuilt dependency
 mutations and genuine omitted-MIR controls. The core-only shared 88-case manifest is unchanged.
+
+Stage 160 supports symbolic whole-element assignment to a direct owned fixed array local with
+one Index projection. Actual MIR destination types certify primitive and pure tuple/array/ordinary
+struct/byte products; all old candidates and the replacement are checked within existing budgets.
+One index comparison controls every field of each rebuilt element. Existing allocated owners
+retain the same live allocation and write checks. Constant and uniquely determined writes keep
+their earlier paths. Nested post-Index stores, reference destinations and deferred lazy nominal
+input candidates retain separate UNKNOWN frontiers. The unchanged tuple symbolic write now
+proves; shared P/R/missing-actual-replacement-body controls record the additional family.
 
 ## UNKNOWN categories
 
