@@ -157,6 +157,23 @@ pub(super) fn certify_unit_protocol<'tcx>(
     tcx: TyCtxt<'tcx>,
     outer: ty::Instance<'tcx>,
 ) -> Result<(), String> {
+    certify_protocol(tcx, outer, tcx.types.unit, None)
+}
+
+pub(super) fn certify_nominal_protocol<'tcx>(
+    tcx: TyCtxt<'tcx>,
+    outer: ty::Instance<'tcx>,
+    certificate: &owned_box_payloads::Certificate<'tcx>,
+) -> Result<(), String> {
+    certify_protocol(tcx, outer, certificate.original(), Some(certificate))
+}
+
+fn certify_protocol<'tcx>(
+    tcx: TyCtxt<'tcx>,
+    outer: ty::Instance<'tcx>,
+    original: Ty<'tcx>,
+    nominal: Option<&owned_box_payloads::Certificate<'tcx>>,
+) -> Result<(), String> {
     let owned = tcx
         .lang_items()
         .owned_box()
@@ -170,7 +187,6 @@ pub(super) fn certify_unit_protocol<'tcx>(
         .get_diagnostic_item(Symbol::intern("box_new"))
         .filter(|id| id.krate == owned.krate)
         .ok_or("Box constructor identity is unavailable")?;
-    let original = tcx.types.unit;
     let constructor_args = tcx.mk_args(&[original.into()]);
     let constructor_signature = tcx
         .fn_sig(constructor)
@@ -240,16 +256,37 @@ pub(super) fn certify_unit_protocol<'tcx>(
             }
         }
         let generic = tcx.instance_mir(instance.def);
-        let encoded = pure_comparison_templates::encode_template_with_alloc(
-            tcx,
-            generic,
-            core,
-            Some(owned.krate),
-        )?;
+        let body = instance
+            .try_instantiate_mir_and_normalize_erasing_regions(
+                tcx,
+                ty::TypingEnv::fully_monomorphized(),
+                ty::EarlyBinder::bind(tcx, generic.clone()),
+            )
+            .map_err(|_| "Box selected body could not be instantiated")?;
         let definition = pure_comparison_templates::owned_definition_key(instance.def_id());
-        let family = reference_family(&definition, &encoded).ok_or_else(|| {
-            format!("Box protocol body differs from its complete reference: {definition}")
-        })?;
+        let family = if original != tcx.types.unit
+            && matches!(
+                instance.def,
+                ty::InstanceKind::Shim(ty::ShimKind::DropGlue(_, _))
+            ) {
+            owned_box_glue::nominal_glue(
+                tcx,
+                instance,
+                &body,
+                nominal.ok_or("nominal Box protocol lacks its complete payload certificate")?,
+                box_type,
+            )?
+        } else {
+            let encoded = pure_comparison_templates::encode_template_with_alloc(
+                tcx,
+                generic,
+                core,
+                Some(owned.krate),
+            )?;
+            reference_family(&definition, &encoded).ok_or_else(|| {
+                format!("Box protocol body differs from its complete reference: {definition}")
+            })?
+        };
         if family == BoxTemplateFamily::BoxNew && instance.def_id() != constructor {
             return Err("Box constructor does not have the actual diagnostic identity".into());
         }
@@ -274,13 +311,6 @@ pub(super) fn certify_unit_protocol<'tcx>(
                 "Box protocol selected different original payload or allocator arguments".into(),
             );
         }
-        let body = instance
-            .try_instantiate_mir_and_normalize_erasing_regions(
-                tcx,
-                ty::TypingEnv::fully_monomorphized(),
-                ty::EarlyBinder::bind(tcx, generic.clone()),
-            )
-            .map_err(|_| "Box selected body could not be instantiated")?;
         if expected_family.is_some_and(|expected| expected != family) {
             return Err("Box selected delegate differs from the certified child family".into());
         }

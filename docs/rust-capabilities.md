@@ -11,8 +11,8 @@ execution at O0 and O2, positive/refuted/unknown controls, a source mutation tha
 structured UNKNOWN reporting, and passing repository checks. Completion establishes a repeatable
 baseline. It does not establish full Rust support or a completed memory-model refactor.
 
-The manifest contains 167 cases across 57 families. Each build configuration expects 66 PROVED,
-58 REFUTED and 43 UNKNOWN results. Stage 133 originally had 23 cases with 10 PROVED, 9 REFUTED
+The manifest contains 170 cases across 58 families. Each build configuration expects 67 PROVED,
+59 REFUTED and 44 UNKNOWN results. Stage 133 originally had 23 cases with 10 PROVED, 9 REFUTED
 and 4 UNKNOWN; stage 134 closed its retained-prefix projection gap. Stage 136 adds raw-pointer
 metadata P/R controls and a safe core reference-array grant that remains UNKNOWN without a
 temporal permission certificate. Stage 137 adds tuple-array P/R and unsupported symbolic-write
@@ -916,3 +916,59 @@ failure remain at `/tmp/miren-stage184-merged-checks` and
 `/tmp/miren-stage184-corrected-checks` and `/tmp/miren-stage184-final-merged-checks`. The newly
 supported length-only case checks its mutable metadata model; all other readonly model assertions
 remain intact. No production semantic source correction followed the author freeze.
+
+Stage 188 extends the private alignment-one zero-sized Box region to exact local ordinary
+Copy/Freeze/no-drop nominal payloads with compiler size zero and alignment one. Complete original
+product and zero-leaf certificates preserve Adt, generic and const identity through construction,
+initialization, sharing, transfer, detached ghosts and drop. Every original child is checked,
+including children beneath zero-length arrays. Weighted payload nodes share the existing cumulative
+512-storage budget with allocations and mutable-slice backing. No allocator-success assumption,
+numeric heap address or additional field permission is introduced.
+
+Complete selected Box/Global templates retain their original typed signatures and effects.
+Synthesized drop glue uses an exhaustive typed original-body grammar, including cleanup, coroutine,
+constant-function and receiver checks. Actual selected user methods execute: Copy does not certify
+Clone or equality. Unrecognized nominal inline construction, nonzero or aligned payloads, external
+payloads, raw access and nested shared-field borrowing remain UNKNOWN. The original nested claim
+stays unchanged; a separate owned-copy control proves payload correlation.
+
+The twenty-root dedicated matrix yields seven PROVED, three REFUTED and ten UNKNOWN per host/ARM
+O0/O2 profile. All eighteen original nominal controls are UNKNOWN under committed Stage 184.
+An actual tag-body mutation
+from 17 to 18 refutes the unchanged claim with selected body entries, query and model. Retained
+foreign-helper MIR proves; genuine invoked-body omission remains MissingCompilerEvidence. Safe
+native originals pass four tests and the unchanged mutation guard exits 101 at O0/O2 with
+ten-second timeouts. Fresh adopted-parent evidence is at
+`/tmp/miren-stage188-parent184-corrected-final-evidence`; historical provisional-parent sources,
+binary and
+captures remain at `/tmp/miren-stage188-provisional187-archive` with their original scope.
+
+Historical fidelity preserves 188 unchanged entry/profile outcomes, including 72 completed pairs
+and all 80 completed queries, models and obligation details. This includes 32 completed mutable
+slice pairs and their 68 queries. Three unsupported Unit-suite/global controls retain Semantics
+UNKNOWN with more precise payload diagnostics. Harness and manifest upkeep change only those
+reasons; original fixtures and claims stay unchanged. Global P/R/U controls and actual-helper
+mutation/native guard are at `/tmp/miren-stage188-global-corrected-after-evidence`.
+The combined manifest
+has 170 cases in 58 families. No assumptions, firmware rewrites, input caps or resource budget
+increases are introduced.
+
+Review also closed three storage-growth accounting gaps in raw locals, iterator-find temporaries
+and async-factory storage. A 510-node weighted payload followed by three scalar raw-address
+allocations proves under the preserved intermediate build but reaches ResourceLimit UNKNOWN
+under the corrected build. A small raw-address control still proves. This is a budget correction;
+raw permissions and legacy frame-only refusals are preserved. The weighted control is never run
+as a native test.
+
+Final isolated validation passes 764 Rust tests and 68 Python tests; fresh-main focused validation
+passes 76 Rust tests and 68 Python tests. Formatting, lint, debug/release builds, dependency denial,
+documentation and manual hooks pass in both. All 825 tracked files match byte for byte. Both
+surveys yield 268 PROVED, 236 REFUTED and 176 UNKNOWN across four profiles. All 496 previously
+completed roots retain identical outcomes, obligation details, queries, models and premises;
+all 680 main/isolate results match with no diagnostic context differences. Fresh main release
+captures at `/tmp/miren-stage188-main-release-final-evidence` match 100 complete original/mutant,
+dependency and resource proof objects with 16 queries after explicit source/replay path mappings.
+Global release captures at `/tmp/miren-stage188-global-final-evidence` match 16 proof objects and
+eight queries. Native records retain their final corrected author execution scope. Source, input
+and release hashes are verified. No production semantic correction followed the corrected
+thirteen-path author freeze. Final documentation reflow leaves the validated code unchanged.

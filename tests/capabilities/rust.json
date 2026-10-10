@@ -871,7 +871,7 @@
       "entry": "nonzero_box_unknown",
       "family": "zst_box",
       "expected": "unknown",
-      "unknown_reason": "owned Box constructor currently requires the exact Unit payload",
+      "unknown_reason": "owned Box payload requires an exact local nominal zero-sized struct",
       "unknown_category": "semantics"
     },
     {
@@ -921,6 +921,23 @@
       "family": "mutable_u16_store",
       "expected": "unknown",
       "unknown_reason": "mutable u16 child reborrow requires child lease protocol",
+      "unknown_category": "semantics"
+    },
+    {
+      "entry": "nominal_zst_box",
+      "family": "nominal_zst_box",
+      "expected": "proved"
+    },
+    {
+      "entry": "nominal_zst_box_wrong_claim",
+      "family": "nominal_zst_box",
+      "expected": "refuted"
+    },
+    {
+      "entry": "nominal_aligned_box_unknown",
+      "family": "nominal_zst_box",
+      "expected": "unknown",
+      "unknown_reason": "owned nominal Box payload requires compiler size zero and alignment one",
       "unknown_category": "semantics"
     }
   ]

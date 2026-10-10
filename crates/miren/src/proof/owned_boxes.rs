@@ -4,13 +4,20 @@ use super::*;
 use rustc_span::Symbol;
 use symbolic::OwnedRegionKind;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub(super) struct BoxType<'tcx> {
     pub(super) original: Ty<'tcx>,
+    pub(super) payload: Ty<'tcx>,
+    pub(super) shape: Option<typed_array_choices::OwnedChoiceShape>,
+    pub(super) slots: usize,
 }
 
 impl<'tcx> Engine<'tcx> {
     pub(super) fn unit_box_type(&self) -> Result<Ty<'tcx>, String> {
+        self.original_box_type(self.tcx.types.unit)
+    }
+
+    pub(super) fn original_box_type(&self, payload: Ty<'tcx>) -> Result<Ty<'tcx>, String> {
         let owned = self
             .tcx
             .lang_items()
@@ -21,7 +28,7 @@ impl<'tcx> Engine<'tcx> {
             .get_diagnostic_item(Symbol::intern("box_new"))
             .filter(|id| id.krate == owned.krate)
             .ok_or("Box constructor identity is unavailable")?;
-        let args = self.tcx.mk_args(&[self.tcx.types.unit.into()]);
+        let args = self.tcx.mk_args(&[payload.into()]);
         let signature = self
             .tcx
             .fn_sig(constructor)
@@ -30,14 +37,14 @@ impl<'tcx> Engine<'tcx> {
         if signature.safety() != rustc_hir::Safety::Safe
             || signature.abi() != rustc_abi::ExternAbi::Rust
             || signature.c_variadic()
-            || signature.inputs() != [self.tcx.types.unit]
+            || signature.inputs() != [payload]
         {
             return Err("Box constructor has a different original safe signature".into());
         }
         let ty::Adt(def, arguments) = signature.output().kind() else {
             return Err("Box constructor output is not its owned type".into());
         };
-        if def.did() != owned || arguments.type_at(0) != self.tcx.types.unit {
+        if def.did() != owned || arguments.type_at(0) != payload {
             return Err("Box constructor output has a different original payload".into());
         }
         Ok(signature.output())
@@ -59,8 +66,48 @@ impl<'tcx> Engine<'tcx> {
             ));
         }
         let index = self.owned_box_types.len();
-        self.owned_box_types.push(BoxType { original });
+        self.owned_box_types.push(BoxType {
+            original,
+            payload: self.tcx.types.unit,
+            shape: None,
+            slots: 1,
+        });
         Ok(index)
+    }
+
+    fn register_nominal_box(&mut self, payload: Ty<'tcx>) -> Result<usize, String> {
+        let (shape, slots) = self.nominal_box_shape(payload)?;
+        let original = self.original_box_type(payload)?;
+        if let Some(index) = self
+            .owned_box_types
+            .iter()
+            .position(|entry| entry.original == original)
+        {
+            return Ok(index);
+        }
+        if self.owned_box_types.len() >= 512 {
+            return Err(self.categorized_error(
+                UnknownCategory::ResourceLimit,
+                "Box type certificate exceeds its node budget".into(),
+            ));
+        }
+        let index = self.owned_box_types.len();
+        self.owned_box_types.push(BoxType {
+            original,
+            payload,
+            shape: Some(shape),
+            slots,
+        });
+        Ok(index)
+    }
+
+    fn region_box_type(&self, value: &Value) -> Result<&BoxType<'tcx>, String> {
+        let Value::OwnedRegion { certificate, .. } = value else {
+            return Err("expected an issued owned Box region".into());
+        };
+        self.owned_box_types
+            .get(*certificate)
+            .ok_or_else(|| "owned region lacks an issued original type certificate".into())
     }
 
     pub(super) fn validate_owned_region(
@@ -80,7 +127,7 @@ impl<'tcx> Engine<'tcx> {
             .owned_box_types
             .get(*certificate)
             .ok_or("owned region lacks an issued original type certificate")?;
-        if entry.original != self.unit_box_type()? {
+        if entry.original != self.original_box_type(entry.payload)? {
             return Err("owned region original type certificate differs".into());
         }
         if matches!(kind, OwnedRegionKind::ConstructorPointer) {
@@ -92,13 +139,15 @@ impl<'tcx> Engine<'tcx> {
             }
             return Ok(());
         }
-        if !matches!(
-            memory
-                .owned_region_payload(*key, *certificate)
-                .map_err(|detail| self.categorized_error(UnknownCategory::Semantics, detail))?,
-            Value::Unit
-        ) {
-            return Err("owned region does not contain its certified initialized Unit".into());
+        let payload = memory
+            .owned_region_payload(*key, *certificate)
+            .map_err(|detail| self.categorized_error(UnknownCategory::Semantics, detail))?;
+        if entry.payload == self.tcx.types.unit {
+            if !matches!(payload, Value::Unit) {
+                return Err("owned region does not contain its certified initialized Unit".into());
+            }
+        } else {
+            self.box_payload_value(entry, payload)?;
         }
         Ok(())
     }
@@ -346,14 +395,16 @@ impl<'tcx> Engine<'tcx> {
             return Ok(());
         };
         self.validate_owned_region(value, memory)?;
-        let original = self.owned_box_types[*certificate].original;
+        let entry = &self.owned_box_types[*certificate];
+        let original = entry.original;
+        let payload = entry.payload;
         let allowed = match kind {
             OwnedRegionKind::Owner => expected == original,
             OwnedRegionKind::BorrowedOwner => expected == original,
             OwnedRegionKind::Shared => matches!(expected.kind(), ty::Ref(_, inner, mutable)
-                if *inner == self.tcx.types.unit && !mutable.is_mut()),
+                if *inner == payload && !mutable.is_mut()),
             OwnedRegionKind::Pointer => matches!(expected.kind(), ty::RawPtr(inner, mutable)
-                if *inner == self.tcx.types.unit && !mutable.is_mut()),
+                if *inner == payload && !mutable.is_mut()),
             OwnedRegionKind::Unique => {
                 let ty::Adt(def, args) = original.kind() else {
                     unreachable!()
@@ -365,7 +416,7 @@ impl<'tcx> Engine<'tcx> {
             }
             OwnedRegionKind::ConstructorPointer => {
                 matches!(expected.kind(), ty::RawPtr(inner, mutable)
-                if (*inner == self.tcx.types.unit || *inner == self.tcx.types.u8)
+                if (*inner == payload || *inner == self.tcx.types.u8)
                     && mutable.is_mut())
             }
         };
@@ -432,11 +483,12 @@ impl<'tcx> Engine<'tcx> {
         memory: &Memory,
     ) -> Result<Value, String> {
         self.owned_box_type_value(source, value, memory)?;
+        let payload = self.region_box_type(value)?.payload;
         if !matches!(target.kind(), ty::RawPtr(inner, mutable)
-            if *inner == self.tcx.types.unit && !mutable.is_mut())
+            if *inner == payload && !mutable.is_mut())
         {
             return Err(
-                "Box dereference transport only permits a readonly original Unit pointer".into(),
+                "Box dereference transport only permits a readonly original payload pointer".into(),
             );
         }
         self.owned_region_rekind(
@@ -543,7 +595,8 @@ impl<'tcx> Engine<'tcx> {
             return Err("only the executable owned Box may retire its region".into());
         }
         let glue = ty::Instance::resolve_drop_glue(self.tcx, original);
-        owned_box_templates::certify_unit_protocol(self.tcx, glue)?;
+        let payload = self.region_box_type(value)?.payload;
+        self.certify_owned_box_protocol(glue, payload)?;
         let Value::OwnedRegion {
             key, certificate, ..
         } = value
@@ -553,7 +606,11 @@ impl<'tcx> Engine<'tcx> {
         state.memory.retire_owned_region(*key, *certificate)?;
         self.record_model(
             location,
-            "complete selected Unit Box DropGlue/Global zero-size certificate; region retired",
+            if payload == self.tcx.types.unit {
+                "complete selected Unit Box DropGlue/Global zero-size certificate; region retired"
+            } else {
+                "complete typed nominal Box DropGlue/Global zero-size certificate; region retired"
+            },
         );
         Ok(true)
     }
@@ -629,8 +686,9 @@ impl<'tcx> Engine<'tcx> {
                     ..
                 }
             ) {
-                self.owned_box_type_value(self.unit_box_type()?, &value, &state.memory)?;
-                owned_box_templates::certify_unit_protocol(self.tcx, instance)?;
+                let entry = self.region_box_type(&value)?;
+                self.owned_box_type_value(entry.original, &value, &state.memory)?;
+                self.certify_owned_box_protocol(instance, entry.payload)?;
                 return Ok(value);
             }
         }
@@ -677,11 +735,51 @@ impl<'tcx> Engine<'tcx> {
     ) -> Result<Option<Value>, String> {
         let constructor = self.tcx.get_diagnostic_item(Symbol::intern("box_new"));
         if constructor == Some(instance.def_id()) {
-            if instance.args.type_at(0) != self.tcx.types.unit {
-                return Err(self.categorized_error(
-                    UnknownCategory::Semantics,
-                    "owned Box constructor currently requires the exact Unit payload".into(),
-                ));
+            let payload = instance.args.type_at(0);
+            if payload != self.tcx.types.unit {
+                let certificate = self.register_nominal_box(payload)?;
+                let entry = &self.owned_box_types[certificate];
+                let [value] = values else {
+                    return Err("nominal Box constructor requires its exact single payload".into());
+                };
+                let TerminatorKind::Call { args, .. } = &body.basic_blocks[block].terminator().kind
+                else {
+                    return Err("nominal Box constructor lacks its actual call occurrence".into());
+                };
+                if args.len() != 1 || args[0].node.ty(&body.local_decls, self.tcx) != payload {
+                    return Err(
+                        "nominal Box constructor argument has a different original type".into(),
+                    );
+                }
+                let prepared = self.box_payload_value(entry, value)?;
+                let slots = entry.slots;
+                self.certify_owned_box_protocol(instance, payload)?;
+                let key = self.next_owned_region;
+                self.next_owned_region = key
+                    .checked_add(1)
+                    .ok_or("owned region generation overflows")?;
+                state
+                    .memory
+                    .issue_owned_region_with_slots(key, certificate, slots)
+                    .map_err(|reason| {
+                        self.categorized_error(UnknownCategory::ResourceLimit, reason)
+                    })?;
+                state
+                    .memory
+                    .initialize_owned_region(key, certificate, prepared)?;
+                state.memory.seal_owned_region(key, certificate)?;
+                self.record_model(
+                    instance.def_id(),
+                    concat!(
+                        "complete selected Box/Global nominal zero-branch certificate; ",
+                        "exact owned payload",
+                    ),
+                );
+                return Ok(Some(Value::OwnedRegion {
+                    key,
+                    certificate,
+                    kind: OwnedRegionKind::Owner,
+                }));
             }
             if !matches!(values, [value] if initialized_unit(value)) {
                 return Err("Box constructor payload differs from initialized Unit".into());
@@ -743,7 +841,8 @@ impl<'tcx> Engine<'tcx> {
         {
             let [owner] = values else { unreachable!() };
             self.validate_owned_region(owner, &state.memory)?;
-            owned_box_templates::certify_unit_protocol(self.tcx, instance)?;
+            let payload = self.region_box_type(owner)?.payload;
+            self.certify_owned_box_protocol(instance, payload)?;
             let Value::OwnedRegion {
                 key, certificate, ..
             } = owner
@@ -753,7 +852,11 @@ impl<'tcx> Engine<'tcx> {
             state.memory.retire_owned_region(*key, *certificate)?;
             self.record_model(
                 instance.def_id(),
-                "complete selected owned Unit drop certificate; same logical region retired",
+                if payload == self.tcx.types.unit {
+                    "complete selected owned Unit drop certificate; same logical region retired"
+                } else {
+                    "complete selected owned nominal drop certificate; same logical region retired"
+                },
             );
             return Ok(Some(Value::Unit));
         }

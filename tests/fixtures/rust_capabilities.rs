@@ -2396,3 +2396,39 @@ mod native_mutable_u16_store {
         assert_eq!(values[128], u16::MAX);
     }
 }
+
+#[derive(Clone, Copy)]
+pub struct NominalBoxMarker;
+
+#[inline(never)]
+pub fn nominal_box_marker_tag(_marker: &NominalBoxMarker) -> u8 {
+    17
+}
+
+pub fn nominal_zst_box() {
+    let marker = alloc::boxed::Box::new(NominalBoxMarker);
+    assert!(nominal_box_marker_tag(&marker) == 17);
+}
+
+pub fn nominal_zst_box_wrong_claim() {
+    let marker = alloc::boxed::Box::new(NominalBoxMarker);
+    assert!(nominal_box_marker_tag(&marker) != 17);
+}
+
+#[derive(Clone, Copy)]
+#[repr(align(8))]
+pub struct NominalAlignedBoxMarker;
+
+pub fn nominal_aligned_box_unknown() {
+    let _marker = alloc::boxed::Box::new(NominalAlignedBoxMarker);
+}
+
+#[cfg(test)]
+mod native_nominal_zst_box {
+    use super::*;
+
+    #[test]
+    fn selected_tag_body_preserves_claim() {
+        nominal_zst_box();
+    }
+}

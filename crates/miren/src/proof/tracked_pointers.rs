@@ -39,8 +39,13 @@ impl<'tcx> Engine<'tcx> {
             self.local(state, local)?;
             allocation
         } else {
-            if state.memory.len() >= MAX_TRACKED_ADDRESSES {
-                return Err("memory allocation budget reached".into());
+            if state.memory.storage_slots() >= MAX_TRACKED_ADDRESSES {
+                let reason = "memory allocation budget reached".into();
+                return Err(if state.memory.len() < MAX_TRACKED_ADDRESSES {
+                    self.categorized_error(UnknownCategory::ResourceLimit, reason)
+                } else {
+                    reason
+                });
             }
             let value = self.local(state, local)?;
             let allocation = state.memory.len();

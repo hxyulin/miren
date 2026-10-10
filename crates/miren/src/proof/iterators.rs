@@ -802,9 +802,15 @@ impl<'tcx> Engine<'tcx> {
                     continue;
                 };
                 let temporary = if find {
-                    if memory.len() >= super::tracked_pointers::MAX_TRACKED_ADDRESSES {
+                    if memory.storage_slots() >= super::tracked_pointers::MAX_TRACKED_ADDRESSES {
+                        let reason =
+                            "find predicate item reference exceeds allocation budget".into();
                         return Err(
-                            "find predicate item reference exceeds allocation budget".into()
+                            if memory.len() < super::tracked_pointers::MAX_TRACKED_ADDRESSES {
+                                self.categorized_error(UnknownCategory::ResourceLimit, reason)
+                            } else {
+                                reason
+                            },
                         );
                     }
                     let allocation = memory.len();

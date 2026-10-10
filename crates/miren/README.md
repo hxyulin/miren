@@ -980,3 +980,24 @@ aggregate/caller storage, ordinary borrowed helper calls, raw pointers, or retur
 Copy/Move transport, mutable reborrows, retained shared views, multiple incoming borrows, slices
 passed to helpers, and inductive backing transport remain UNKNOWN. Existing readonly slice,
 finite mutable byte storage, ownership initialization and raw permission policies are unchanged.
+
+The private zero-sized Box protocol also accepts exact local ordinary nominal payloads with
+compiler size zero, alignment one, Copy/Freeze/no-drop eligibility and no observable scalar
+leaves. Original child types are checked even under zero-length arrays. The immutable payload
+certificate retains the original type, nominal field identity and bounded product shape across
+construction, readonly access, snapshots, owner transfer and retirement. Region storage charges
+the complete original payload node count against the existing shared frame/region budget.
+
+Generic Box/Global constructor and drop bodies retain their complete selected-body certificates.
+A separate exhaustive typed synthesized-glue certificate checks every local type, block, effect,
+receiver projection and selected delegate for the original nominal payload. Its successful report
+labels describe a certified semantic model, without claiming that summarized library bodies were
+stepped. User methods and custom Clone/PartialEq bodies execute normally. Unit protocol labels and
+completed queries are preserved. Nominal inlined constructor lowering, external payloads, aligned
+payloads and shared dereference-plus-field borrowing remain unsupported. A copied nested nominal
+payload can be read through ordinary owned field projections; this grants no shared field rights.
+
+Tracked raw-local, iterator-find temporary and async-factory storage growth also charge the
+existing cumulative budget, including owned region nodes and private mutable backing. Weighted
+regions cannot bypass that budget by creating ordinary frame temporaries. The corrected weighted
+boundary reports a resource UNKNOWN; raw permissions and the old frame-only refusal remain.

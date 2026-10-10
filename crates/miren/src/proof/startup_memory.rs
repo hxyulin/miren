@@ -21,6 +21,7 @@ impl StaticLocation {
 pub(super) struct OwnedRegion {
     pub(super) key: u64,
     pub(super) certificate: usize,
+    pub(super) slots: usize,
     pub(super) payload: Option<Value>,
     pub(super) construction: Option<usize>,
     pub(super) sealed: bool,
@@ -44,7 +45,7 @@ impl Memory {
     pub(super) fn storage_slots(&self) -> usize {
         self.allocations
             .len()
-            .saturating_add(self.owned_regions.len())
+            .saturating_add(self.owned_regions.iter().map(|region| region.slots).sum())
             .saturating_add(self.mutable_u16.len())
     }
 
@@ -75,7 +76,17 @@ impl Memory {
         key: u64,
         certificate: usize,
     ) -> Result<(), String> {
-        if self.storage_slots() >= super::memory::MAX_ALLOCATIONS {
+        self.issue_owned_region_with_slots(key, certificate, 1)
+    }
+
+    pub(super) fn issue_owned_region_with_slots(
+        &mut self,
+        key: u64,
+        certificate: usize,
+        slots: usize,
+    ) -> Result<(), String> {
+        if slots == 0 || slots > super::memory::MAX_ALLOCATIONS.saturating_sub(self.storage_slots())
+        {
             return Err("owned region exceeds the cumulative 512-storage budget".into());
         }
         if self.owned_regions.iter().any(|region| region.key == key) {
@@ -84,6 +95,7 @@ impl Memory {
         Rc::make_mut(&mut self.owned_regions).push(OwnedRegion {
             key,
             certificate,
+            slots,
             payload: None,
             construction: None,
             sealed: false,
@@ -294,6 +306,24 @@ mod tests {
         assert!(memory.issue_owned_region(2, 0).is_err());
         let mut memory: Memory = vec![Some(Value::Unit); 512].into();
         assert!(memory.issue_owned_region(1, 0).is_err());
+    }
+
+    #[test]
+    fn nominal_owned_regions_charge_each_original_payload_node() {
+        let mut memory: Memory = vec![Some(Value::Unit); 509].into();
+        memory.issue_owned_region_with_slots(1, 0, 3).unwrap();
+        assert_eq!(memory.storage_slots(), 512);
+        assert!(memory.issue_owned_region(2, 0).is_err());
+        assert!(
+            Memory::default()
+                .issue_owned_region_with_slots(1, 0, 0)
+                .is_err()
+        );
+        assert!(
+            Memory::default()
+                .issue_owned_region_with_slots(1, 0, 513)
+                .is_err()
+        );
     }
 
     #[test]

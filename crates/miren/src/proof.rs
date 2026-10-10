@@ -67,6 +67,8 @@ mod opaque_function_inputs;
 #[cfg(test)]
 mod owned_box_capture;
 mod owned_box_constructors;
+mod owned_box_glue;
+mod owned_box_payloads;
 mod owned_box_references;
 mod owned_box_templates;
 mod owned_boxes;

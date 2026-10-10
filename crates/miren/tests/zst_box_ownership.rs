@@ -73,7 +73,14 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
         assert!(proof.entry_assumptions.is_empty());
         if *expected == ProofStatus::Unknown {
             let (category, reason) = match *name {
-                "nonzero" | "aligned_zero" => (UnknownCategory::Semantics, "exact Unit payload"),
+                "nonzero" => (
+                    UnknownCategory::Semantics,
+                    "exact local nominal zero-sized struct",
+                ),
+                "aligned_zero" => (
+                    UnknownCategory::Semantics,
+                    "compiler size zero and alignment one",
+                ),
                 "analyzer_only::copied_owner" => (
                     UnknownCategory::Semantics,
                     "executable owned Box Copy needs",

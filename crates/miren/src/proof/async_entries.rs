@@ -69,8 +69,15 @@ impl<'tcx> Engine<'tcx> {
             {
                 return Err("async entry factory did not return a fresh constructed future".into());
             }
-            if constructed.memory.len() + 2 > MAX_INPUT_VALUES {
-                return Err("async entry exceeds the tracked allocation budget".into());
+            if constructed.memory.storage_slots().saturating_add(2) > MAX_INPUT_VALUES {
+                let reason = "async entry exceeds the tracked allocation budget".into();
+                return Err(
+                    if constructed.memory.len().saturating_add(2) <= MAX_INPUT_VALUES {
+                        self.categorized_error(UnknownCategory::ResourceLimit, reason)
+                    } else {
+                        reason
+                    },
+                );
             }
             let future_allocation = constructed.memory.len();
             constructed.memory.push(Some(constructed.value));
