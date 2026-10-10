@@ -9,7 +9,50 @@ pub(super) struct CapturedDestinationIndices {
     indices: Vec<(Local, Value)>,
 }
 
+pub(super) enum CapturedCallDestination<'tcx> {
+    Owned(CapturedDestinationIndices),
+    Tracked(call_destination_locations::CapturedTrackedDestination<'tcx>),
+}
+
 impl<'tcx> Engine<'tcx> {
+    pub(super) fn capture_call_destination(
+        &self,
+        body: &Body<'tcx>,
+        state: &State,
+        place: Place<'tcx>,
+    ) -> Result<Option<CapturedCallDestination<'tcx>>, String> {
+        if place
+            .projection
+            .iter()
+            .any(|part| matches!(part, ProjectionElem::Deref))
+        {
+            return self
+                .capture_tracked_call_destination(body, state, place)
+                .map(|captured| Some(CapturedCallDestination::Tracked(captured)));
+        }
+        self.capture_destination_indices(body, state, place)
+            .map(|captured| captured.map(CapturedCallDestination::Owned))
+    }
+
+    pub(super) fn store_call_result(
+        &mut self,
+        body: &Body<'tcx>,
+        state: &mut State,
+        place: Place<'tcx>,
+        captured: Option<&CapturedCallDestination<'tcx>>,
+        value: Value,
+    ) -> Result<(), String> {
+        match captured {
+            Some(CapturedCallDestination::Tracked(captured)) => {
+                self.store_tracked_call_result(state, captured, value)
+            }
+            Some(CapturedCallDestination::Owned(indices)) => {
+                self.store_owned_call_result(body, state, place, Some(indices), value)
+            }
+            None => self.store_owned_call_result(body, state, place, None, value),
+        }
+    }
+
     pub(super) fn capture_destination_indices(
         &self,
         body: &Body<'tcx>,
@@ -71,9 +114,25 @@ impl<'tcx> Engine<'tcx> {
             &self.local(state, place.local.as_usize())?,
             &state.conditions,
         )?;
+        let (indices, _) =
+            self.capture_owned_destination_path(body, state, original, place.projection)?;
+        Ok(Some(CapturedDestinationIndices {
+            root: place.local,
+            allocation,
+            indices,
+        }))
+    }
+
+    pub(super) fn capture_owned_destination_path(
+        &self,
+        body: &Body<'tcx>,
+        state: &State,
+        original: Ty<'tcx>,
+        projections: &[rustc_middle::mir::PlaceElem<'tcx>],
+    ) -> Result<(Vec<(Local, Value)>, Ty<'tcx>), String> {
         let mut indices: Vec<(Local, Value)> = Vec::new();
         let mut current = original;
-        for projection in place.projection {
+        for projection in projections.iter().copied() {
             match projection {
                 ProjectionElem::Field(field, recorded) => {
                     let child = match current.kind() {
@@ -159,11 +218,7 @@ impl<'tcx> Engine<'tcx> {
                 _ => return Err("call destination has an uncertified owned projection".into()),
             }
         }
-        Ok(Some(CapturedDestinationIndices {
-            root: place.local,
-            allocation,
-            indices,
-        }))
+        Ok((indices, current))
     }
 
     pub(super) fn destination_index(
@@ -183,7 +238,7 @@ impl<'tcx> Engine<'tcx> {
         }
     }
 
-    pub(super) fn store_call_result(
+    fn store_owned_call_result(
         &mut self,
         body: &Body<'tcx>,
         state: &mut State,

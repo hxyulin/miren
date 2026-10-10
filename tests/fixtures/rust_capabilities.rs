@@ -1,6 +1,8 @@
 #![no_std]
 #![cfg_attr(not(test), feature(custom_mir, core_intrinsics))]
 #![cfg_attr(not(test), allow(internal_features))]
+#![cfg_attr(test, feature(custom_mir, core_intrinsics))]
+#![cfg_attr(test, allow(internal_features))]
 
 use core::future::Future;
 use core::pin::pin;
@@ -1355,8 +1357,76 @@ pub fn owned_call_destination_missing_body(values: ([u16; 2], u16), index: usize
     }
 }
 
+#[inline(never)]
+fn tracked_call_redirect<'a>(pointer: &mut &'a mut u16, other: &'a mut u16) -> u16 {
+    *pointer = other;
+    19
+}
+
+#[custom_mir(dialect = "runtime", phase = "optimized")]
+fn tracked_call_update(mut left: u16, mut right: u16) -> (u16, u16) {
+    use core::intrinsics::mir::*;
+    mir! {
+        let pointer: &mut u16;
+        let other: &mut u16;
+        let indirect: &mut &mut u16;
+        {
+            pointer = &mut left;
+            other = &mut right;
+            indirect = &mut pointer;
+            Call(*pointer = tracked_call_redirect(indirect, other),
+                ReturnTo(done), UnwindUnreachable())
+        }
+        done = { RET = (left, right); Return() }
+    }
+}
+
+pub fn tracked_call_destination(left: u16, right: u16) {
+    let (changed_left, changed_right) = tracked_call_update(left, right);
+    assert!(changed_left == 19);
+    assert!(changed_right == right);
+}
+
+pub fn tracked_call_destination_wrong_claim(left: u16, right: u16) {
+    let (changed_left, changed_right) = tracked_call_update(left, right);
+    assert!(changed_left == left);
+    assert!(changed_right == 19);
+}
+
+#[cfg(not(test))]
+unsafe extern "Rust" {
+    fn tracked_call_unavailable() -> u16;
+}
+
+#[cfg(not(test))]
+#[custom_mir(dialect = "runtime", phase = "optimized")]
+pub fn tracked_call_destination_missing_body(mut value: u16) {
+    use core::intrinsics::mir::*;
+    mir! {
+        let target: &mut u16;
+        {
+            target = &mut value;
+            Call(*target = tracked_call_unavailable(), ReturnTo(done), UnwindUnreachable())
+        }
+        done = { Return() }
+    }
+}
+
 #[cfg(test)]
 mod native {
+    #[test]
+    fn tracked_call_destination_controls() {
+        for (left, right) in [(3, 7), (0, u16::MAX), (19, 19)] {
+            tracked_call_destination(left, right);
+        }
+    }
+
+    #[test]
+    #[should_panic]
+    fn tracked_call_destination_wrong_claim_panics() {
+        tracked_call_destination_wrong_claim(3, 7);
+    }
+
     #[test]
     fn owned_call_destination_controls() {
         for index in [0, 1, 2, usize::MAX] {

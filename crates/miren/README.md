@@ -809,6 +809,12 @@ uses those captured indices with the current complete owner and exact replacemen
 The existing writer runs first; only its precise unsupported-index frontier can invoke the
 existing typed transaction. Callee effects run once, untouched fields retain the returned state,
 and unsupported siblings remain unsupported even when empty. No-return calls still execute their
-actual bodies for certified destinations. Dereference destinations, including static and raw
-bases, need a separate pre-call base-location certificate and remain unsupported. Whole-local
-result stores retain their existing policy.
+actual bodies for certified destinations. Whole-local result stores retain their existing policy.
+
+A leading dereference through an unprojected tracked mutable reference to a complete pure owner
+can also capture its original allocation and typed field/index path before the callee. Redirecting
+the reference inside the callee does not redirect the returned value. Storage validates the
+captured allocation's current live contents and exact replacement before a single commit, keeping
+sibling effects. Shared, raw, static and inherited reference projections remain unsupported;
+compiler type evidence does not grant new access rights. Symbolic writes retain the existing
+writer's bounds and uniqueness requirements.

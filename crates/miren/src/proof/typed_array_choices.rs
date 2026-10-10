@@ -143,6 +143,41 @@ impl<'tcx> Engine<'tcx> {
         Ok(())
     }
 
+    pub(super) fn validate_owned_product_update(
+        &self,
+        original: Ty<'tcx>,
+        storage: &Value,
+        target: Ty<'tcx>,
+        replacement: &Value,
+        conditions: &[Term],
+    ) -> Result<(), String> {
+        let original_shape = self
+            .owned_product_shape(original)?
+            .ok_or("captured store requires a complete pure owned root type")?;
+        let target_shape = self
+            .owned_product_shape(target)?
+            .ok_or("captured store requires a pure original replacement type")?;
+        let bits = u32::from(self.tcx.sess.target.pointer_width);
+        let mut nodes = 0;
+        self.product_leaves(
+            original,
+            bits,
+            &original_shape,
+            storage,
+            conditions,
+            &mut nodes,
+        )?;
+        self.product_leaves(
+            target,
+            bits,
+            &target_shape,
+            replacement,
+            conditions,
+            &mut nodes,
+        )?;
+        Ok(())
+    }
+
     pub(super) fn owned_product_shape(
         &self,
         original: Ty<'tcx>,

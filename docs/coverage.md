@@ -1568,3 +1568,14 @@ requires separate pre-call location capture and returns explicit UNKNOWN, includ
 without an index. Native controls confirm both previous false proofs and their corrected outcomes.
 The nineteen-root compiler matrix yields eight PROVED, three REFUTED and eight UNKNOWN per profile.
 Full final validation is recorded in the stage log.
+
+
+Stage 175 extends call-result capture to an unprojected tracked mutable reference with one
+leading dereference and a bounded typed pure-owner path. The captured allocation and path survive
+legitimate callee changes to the reference handle. Storage uses current contents, validates the
+whole owner and replacement together, then commits through the original live writable location.
+Inherited projections, shared/raw/static bases and unsupported symbolic writes retain precise
+UNKNOWN results. The unchanged pointer-redirection pair now yields PROVED and REFUTED across
+host/ARM O0/O2; actual replacement mutation refutes and fails valid native execution. The dedicated
+twenty-root matrix yields eight PROVED, three REFUTED and nine UNKNOWN per configuration. Final
+integrated validation remains pending.

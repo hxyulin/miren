@@ -28,6 +28,7 @@ mod async_entries;
 mod atomic_intrinsics;
 mod atomic_rmw;
 mod builtins;
+mod call_destination_locations;
 mod call_destinations;
 mod call_metadata;
 mod characters;
@@ -1356,7 +1357,7 @@ impl<'tcx> Engine<'tcx> {
                         .map(|arg| self.operand(id, body, &state, &arg.node))
                         .collect::<Result<Vec<_>, _>>()?;
                     let destination_indices =
-                        self.capture_destination_indices(body, &state, *destination)?;
+                        self.capture_call_destination(body, &state, *destination)?;
                     let fn_trait = [LangItem::Fn, LangItem::FnMut, LangItem::FnOnce]
                         .iter()
                         .any(|item| {

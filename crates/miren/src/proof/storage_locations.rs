@@ -65,6 +65,19 @@ impl StorageLocation {
         }
     }
 
+    pub(super) fn write(self, memory: &mut [Option<Value>], value: Value) -> Result<(), String> {
+        self.require_write(memory)?;
+        match self.identity {
+            AllocationIdentity::Tracked(allocation) => {
+                memory[allocation] = Some(value);
+                Ok(())
+            }
+            AllocationIdentity::Static(_) => {
+                Err("captured tracked store cannot update a static location".into())
+            }
+        }
+    }
+
     pub(super) fn require_write(self, memory: &[Option<Value>]) -> Result<(), String> {
         self.validate(memory)?;
         match self.capability {
@@ -98,6 +111,34 @@ mod tests {
             krate: rustc_span::def_id::LOCAL_CRATE,
             index: rustc_span::def_id::DefIndex::from_usize(index),
         }
+    }
+
+    #[test]
+    fn captured_commits_preserve_identity_and_require_live_write_capability() {
+        let mut memory = vec![Some(Value::Unit), Some(Value::Unit)];
+        StorageLocation::tracked(1, true)
+            .write(&mut memory, Value::Tuple(vec![Value::Unit]))
+            .unwrap();
+        assert!(matches!(memory[0], Some(Value::Unit)));
+        assert!(matches!(memory[1], Some(Value::Tuple(_))));
+        assert!(
+            StorageLocation::tracked(0, false)
+                .write(&mut memory, Value::Tuple(vec![]))
+                .is_err()
+        );
+        assert!(
+            StorageLocation::static_view(definition(0), 0, true)
+                .write(&mut memory, Value::Tuple(vec![]))
+                .is_err()
+        );
+        assert!(matches!(memory[0], Some(Value::Unit)));
+        memory[1] = None;
+        assert!(
+            StorageLocation::tracked(1, true)
+                .write(&mut memory, Value::Unit)
+                .is_err()
+        );
+        assert!(memory[1].is_none());
     }
 
     #[test]

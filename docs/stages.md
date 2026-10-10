@@ -4429,3 +4429,54 @@ All 376 earlier completed roots retain identical status, obligation details and 
 approves the nineteen-root matrix, actual replacement mutation, valid native controls and mandatory
 dereference refusal. No assumptions, input caps or resource-budget changes are introduced.
 This correctness stage follows Stage 173 independently of composite comparison Stage 172.
+
+
+## Stage 175: captured tracked call-result locations
+
+The dereference timing guard in Stage 174 prevents a confirmed false proof. This extension
+captures an actual unprojected tracked mutable reference's allocation and typed destination path
+before the callee executes. It requires a complete original pure pointee type and pre-call bounds.
+Each returned continuation validates that allocation's current live writable root and exact
+replacement together before one commit. Callee pointer redirection cannot change the captured
+location, and sibling effects are retained. Shared, raw, static and inherited references gain no
+new permission; symbolic writes retain their existing uniqueness and bounds requirements.
+
+The unchanged prior pointer-redirection claims move from UNKNOWN to PROVED/REFUTED in all four
+profiles, with empty assumptions. Original sources remain unchanged. The obsolete reason failure
+for the older retained-index control is preserved before harness-only upkeep; this control remains
+UNKNOWN at its actual pre-call bounds frontier. Evidence remains at
+`/tmp/miren-stage175-old-call-destinations` and
+`/tmp/miren-stage175-old-call-destinations-initial.log`.
+
+The dedicated twenty-root matrix yields eight PROVED, three REFUTED and nine UNKNOWN per profile.
+Actual replacement mutation refutes unchanged claims; valid originals pass native O0/O2 and
+mutant guards exit 101 under ten-second timeouts. Complete provisional reports, commands and
+source/binary hashes remain at `/tmp/miren-stage175-final-evidence`. Independent review confirms
+bounded validation precedes root cloning. Final parent integration and required checks remain
+pending; composite comparison Stage 172 proceeds independently.
+
+
+The global tracked-location triplet yields P/R/missing-body U across all four profiles. The exact
+same source returns UNKNOWN for all three under the immutable Stage 174 binary. Actual redirect
+replacement mutation from 19 to 20 refutes the unchanged selected-location claim in all builds.
+Native custom-MIR originals pass at O0/O2; mutant guards fail with exit 101. Full reports, commands,
+query/model equality, empty assumptions and ten-second native timeouts remain at
+`/tmp/miren-stage175-global-evidence`. The expanded manifest contains 131 cases in 45 families;
+these counts describe the selected controls and do not establish a Rust coverage percentage.
+
+
+Final validation passes all 703 Rust tests and 68 Python tests in the isolated workspace.
+All semantic and test source bytes remain unchanged across actual Stage 174 parent adoption;
+only documentation changed. All 642 tracked main files match the final snapshot byte for byte.
+Fresh main debug/release builds, sixteen related integration tests, four storage-location unit
+tests, 68 Python tests and every remaining required check pass. Both frozen surveys yield
+208 PROVED, 184 REFUTED and 132 UNKNOWN at `/tmp/miren-stage175-capabilities-20261010` and
+`/tmp/miren-stage175-merged-capabilities-20261010`, with source/input/release hashes verified.
+All 384 previously completed roots retain identical status, obligation details and query text;
+all 524 main/isolate selected outcomes, queries, models and premises match. One host O0 fold
+retains the same thirty-second resource UNKNOWN with a closure-context diagnostic prefix in only
+one run; both original reports and the initial exact-detail mismatch remain preserved. Source
+review approves original-location capture, current-owner validation, the twenty-root matrix and
+actual dedicated/global mutation and native evidence. No assumptions, input caps or resource-
+budget changes are introduced. Stage 175 follows Stage 174; composite comparison Stage 172
+remains an independent implementation awaiting integration.

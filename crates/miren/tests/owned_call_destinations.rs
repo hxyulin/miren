@@ -83,8 +83,8 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
                     "no compiler-exported Rust definition matches the foreign symbol",
                 ),
                 "analyzer_only::retained" => (
-                    UnknownCategory::Semantics,
-                    "call destination dereference requires pre-call base-location capture",
+                    UnknownCategory::Unclassified,
+                    "memory index lacks a proven bounds check",
                 ),
                 "analyzer_only::retroactive_bound" | "analyzer_only::invalid_fixed_prefix" => (
                     UnknownCategory::Unclassified,
@@ -97,10 +97,6 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
                 "analyzer_only::dead_owner" => (
                     UnknownCategory::Unclassified,
                     "uninitialized or unavailable local",
-                ),
-                "analyzer_only::dereference_correct" | "analyzer_only::dereference_false" => (
-                    UnknownCategory::Semantics,
-                    "call destination dereference requires pre-call base-location capture",
                 ),
                 other => panic!("missing frontier for {other}"),
             };
@@ -182,8 +178,8 @@ fn call_destinations_use_pre_call_addresses_and_returned_owner_storage() {
         ("analyzer_only::unsupported_zero", ProofStatus::Unknown),
         ("analyzer_only::dead_owner", ProofStatus::Unknown),
         ("analyzer_only::invalid_fixed_prefix", ProofStatus::Unknown),
-        ("analyzer_only::dereference_correct", ProofStatus::Unknown),
-        ("analyzer_only::dereference_false", ProofStatus::Unknown),
+        ("analyzer_only::dereference_correct", ProofStatus::Proved),
+        ("analyzer_only::dereference_false", ProofStatus::Refuted),
     ];
     for target in [None, Some("thumbv7em-none-eabihf")] {
         for optimized in [false, true] {

@@ -11,8 +11,8 @@ execution at O0 and O2, positive/refuted/unknown controls, a source mutation tha
 structured UNKNOWN reporting, and passing repository checks. Completion establishes a repeatable
 baseline. It does not establish full Rust support or a completed memory-model refactor.
 
-The manifest contains 128 cases across 44 families. Each build configuration expects 51 PROVED,
-45 REFUTED and 32 UNKNOWN results. Stage 133 originally had 23 cases with 10 PROVED, 9 REFUTED
+The manifest contains 131 cases across 45 families. Each build configuration expects 52 PROVED,
+46 REFUTED and 33 UNKNOWN results. Stage 133 originally had 23 cases with 10 PROVED, 9 REFUTED
 and 4 UNKNOWN; stage 134 closed its retained-prefix projection gap. Stage 136 adds raw-pointer
 metadata P/R controls and a safe core reference-array grant that remains UNKNOWN without a
 temporal permission certificate. Stage 137 adds tuple-array P/R and unsupported symbolic-write
@@ -101,6 +101,10 @@ Original indices and owner identity are captured before the callee; returned val
 current owner using those indices. Complete root types, bounds, liveness and replacement checks
 remain required. Dereference destinations require a separate base-location certificate and return
 UNKNOWN. The original false proofs and valid native countercontrols remain recorded.
+Stage 175 adds tracked mutable call-result location P/R and missing callee body U controls.
+The original allocation and typed path are captured before the callee; changes to its reference
+handle cannot redirect the returned value. Current whole-owner and replacement validation precede
+one writable live-location commit. Unsupported reference forms retain their explicit frontiers.
 These additions change the denominator, not a coverage percentage.
 Covered examples exercise arithmetic, enum payloads, array indexing, reference effects, concrete
 generics, closures, iterator callbacks, finite loops, destructors, fresh future polling and raw

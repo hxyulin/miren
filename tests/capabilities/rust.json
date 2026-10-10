@@ -705,6 +705,23 @@
       "expected": "unknown",
       "unknown_reason": "no compiler-exported Rust definition matches the foreign symbol",
       "unknown_category": "missing_compiler_evidence"
+    },
+    {
+      "entry": "tracked_call_destination",
+      "family": "tracked_call_destination",
+      "expected": "proved"
+    },
+    {
+      "entry": "tracked_call_destination_wrong_claim",
+      "family": "tracked_call_destination",
+      "expected": "refuted"
+    },
+    {
+      "entry": "tracked_call_destination_missing_body",
+      "family": "tracked_call_destination",
+      "expected": "unknown",
+      "unknown_reason": "no compiler-exported Rust definition matches the foreign symbol",
+      "unknown_category": "missing_compiler_evidence"
     }
   ]
 }
