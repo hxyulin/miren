@@ -132,10 +132,7 @@ impl<'tcx> Engine<'tcx> {
         let ty::Adt(definition, args) = original.kind() else {
             return Ok(None);
         };
-        if !definition.did().is_local()
-            || !definition.is_struct()
-            || self.owned_product_shape(original)?.is_none()
-        {
+        if !definition.is_struct() || self.owned_product_shape(original)?.is_none() {
             return Ok(None);
         }
         Ok(Some(
@@ -185,7 +182,7 @@ impl<'tcx> Engine<'tcx> {
             ));
         }
         if self.nominal_comparison_fields(original)?.is_none() {
-            return Err("nominal comparison requires an exact local pure struct".into());
+            return Err("nominal comparison requires an exact ordinary pure struct".into());
         }
         let core = self
             .tcx

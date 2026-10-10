@@ -898,21 +898,29 @@ validates
 the returned value and never encodes the consumed callee locals into a successor state. Entry ghosts
 remain immutable, while current post-state argument observations still require initialization.
 
-Full-domain read-only slice membership and equality can certify a local ordinary struct's actual
+Full-domain read-only slice membership and equality can certify an ordinary struct's actual
 selected `PartialEq` body before constructing structural numeric comparisons. The complete
 original type must be pure, Copy, Freeze and have no drop glue. Exact shared receiver origins,
 recorded field types, branch-local initialization and Move consumption, every reachable effect,
 selected child comparers and the full Boolean result are checked. A bounded Boolean DAG must equal
 the conjunction of every corresponding primitive field; derive markers and method names grant
-nothing. Nested local structs and tuples reuse exact certificates, and the actual default `ne`
+nothing. Nested ordinary structs and tuples reuse exact certificates, and the actual default `ne`
 body is checked separately. Nominal CFG work and existing core-template work have separate bounded
 counters. Certificates are rechecked against the selected instantiated MIR without a cache.
 
 The slice source and comparator certificate are checked before empty or unequal-length shortcuts.
 Float fields retain numeric NaN and signed-zero semantics; Char observations retain their existing
 Unicode validation. Struct carriers must match exact nominal identity, field order and primitive
-width, signedness, sort and context. Array-field comparers, aggregate-to-integer casts, external
-nominal comparers and effects outside the certificate grammar remain UNKNOWN. Actual invoked
+width, signedness, sort and context. Array-field comparers, aggregate-to-integer casts and effects
+outside the certificate grammar remain UNKNOWN. Actual invoked
 missing helpers remain UNKNOWN; their diagnostic does not stand in for a missing comparator body.
 Existing finite custom-comparison calls still execute their actual bodies. The certificate supplies
 no new borrow, write, raw-pointer or allocation rights and imposes no input slice length cap.
+
+Ordinary external nominal slice comparers use the same complete original-type certificate as
+local comparers. The selected safe Rust `PartialEq` body must be available and compute all
+corresponding field equalities without unsupported effects. External crate identity, exported
+symbols, derive markers and field visibility do not replace this proof. Missing selected MIR
+remains unknown before empty, unequal-length or zero-field shortcuts. Separate identical-source
+retained/omitted dependency builds exercise this boundary; existing array casts, special types
+and nonstructural comparers remain unsupported.

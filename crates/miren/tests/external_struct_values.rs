@@ -145,6 +145,12 @@ fn verify(
                 ))) || *name == "owned"
             );
         }
+        if *name == "whole_contains" {
+            assert!(proof.models.iter().any(|model| model.contains(concat!(
+                "full-domain pure composite slice membership; ",
+                "scoped existential structural numeric equality"
+            ))));
+        }
         let body = match *name {
             "selected_method" if retained => Some("Pair::selected"),
             "borrowed_method" => Some("Pair::borrowed"),
@@ -178,11 +184,6 @@ fn verify(
                 (
                     UnknownCategory::MissingCompilerEvidence,
                     "MIR body unavailable for external_struct_values_dependency::Pair::selected",
-                )
-            } else if *name == "whole_contains" {
-                (
-                    UnknownCategory::Semantics,
-                    "whole composite slice membership is unsupported",
                 )
             } else if *name == "analyzer_only::dead_empty" {
                 (UnknownCategory::Unclassified, "dead or uninitialized")
@@ -270,7 +271,7 @@ fn actual_dependency_struct_metadata_and_retained_bodies_preserve_rust_values() 
         ("oversized", ProofStatus::Unknown),
         ("mutable", ProofStatus::Unknown),
         ("competing", ProofStatus::Unknown),
-        ("whole_contains", ProofStatus::Unknown),
+        ("whole_contains", ProofStatus::Proved),
         ("analyzer_only::dead_empty", ProofStatus::Unknown),
     ];
     for target in [None, Some("thumbv7em-none-eabihf")] {

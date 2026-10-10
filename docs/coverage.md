@@ -1934,3 +1934,54 @@ ledger. Source, input and release hashes are verified. The manifest contains 155
 families. Current release global captures remain at `/tmp/miren-stage183-global-final-evidence`;
 the native evidence retains its original binary scope. Initial failures remain preserved, and no
 assumptions, input caps, firmware rewrites or increased resource budgets are introduced.
+
+
+Stage 185 extends structural comparison certificates to already eligible ordinary dependency
+structs. The original complete product, ABI/layout, Copy/Freeze/no-drop and raw-field checks stay
+in force. Only the additional comparer-local restriction is removed. Actual selected comparator
+MIR, exact signatures, all reachable effects and the complete field-equality relation remain
+mandatory before empty, unequal-length or zero-field shortcuts. No dependency name or derive
+marker grants a proof.
+
+A genuine dual-rlib compiler matrix builds identical dependency and consumer sources with selected
+MIR retained or omitted in host/ARM O0/O2. Each retained profile yields nine PROVED and three
+REFUTED roots; all twelve omitted roots return selected-comparer MissingCompilerEvidence. The
+actual data-helper mutation refutes the unchanged claim with its body entered and query/model on
+the failing obligation. A wrong-field comparator mutation remains UNKNOWN. Safe native originals
+pass five tests and the data mutant exits 101 at O0/O2 with ten-second limits. Exact commands,
+source/archive/binary hashes and complete outputs remain at `/tmp/miren-stage185-final-evidence`.
+The committed-parent before captures remain at `/tmp/miren-stage185-before`.
+
+Focused fidelity preserves 176 status/detail/premise pairs and all 216 queries byte for byte.
+Of 132 completed root/profile pairs, 116 have queries and sixteen are query-free. Evidence remains
+at `/tmp/miren-stage185-query-fidelity`. The global fixture,
+manifest and runner remain unchanged: 155 cases in 53 families. This dedicated external-domain
+matrix is separate from that global inventory. No assumptions, input caps, compiler-special type
+rights, write permissions or increased resource budgets are introduced. Integrated full validation
+and fresh-main checks follow the frozen focused captures.
+
+
+The initial full run passed 742 Rust tests and failed one stale expectation in
+`external_struct_values`; its separate native-mutant child failure is expected. Original logs
+remain at `/tmp/miren-stage185-checks`, and actual counts are retained at
+`/tmp/miren-stage185-initial-full-actual-counts.json`. Sixteen unchanged-source before/after root
+results show retained `whole_contains` advancing from UNKNOWN to PROVED in all four profiles,
+while the dead-source empty control remains UNKNOWN. Commands, original sources, dependency
+archives and analyzer hashes remain at `/tmp/miren-stage185-extra-frontiers`. One harness update
+pins the real full-domain producer and changes no fixture, dependency or claim. Corrected full
+validation follows this recorded first run.
+
+
+Final corrected validation passes all 743 Rust tests and 68 Python tests. Formatting, lint,
+debug/release builds, cargo deny, documentation and manual hooks pass. Fresh main checks pass
+34 relevant Rust tests and 68 Python tests. All 783 tracked files match the isolated source byte
+for byte. Both frozen surveys yield 244 PROVED, 216 REFUTED and 160 UNKNOWN:
+`/tmp/miren-stage185-corrected-capabilities-20261010` and
+`/tmp/miren-stage185-merged-capabilities-20261010`. All 460 previously completed parent roots
+retain identical outcomes, obligation details and queries. All 620 main/isolate outcomes, queries,
+models and premises match, with no diagnostic context differences. Source, input and release
+hashes are verified. Fresh release captures of the complete external matrix remain at
+`/tmp/miren-stage185-main-release-final-evidence`; unchanged native records explicitly retain their
+original frozen-author execution scope. Initial failing logs remain preserved. The global
+manifest stays at 155 cases in 53 families; no assumptions, input caps, firmware rewrites or
+increased resource budgets are introduced.
