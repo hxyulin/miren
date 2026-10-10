@@ -90,7 +90,7 @@ fn concrete_dispatch_preserves_methods_and_effects() {
         ("wrong_effect", ProofStatus::Refuted),
         ("arbitrary_object", ProofStatus::Unknown),
         ("arbitrary_mutable", ProofStatus::Unknown),
-        ("upcast_unknown", ProofStatus::Unknown),
+        ("upcast_unknown", ProofStatus::Proved),
         ("escaping_object", ProofStatus::Unknown),
         ("dead_object", ProofStatus::Unknown),
     ];

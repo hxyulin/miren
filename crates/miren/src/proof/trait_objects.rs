@@ -1,4 +1,5 @@
 use super::*;
+use rustc_middle::ty::TypeVisitableExt;
 use rustc_middle::ty::adjustment::PointerCoercion;
 
 /// Compiler types retained at a concrete reference unsizing site. This is not a vtable address
@@ -48,6 +49,17 @@ impl<'tcx> Engine<'tcx> {
             }
             return self
                 .borrow_trait_object(&source, id, target_mutability.is_mut(), state)
+                .map(Some);
+        }
+        if kind == PointerCoercion::Unsize && matches!(concrete.kind(), ty::Dynamic(..)) {
+            return self
+                .trait_object_upcast(
+                    *concrete,
+                    *object,
+                    (source_mutability.is_mut(), target_mutability.is_mut()),
+                    value,
+                    state,
+                )
                 .map(Some);
         }
         if kind != PointerCoercion::Unsize
@@ -108,6 +120,128 @@ impl<'tcx> Engine<'tcx> {
             id,
             place: false,
         }))
+    }
+
+    fn trait_object_upcast(
+        &mut self,
+        source_object: Ty<'tcx>,
+        target_object: Ty<'tcx>,
+        mutability: (bool, bool),
+        value: Value,
+        state: &State,
+    ) -> Result<Value, String> {
+        let (source_mutable, target_mutable) = mutability;
+        if target_mutable && !source_mutable {
+            return Err("trait-object upcast cannot grant mutable receiver rights".into());
+        }
+        let Value::TraitObject {
+            source,
+            id,
+            place: false,
+        } = value
+        else {
+            return Err("trait-object upcast needs a retained concrete witness".into());
+        };
+        let witness = *self
+            .trait_objects
+            .get(id)
+            .ok_or("trait-object upcast witness is missing")?;
+        let source_object = self.tcx.erase_and_anonymize_regions(source_object);
+        let target_object = self.tcx.erase_and_anonymize_regions(target_object);
+        if source_object.has_non_region_param()
+            || source_object.has_non_region_infer()
+            || target_object.has_non_region_param()
+            || target_object.has_non_region_infer()
+        {
+            return Err("trait-object upcast needs fully monomorphized compiler types".into());
+        }
+        if witness.object != source_object {
+            return Err("trait-object upcast source differs from its concrete witness".into());
+        }
+        let ty::Dynamic(source_predicates, _) = source_object.kind() else {
+            return Err("trait-object upcast source has no dynamic principal".into());
+        };
+        let ty::Dynamic(target_predicates, _) = target_object.kind() else {
+            return Err("trait-object upcast target has no dynamic principal".into());
+        };
+        let source_principal = source_predicates
+            .principal()
+            .ok_or("trait-object upcast source needs a principal trait")?;
+        let target_principal = target_predicates
+            .principal()
+            .ok_or("trait-object upcast target needs a principal trait")?;
+        let unsize = self
+            .tcx
+            .lang_items()
+            .get(LangItem::Unsize)
+            .ok_or("trait-object upcast has no compiler Unsize trait")?;
+        for from in [source_object, witness.concrete] {
+            let obligation = ty::TraitRef::new(self.tcx, unsize, [from, target_object]);
+            self.tcx
+                .codegen_select_candidate(
+                    ty::TypingEnv::fully_monomorphized().as_query_input(obligation),
+                )
+                .map_err(|error| {
+                    format!("compiler trait-object upcast is not established: {error:?}")
+                })?;
+        }
+        let source_trait = source_principal
+            .no_bound_vars()
+            .ok_or("trait-object upcast source principal has bound variables")?
+            .with_self_ty(self.tcx, witness.concrete);
+        let target_trait = target_principal
+            .no_bound_vars()
+            .ok_or("trait-object upcast target principal has bound variables")?
+            .with_self_ty(self.tcx, witness.concrete);
+        let source_entries = self.tcx.vtable_entries(source_trait);
+        let target_entries = self.tcx.vtable_entries(target_trait);
+        let header = TyCtxt::COMMON_VTABLE_ENTRIES;
+        if !source_entries.starts_with(header) || !target_entries.starts_with(header) {
+            return Err("trait-object upcast needs exact compiler metadata headers".into());
+        }
+        match self
+            .tcx
+            .supertrait_vtable_slot((source_object, target_object))
+        {
+            Some(slot) => {
+                let Some(ty::VtblEntry::TraitVPtr(actual)) = source_entries.get(slot) else {
+                    return Err(
+                        "trait-object upcast slot is not a compiler supertrait pointer".into(),
+                    );
+                };
+                if self.tcx.erase_and_anonymize_regions(*actual) != target_trait {
+                    return Err("trait-object upcast supertrait pointer changes its target".into());
+                }
+            }
+            None => {
+                if !source_entries.starts_with(target_entries) {
+                    return Err(
+                        "trait-object upcast reused vtable lacks exact target prefix".into(),
+                    );
+                }
+            }
+        }
+        self.validate_tracked_value(&source, state)?;
+        let source = self.trait_object_source(*source, target_mutable)?;
+        let entry = TraitObject {
+            concrete: witness.concrete,
+            object: target_object,
+        };
+        let id = if let Some(id) = self.trait_objects.iter().position(|item| *item == entry) {
+            id
+        } else {
+            if self.trait_objects.len() >= 512 {
+                return Err("concrete trait-object registry exceeds 512 witnesses".into());
+            }
+            let id = self.trait_objects.len();
+            self.trait_objects.push(entry);
+            id
+        };
+        Ok(Value::TraitObject {
+            source: Box::new(source),
+            id,
+            place: false,
+        })
     }
 
     fn trait_object_source(&self, value: Value, mutable: bool) -> Result<Value, String> {

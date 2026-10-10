@@ -254,7 +254,7 @@ Payload enums remain limited to 64 variants. Exact discriminant validity constra
 
 Concrete reference coercions to trait objects retain the compiler type and vtable witness.
 Virtual calls execute the exact resolved implementation with the original storage and permissions.
-Arbitrary trait-object roots, unsupported upcasts and raw/boxed trait objects remain UNKNOWN.
+Arbitrary trait-object roots, uncertified upcasts and raw/boxed trait objects remain UNKNOWN.
 
 Compiler-layout raw addresses of bounded struct/tuple fields and array elements retain allocation
 provenance, offsets and subobject extents. The exact initialized pointer-array to reference-array
@@ -857,3 +857,12 @@ captured allocation's current live contents and exact replacement before a singl
 sibling effects. Shared, raw, static and inherited reference projections remain unsupported;
 compiler type evidence does not grant new access rights. Symbolic writes retain the existing
 writer's bounds and uniqueness requirements.
+
+Concrete witnessed reference trait-object upcasts authenticate both compiler Unsize obligations
+and the actual supertrait vtable transport. A compiler-selected TraitVPtr must identify the exact
+target with the same concrete type; reused vtables must contain the exact target prefix. The
+original allocation, projections and access rights are retained or narrowed. Target methods still
+resolve to their exact compiler vtable Item and execute actual available MIR. This includes
+associated-type bounds, chained and second-supertrait upcasts and existing mutable receiver
+rights; it supplies no arbitrary trait-object input, physical vtable or raw pointer capability.
+Missing method bodies and dead or escaping backing storage remain UNKNOWN.

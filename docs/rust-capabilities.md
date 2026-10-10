@@ -537,3 +537,53 @@ approves the exact Char layout and Unicode validity model at
 `/tmp/miren-stage179-global-final-evidence`; historical dedicated, layout and native artifacts
 retain their original binary scope. No assumptions, input caps or increased resource budgets
 are introduced. Stage 179 integrates after actual Stage 178 commit `4d692c3`.
+
+
+Stage 181 supports compiler-certified supertrait upcasts of an existing concrete reference
+witness. Actual source-to-target and concrete-to-target Unsize selection must succeed. The
+compiler's supertrait slot is authenticated against an exact TraitVPtr, or its reused vtable
+against the complete target prefix. Target substitutions and descriptor identity remain exact;
+source storage, lifetime and write rights are preserved. Virtual dispatch still executes the
+compiler-selected actual implementation body. Arbitrary incoming objects and forged metadata
+remain unsupported. No physical vtable identity or extra pointer rights are inferred.
+
+The dedicated twelve-root source matrix yields six PROVED, three REFUTED and three UNKNOWN per
+host/ARM O0/O2 profile. A genuinely separately compiled dependency with omitted implementation
+MIR adds an UNKNOWN control in each profile, for thirteen controls with six P, three R and four U.
+Exact final source controls are UNKNOWN under the committed Stage 179 binary. Compiler vtable
+probes verify reused-prefix and second-supertrait pointer slots in all profiles at
+`/tmp/miren-stage181-vtables`. Actual parent implementation mutation refutes the unchanged claim
+in all profiles, with the same failing obligation retaining query and model. Four-test native
+original suites pass; mutant guards exit 101 at O0/O2 with ten-second timeouts. Final source,
+binary, commands and outputs remain at `/tmp/miren-stage181-final-evidence`.
+
+The unchanged old `trait_objects::upcast_unknown` becomes PROVED across all four profiles.
+Its initial stale expectation failure is retained at
+`/tmp/miren-stage181-focused-related-initial.log` before harness-only upkeep. All eleven other
+old roots retain exact outcomes and obligation details; 44 root/profile pairs and eight completed
+queries remain identical at `/tmp/miren-stage181-old-fidelity`. Independent source and focused
+review approves the narrow witness transport at `/tmp/miren-stage181-source-review.md`.
+Global proof, counterexample and missing-body controls plus actual implementation mutation
+and native evidence remain at `/tmp/miren-stage181-global-evidence`. The manifest now contains
+149 cases in 51 families; selected controls do not establish a Rust coverage percentage.
+These focused captures preceded full validation and final survey comparison. No assumptions,
+input caps or increased resource budgets are introduced.
+
+
+Final validation passes all 725 Rust tests and 68 Python tests. Formatting, lint, debug/release
+builds, cargo deny, documentation and manual hooks pass. All 770 tracked main files match the
+isolated snapshot byte for byte. Fresh main builds, twelve related integration tests and
+68 Python tests pass. Both frozen surveys yield 232 PROVED, 208 REFUTED and 156 UNKNOWN at
+`/tmp/miren-stage181-capabilities-20261010` and
+`/tmp/miren-stage181-merged-capabilities-20261010`. All 432 previously completed parent roots
+retain identical outcomes, obligation details and query text. All 596 main/isolate outcomes,
+queries, models and premises match. One query-free ARM O0 resource-limit UNKNOWN differs only
+in its diagnostic call-context prefix; both original details remain in
+`/tmp/miren-stage181-main-query-comparison.json`. No status, query or execution budget changes.
+Source, input and release hashes are verified. Independent source and focused-evidence review
+approves the concrete witness certificate at `/tmp/miren-stage181-source-review.md`.
+Current global after/mutation reports remain at `/tmp/miren-stage181-global-final-evidence`;
+historical dedicated, compiler vtable, omitted-dependency and native evidence retains its
+original binary scope. No assumptions, input caps or increased resource budgets are introduced.
+Stage 181 integrates after actual Stage 179 commit `eebf727`; ownership Stage 180 remains a
+separate implementation rather than an implicit part of this validated snapshot.

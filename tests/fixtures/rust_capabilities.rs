@@ -1633,6 +1633,62 @@ pub fn char_niche_slice_missing_body(values: &[Option<char>], index: usize) -> c
     '\0'
 }
 
+trait UpcastParent {
+    fn selected(&self) -> u8;
+}
+
+trait UpcastChild: UpcastParent {
+    fn child(&self) -> u8;
+}
+
+struct UpcastNumber(u8);
+
+impl UpcastParent for UpcastNumber {
+    #[inline(never)]
+    fn selected(&self) -> u8 {
+        self.0 & 15
+    }
+}
+
+impl UpcastChild for UpcastNumber {
+    fn child(&self) -> u8 {
+        self.0
+    }
+}
+
+#[inline(never)]
+fn trait_upcast_selected(value: &dyn UpcastChild) -> u8 {
+    let parent: &dyn UpcastParent = value;
+    parent.selected()
+}
+
+pub fn trait_upcast(value: u8) {
+    let number = UpcastNumber(value);
+    let child: &dyn UpcastChild = &number;
+    assert!(child.child() == value);
+    assert!(trait_upcast_selected(child) < 16);
+}
+
+pub fn trait_upcast_wrong_claim(value: u8) {
+    let number = UpcastNumber(value);
+    let child: &dyn UpcastChild = &number;
+    assert!(trait_upcast_selected(child) == 0);
+}
+
+#[cfg(not(test))]
+unsafe extern "Rust" {
+    fn opaque_trait_upcast(value: u8) -> u8;
+}
+
+#[cfg(not(test))]
+pub fn trait_upcast_missing_body(value: u8) -> u8 {
+    let number = UpcastNumber(value);
+    let child: &dyn UpcastChild = &number;
+    let selected = trait_upcast_selected(child);
+    assert!(selected < 16);
+    unsafe { opaque_trait_upcast(selected) }
+}
+
 #[cfg(test)]
 mod native {
     #[test]
@@ -1650,6 +1706,19 @@ mod native {
         nominal_enum_slice_wrong_claim(&[
             NominalTaggedReading::Data(NominalTaggedRecord { left: 3, right: 7 }),
         ], 0);
+    }
+
+    #[test]
+    fn trait_upcast_controls() {
+        for value in [0, 1, 19, 255] {
+            trait_upcast(value);
+        }
+    }
+
+    #[test]
+    #[should_panic]
+    fn trait_upcast_wrong_claim_panics() {
+        trait_upcast_wrong_claim(19);
     }
 
     #[test]
