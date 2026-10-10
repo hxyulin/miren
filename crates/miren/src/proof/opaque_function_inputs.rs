@@ -7,7 +7,13 @@ impl<'tcx> Engine<'tcx> {
         if let Some(id) = pointers.iter().position(|item| *item == entry) {
             return Ok(id);
         }
-        if pointers.len() >= 512 {
+        let used = pointers.iter().try_fold(0_usize, |used, entry| {
+            used.checked_add(super::function_tables::registry_cost(entry))
+        });
+        if used
+            .and_then(|used| used.checked_add(super::function_tables::registry_cost(&entry)))
+            .is_none_or(|next| next > 512)
+        {
             return Err(
                 "typed function-pointer registry exceeds 512 signatures and targets".into(),
             );
@@ -60,6 +66,7 @@ impl<'tcx> Engine<'tcx> {
                 "compiler function pointer {signature}; target {}",
                 self.tcx.def_path_str(instance.def_id())
             )),
+            Target::Choice(_) => Err("function table choice is not an incoming pointer".into()),
         }
     }
 
@@ -77,6 +84,7 @@ impl<'tcx> Engine<'tcx> {
             .ok_or("function-pointer signature witness is missing")?;
         let retained = match target {
             Target::Known { signature, .. } | Target::Opaque { signature } => *signature,
+            Target::Choice(choice) => choice.signature(),
         };
         if self.tcx.erase_and_anonymize_regions(signature) != retained {
             return Err("function-pointer storage changes the retained callable signature".into());

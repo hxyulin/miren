@@ -1,7 +1,7 @@
 use super::*;
 use rustc_middle::ty::adjustment::PointerCoercion;
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub(super) enum Target<'tcx> {
     Known {
         instance: ty::Instance<'tcx>,
@@ -10,6 +10,7 @@ pub(super) enum Target<'tcx> {
     Opaque {
         signature: Ty<'tcx>,
     },
+    Choice(super::function_tables::Choice<'tcx>),
 }
 
 impl<'tcx> Engine<'tcx> {

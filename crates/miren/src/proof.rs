@@ -52,6 +52,7 @@ mod float_pairs;
 mod floating_intrinsics;
 mod foreign_calls;
 mod function_pointers;
+mod function_tables;
 mod hardware;
 mod induction;
 mod initialized_places;
@@ -1531,6 +1532,35 @@ impl<'tcx> Engine<'tcx> {
                         )?;
                     }
                     let callable_ty = func.ty(&body.local_decls, self.tcx);
+                    if let Some(results) = self.function_table_call(
+                        &state,
+                        function_tables::TableCall {
+                            body,
+                            block,
+                            func,
+                            args,
+                            destination: *destination,
+                            target: *target,
+                            stack: &stack,
+                            site: (id, terminator.source_info.span),
+                        },
+                    )? {
+                        let target =
+                            target.ok_or("function table call has no normal return edge")?;
+                        for (consumed, result) in results {
+                            let mut continuation =
+                                consumed.continuation(result.conditions, result.memory);
+                            self.store_call_result(
+                                body,
+                                &mut continuation,
+                                *destination,
+                                destination_indices.as_ref(),
+                                result.value,
+                            )?;
+                            queue.push_back((target, continuation, retry_path.clone()));
+                        }
+                        continue;
+                    }
                     let instance = match *callable_ty.kind() {
                         ty::FnDef(callee, generic_args) => {
                             if !matches!(func, Operand::Constant(_)) {
@@ -2211,12 +2241,19 @@ impl<'tcx> Engine<'tcx> {
                     local: place.local,
                     projection: self.tcx.mk_place_elems(&place.projection[..position]),
                 };
+                let original_index = index;
                 let index = self.local(state, index.as_usize())?;
-                value = self.fixed_element_with_type(
+                value = self.fixed_element_with_source(
                     &elements,
                     &index,
                     &state.conditions,
                     Some(prefix.ty(&body.local_decls, self.tcx).ty),
+                    Some(function_tables::TableSource {
+                        body,
+                        prefix,
+                        state,
+                        index: original_index,
+                    }),
                 )?;
             } else {
                 value = self.place_projection(state, value, projection)?;

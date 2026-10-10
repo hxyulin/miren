@@ -1071,6 +1071,23 @@
       "expected": "unknown",
       "unknown_reason": "checked_subslice_nested bb0: mutable u16 staging needs a pending child",
       "unknown_category": "semantics"
+    },
+    {
+      "entry": "known_function_table",
+      "family": "known_function_table",
+      "expected": "proved"
+    },
+    {
+      "entry": "known_function_table_wrong",
+      "family": "known_function_table",
+      "expected": "refuted"
+    },
+    {
+      "entry": "known_function_table_opaque",
+      "family": "known_function_table",
+      "expected": "unknown",
+      "unknown_reason": "function table cannot contain opaque or nested choices",
+      "unknown_category": "semantics"
     }
   ]
 }

@@ -271,6 +271,13 @@ unsafe callbacks and Waker table fields. Unused or copied fields do not choose a
 Calls, address casts, pointer comparisons and native replay of these inputs remain UNKNOWN.
 Concrete function-item pointers continue executing their actual bodies and effects.
 
+Symbolic indexing into initialized owned arrays of known safe Rust `fn(u16) -> u16` pointers
+preserves the index-to-target relation and executes each feasible target's actual MIR body. This
+includes fixed owned fields, duplicate targets and repeated calls, within the existing sixteen
+array-element and shared analysis budgets. Each call consumes its operands once and carries its
+own returned memory. Missing feasible bodies, opaque targets, shared input tables, other signatures
+and oversized arrays remain UNKNOWN. Infeasible targets are pruned only after solver checking.
+
 Owned non-byte arrays share immutable host payloads and detach changed paths on writes. Rust copies
 retain independent storage. Evaluated constants check every occurrence before reusing exact typed
 initialized values, with at most 2,048 visits, sixteen levels and 256 scalar or 128 composite array

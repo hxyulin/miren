@@ -2,7 +2,7 @@ use super::*;
 use rustc_index::IndexVec;
 
 const MAX_ARRAY_BYTES: u64 = 128;
-const MAX_ARRAY_ELEMENTS: usize = 16;
+pub(super) const MAX_ARRAY_ELEMENTS: usize = 16;
 const MAX_INPUT_ELEMENTS: usize = 256;
 pub(super) const MAX_ENUM_VARIANTS: usize = 64;
 pub(super) const MAX_FIELDLESS_ENUM_VARIANTS: usize = 256;
@@ -295,6 +295,17 @@ impl<'tcx> Engine<'tcx> {
         conditions: &[Term],
         original: Option<Ty<'tcx>>,
     ) -> Result<Value, String> {
+        self.fixed_element_with_source(elements, index, conditions, original, None)
+    }
+
+    pub(super) fn fixed_element_with_source(
+        &self,
+        elements: &[Value],
+        index: &Value,
+        conditions: &[Term],
+        original: Option<Ty<'tcx>>,
+        source: Option<function_tables::TableSource<'_, 'tcx>>,
+    ) -> Result<Value, String> {
         let (expression, bits, signed) = index.integer()?;
         if signed || bits != u32::from(self.tcx.sess.target.pointer_width) {
             return Err("fixed array index type mismatch".to_owned());
@@ -352,6 +363,12 @@ impl<'tcx> Engine<'tcx> {
         outside.push(symbolic::not(&bound));
         if self.feasible(&outside)? {
             return Err("array read lacks a proven bounds check".to_owned());
+        }
+        if let Some(original) = original
+            && let Some(selected) =
+                self.function_table_choice(original, elements, index, conditions, source)?
+        {
+            return Ok(selected);
         }
         if let Some(original) = original
             && let Some(selected) =

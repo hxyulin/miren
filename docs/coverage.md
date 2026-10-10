@@ -2682,3 +2682,35 @@ captures; global captures retain their separate explicit custom mode. Fingerprin
 identifiers, models and non-path fields remain exact. Native evidence is adopted separately with
 verified source, executable and output hashes and its original execution scope. Final docs and
 hooks run after this prose update; production source stays at the validated freeze.
+
+
+## Stage 200: correlated known-target function tables
+
+Symbolic indices into initialized owned arrays of safe Rust `fn(u16) -> u16` pointers now
+retain their exact index-to-target relation. Feasible branches execute the actual available
+callee MIR and carry its returned memory. Dispatch consumes each original operand once;
+it does not replay preceding statements. Original compiler array and signature types,
+current source elements, initialization, index domain and recorded owned field types are
+checked before issuing a choice. The existing sixteen-element and shared execution/registry
+budgets remain. Opaque targets, other signatures, shared input tables, reference transport,
+configured target contracts and unsupported unwind paths remain UNKNOWN.
+
+The dedicated nine-root matrix has four PROVED, one REFUTED and four UNKNOWN results in each
+host/ARM O0/O2 profile. Changing the actual helper body or table order refutes the unchanged
+assertion in all four profiles and fails finite native tests. Genuine external archives prove
+only with retained MIR for feasible targets; omitted feasible bodies remain missing-evidence
+UNKNOWN. Solver-proved infeasible omitted targets are pruned. The original `assert_eq!` scout's
+missing panic-formatting body remains separately recorded UNKNOWN, without a replacement summary.
+
+Three append-only global controls bring the manifest to 197 cases in 67 families, with
+78 PROVED, 68 REFUTED and 51 UNKNOWN per profile. The 194 old cases retain 1,452 emitted queries;
+775 of 776 full proof objects are identical. One query/model-free unbounded-fold timeout changes
+only its diagnostic prefix, with every residual field exact. Evidence is retained under
+`/tmp/miren-stage200-global-before-evidence` and `/tmp/miren-stage200-global-after-evidence`.
+
+All 805 workspace tests and 68 Python tests pass, alongside formatting, Clippy, release builds,
+Cargo deny and manual hooks. All 878 root/isolated source files match. Fresh root release checks
+retain 914 of 916 full proof objects exactly and all 1,580 emitted queries: 1,436 from completed
+roots and 144 partial queries from UNKNOWN roots. Two named query-free fold timeout contexts
+retain exact residual proof fields; their raw prefixes and call chains are preserved in
+`/tmp/miren-stage200-root-global-evidence`. This stage adds no assumptions or hardware model.

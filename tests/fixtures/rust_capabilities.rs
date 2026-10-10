@@ -2813,3 +2813,37 @@ mod native_checked_subslice {
         assert_eq!(values[128], 7);
     }
 }
+
+
+#[inline(never)]
+pub fn known_table_first(word: u16) -> u16 { word }
+
+#[inline(never)]
+pub fn known_table_second(word: u16) -> u16 { word ^ 1 }
+
+pub fn known_function_table(index: usize, word: u16) {
+    let table: [fn(u16) -> u16; 2] = [known_table_first, known_table_second];
+    if index < 2 {
+        assert!(table[index](word) == if index == 0 { word } else { word ^ 1 });
+    }
+}
+
+pub fn known_function_table_wrong(index: usize, word: u16) {
+    let table: [fn(u16) -> u16; 2] = [known_table_first, known_table_second];
+    if index < 2 { assert!(table[index](word) == word); }
+}
+
+pub fn known_function_table_opaque(index: usize, word: u16, callback: fn(u16) -> u16) {
+    let table: [fn(u16) -> u16; 2] = [known_table_first, callback];
+    if index < 2 { assert!(table[index](word) == word); }
+}
+
+#[cfg(test)]
+mod native_known_function_table {
+    #[test]
+    fn target_body_and_order_match_original_assertion() {
+        super::known_function_table(0, 129);
+        super::known_function_table(1, 129);
+        super::known_function_table(2, 129);
+    }
+}
