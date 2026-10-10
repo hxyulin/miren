@@ -1,0 +1,57 @@
+args=1 spread=None
+local _0 Mut *mut u8 user=None
+local _1 Not core::alloc::Layout user=None
+local _2 Mut core::result::Result<core::ptr::NonNull<[u8]>, core::alloc::AllocError> user=None
+local _3 Mut isize user=None
+local _4 Not core::ptr::NonNull<[u8]> user=None
+local _5 Mut ! user=None
+local _6 Mut core::ptr::NonNull<u8> user=None
+local _7 Mut *mut u8 user=None
+local _8 Mut *mut [u8] user=None
+block bb0 cleanup=false
+StorageLive(_2)
+call alloc::alloc::Global::alloc_impl_runtime destination=_2/[] target=Some(bb4) unwind=Unreacha
+  | ble source=Misc
+const-value ZeroSized FnDef(DefId(alloc::alloc::{impl#2}::alloc_impl_runtime), Binder { value: [
+  | ], bound_vars: [] })
+copy _1/[]
+const-value Scalar(0x00) bool
+block bb1 cleanup=false
+unreachable
+block bb2 cleanup=false
+call alloc::alloc::handle_alloc_error destination=_5/[] target=None unwind=Unreachable source=No
+  | rmal
+const-value ZeroSized FnDef(DefId(alloc::alloc::handle_alloc_error), Binder { value: [], bound_v
+  | ars: [] })
+move _1/[]
+block bb3 cleanup=false
+StorageLive(_4)
+assign local=_4 path=[]
+use Yes
+copy _2/[Downcast(Some("Ok"), 0), Field(0, core::ptr::NonNull<[u8]>)]
+StorageLive(_6)
+StorageLive(_7)
+StorageLive(_8)
+assign local=_8 path=[]
+cast Transmute target=*mut [u8]
+copy _4/[]
+assign local=_7 path=[]
+cast PtrToPtr target=*mut u8
+copy _8/[]
+StorageDead(_8)
+assign local=_6 path=[]
+cast Transmute target=core::ptr::NonNull<u8>
+copy _7/[]
+StorageDead(_7)
+assign local=_0 path=[]
+cast Transmute target=*mut u8
+copy _6/[]
+StorageDead(_6)
+StorageDead(_4)
+StorageDead(_2)
+return
+block bb4 cleanup=false
+assign local=_3 path=[]
+discriminant(_2) local=_2 path=[]
+switch SwitchTargets { values: [Pu128(0), Pu128(1)], targets: [bb3, bb2, bb1] }
+move _3/[]

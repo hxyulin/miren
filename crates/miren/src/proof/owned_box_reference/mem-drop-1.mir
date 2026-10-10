@@ -1,0 +1,7 @@
+args=1 spread=None
+local _0 Mut () user=None
+local _1 Not T/#0 user=None
+block bb0 cleanup=false
+drop _1/[] target=bb1 unwind=Continue replace=false async=None
+block bb1 cleanup=false
+return

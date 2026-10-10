@@ -1,0 +1,275 @@
+args=2 spread=None
+local _0 Mut core::result::Result<core::ptr::NonNull<[u8]>, core::alloc::AllocError> user=None
+local _1 Not core::alloc::Layout user=None
+local _2 Not bool user=None
+local _3 Mut usize user=None
+local _4 Mut &'{erased} core::alloc::Layout user=None
+local _5 Mut core::ptr::NonNull<[u8]> user=None
+local _6 Mut core::ptr::NonNull<u8> user=None
+local _7 Mut &'{erased} core::alloc::Layout user=None
+local _8 Not *mut u8 user=None
+local _9 Mut core::ops::ControlFlow<core::result::Result<!, core::alloc::AllocError>, core::ptr:
+  | :NonNull<u8>> user=None
+local _10 Mut core::result::Result<core::ptr::NonNull<u8>, core::alloc::AllocError> user=None
+local _11 Mut core::option::Option<core::ptr::NonNull<u8>> user=None
+local _12 Mut core::result::Result<!, core::alloc::AllocError> user=None
+local _13 Not core::ptr::NonNull<u8> user=None
+local _14 Mut core::ptr::NonNull<[u8]> user=None
+local _15 Mut core::mem::Alignment user=None
+local _16 Mut *mut [u8] user=None
+local _17 Mut *mut u8 user=None
+local _18 Not () user=None
+local _19 Mut *mut () user=None
+local _20 Not () user=None
+local _21 Mut &'{erased} core::alloc::Layout user=None
+local _22 Mut core::mem::Alignment user=None
+local _23 Mut &'{erased} core::alloc::Layout user=None
+local _24 Not () user=None
+local _25 Mut &'{erased} core::alloc::Layout user=None
+local _26 Mut core::mem::Alignment user=None
+local _27 Mut &'{erased} core::alloc::Layout user=None
+local _28 Mut bool user=None
+local _29 Mut core::ptr::NonNull<u8> user=None
+local _30 Mut usize user=None
+local _31 Not () user=None
+local _32 Mut *mut () user=None
+local _33 Not core::ptr::NonNull<u8> user=None
+local _34 Not core::ptr::NonNull<u8> user=None
+local _35 Mut *mut [u8] user=None
+local _36 Mut *mut u8 user=None
+local _37 Not () user=None
+local _38 Mut *mut () user=None
+local _39 Mut isize user=None
+local _40 Mut bool user=None
+block bb0 cleanup=false
+StorageLive(_3)
+assign local=_3 path=[]
+use Yes
+copy _1/[Field(0, usize)]
+switch SwitchTargets { values: [Pu128(0)], targets: [bb2, bb1] }
+copy _3/[]
+block bb1 cleanup=false
+switch SwitchTargets { values: [Pu128(0)], targets: [bb4, bb3] }
+copy _2/[]
+block bb2 cleanup=false
+StorageLive(_5)
+StorageLive(_6)
+assign local=_15 path=[]
+use Yes
+copy _1/[Field(1, core::mem::Alignment)]
+assign local=_6 path=[]
+cast Transmute target=core::ptr::NonNull<u8>
+copy _15/[]
+StorageLive(_16)
+StorageLive(_17)
+assign local=_17 path=[]
+cast Transmute target=*mut u8
+copy _15/[]
+assign local=_16 path=[]
+aggregate RawPtr([u8], Mut)
+copy _17/[]
+const-value Scalar(0x00000000) usize
+StorageDead(_17)
+switch SwitchTargets { values: [Pu128(0)], targets: [bb10, bb8] }
+runtime-checks UbChecks
+block bb3 cleanup=false
+call alloc::alloc::__rust_no_alloc_shim_is_unstable_v2 destination=_20/[] target=Some(bb11) unwi
+  | nd=Unreachable source=Normal
+const-value ZeroSized FnDef(DefId(alloc::alloc::{extern#0}::__rust_no_alloc_shim_is_unstable_v2)
+  | , Binder { value: [], bound_vars: [] })
+block bb4 cleanup=false
+call alloc::alloc::__rust_no_alloc_shim_is_unstable_v2 destination=_24/[] target=Some(bb13) unwi
+  | nd=Unreachable source=Normal
+const-value ZeroSized FnDef(DefId(alloc::alloc::{extern#0}::__rust_no_alloc_shim_is_unstable_v2)
+  | , Binder { value: [], bound_vars: [] })
+block bb5 cleanup=false
+StorageLive(_9)
+StorageLive(_10)
+StorageLive(_11)
+StorageLive(_28)
+StorageLive(_30)
+assign local=_30 path=[]
+cast Transmute target=usize
+copy _8/[]
+assign local=_28 path=[]
+binary Eq
+move _30/[]
+const-value Scalar(0x00000000) usize
+StorageDead(_30)
+switch SwitchTargets { values: [Pu128(0)], targets: [bb16, bb15] }
+move _28/[]
+block bb6 cleanup=false
+StorageDead(_3)
+goto -> bb7
+block bb7 cleanup=false
+return
+block bb8 cleanup=false
+StorageLive(_19)
+assign local=_19 path=[]
+cast Transmute target=*mut ()
+copy _15/[]
+call core::ptr::NonNull::<T>::new_unchecked::precondition_check destination=_18/[] target=Some(b
+  | b9) unwind=Unreachable source=Normal
+const-value ZeroSized FnDef(DefId(core::ptr::non_null::{impl#3}::new_unchecked::precondition_che
+  | ck), Binder { value: [], bound_vars: [] })
+move _19/[]
+block bb9 cleanup=false
+StorageDead(_19)
+goto -> bb10
+block bb10 cleanup=false
+assign local=_5 path=[]
+cast Transmute target=core::ptr::NonNull<[u8]>
+copy _16/[]
+StorageDead(_16)
+StorageDead(_6)
+assign local=_0 path=[]
+aggregate Adt(DefId(core::result::Result), 0, [core::ptr::NonNull<[u8]>, core::alloc::AllocError
+  | ], None, None)
+move _5/[]
+StorageDead(_5)
+goto -> bb6
+block bb11 cleanup=false
+StorageLive(_22)
+assign local=_22 path=[]
+use Yes
+copy _1/[Field(1, core::mem::Alignment)]
+call alloc::alloc::__rust_alloc_zeroed destination=_8/[] target=Some(bb12) unwind=Unreachable so
+  | urce=Normal
+const-value ZeroSized FnDef(DefId(alloc::alloc::{extern#0}::__rust_alloc_zeroed), Binder { value
+  | : [], bound_vars: [] })
+copy _3/[]
+move _22/[]
+block bb12 cleanup=false
+StorageDead(_22)
+goto -> bb5
+block bb13 cleanup=false
+StorageLive(_26)
+assign local=_26 path=[]
+use Yes
+copy _1/[Field(1, core::mem::Alignment)]
+call alloc::alloc::__rust_alloc destination=_8/[] target=Some(bb14) unwind=Unreachable source=No
+  | rmal
+const-value ZeroSized FnDef(DefId(alloc::alloc::{extern#0}::__rust_alloc), Binder { value: [], b
+  | ound_vars: [] })
+copy _3/[]
+move _26/[]
+block bb14 cleanup=false
+StorageDead(_26)
+goto -> bb5
+block bb15 cleanup=false
+assign local=_11 path=[]
+use Yes
+const-value Scalar(0x00000000) core::option::Option<core::ptr::NonNull<u8>>
+StorageDead(_28)
+assign local=_10 path=[]
+use Yes
+const-value Scalar(0x00000000) core::result::Result<core::ptr::NonNull<u8>, core::alloc::AllocEr
+  | ror>
+StorageDead(_11)
+StorageDead(_10)
+StorageLive(_39)
+StorageLive(_40)
+assign local=_39 path=[]
+discriminant(_12) local=_12 path=[]
+assign local=_40 path=[]
+binary Eq
+copy _39/[]
+const-value Scalar(0x00000001) isize
+assume
+move _40/[]
+assign local=_0 path=[]
+use Yes
+const-object type=core::result::Result<core::ptr::NonNull<[u8]>, core::alloc::AllocError> size=8
+  |  align=4 offset=0 bytes=[00,00,00,00,uninit,uninit,uninit,uninit]
+StorageDead(_40)
+StorageDead(_39)
+StorageDead(_9)
+StorageDead(_3)
+goto -> bb7
+block bb16 cleanup=false
+StorageLive(_29)
+switch SwitchTargets { values: [Pu128(0)], targets: [bb19, bb17] }
+runtime-checks UbChecks
+block bb17 cleanup=false
+StorageLive(_32)
+assign local=_32 path=[]
+cast PtrToPtr target=*mut ()
+copy _8/[]
+call core::ptr::NonNull::<T>::new_unchecked::precondition_check destination=_31/[] target=Some(b
+  | b18) unwind=Unreachable source=Normal
+const-value ZeroSized FnDef(DefId(core::ptr::non_null::{impl#3}::new_unchecked::precondition_che
+  | ck), Binder { value: [], bound_vars: [] })
+move _32/[]
+block bb18 cleanup=false
+StorageDead(_32)
+goto -> bb19
+block bb19 cleanup=false
+assign local=_29 path=[]
+cast Transmute target=core::ptr::NonNull<u8>
+copy _8/[]
+assign local=_11 path=[]
+aggregate Adt(DefId(core::option::Option), 1, [core::ptr::NonNull<u8>], None, None)
+move _29/[]
+StorageDead(_29)
+StorageDead(_28)
+StorageLive(_33)
+assign local=_33 path=[]
+use Yes
+move _11/[Downcast(Some("Some"), 1), Field(0, core::ptr::NonNull<u8>)]
+assign local=_10 path=[]
+aggregate Adt(DefId(core::result::Result), 0, [core::ptr::NonNull<u8>, core::alloc::AllocError],
+  |  None, None)
+copy _33/[]
+StorageDead(_33)
+StorageDead(_11)
+StorageLive(_34)
+assign local=_34 path=[]
+use Yes
+move _10/[Downcast(Some("Ok"), 0), Field(0, core::ptr::NonNull<u8>)]
+assign local=_9 path=[]
+aggregate Adt(DefId(core::ops::control_flow::ControlFlow), 0, [core::result::Result<!, core::all
+  | oc::AllocError>, core::ptr::NonNull<u8>], None, None)
+copy _34/[]
+StorageDead(_34)
+StorageDead(_10)
+assign local=_13 path=[]
+use Yes
+copy _9/[Downcast(Some("Continue"), 0), Field(0, core::ptr::NonNull<u8>)]
+StorageDead(_9)
+StorageLive(_14)
+StorageLive(_35)
+StorageLive(_36)
+assign local=_36 path=[]
+cast Transmute target=*mut u8
+copy _13/[]
+assign local=_35 path=[]
+aggregate RawPtr([u8], Mut)
+copy _36/[]
+copy _3/[]
+StorageDead(_36)
+switch SwitchTargets { values: [Pu128(0)], targets: [bb22, bb20] }
+runtime-checks UbChecks
+block bb20 cleanup=false
+StorageLive(_38)
+assign local=_38 path=[]
+cast Transmute target=*mut ()
+copy _13/[]
+call core::ptr::NonNull::<T>::new_unchecked::precondition_check destination=_37/[] target=Some(b
+  | b21) unwind=Unreachable source=Normal
+const-value ZeroSized FnDef(DefId(core::ptr::non_null::{impl#3}::new_unchecked::precondition_che
+  | ck), Binder { value: [], bound_vars: [] })
+move _38/[]
+block bb21 cleanup=false
+StorageDead(_38)
+goto -> bb22
+block bb22 cleanup=false
+assign local=_14 path=[]
+cast Transmute target=core::ptr::NonNull<[u8]>
+copy _35/[]
+StorageDead(_35)
+assign local=_0 path=[]
+aggregate Adt(DefId(core::result::Result), 0, [core::ptr::NonNull<[u8]>, core::alloc::AllocError
+  | ], None, None)
+move _14/[]
+StorageDead(_14)
+goto -> bb6

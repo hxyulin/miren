@@ -968,6 +968,7 @@ fn contains_deferred_product(values: &[Value]) -> Result<bool, String> {
         }
         nodes += 1;
         let children: &[Value] = match value {
+            Value::OwnedRegion { .. } | Value::OwnedSnapshot(_) => return Ok(false),
             Value::Input(_) => return Ok(true),
             Value::Tuple(children) => children,
             Value::Elements(children) => children,

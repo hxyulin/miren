@@ -42,6 +42,18 @@ impl<'tcx> Engine<'tcx> {
         captured: Option<&CapturedCallDestination<'tcx>>,
         value: Value,
     ) -> Result<(), String> {
+        if !state.memory.owned_regions.is_empty()
+            && super::owned_boxes::region_occurrences(std::slice::from_ref(&value))?
+                .iter()
+                .any(|(_, _, kind)| *kind == symbolic::OwnedRegionKind::BorrowedOwner)
+        {
+            return Err("readonly virtual Box cannot be an executable call result".into());
+        }
+        self.owned_box_type_value(
+            place.ty(&body.local_decls, self.tcx).ty,
+            &value,
+            &state.memory,
+        )?;
         match captured {
             Some(CapturedCallDestination::Tracked(captured)) => {
                 self.store_tracked_call_result(state, captured, value)

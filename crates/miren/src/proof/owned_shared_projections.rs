@@ -257,7 +257,7 @@ impl<'tcx> Engine<'tcx> {
             StorageLocation::tracked(allocation, false).read(&state.memory)?;
             allocation
         } else {
-            if state.memory.len() >= MAX_ALLOCATIONS {
+            if state.memory.storage_slots() >= MAX_ALLOCATIONS {
                 return Err("memory allocation budget reached".into());
             }
             let allocation = state.memory.len();

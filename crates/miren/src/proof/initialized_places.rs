@@ -289,6 +289,26 @@ impl<'tcx> Engine<'tcx> {
             None
         };
         let value = self.operand(id, body, state, operand)?;
+        if !state.memory.owned_regions.is_empty()
+            && matches!(operand, Operand::Move(_))
+            && owned_boxes::region_occurrences(std::slice::from_ref(&value))?
+                .iter()
+                .any(|(_, _, kind)| *kind == symbolic::OwnedRegionKind::BorrowedOwner)
+        {
+            return Err(self.categorized_error(
+                UnknownCategory::Semantics,
+                "readonly virtual Box cannot become an executable moved owner".into(),
+            ));
+        }
+        if !state.memory.owned_regions.is_empty()
+            && matches!(operand, Operand::Copy(_))
+            && !owned_boxes::owner_occurrences(std::slice::from_ref(&value))?.is_empty()
+        {
+            return Err(self.categorized_error(
+                UnknownCategory::Semantics,
+                "executable owned Box Copy needs an exact consuming call certificate".into(),
+            ));
+        }
         if let Some((place, fields)) = footprint {
             let local = place.local.as_usize();
             if let Some(allocation) = state.addresses[local] {

@@ -1,0 +1,35 @@
+args=3 spread=None
+local _0 Mut () user=None
+local _1 Not &'{erased} alloc::alloc::Global user=None
+local _2 Not core::ptr::NonNull<u8> user=None
+local _3 Not core::alloc::Layout user=None
+local _4 Mut usize user=None
+local _5 Mut &'{erased} core::alloc::Layout user=None
+local _6 Mut &'{erased} core::alloc::Layout user=None
+local _7 Mut core::mem::Alignment user=None
+local _8 Mut &'{erased} core::alloc::Layout user=None
+block bb0 cleanup=false
+StorageLive(_4)
+assign local=_4 path=[]
+use Yes
+copy _3/[Field(0, usize)]
+switch SwitchTargets { values: [Pu128(0)], targets: [bb2, bb1] }
+copy _4/[]
+block bb1 cleanup=false
+StorageLive(_7)
+assign local=_7 path=[]
+use Yes
+copy _3/[Field(1, core::mem::Alignment)]
+call alloc::alloc::__rust_dealloc destination=_0/[] target=Some(bb3) unwind=Unreachable source=N
+  | ormal
+const-value ZeroSized FnDef(DefId(alloc::alloc::{extern#0}::__rust_dealloc), Binder { value: [],
+  |  bound_vars: [] })
+move _2/[]
+move _4/[]
+move _7/[]
+block bb2 cleanup=false
+StorageDead(_4)
+return
+block bb3 cleanup=false
+StorageDead(_7)
+goto -> bb2

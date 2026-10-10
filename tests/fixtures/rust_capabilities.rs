@@ -2193,3 +2193,43 @@ mod native_nominal_struct_predicates {
         nominal_struct_wrong_claim(&[SliceSample { left: 3, right: 7 }; 129], 128);
     }
 }
+
+
+extern crate alloc;
+
+#[inline(never)]
+fn zst_box_selected(value: alloc::boxed::Box<()>) -> u16 {
+    let borrowed: &() = &value;
+    let () = *borrowed;
+    core::mem::drop(value);
+    19
+}
+
+pub fn zst_box() {
+    assert!(zst_box_selected(alloc::boxed::Box::new(())) == 19);
+}
+
+pub fn zst_box_wrong_claim() {
+    assert!(zst_box_selected(alloc::boxed::Box::new(())) == 20);
+}
+
+pub fn nonzero_box_unknown(word: u16) {
+    let value = alloc::boxed::Box::new(word);
+    assert!(*value == word);
+}
+
+#[cfg(test)]
+mod native_zst_boxes {
+    use super::*;
+
+    #[test]
+    fn zst_owner_executes_selected_body() {
+        zst_box();
+    }
+
+    #[test]
+    #[should_panic]
+    fn zst_false_claim_panics() {
+        zst_box_wrong_claim();
+    }
+}

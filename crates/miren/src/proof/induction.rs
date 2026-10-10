@@ -1134,6 +1134,9 @@ fn flatten(state: &State) -> Result<Vec<Term>, String> {
 
 fn flatten_value(value: &Value, result: &mut Vec<Term>) -> Result<(), String> {
     match value {
+        Value::OwnedRegion { .. } | Value::OwnedSnapshot(_) => {
+            return Err("owned regions require their private typed protocol".into());
+        }
         Value::Bool(term)
         | Value::Int {
             expression: term, ..

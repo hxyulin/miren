@@ -258,6 +258,9 @@ impl<'tcx> Engine<'tcx> {
 
     fn equality_slice_length(&self, source: &Value, conditions: &[Term]) -> Result<Value, String> {
         match source {
+            Value::OwnedRegion { .. } | Value::OwnedSnapshot(_) => {
+                Err("owned regions require their private typed protocol".into())
+            }
             Value::CompositeSlice { .. } => Err("composite equality is unsupported".into()),
             Value::ScalarSlice { .. } => self.scalar_slice_length(source, conditions),
             Value::Bytes { length, .. } => Ok((**length).clone()),
@@ -301,6 +304,9 @@ impl<'tcx> Engine<'tcx> {
         conditions: &[Term],
     ) -> Result<Value, String> {
         match value {
+            Value::OwnedRegion { .. } | Value::OwnedSnapshot(_) => {
+                Err("owned regions require their private typed protocol".into())
+            }
             Value::CompositeSlice { .. } => Err("composite equality is unsupported".into()),
             Value::ScalarSlice { .. } => {
                 self.scalar_slice_select(value, &self.iterator_index(index as u128), conditions)

@@ -20,6 +20,9 @@ impl<'tcx> Engine<'tcx> {
         roots: &mut Vec<Value>,
     ) -> Result<(), String> {
         match value {
+            Value::OwnedRegion { .. } | Value::OwnedSnapshot(_) => {
+                return Err("owned regions require their private typed protocol".into());
+            }
             Value::MaybeUninit { payload, .. } => {
                 if let Some(payload) = payload {
                     Self::collect_static_store_references(payload, roots)?;

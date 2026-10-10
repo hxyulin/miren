@@ -225,7 +225,7 @@ impl<'tcx> Engine<'tcx> {
         if let Some(element) = self.cell_element(receiver_ty) {
             let result = match (name.as_str(), values) {
                 ("new", [value]) => {
-                    if state.memory.len() >= 512 {
+                    if state.memory.storage_slots() >= 512 {
                         return Err("memory allocation budget reached".to_owned());
                     }
                     let allocation = state.memory.len();
@@ -279,7 +279,7 @@ impl<'tcx> Engine<'tcx> {
             if (actual_bits, actual_signed) != (bits, signed) {
                 return Err("atomic constructor value type mismatch".into());
             }
-            if state.memory.len() >= 512 {
+            if state.memory.storage_slots() >= 512 {
                 return Err("memory allocation budget reached".into());
             }
             let allocation = state.memory.len();

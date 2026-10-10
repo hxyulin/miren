@@ -684,6 +684,9 @@ mod tests {
                     resolved_contracts: BTreeMap::new(),
                     solver: std::cell::RefCell::new(Solver::with_limits(limits)),
                     coroutine_places: Default::default(),
+                    owned_box_types: Vec::new(),
+                    next_owned_region: 0,
+                    owned_box_constructors: Vec::new(),
                     bodies: std::cell::RefCell::new(std::collections::HashMap::new()),
                     call_signatures: std::cell::RefCell::new(std::collections::HashMap::new()),
                     proof: Proof {

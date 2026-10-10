@@ -17,9 +17,20 @@ impl StaticLocation {
     }
 }
 
+#[derive(Clone, Debug)]
+pub(super) struct OwnedRegion {
+    pub(super) key: u64,
+    pub(super) certificate: usize,
+    pub(super) payload: Option<Value>,
+    pub(super) construction: Option<usize>,
+    pub(super) sealed: bool,
+    pub(super) live: bool,
+}
+
 #[derive(Clone, Default)]
 pub(super) struct Memory {
     allocations: Rc<Vec<Option<Value>>>,
+    pub(super) owned_regions: Rc<Vec<OwnedRegion>>,
     pub(super) missing_places: initialized_places::MissingPlaces,
     pub(super) startup_values: std::collections::HashMap<StaticLocation, Value>,
     pub(super) startup_invalidated: bool,
@@ -29,6 +40,104 @@ pub(super) struct Memory {
 }
 
 impl Memory {
+    pub(super) fn storage_slots(&self) -> usize {
+        self.allocations
+            .len()
+            .saturating_add(self.owned_regions.len())
+    }
+
+    pub(super) fn owned_region(
+        &self,
+        key: u64,
+        certificate: usize,
+    ) -> Result<&OwnedRegion, String> {
+        self.owned_regions
+            .iter()
+            .find(|region| region.key == key && region.certificate == certificate && region.live)
+            .ok_or_else(|| "owned region is unavailable or has different type identity".into())
+    }
+
+    pub(super) fn owned_region_mut(
+        &mut self,
+        key: u64,
+        certificate: usize,
+    ) -> Result<&mut OwnedRegion, String> {
+        Rc::make_mut(&mut self.owned_regions)
+            .iter_mut()
+            .find(|region| region.key == key && region.certificate == certificate && region.live)
+            .ok_or_else(|| "owned region is unavailable or has different type identity".into())
+    }
+
+    pub(super) fn issue_owned_region(
+        &mut self,
+        key: u64,
+        certificate: usize,
+    ) -> Result<(), String> {
+        if self.storage_slots() >= super::memory::MAX_ALLOCATIONS {
+            return Err("owned region exceeds the cumulative 512-storage budget".into());
+        }
+        if self.owned_regions.iter().any(|region| region.key == key) {
+            return Err("owned region identity has already been issued".into());
+        }
+        Rc::make_mut(&mut self.owned_regions).push(OwnedRegion {
+            key,
+            certificate,
+            payload: None,
+            construction: None,
+            sealed: false,
+            live: true,
+        });
+        Ok(())
+    }
+
+    pub(super) fn initialize_owned_region(
+        &mut self,
+        key: u64,
+        certificate: usize,
+        payload: Value,
+    ) -> Result<(), String> {
+        let region = self.owned_region_mut(key, certificate)?;
+        if region.sealed || region.payload.is_some() {
+            return Err("owned constructor payload has already been initialized".into());
+        }
+        region.payload = Some(payload);
+        Ok(())
+    }
+
+    pub(super) fn seal_owned_region(&mut self, key: u64, certificate: usize) -> Result<(), String> {
+        let region = self.owned_region_mut(key, certificate)?;
+        if region.sealed || region.payload.is_none() {
+            return Err("owned constructor requires exactly one initialized payload".into());
+        }
+        region.sealed = true;
+        Ok(())
+    }
+
+    pub(super) fn owned_region_payload(
+        &self,
+        key: u64,
+        certificate: usize,
+    ) -> Result<&Value, String> {
+        let region = self.owned_region(key, certificate)?;
+        if !region.sealed {
+            return Err("owned constructor has not sealed its payload".into());
+        }
+        region
+            .payload
+            .as_ref()
+            .ok_or_else(|| "owned payload is unavailable".into())
+    }
+
+    pub(super) fn retire_owned_region(
+        &mut self,
+        key: u64,
+        certificate: usize,
+    ) -> Result<(), String> {
+        self.owned_region_payload(key, certificate)?;
+        self.owned_region_mut(key, certificate)?.live = false;
+        Ok(())
+    }
+
     pub(super) fn startup_initializer_available(&self, location: StaticLocation) -> bool {
         !self.startup_invalidated
             && !self
@@ -139,6 +248,50 @@ mod tests {
                 Some(Value::Reference { allocation: 1, .. })
             ));
         }
+    }
+
+    #[test]
+    fn owned_region_phases_and_retirement_preserve_branch_identity() {
+        let mut original = Memory::default();
+        original.issue_owned_region(17, 3).unwrap();
+        assert!(original.owned_region_payload(17, 3).is_err());
+        assert!(original.seal_owned_region(17, 3).is_err());
+        assert!(original.owned_region(17, 4).is_err());
+        assert!(original.issue_owned_region(17, 4).is_err());
+        original
+            .initialize_owned_region(17, 3, Value::Unit)
+            .unwrap();
+        assert!(
+            original
+                .initialize_owned_region(17, 3, Value::Unit)
+                .is_err()
+        );
+        original.seal_owned_region(17, 3).unwrap();
+        assert!(original.seal_owned_region(17, 3).is_err());
+        let mut branch = original.clone();
+        assert!(Rc::ptr_eq(&original.owned_regions, &branch.owned_regions));
+        branch.retire_owned_region(17, 3).unwrap();
+        assert!(branch.owned_region_payload(17, 3).is_err());
+        assert!(branch.retire_owned_region(17, 3).is_err());
+        assert!(branch.issue_owned_region(17, 3).is_err());
+        assert!(matches!(
+            original.owned_region_payload(17, 3),
+            Ok(Value::Unit)
+        ));
+        assert!(!Rc::ptr_eq(&original.owned_regions, &branch.owned_regions));
+        assert!(Rc::ptr_eq(&original.allocations, &branch.allocations));
+        assert_eq!(original.len(), 0);
+        assert_eq!(original.storage_slots(), 1);
+    }
+
+    #[test]
+    fn owned_regions_share_the_existing_storage_budget_with_frames() {
+        let mut memory: Memory = vec![Some(Value::Unit); 511].into();
+        memory.issue_owned_region(1, 0).unwrap();
+        assert_eq!(memory.storage_slots(), 512);
+        assert!(memory.issue_owned_region(2, 0).is_err());
+        let mut memory: Memory = vec![Some(Value::Unit); 512].into();
+        assert!(memory.issue_owned_region(1, 0).is_err());
     }
 
     #[test]

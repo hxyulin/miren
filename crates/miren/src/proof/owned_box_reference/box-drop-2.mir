@@ -1,0 +1,108 @@
+args=1 spread=None
+local _0 Mut () user=None
+local _1 Not &'{erased} mut alloc::boxed::Box<T/#0, A/#1> user=None
+local _2 Not core::alloc::Layout user=None
+local _3 Mut *const T/#0 user=None
+local _4 Mut *mut T/#0 user=None
+local _5 Mut &'{erased} core::alloc::Layout user=None
+local _6 Not () user=None
+local _7 Mut &'{erased} A/#1 user=None
+local _8 Mut usize user=None
+local _9 Mut core::mem::Alignment user=None
+local _10 Not usize user=None
+local _11 Not () user=None
+local _12 Not () user=None
+local _13 Mut core::ptr::NonNull<u8> user=None
+local _14 Mut *mut u8 user=None
+local _15 Not core::ptr::NonNull<T/#0> user=None
+local _16 Not core::marker::PhantomData<T/#0> user=None
+block bb0 cleanup=false
+StorageLive(_15)
+StorageLive(_16)
+assign local=_15 path=[]
+use Yes
+copy _1/[Deref, Field(0, core::ptr::Unique<T/#0>), Field(0, core::ptr::NonNull<T/#0>)]
+assign local=_16 path=[]
+use Yes
+copy _1/[Deref, Field(0, core::ptr::Unique<T/#0>), Field(1, core::marker::PhantomData<T/#0>)]
+StorageLive(_2)
+StorageLive(_3)
+assign local=_4 path=[]
+cast Transmute target=*mut T/#0
+copy _15/[]
+assign local=_3 path=[]
+cast Transmute target=*const T/#0
+copy _15/[]
+StorageLive(_9)
+call core::intrinsics::size_of_val::<T> destination=_8/[] target=Some(bb4) unwind=Unreachable so
+  | urce=Normal
+const-value ZeroSized FnDef(DefId(core::intrinsics::size_of_val), Binder { value: [T/#0], bound_
+  | vars: [] })
+copy _3/[]
+block bb1 cleanup=false
+StorageLive(_7)
+assign local=_7 path=[]
+ref '{erased} Shared local=_1 path=[Deref, Field(1, A/#1)]
+StorageLive(_14)
+assign local=_14 path=[]
+cast PtrToPtr target=*mut u8
+copy _4/[]
+assign local=_13 path=[]
+cast Transmute target=core::ptr::NonNull<u8>
+copy _14/[]
+StorageDead(_14)
+call <A as core::alloc::Allocator>::deallocate destination=_6/[] target=Some(bb2) unwind=Unreach
+  | able source=Normal
+const-value ZeroSized FnDef(DefId(core::alloc::Allocator::deallocate), Binder { value: [A/#1], b
+  | ound_vars: [] })
+move _7/[]
+move _13/[]
+move _2/[]
+block bb2 cleanup=false
+StorageDead(_7)
+goto -> bb3
+block bb3 cleanup=false
+StorageDead(_2)
+StorageDead(_15)
+StorageDead(_16)
+return
+block bb4 cleanup=false
+StorageLive(_10)
+call core::intrinsics::align_of_val::<T> destination=_10/[] target=Some(bb5) unwind=Unreachable
+  > U+0020
+  | source=Normal
+const-value ZeroSized FnDef(DefId(core::intrinsics::align_of_val), Binder { value: [T/#0], bound
+  | _vars: [] })
+move _3/[]
+block bb5 cleanup=false
+switch SwitchTargets { values: [Pu128(0)], targets: [bb7, bb6] }
+runtime-checks UbChecks
+block bb6 cleanup=false
+call core::mem::Alignment::new_unchecked::precondition_check destination=_11/[] target=Some(bb7)
+  |  unwind=Unreachable source=Normal
+const-value ZeroSized FnDef(DefId(core::mem::alignment::{impl#0}::new_unchecked::precondition_ch
+  | eck), Binder { value: [], bound_vars: [] })
+copy _10/[]
+block bb7 cleanup=false
+assign local=_9 path=[]
+cast Transmute target=core::mem::Alignment
+copy _10/[]
+StorageDead(_10)
+switch SwitchTargets { values: [Pu128(0)], targets: [bb9, bb8] }
+runtime-checks UbChecks
+block bb8 cleanup=false
+call core::alloc::Layout::from_size_alignment_unchecked::precondition_check destination=_12/[] t
+  | arget=Some(bb9) unwind=Unreachable source=Normal
+const-value ZeroSized FnDef(DefId(core::alloc::layout::{impl#0}::from_size_alignment_unchecked::
+  | precondition_check), Binder { value: [], bound_vars: [] })
+copy _8/[]
+copy _9/[]
+block bb9 cleanup=false
+assign local=_2 path=[]
+aggregate Adt(DefId(core::alloc::layout::Layout), 0, [], None, None)
+copy _8/[]
+copy _9/[]
+StorageDead(_9)
+StorageDead(_3)
+switch SwitchTargets { values: [Pu128(0)], targets: [bb3, bb1] }
+copy _8/[]

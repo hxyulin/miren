@@ -1,0 +1,25 @@
+args=1 spread=None
+local _0 Mut () user=None
+local _1 Not &'{erased} mut alloc::boxed::Box<(), alloc::alloc::Global> user=None
+local _2 Mut &'{erased} mut alloc::boxed::Box<(), alloc::alloc::Global> user=None
+local _3 Mut () user=None
+local _4 Mut &'{erased} mut alloc::boxed::Box<(), alloc::alloc::Global> user=None
+local _5 Mut () user=None
+local _6 Mut *const () user=None
+block bb0 cleanup=false
+assign local=_6 path=[]
+cast Transmute target=*const ()
+copy _1/[Deref, Field(0, core::ptr::Unique<()>), Field(0, core::ptr::NonNull<()>)]
+drop _6/[Deref] target=bb2 unwind=Unreachable replace=false async=None
+block bb1 cleanup=false
+return
+block bb2 cleanup=false
+assign local=_2 path=[]
+use Yes
+copy _1/[]
+call <alloc::boxed::Box<()> as core::ops::Drop>::drop destination=_3/[] target=Some(bb1) unwind=
+  | Unreachable source=Misc
+const-value ZeroSized FnDef(DefId(core::ops::drop::Drop::drop), Binder { value: [alloc::boxed::B
+  | ox<(), alloc::alloc::Global>], bound_vars: [Region(BrNamed(DefId(core::ops::drop::Drop::drop::'_
+  | )))] })
+move _2/[]

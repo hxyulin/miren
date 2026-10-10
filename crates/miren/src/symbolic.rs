@@ -40,8 +40,24 @@ pub enum ScalarSliceElement {
     Char,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum OwnedRegionKind {
+    Owner,
+    BorrowedOwner,
+    ConstructorPointer,
+    Unique,
+    Pointer,
+    Shared,
+}
+
 #[derive(Clone, Debug)]
 pub enum Value {
+    OwnedRegion {
+        key: u64,
+        certificate: usize,
+        kind: OwnedRegionKind,
+    },
+    OwnedSnapshot(Box<Value>),
     Uninitialized,
     MaybeUninit {
         id: usize,
@@ -189,7 +205,9 @@ impl Value {
                     size.checked_add(value.owned_repeat_size()?)
                         .filter(|size| *size <= MAX_REPEAT_VALUES)
                 }),
-            Self::CompositeSlice { .. }
+            Self::OwnedRegion { .. }
+            | Self::OwnedSnapshot(_)
+            | Self::CompositeSlice { .. }
             | Self::ScalarSlice { .. }
             | Self::MaybeUninit { .. }
             | Self::Cell { .. }
@@ -241,7 +259,9 @@ impl Value {
             | Self::Unit
             | Self::Elements(_)
             | Self::Adt { .. } => Some(1),
-            Self::CompositeSlice { .. }
+            Self::OwnedRegion { .. }
+            | Self::OwnedSnapshot(_)
+            | Self::CompositeSlice { .. }
             | Self::ScalarSlice { .. }
             | Self::MaybeUninit { .. }
             | Self::Cell { .. }
@@ -298,7 +318,9 @@ impl Value {
             | Self::Bytes { .. }
             | Self::RawPointer { .. }
             | Self::Unit => self.owned_repeat_size(),
-            Self::CompositeSlice { .. }
+            Self::OwnedRegion { .. }
+            | Self::OwnedSnapshot(_)
+            | Self::CompositeSlice { .. }
             | Self::ScalarSlice { .. }
             | Self::MaybeUninit { .. }
             | Self::Cell { .. }
@@ -325,7 +347,7 @@ impl Value {
             Self::MaybeUninit { payload, .. } => {
                 payload.as_ref().is_some_and(|v| v.contains_mutable())
             }
-            Self::Input(_) => false,
+            Self::OwnedRegion { .. } | Self::OwnedSnapshot(_) | Self::Input(_) => false,
             Self::Reference { mutable: true, .. } => true,
             Self::StaticSlice { mutable, .. } => *mutable,
             Self::SliceIterator {
@@ -381,7 +403,9 @@ impl Value {
             | Self::DebugReference { source, .. } => source.contains_local_atomic(),
             Self::TrackedPointer { reference, .. } => reference.contains_local_atomic(),
             Self::RawSlice { source, .. } => source.contains_local_atomic(),
-            Self::Input(_)
+            Self::OwnedRegion { .. }
+            | Self::OwnedSnapshot(_)
+            | Self::Input(_)
             | Self::Bool(_)
             | Self::Int { .. }
             | Self::Float { .. }

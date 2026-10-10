@@ -1,0 +1,104 @@
+args=2 spread=None
+local _0 Mut () user=None
+local _1 Not usize user=None
+local _2 Not core::mem::Alignment user=None
+local _3 Mut bool user=None
+local _4 Not &'{erased} str user=None
+local _5 Not ! user=None
+local _6 Mut core::fmt::Arguments<'{erased}> user=None
+local _7 Mut usize user=None
+local _8 Mut usize user=None
+local _9 Mut core::ptr::NonNull<u8> user=None
+local _10 Mut *const u8 user=None
+local _11 Mut core::ptr::NonNull<core::fmt::rt::Argument<'{erased}>> user=None
+local _12 Mut usize user=None
+local _13 Mut usize user=None
+local _14 Mut usize user=None
+local _15 Mut *const str user=None
+local _16 Not &'{erased} [u8] user=None
+block bb0 cleanup=false
+StorageLive(_3)
+StorageLive(_7)
+StorageLive(_8)
+assign local=_8 path=[]
+cast Transmute target=usize
+copy _2/[]
+assign local=_7 path=[]
+binary SubUnchecked
+const-value Scalar(0x8000000000000000) usize
+move _8/[]
+StorageDead(_8)
+assign local=_3 path=[]
+binary Le
+copy _1/[]
+move _7/[]
+StorageDead(_7)
+switch SwitchTargets { values: [Pu128(0)], targets: [bb2, bb1] }
+move _3/[]
+block bb1 cleanup=false
+StorageDead(_3)
+return
+block bb2 cleanup=false
+assign local=_4 path=[]
+use Yes
+const-string "unsafe precondition(s) violated: Layout::from_size_alignment_unchecked requires th
+  | at the rounded-up allocation size does not exceed isize::MAX\n\nThis indicates a bug in the prog
+  | ram. This Undefined Behavior check is optional, and cannot be relied on for safety." &'{erased}
+  > U+0020
+  | str
+StorageLive(_6)
+StorageLive(_9)
+StorageLive(_10)
+StorageLive(_15)
+assign local=_15 path=[]
+raw Const local=_4 path=[Deref]
+assign local=_10 path=[]
+cast PtrToPtr target=*const u8
+copy _15/[]
+StorageDead(_15)
+assign local=_9 path=[]
+cast Transmute target=core::ptr::NonNull<u8>
+copy _10/[]
+StorageDead(_10)
+StorageLive(_11)
+StorageLive(_12)
+StorageLive(_13)
+StorageLive(_14)
+StorageLive(_16)
+assign local=_16 path=[]
+cast Transmute target=&'{erased} [u8]
+const-string "unsafe precondition(s) violated: Layout::from_size_alignment_unchecked requires th
+  | at the rounded-up allocation size does not exceed isize::MAX\n\nThis indicates a bug in the prog
+  | ram. This Undefined Behavior check is optional, and cannot be relied on for safety." &'{erased}
+  > U+0020
+  | str
+assign local=_14 path=[]
+unary PtrMetadata
+copy _16/[]
+StorageDead(_16)
+assign local=_13 path=[]
+binary Shl
+move _14/[]
+const-value Scalar(0x00000001) i32
+StorageDead(_14)
+assign local=_12 path=[]
+binary BitOr
+move _13/[]
+const-value Scalar(0x0000000000000001) usize
+StorageDead(_13)
+assign local=_11 path=[]
+cast Transmute target=core::ptr::NonNull<core::fmt::rt::Argument<'{erased}>>
+move _12/[]
+StorageDead(_12)
+assign local=_6 path=[]
+aggregate Adt(DefId(core::fmt::Arguments), 0, ['{erased}], None, None)
+move _9/[]
+move _11/[]
+StorageDead(_11)
+StorageDead(_9)
+call core::panicking::panic_nounwind_fmt destination=_5/[] target=None unwind=Unreachable source
+  | =Normal
+const-value ZeroSized FnDef(DefId(core::panicking::panic_nounwind_fmt), Binder { value: [], boun
+  | d_vars: [] })
+move _6/[]
+const-value Scalar(0x00) bool

@@ -63,6 +63,12 @@ mod mutable_slice_ranges;
 mod nominal_comparisons;
 mod nonzero_options;
 mod opaque_function_inputs;
+#[cfg(test)]
+mod owned_box_capture;
+mod owned_box_constructors;
+mod owned_box_references;
+mod owned_box_templates;
+mod owned_boxes;
 mod owned_iterators;
 mod owned_shared_projections;
 mod pointer_atomic_cas;
@@ -143,6 +149,9 @@ struct Engine<'tcx> {
     function_pointers: std::cell::RefCell<Vec<function_pointers::Target<'tcx>>>,
     static_addresses: std::collections::HashMap<DefId, Term>,
     maybe_uninit_types: Vec<Ty<'tcx>>,
+    owned_box_types: Vec<owned_boxes::BoxType<'tcx>>,
+    next_owned_region: u64,
+    owned_box_constructors: Vec<owned_box_constructors::Constructor<'tcx>>,
     scalar_slice_types: Vec<Ty<'tcx>>,
     composite_slice_types: Vec<composite_slices::CompositeType<'tcx>>,
     tracked_addresses: Vec<(tracked_pointers::AddressLocation<'tcx>, Term)>,
@@ -215,6 +224,9 @@ pub fn verify(
         static_addresses: std::collections::HashMap::new(),
         tracked_addresses: Vec::new(),
         maybe_uninit_types: Vec::new(),
+        owned_box_types: Vec::new(),
+        next_owned_region: 0,
+        owned_box_constructors: Vec::new(),
         scalar_slice_types: Vec::new(),
         composite_slice_types: Vec::new(),
         steps: 0,
@@ -483,6 +495,9 @@ impl<'tcx> Engine<'tcx> {
 
     fn input_binding(&mut self, name: &str, value: &Value) -> Result<(), String> {
         let description = match value {
+            Value::OwnedRegion { .. } | Value::OwnedSnapshot(_) => {
+                return Err("owned regions require their private typed protocol".into());
+            }
             Value::Input(input) => {
                 format!("lazy input; {} reserved symbol slots", input.shape.slots)
             }
@@ -1104,7 +1119,15 @@ impl<'tcx> Engine<'tcx> {
         if arguments.len() != body.arg_count {
             return Err("call arguments do not match the MIR body".to_owned());
         }
+        self.validate_owned_call_arguments(&arguments, &memory)?;
+        let initial_regions = memory.owned_regions.len();
+        let owned_arguments = if initial_regions == 0 {
+            Vec::new()
+        } else {
+            owned_boxes::owner_occurrences(&arguments)?
+        };
         for (local, value) in body.args_iter().zip(&arguments) {
+            self.owned_box_type_value(body.local_decls[local].ty, value, &memory)?;
             self.validate_readonly_slice_value(
                 body.local_decls[local].ty,
                 value,
@@ -1279,6 +1302,13 @@ impl<'tcx> Engine<'tcx> {
                     } else {
                         self.local(&state, 0)?
                     };
+                    self.owned_box_type_value(body.return_ty(), &value, &state.memory)?;
+                    self.validate_owned_exit(
+                        &state.memory,
+                        initial_regions,
+                        &owned_arguments,
+                        &value,
+                    )?;
                     self.validate_maybe_uninit_value(body.return_ty(), &value, &state.conditions)?;
                     self.validate_readonly_slice_value(
                         body.return_ty(),
@@ -1436,8 +1466,18 @@ impl<'tcx> Engine<'tcx> {
                     }
                     let mut values = args
                         .iter()
-                        .map(|arg| self.evaluate_operand(id, body, &mut state, &arg.node))
+                        .map(|arg| {
+                            self.evaluate_owned_call_operand(
+                                id,
+                                body,
+                                &mut state,
+                                instance,
+                                args.len(),
+                                &arg.node,
+                            )
+                        })
                         .collect::<Result<Vec<_>, _>>()?;
+                    self.validate_owned_call_arguments(&values, &state.memory)?;
                     let fn_trait = [LangItem::Fn, LangItem::FnMut, LangItem::FnOnce]
                         .iter()
                         .any(|item| {
@@ -1576,6 +1616,21 @@ impl<'tcx> Engine<'tcx> {
                         queue.push_back((target, state, retry_path.clone()));
                         continue;
                     }
+                    if !configured
+                        && let Some(value) =
+                            self.owned_box_call(&owned_body, block, instance, &values, &mut state)?
+                    {
+                        self.store_call_result(
+                            body,
+                            &mut state,
+                            *destination,
+                            destination_indices.as_ref(),
+                            value,
+                        )?;
+                        let target = target.ok_or("owned Box call has no normal return edge")?;
+                        queue.push_back((target, state, retry_path.clone()));
+                        continue;
+                    }
                     let argument_types: Vec<_> = args
                         .iter()
                         .map(|arg| arg.node.ty(&body.local_decls, self.tcx))
@@ -1697,6 +1752,22 @@ impl<'tcx> Engine<'tcx> {
                         queue.push_back((*target, state, retry_path.clone()));
                         continue;
                     }
+                    let private = self.raw_local(&state, place.local.as_usize())?;
+                    if matches!(private, Value::OwnedRegion { .. }) {
+                        let value = self.place(&state, *place)?;
+                        if !self.owned_box_drop(ty, &value, &mut state, id)? {
+                            return Err("owned-region destructor protocol is unavailable".into());
+                        }
+                        let fields = self.owned_field_footprint(body, *place)?;
+                        let local = place.local.as_usize();
+                        if let Some(allocation) = state.addresses[local] {
+                            state.memory.missing_places.consume(allocation, fields)?;
+                        } else {
+                            state.missing_places.consume(local, fields)?;
+                        }
+                        queue.push_back((*target, state, retry_path.clone()));
+                        continue;
+                    }
                     let coroutine_argument =
                         self.borrow_coroutine_carrier(body, &state, *place, true)?;
                     let dropped = if coroutine_argument.is_some() {
@@ -1809,7 +1880,7 @@ impl<'tcx> Engine<'tcx> {
             StatementKind::Assign(assignment) => {
                 let (place, value) = assignment.as_ref();
                 let value = self.rvalue(id, body, state, value)?;
-                self.store_assignment_value(body, state, *place, value)
+                self.store_assignment_value(body, state, *place, value, statement)
             }
             StatementKind::SetDiscriminant {
                 place,
@@ -1838,7 +1909,17 @@ impl<'tcx> Engine<'tcx> {
         state: &mut State,
         place: Place<'tcx>,
         value: Value,
+        occurrence: &StatementKind<'tcx>,
     ) -> Result<(), String> {
+        if self.owned_constructor_store(body, state, place, &value, occurrence)? {
+            return Ok(());
+        }
+        self.validate_borrowed_box_store(body, state, place, &value)?;
+        self.owned_box_type_value(
+            place.ty(&body.local_decls, self.tcx).ty,
+            &value,
+            &state.memory,
+        )?;
         self.validate_maybe_uninit_value(
             place.ty(&body.local_decls, self.tcx).ty,
             &value,
@@ -1961,6 +2042,9 @@ impl<'tcx> Engine<'tcx> {
         value: Value,
         projection: rustc_middle::mir::PlaceElem<'tcx>,
     ) -> Result<Value, String> {
+        if let Some(projected) = self.owned_box_project(&value, projection, &state.memory)? {
+            return Ok(projected);
+        }
         if matches!(value, Value::StaticSlice { .. }) {
             self.validate_tracked_value(&value, state)?;
         }
@@ -2137,6 +2221,11 @@ impl<'tcx> Engine<'tcx> {
         match operand {
             Operand::Copy(place) | Operand::Move(place) => {
                 let value = self.read_place(state, *place, Some(body))?;
+                self.owned_box_type_value(
+                    place.ty(&body.local_decls, self.tcx).ty,
+                    &value,
+                    &state.memory,
+                )?;
                 self.validate_maybe_uninit_value(
                     place.ty(&body.local_decls, self.tcx).ty,
                     &value,
@@ -2233,9 +2322,9 @@ impl<'tcx> Engine<'tcx> {
         id: DefId,
         body: &Body<'tcx>,
         state: &mut State,
-        value: &Rvalue<'tcx>,
+        rvalue: &Rvalue<'tcx>,
     ) -> Result<Value, String> {
-        match value {
+        match rvalue {
             Rvalue::Use(operand, retag) => {
                 let narrowed = if let Operand::Copy(place) = operand
                     && retag.no()
@@ -2258,6 +2347,9 @@ impl<'tcx> Engine<'tcx> {
                 Ok(value)
             }
             Rvalue::Ref(_, BorrowKind::Shared, place) => {
+                if let Some(value) = self.owned_box_shared_borrow(state, *place, false)? {
+                    return Ok(value);
+                }
                 if let Some(value) = self.borrow_coroutine_carrier(body, state, *place, false)? {
                     return Ok(value);
                 }
@@ -2289,6 +2381,9 @@ impl<'tcx> Engine<'tcx> {
                 }
             }
             Rvalue::Ref(_, BorrowKind::Mut { .. }, place) => {
+                if let Some(value) = self.owned_box_shared_borrow(state, *place, true)? {
+                    return Ok(value);
+                }
                 if let Some(value) = self.borrow_coroutine_carrier(body, state, *place, true)? {
                     Ok(value)
                 } else {
@@ -2304,6 +2399,7 @@ impl<'tcx> Engine<'tcx> {
                 kind @ (rustc_middle::mir::RawPtrKind::Const | rustc_middle::mir::RawPtrKind::Mut),
                 place,
             ) => {
+                self.validate_owned_raw_borrow(state, *place)?;
                 let value = self.place(state, *place)?;
                 if matches!(value, Value::StaticView { .. }) {
                     self.raw_static_view(&value, state)
@@ -2350,7 +2446,7 @@ impl<'tcx> Engine<'tcx> {
             }
             Rvalue::Discriminant(place) => {
                 let (bits, signed) = self
-                    .integer_type(value.ty(&body.local_decls, self.tcx))
+                    .integer_type(rvalue.ty(&body.local_decls, self.tcx))
                     .ok_or("unsupported discriminant type")?;
                 let ty = place.ty(&body.local_decls, self.tcx).ty;
                 if ty.is_coroutine()
@@ -2579,6 +2675,12 @@ impl<'tcx> Engine<'tcx> {
             ) => {
                 let source = operand.ty(&body.local_decls, self.tcx);
                 let value = self.evaluate_operand(id, body, state, operand)?;
+                if let Some(value) = self.owned_constructor_cast(body, state, rvalue, &value)? {
+                    return Ok(value);
+                }
+                if matches!(value, Value::OwnedRegion { .. }) {
+                    return Err("logical owned regions do not grant generic pointer casts".into());
+                }
                 if matches!(value, Value::StaticView { .. }) {
                     if *kind == CastKind::PointerExposeProvenance {
                         self.record_model(
@@ -2632,9 +2734,20 @@ impl<'tcx> Engine<'tcx> {
                 )?;
                 Ok(self.materialize_float(value))
             }
+            Rvalue::Cast(CastKind::BoxDerefTransmute, operand, target) => {
+                let source = operand.ty(&body.local_decls, self.tcx);
+                let value = self.evaluate_operand(id, body, state, operand)?;
+                self.owned_box_deref_cast(source, *target, &value, &state.memory)
+            }
             Rvalue::Cast(CastKind::Transmute, operand, target) => {
                 let source = operand.ty(&body.local_decls, self.tcx);
                 let value = self.evaluate_operand(id, body, state, operand)?;
+                if let Some(value) = self.owned_constructor_cast(body, state, rvalue, &value)? {
+                    return Ok(value);
+                }
+                if matches!(value, Value::OwnedRegion { .. }) {
+                    return Err("logical owned regions do not grant generic transmute".into());
+                }
                 if let Some(value) =
                     self.char_transmute(source, *target, &value, &state.conditions)?
                 {

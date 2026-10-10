@@ -11,8 +11,8 @@ execution at O0 and O2, positive/refuted/unknown controls, a source mutation tha
 structured UNKNOWN reporting, and passing repository checks. Completion establishes a repeatable
 baseline. It does not establish full Rust support or a completed memory-model refactor.
 
-The manifest contains 155 cases across 53 families. Each build configuration expects 61 PROVED,
-54 REFUTED and 40 UNKNOWN results. Stage 133 originally had 23 cases with 10 PROVED, 9 REFUTED
+The manifest contains 158 cases across 54 families. Each build configuration expects 62 PROVED,
+55 REFUTED and 41 UNKNOWN results. Stage 133 originally had 23 cases with 10 PROVED, 9 REFUTED
 and 4 UNKNOWN; stage 134 closed its retained-prefix projection gap. Stage 136 adds raw-pointer
 metadata P/R controls and a safe core reference-array grant that remains UNKNOWN without a
 temporal permission certificate. Stage 137 adds tuple-array P/R and unsupported symbolic-write
@@ -698,7 +698,7 @@ The committed-parent before captures remain at `/tmp/miren-stage185-before`.
 Focused fidelity preserves 176 status/detail/premise pairs and all 216 queries byte for byte.
 Of 132 completed root/profile pairs, 116 have queries and sixteen are query-free. Evidence remains
 at `/tmp/miren-stage185-query-fidelity`. The global fixture,
-manifest and runner remain unchanged: 155 cases in 53 families. This dedicated external-domain
+manifest and runner remain unchanged: 158 cases in 54 families. This dedicated external-domain
 matrix is separate from that global inventory. No assumptions, input caps, compiler-special type
 rights, write permissions or increased resource budgets are introduced. Integrated full validation
 and fresh-main checks follow the frozen focused captures.
@@ -728,3 +728,53 @@ hashes are verified. Fresh release captures of the complete external matrix rema
 original frozen-author execution scope. Initial failing logs remain preserved. The global
 manifest stays at 155 cases in 53 families; no assumptions, input caps, firmware rewrites or
 increased resource budgets are introduced.
+
+
+Stage 182 adds exact locally constructed `Box<(), Global>` ownership. Private branch-local
+regions track initialization, sealing, liveness and retirement separately from frame storage.
+Original compiler Box/Global identities, Unit type and layout (size zero, alignment one), selected
+constructor/dereference/destructor bodies and complete effect certificates are required. The
+actual zero-size allocation branch cannot reach allocator or OOM calls. Initialization is tied
+to its exact source occurrence, including the certified optimized Unit-store lowering. Region
+identity grants no numeric address, pointer inequality or raw-access right.
+
+Move transfers one owner; destruction retires the region and retained executable borrows.
+Ghost observations detach Unit without executable ownership. Borrowed virtual owners remain in
+authenticated private readonly temporaries. Mutable borrowing, raw exposure, ordinary owner Copy
+and escape stay UNKNOWN. The narrow consuming optimizer Copy boundary is certified against the
+actual Unit mem::drop call. Non-Unit payloads, general ZST structs, nonzero allocation, raw
+constructors and general heap mutation remain unsupported. Existing cumulative budgets apply.
+
+The dedicated 23-root matrix yields seven PROVED, three REFUTED and thirteen UNKNOWN per host/ARM
+O0/O2 profile. Actual selected-helper mutation 19 to 20 refutes the unchanged claim with body entry
+and query/model on the failing obligation. Safe native originals pass seven tests; the mutant
+exits 101 at O0/O2 with ten-second limits. Current captures remain at
+`/tmp/miren-stage182-parent185-final-evidence`; unchanged native records retain their historical
+execution scope. All 92 refreshed original proof objects exactly match historical parent-183
+captures. Old source, binary, freeze and handoff remain at
+`/tmp/miren-stage182-historical-parent183`. Exact-source before captures under committed Stage 185
+return UNKNOWN for all 23 roots in four profiles at
+`/tmp/miren-stage182-parent185-before-final-source`. Historical async/induction fidelity preserves
+136 outcome pairs and 72 query identities under its original parent-183 scope.
+
+Actual compiler metadata and source/template corruption controls are separate from proof
+inventory. Global Unit P/R and non-Unit U controls have an independent actual-helper mutation and
+native guard at `/tmp/miren-stage182-global-after-evidence`. The non-Unit control reaches the exact
+Unit-payload admission refusal; it does not model allocator failure. The combined manifest has
+158 cases in 54 families. Integrated full validation follows the frozen captures. No assumptions,
+input caps, firmware rewrites or increased resource budgets are introduced.
+
+Final Stage 182 validation passes 751 Rust tests and 68 Python tests in the isolated workspace;
+fresh main passes 50 relevant Rust checks and 68 Python tests. Formatting, lint, workspace debug
+and release builds, documentation, dependency denial and manual hooks pass in both. All 810
+tracked files match byte for byte. Both surveys yield 248 PROVED, 220 REFUTED and 164 UNKNOWN:
+`/tmp/miren-stage182-capabilities-20261010` and
+`/tmp/miren-stage182-merged-capabilities-20261010`. All 460 previously completed parent roots
+retain identical outcomes, obligation details and queries. All 632 main/isolate outcomes, queries,
+models and premises match, with no diagnostic context differences. Source, input and release
+hashes are verified. Fresh release captures at `/tmp/miren-stage182-main-release-final-evidence`
+match 96 dedicated original and mutant proof objects after explicitly mapping source paths;
+unchanged native records retain their original execution scope. Global fresh release captures are
+at `/tmp/miren-stage182-global-final-evidence`. The historical author freeze remains immutable;
+a root README line reflow is recorded separately. No assumptions or resource budget changes are
+introduced.

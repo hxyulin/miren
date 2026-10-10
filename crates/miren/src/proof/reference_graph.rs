@@ -67,6 +67,24 @@ impl<'tcx> Engine<'tcx> {
             }
         }
         match value {
+            Value::OwnedRegion {
+                key,
+                certificate,
+                kind,
+            } => {
+                if initialized || *kind != symbolic::OwnedRegionKind::Owner {
+                    let region = state.memory.owned_region(*key, *certificate)?;
+                    if *kind != symbolic::OwnedRegionKind::ConstructorPointer {
+                        state.memory.owned_region_payload(*key, *certificate)?;
+                    } else if region.sealed {
+                        return Err("sealed owner cannot reuse a constructor pointer".into());
+                    }
+                }
+                Ok(())
+            }
+            Value::OwnedSnapshot(_) => {
+                Err("contract owned-region ghost is not an executable graph".into())
+            }
             Value::ScalarSlice { length, .. } | Value::CompositeSlice { length, .. } => {
                 Self::reference_graph(length, state, incoming, visited, initialized)
             }
@@ -280,6 +298,55 @@ mod tests {
         let error = Engine::validate_reference_graph(&pointer, &live, Some(0), &mut Vec::new())
             .unwrap_err();
         assert!(error.contains("frame-owned"));
+    }
+
+    #[test]
+    fn nonowning_heap_handles_remain_live_checked_in_lifetime_only_escape_scans() {
+        let mut state = state(vec![]);
+        state.memory.issue_owned_region(7, 3).unwrap();
+        state
+            .memory
+            .initialize_owned_region(7, 3, Value::Unit)
+            .unwrap();
+        state.memory.seal_owned_region(7, 3).unwrap();
+        for kind in [
+            symbolic::OwnedRegionKind::Shared,
+            symbolic::OwnedRegionKind::BorrowedOwner,
+            symbolic::OwnedRegionKind::Pointer,
+        ] {
+            let borrowed = Value::OwnedRegion {
+                key: 7,
+                certificate: 3,
+                kind,
+            };
+            Engine::reference_graph(&borrowed, &state, Some(0), &mut Vec::new(), false).unwrap();
+        }
+        state.memory.retire_owned_region(7, 3).unwrap();
+        for kind in [
+            symbolic::OwnedRegionKind::Shared,
+            symbolic::OwnedRegionKind::BorrowedOwner,
+            symbolic::OwnedRegionKind::Pointer,
+        ] {
+            let borrowed = Value::OwnedRegion {
+                key: 7,
+                certificate: 3,
+                kind,
+            };
+            assert!(
+                Engine::reference_graph(&borrowed, &state, Some(0), &mut Vec::new(), false)
+                    .is_err()
+            );
+        }
+        let consumed_owner = Value::OwnedRegion {
+            key: 7,
+            certificate: 3,
+            kind: symbolic::OwnedRegionKind::Owner,
+        };
+        Engine::reference_graph(&consumed_owner, &state, Some(0), &mut Vec::new(), false).unwrap();
+        assert!(
+            Engine::validate_reference_graph(&consumed_owner, &state, None, &mut Vec::new())
+                .is_err()
+        );
     }
 
     #[test]

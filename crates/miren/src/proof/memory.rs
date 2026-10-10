@@ -80,6 +80,23 @@ impl<'tcx> Engine<'tcx> {
             return Err("memory snapshot nesting limit reached".to_owned());
         }
         match value {
+            Value::OwnedRegion { kind, .. } => {
+                self.validate_owned_region(value, memory)?;
+                if !matches!(
+                    kind,
+                    symbolic::OwnedRegionKind::Owner
+                        | symbolic::OwnedRegionKind::BorrowedOwner
+                        | symbolic::OwnedRegionKind::Shared
+                ) {
+                    return Err(
+                        "private constructor or pointer transport cannot become a ghost".into(),
+                    );
+                }
+                Ok(Value::OwnedSnapshot(Box::new(
+                    self.owned_region_read(value, memory)?,
+                )))
+            }
+            Value::OwnedSnapshot(_) => Ok(value.clone()),
             Value::CompositeSlice { .. } => {
                 self.composite_slice_length(value, conditions)?;
                 Ok(value.clone())
@@ -207,6 +224,9 @@ impl<'tcx> Engine<'tcx> {
                 .check_projection_initialization(*allocation, projection)
                 .map_err(|reason| self.categorized_error(UnknownCategory::Semantics, reason))?;
         }
+        if matches!(reference, Value::OwnedRegion { .. }) {
+            return self.owned_region_read(reference, memory);
+        }
         self.reference_storage(reference, memory, conditions)
     }
 
@@ -273,6 +293,20 @@ impl<'tcx> Engine<'tcx> {
             } else {
                 value = self.memory_projection(value, element, conditions)?;
             }
+        }
+        if matches!(
+            value,
+            Value::OwnedRegion {
+                kind: symbolic::OwnedRegionKind::Owner,
+                ..
+            }
+        ) {
+            return self.owned_region_rekind(
+                &value,
+                memory,
+                symbolic::OwnedRegionKind::Owner,
+                symbolic::OwnedRegionKind::BorrowedOwner,
+            );
         }
         Ok(value)
     }
@@ -939,7 +973,7 @@ impl<'tcx> Engine<'tcx> {
         let allocation = if let Some(allocation) = allocation {
             allocation
         } else {
-            if state.memory.len() >= MAX_ALLOCATIONS {
+            if state.memory.storage_slots() >= MAX_ALLOCATIONS {
                 return Err("memory allocation budget reached".to_owned());
             }
             let allocation = state.memory.len();
@@ -1255,7 +1289,7 @@ impl<'tcx> Engine<'tcx> {
         state: &State,
     ) -> Result<(Value, Memory), String> {
         self.validate_tracked_value(callback, state)?;
-        if state.memory.len() >= MAX_ALLOCATIONS {
+        if state.memory.storage_slots() >= MAX_ALLOCATIONS {
             return Err("memory allocation budget reached".to_owned());
         }
         let mut memory = state.memory.clone();
@@ -1296,6 +1330,13 @@ impl<'tcx> Engine<'tcx> {
             self.validate_static_initialization_graph(&value, state, &mut Vec::new())?;
         }
         match value {
+            value @ Value::OwnedRegion { .. } => {
+                self.owned_box_return(&value, &state.memory)?;
+                Ok(value)
+            }
+            Value::OwnedSnapshot(_) => {
+                Err("contract owned-region ghost cannot escape as a value".into())
+            }
             Value::CompositeSlice { .. } => {
                 Err("composite slice returns require retained caller provenance".into())
             }

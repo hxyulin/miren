@@ -43,6 +43,9 @@ impl<'tcx> Engine<'tcx> {
                 Err("typed owned projections are unsupported in induction".into())
             }
             Some((MemoryProjection::Field(index), rest)) => match storage {
+                Value::OwnedRegion { .. } | Value::OwnedSnapshot(_) => {
+                    Err("owned regions require their private typed protocol".into())
+                }
                 Value::Adt { fields, .. } => {
                     self.loop_write_projection(&mut fields[*index].1, rest, value, conditions)
                 }
@@ -80,6 +83,9 @@ impl<'tcx> Engine<'tcx> {
                 | Value::Unit => Err("unsupported inductive write field".into()),
             },
             Some((MemoryProjection::Variant(index), rest)) => match storage {
+                Value::OwnedRegion { .. } | Value::OwnedSnapshot(_) => {
+                    Err("owned regions require their private typed protocol".into())
+                }
                 Value::Enum { variants, .. } => {
                     self.loop_write_projection(&mut variants[*index], rest, value, conditions)
                 }
@@ -156,6 +162,9 @@ fn scalar_update(
     old: &Value,
 ) -> Result<Value, String> {
     match (new, old) {
+        (Value::OwnedRegion { .. } | Value::OwnedSnapshot(_), _) => {
+            Err("owned regions require their private typed protocol".into())
+        }
         (
             Value::Int {
                 expression: a,

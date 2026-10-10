@@ -584,6 +584,7 @@ fn contains_wrapper(value: &Value) -> bool {
     let mut pending = vec![value];
     while let Some(value) = pending.pop() {
         match value {
+            Value::OwnedRegion { .. } | Value::OwnedSnapshot(_) => return false,
             Value::MaybeUninit { .. } => return true,
             Value::Tuple(values) => pending.extend(values),
             Value::Enum {

@@ -1,0 +1,5 @@
+args=1 spread=None
+local _0 Mut () user=None
+local _1 Not &'{erased} mut T/#0 user=None
+block bb0 cleanup=false
+return

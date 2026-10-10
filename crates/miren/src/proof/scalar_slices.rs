@@ -429,6 +429,9 @@ impl<'tcx> Engine<'tcx> {
             return Err("scalar slice typed carrier nesting limit reached".into());
         }
         match value {
+            Value::OwnedRegion { .. } | Value::OwnedSnapshot(_) => {
+                return Err("owned regions require their private typed protocol".into());
+            }
             Value::CompositeSlice { id, .. } => {
                 let ty::Slice(ty) = expected.kind() else {
                     return Err(
@@ -845,6 +848,7 @@ impl<'tcx> Engine<'tcx> {
 
 fn contains_readonly_slice(value: &Value, memory: &Memory, visited: &mut Vec<usize>) -> bool {
     match value {
+        Value::OwnedRegion { .. } | Value::OwnedSnapshot(_) => false,
         Value::ScalarSlice { .. } | Value::CompositeSlice { .. } => true,
         Value::Reference { allocation, .. }
         | Value::Cell { allocation }

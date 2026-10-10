@@ -924,3 +924,25 @@ symbols, derive markers and field visibility do not replace this proof. Missing 
 remains unknown before empty, unequal-length or zero-field shortcuts. Separate identical-source
 retained/omitted dependency builds exercise this boundary; existing array casts, special types
 and nonstructural comparers remain unsupported.
+
+Exact `Box<(), Global>` construction now uses a complete compiler-backed semantic certificate for
+selected Box, Global and drop bodies. The certificate matches every executable MIR byte, checks
+actual core/alloc identities and original signatures, and derives the zero-size, alignment-one
+branches and their unreachable allocator/panic edges. Reported models distinguish this certificate
+from the actual user helper bodies that execute. Other payloads, including aligned zero-sized types,
+remain UNKNOWN.
+
+The resulting logical owned region has a distinct lifecycle from frame allocations and numeric
+addresses. Move transport preserves its identity; ordinary executable owner copies are refused.
+The selected `mem::drop` lowering may copy its single authenticated owner before retiring the same
+region. Automatic drop uses the selected drop-glue certificate. Readonly Unit borrows remain tied to
+that live region, and returned owners must account for every live region created or received by
+value. Detached contract snapshots confer no executable ownership or access rights. Constructors,
+owner transfer and drop retain the existing initialization masks and combined storage budget.
+
+Mutable borrows, raw/address exposure, pointer equality, arbitrary incoming Box handles, allocator
+failure paths, custom allocators, `leak` and `forget` are not admitted by this certificate. A
+readonly compiler-generated Box temporary cannot acquire mutable authority, move, escape as an
+owner, or become caller-owned storage. Duplicate drops and shared borrows escaping a retired
+region remain UNKNOWN. No allocation-success premise or raw-memory grant follows from a zero-sized
+payload.

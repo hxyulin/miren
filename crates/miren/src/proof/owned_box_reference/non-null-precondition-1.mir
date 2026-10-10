@@ -1,0 +1,94 @@
+args=1 spread=None
+local _0 Mut () user=None
+local _1 Not *mut () user=None
+local _2 Mut bool user=None
+local _3 Not &'{erased} str user=None
+local _4 Not ! user=None
+local _5 Mut core::fmt::Arguments<'{erased}> user=None
+local _6 Mut usize user=None
+local _7 Mut core::ptr::NonNull<u8> user=None
+local _8 Mut *const u8 user=None
+local _9 Mut core::ptr::NonNull<core::fmt::rt::Argument<'{erased}>> user=None
+local _10 Mut usize user=None
+local _11 Mut usize user=None
+local _12 Mut usize user=None
+local _13 Mut *const str user=None
+local _14 Not &'{erased} [u8] user=None
+block bb0 cleanup=false
+StorageLive(_2)
+StorageLive(_6)
+assign local=_6 path=[]
+cast Transmute target=usize
+copy _1/[]
+assign local=_2 path=[]
+binary Eq
+move _6/[]
+const-value Scalar(0x0000000000000000) usize
+StorageDead(_6)
+switch SwitchTargets { values: [Pu128(0)], targets: [bb2, bb1] }
+move _2/[]
+block bb1 cleanup=false
+assign local=_3 path=[]
+use Yes
+const-string "unsafe precondition(s) violated: NonNull::new_unchecked requires that the pointer
+  > U+0020
+  | is non-null\n\nThis indicates a bug in the program. This Undefined Behavior check is optional, a
+  | nd cannot be relied on for safety." &'{erased} str
+StorageLive(_5)
+StorageLive(_7)
+StorageLive(_8)
+StorageLive(_13)
+assign local=_13 path=[]
+raw Const local=_3 path=[Deref]
+assign local=_8 path=[]
+cast PtrToPtr target=*const u8
+copy _13/[]
+StorageDead(_13)
+assign local=_7 path=[]
+cast Transmute target=core::ptr::NonNull<u8>
+copy _8/[]
+StorageDead(_8)
+StorageLive(_9)
+StorageLive(_10)
+StorageLive(_11)
+StorageLive(_12)
+StorageLive(_14)
+assign local=_14 path=[]
+cast Transmute target=&'{erased} [u8]
+const-string "unsafe precondition(s) violated: NonNull::new_unchecked requires that the pointer
+  > U+0020
+  | is non-null\n\nThis indicates a bug in the program. This Undefined Behavior check is optional, a
+  | nd cannot be relied on for safety." &'{erased} str
+assign local=_12 path=[]
+unary PtrMetadata
+copy _14/[]
+StorageDead(_14)
+assign local=_11 path=[]
+binary Shl
+move _12/[]
+const-value Scalar(0x00000001) i32
+StorageDead(_12)
+assign local=_10 path=[]
+binary BitOr
+move _11/[]
+const-value Scalar(0x0000000000000001) usize
+StorageDead(_11)
+assign local=_9 path=[]
+cast Transmute target=core::ptr::NonNull<core::fmt::rt::Argument<'{erased}>>
+move _10/[]
+StorageDead(_10)
+assign local=_5 path=[]
+aggregate Adt(DefId(core::fmt::Arguments), 0, ['{erased}], None, None)
+move _7/[]
+move _9/[]
+StorageDead(_9)
+StorageDead(_7)
+call core::panicking::panic_nounwind_fmt destination=_4/[] target=None unwind=Unreachable source
+  | =Normal
+const-value ZeroSized FnDef(DefId(core::panicking::panic_nounwind_fmt), Binder { value: [], boun
+  | d_vars: [] })
+move _5/[]
+const-value Scalar(0x00) bool
+block bb2 cleanup=false
+StorageDead(_2)
+return

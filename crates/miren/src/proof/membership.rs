@@ -203,6 +203,9 @@ impl<'tcx> Engine<'tcx> {
         }
         let mut member = self.terms.boolean(false);
         match &slice {
+            Value::OwnedRegion { .. } | Value::OwnedSnapshot(_) => {
+                return Err("owned regions require their private typed protocol".into());
+            }
             Value::Elements(elements) => {
                 if elements.len() > MAX_MEMBERSHIP_ELEMENTS {
                     return Err("slice membership exceeds the 128-element model budget".to_owned());

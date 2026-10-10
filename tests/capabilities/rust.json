@@ -856,6 +856,23 @@
       "expected": "unknown",
       "unknown_reason": "nominal comparison does not compute all corresponding field equalities",
       "unknown_category": "semantics"
+    },
+    {
+      "entry": "zst_box",
+      "family": "zst_box",
+      "expected": "proved"
+    },
+    {
+      "entry": "zst_box_wrong_claim",
+      "family": "zst_box",
+      "expected": "refuted"
+    },
+    {
+      "entry": "nonzero_box_unknown",
+      "family": "zst_box",
+      "expected": "unknown",
+      "unknown_reason": "owned Box constructor currently requires the exact Unit payload",
+      "unknown_category": "semantics"
     }
   ]
 }

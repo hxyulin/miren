@@ -1,0 +1,27 @@
+args=1 spread=None
+local _0 Mut alloc::boxed::Box<T/#0, alloc::alloc::Global> user=None
+local _1 Not T/#0 user=None
+local _2 Mut *mut T/#0 user=None
+local _3 Mut *mut u8 user=None
+block bb0 cleanup=false
+call alloc::boxed::box_new_uninit destination=_3/[] target=Some(bb1) unwind=Cleanup(bb3) source=
+  | Normal
+const-value ZeroSized FnDef(DefId(alloc::boxed::box_new_uninit), Binder { value: [], bound_vars:
+  |  [] })
+const-unevaluated UnevaluatedConst { def: DefId(core::mem::SizedTypeProperties::LAYOUT), args: [
+  | T/#0], promoted: None } core::alloc::Layout
+block bb1 cleanup=false
+assign local=_2 path=[]
+cast PtrToPtr target=*mut T/#0
+copy _3/[]
+assign local=_2 path=[Deref]
+use Yes
+move _1/[]
+assign local=_0 path=[]
+cast Transmute target=alloc::boxed::Box<T/#0, alloc::alloc::Global>
+copy _3/[]
+return
+block bb2 cleanup=true
+resume
+block bb3 cleanup=true
+drop _1/[] target=bb2 unwind=Terminate(InCleanup) replace=false async=None

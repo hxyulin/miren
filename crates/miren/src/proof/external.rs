@@ -206,6 +206,9 @@ impl<'tcx> Engine<'tcx> {
 
     fn invalidate_local_atomics(value: &Value, memory: &mut [Option<Value>]) -> Result<(), String> {
         match value {
+            Value::OwnedRegion { .. } | Value::OwnedSnapshot(_) => {
+                return Err("owned regions require their private typed protocol".into());
+            }
             Value::MaybeUninit { payload, .. } => {
                 if let Some(payload) = payload {
                     Self::invalidate_local_atomics(payload, memory)?;

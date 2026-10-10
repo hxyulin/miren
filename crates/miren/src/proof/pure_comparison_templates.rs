@@ -35,6 +35,10 @@ pub(super) fn definition_key(id: DefId) -> String {
     normalize_template(&format!("{id:?}"))
 }
 
+pub(super) fn owned_definition_key(id: DefId) -> String {
+    normalize_owned_template(&format!("{id:?}"), true)
+}
+
 const TEMPLATE_NODES: usize = 512;
 const TEMPLATE_DEPTH: usize = 16;
 const TEMPLATE_OPERAND_WORK: usize = TEMPLATE_NODES * 8;
@@ -71,6 +75,17 @@ pub(super) fn encode_template<'tcx>(
     body: &Body<'tcx>,
     core: rustc_span::def_id::CrateNum,
 ) -> Result<String, String> {
+    encode_template_with_alloc(tcx, body, core, None)
+}
+
+// The additional crate is supplied only by an independently authenticated owned-box family.
+// Existing pure comparison callers retain the exact single-core domain.
+pub(super) fn encode_template_with_alloc<'tcx>(
+    tcx: TyCtxt<'tcx>,
+    body: &Body<'tcx>,
+    core: rustc_span::def_id::CrateNum,
+    alloc: Option<rustc_span::def_id::CrateNum>,
+) -> Result<String, String> {
     if body.coroutine.is_some()
         || body.tainted_by_errors.is_some()
         || body.basic_blocks.len() > 128
@@ -79,7 +94,7 @@ pub(super) fn encode_template<'tcx>(
         return Err("comparison template exceeds its supported body domain".into());
     }
     template_work(body)?;
-    validate_template_core(body, core)?;
+    validate_template_core(body, core, alloc)?;
     let mut work = 0;
     let mut lines = vec![format!(
         "args={} spread={:?}",
@@ -119,25 +134,25 @@ pub(super) fn encode_template<'tcx>(
                         Rvalue::Aggregate(kind, operands) => {
                             lines.push(format!("aggregate {kind:?}"));
                             for operand in operands {
-                                lines.push(encode_operand(tcx, operand)?);
+                                lines.push(encode_operand(tcx, operand, alloc.is_some())?);
                             }
                         }
                         Rvalue::Use(operand, retag) => {
                             lines.push(format!("use {retag:?}"));
-                            lines.push(encode_operand(tcx, operand)?);
+                            lines.push(encode_operand(tcx, operand, alloc.is_some())?);
                         }
                         Rvalue::Cast(kind, operand, target) => {
                             lines.push(format!("cast {kind:?} target={:?}", target.kind()));
-                            lines.push(encode_operand(tcx, operand)?);
+                            lines.push(encode_operand(tcx, operand, alloc.is_some())?);
                         }
                         Rvalue::BinaryOp(op, operands) => {
                             lines.push(format!("binary {op:?}"));
-                            lines.push(encode_operand(tcx, &operands.0)?);
-                            lines.push(encode_operand(tcx, &operands.1)?);
+                            lines.push(encode_operand(tcx, &operands.0, alloc.is_some())?);
+                            lines.push(encode_operand(tcx, &operands.1, alloc.is_some())?);
                         }
                         Rvalue::UnaryOp(op, operand) => {
                             lines.push(format!("unary {op:?}"));
-                            lines.push(encode_operand(tcx, operand)?);
+                            lines.push(encode_operand(tcx, operand, alloc.is_some())?);
                         }
                         Rvalue::Discriminant(place) | Rvalue::CopyForDeref(place) => {
                             lines.push(format!(
@@ -156,6 +171,17 @@ pub(super) fn encode_template<'tcx>(
                 StatementKind::StorageLive(_)
                 | StatementKind::StorageDead(_)
                 | StatementKind::Nop => lines.push(format!("{:?}", statement.kind)),
+                StatementKind::Intrinsic(intrinsic) if alloc.is_some() => {
+                    match intrinsic.as_ref() {
+                        rustc_middle::mir::NonDivergingIntrinsic::Assume(operand) => {
+                            lines.push("assume".into());
+                            lines.push(encode_operand(tcx, operand, alloc.is_some())?);
+                        }
+                        rustc_middle::mir::NonDivergingIntrinsic::CopyNonOverlapping(_) => {
+                            return Err("owned template has an unsupported copy intrinsic".into());
+                        }
+                    }
+                }
                 StatementKind::FakeRead(_)
                 | StatementKind::SetDiscriminant { .. }
                 | StatementKind::PlaceMention(_)
@@ -173,25 +199,57 @@ pub(super) fn encode_template<'tcx>(
             return Err("comparison template exceeds its operation budget".into());
         }
         match &data.terminator().kind {
-            TerminatorKind::Call { func, args, destination, target, unwind, call_source, .. } => {
-                lines.push(format!("call {func:?} destination={:?}/{:?} target={target:?} unwind={unwind:?} source={call_source:?}", destination.local, destination.projection));
-                lines.push(encode_operand(tcx, func)?);
-                for argument in args { lines.push(encode_operand(tcx, &argument.node)?); }
+            TerminatorKind::Call {
+                func,
+                args,
+                destination,
+                target,
+                unwind,
+                call_source,
+                ..
+            } => {
+                lines.push(format!(
+                    concat!(
+                        "call {:?} destination={:?}/{:?} target={:?} ",
+                        "unwind={:?} source={:?}"
+                    ),
+                    func, destination.local, destination.projection, target, unwind, call_source,
+                ));
+                lines.push(encode_operand(tcx, func, alloc.is_some())?);
+                for argument in args {
+                    lines.push(encode_operand(tcx, &argument.node, alloc.is_some())?);
+                }
             }
-            TerminatorKind::Drop { place, target, unwind, replace, drop } => lines.push(format!(
-                "drop {:?}/{:?} target={target:?} unwind={unwind:?} replace={replace} async={drop:?}", place.local, place.projection)),
+            TerminatorKind::Drop {
+                place,
+                target,
+                unwind,
+                replace,
+                drop,
+            } => lines.push(format!(
+                "drop {:?}/{:?} target={:?} unwind={:?} replace={} async={:?}",
+                place.local, place.projection, target, unwind, replace, drop
+            )),
             TerminatorKind::SwitchInt { discr, targets } => {
                 lines.push(format!("switch {targets:?}"));
-                lines.push(encode_operand(tcx, discr)?);
+                lines.push(encode_operand(tcx, discr, alloc.is_some())?);
             }
-            TerminatorKind::Goto { .. } | TerminatorKind::Return | TerminatorKind::Unreachable
-            | TerminatorKind::UnwindResume | TerminatorKind::UnwindTerminate(_) =>
-                lines.push(format!("{:?}", data.terminator().kind)),
-            TerminatorKind::Assert { .. } | TerminatorKind::TailCall { .. }
-            | TerminatorKind::Yield { .. } | TerminatorKind::CoroutineDrop
-            | TerminatorKind::FalseEdge { .. } | TerminatorKind::FalseUnwind { .. }
-            | TerminatorKind::InlineAsm { .. } =>
-                return Err("comparison template has an unsupported terminator".into()),
+            TerminatorKind::Goto { .. }
+            | TerminatorKind::Return
+            | TerminatorKind::Unreachable
+            | TerminatorKind::UnwindResume
+            | TerminatorKind::UnwindTerminate(_) => {
+                lines.push(format!("{:?}", data.terminator().kind))
+            }
+            TerminatorKind::Assert { .. }
+            | TerminatorKind::TailCall { .. }
+            | TerminatorKind::Yield { .. }
+            | TerminatorKind::CoroutineDrop
+            | TerminatorKind::FalseEdge { .. }
+            | TerminatorKind::FalseUnwind { .. }
+            | TerminatorKind::InlineAsm { .. } => {
+                return Err("comparison template has an unsupported terminator".into());
+            }
         }
     }
     let bytes = lines.iter().try_fold(0usize, |bytes, line| {
@@ -200,14 +258,21 @@ pub(super) fn encode_template<'tcx>(
     if bytes.is_none_or(|bytes| bytes > TEMPLATE_BYTES) {
         return Err("comparison template exceeds its encoded byte budget".into());
     }
-    let encoded = wrap_template(&normalize_template(&lines.join("\n")))?;
+    let encoded = wrap_template(&normalize_owned_template(
+        &lines.join("\n"),
+        alloc.is_some(),
+    ))?;
     if encoded.len() > TEMPLATE_BYTES {
         return Err("comparison template exceeds its encoded byte budget".into());
     }
     Ok(encoded)
 }
 
-fn encode_operand<'tcx>(tcx: TyCtxt<'tcx>, operand: &Operand<'tcx>) -> Result<String, String> {
+fn encode_operand<'tcx>(
+    tcx: TyCtxt<'tcx>,
+    operand: &Operand<'tcx>,
+    alloc: bool,
+) -> Result<String, String> {
     Ok(match operand {
         Operand::Copy(place) => format!("copy {:?}/{:?}", place.local, place.projection),
         Operand::Move(place) => format!("move {:?}/{:?}", place.local, place.projection),
@@ -250,6 +315,10 @@ fn encode_operand<'tcx>(tcx: TyCtxt<'tcx>, operand: &Operand<'tcx>) -> Result<St
                     .map_err(|_| "comparison template string storage is not UTF-8")?;
                 format!("const-string {text:?} {:?}", ty.kind())
             }
+            rustc_middle::mir::Const::Val(
+                rustc_middle::mir::ConstValue::Indirect { alloc_id, offset },
+                original,
+            ) if alloc => encode_owned_constant(tcx, alloc_id, offset, original)?,
             rustc_middle::mir::Const::Val(value, ty) => {
                 if !matches!(
                     value,
@@ -264,6 +333,62 @@ fn encode_operand<'tcx>(tcx: TyCtxt<'tcx>, operand: &Operand<'tcx>) -> Result<St
         },
         Operand::RuntimeChecks(checks) => format!("runtime-checks {checks:?}"),
     })
+}
+
+fn encode_owned_constant<'tcx>(
+    tcx: TyCtxt<'tcx>,
+    id: rustc_middle::mir::interpret::AllocId,
+    offset: rustc_abi::Size,
+    original: Ty<'tcx>,
+) -> Result<String, String> {
+    use rustc_abi::Size;
+    use rustc_middle::mir::interpret::{GlobalAlloc, alloc_range};
+    let layout = tcx
+        .layout_of(ty::TypingEnv::fully_monomorphized().as_query_input(original))
+        .map_err(|_| "owned template constant has unavailable original layout")?;
+    if !layout.is_sized() || layout.size.bytes() > TEMPLATE_NODES as u64 {
+        return Err("owned template constant exceeds the original sized byte budget".into());
+    }
+    let Some(GlobalAlloc::Memory(allocation)) = tcx.try_get_global_alloc(id) else {
+        return Err("owned template constant lacks actual compiler memory".into());
+    };
+    let allocation = allocation.inner();
+    let end = offset
+        .bytes()
+        .checked_add(layout.size.bytes())
+        .ok_or("owned template constant extent overflows")?;
+    if allocation.mutability.is_mut()
+        || allocation.len() > TEMPLATE_NODES
+        || end > allocation.len() as u64
+        || allocation.align < layout.align.abi
+        || !offset.bytes().is_multiple_of(layout.align.abi.bytes())
+    {
+        return Err("owned template constant differs from original extent/alignment".into());
+    }
+    let range = alloc_range(Size::ZERO, Size::from_bytes(allocation.len() as u64));
+    if !allocation.provenance().range_empty(range, &tcx) {
+        return Err("owned template constant contains allocation provenance".into());
+    }
+    let mut bytes = Vec::new();
+    for index in offset.bytes()..end {
+        let position = Size::from_bytes(index);
+        if allocation.init_mask().get(position) {
+            let byte = allocation
+                .get_bytes_strip_provenance(&tcx, alloc_range(position, Size::from_bytes(1)))
+                .map_err(|_| "owned template constant byte is unavailable")?[0];
+            bytes.push(format!("{byte:02x}"));
+        } else {
+            bytes.push("uninit".into());
+        }
+    }
+    Ok(format!(
+        "const-object type={:?} size={} align={} offset={} bytes=[{}]",
+        original.kind(),
+        layout.size.bytes(),
+        layout.align.abi.bytes(),
+        offset.bytes(),
+        bytes.join(",")
+    ))
 }
 
 fn wrap_template(text: &str) -> Result<String, String> {
@@ -306,6 +431,10 @@ fn append_template_chunk(output: &mut String, chunk: &str) {
 }
 
 pub(super) fn normalize_template(text: &str) -> String {
+    normalize_owned_template(text, false)
+}
+
+fn normalize_owned_template(text: &str, alloc: bool) -> String {
     // Only actual DefId debug tokens outside quoted constants have session metadata removed.
     // The visitor independently certifies every embedded compiler identity before encoding.
     let mut result = String::new();
@@ -323,6 +452,12 @@ pub(super) fn normalize_template(text: &str) -> String {
             {
                 result.push_str("DefId(core::");
                 result.push_str(&id[core + path + 3..]);
+            } else if alloc
+                && let Some(start) = id.find("~ alloc[")
+                && let Some(path) = id[start..].find("]::")
+            {
+                result.push_str("DefId(alloc::");
+                result.push_str(&id[start + path + 3..]);
             } else {
                 result.push_str(id);
             }
@@ -346,11 +481,13 @@ pub(super) fn normalize_template(text: &str) -> String {
 fn validate_template_core<'tcx>(
     body: &Body<'tcx>,
     core: rustc_span::def_id::CrateNum,
+    alloc: Option<rustc_span::def_id::CrateNum>,
 ) -> Result<(), String> {
     use rustc_middle::mir::visit::Visitor;
     let mut checker = CoreTemplateVisitor {
         types: CoreTemplateTypes {
             core,
+            alloc,
             count: 0,
             depth: 0,
         },
@@ -366,8 +503,15 @@ fn validate_template_core<'tcx>(
 
 struct CoreTemplateTypes {
     core: rustc_span::def_id::CrateNum,
+    alloc: Option<rustc_span::def_id::CrateNum>,
     count: usize,
     depth: usize,
+}
+
+impl CoreTemplateTypes {
+    fn permits(&self, krate: rustc_span::def_id::CrateNum) -> bool {
+        krate == self.core || self.alloc == Some(krate)
+    }
 }
 
 impl<'tcx> ty::TypeVisitor<TyCtxt<'tcx>> for CoreTemplateTypes {
@@ -409,7 +553,7 @@ impl<'tcx> ty::TypeVisitor<TyCtxt<'tcx>> for CoreTemplateTypes {
             | ty::Infer(_)
             | ty::Error(_) => return std::ops::ControlFlow::Break(()),
         };
-        if named.is_some_and(|id| id.krate != self.core) {
+        if named.is_some_and(|id| !self.permits(id.krate)) {
             return std::ops::ControlFlow::Break(());
         }
         self.depth += 1;
@@ -446,6 +590,14 @@ struct CoreTemplateVisitor {
 }
 
 impl<'tcx> rustc_middle::mir::visit::Visitor<'tcx> for CoreTemplateVisitor {
+    fn visit_var_debug_info(&mut self, info: &rustc_middle::mir::VarDebugInfo<'tcx>) {
+        // Debug-only promoted Global constants are not executable MIR operands. Existing
+        // comparison validation stays unchanged; the owned encoder still visits every statement.
+        if self.types.alloc.is_none() {
+            self.super_var_debug_info(info);
+        }
+    }
+
     fn visit_ty(&mut self, original: Ty<'tcx>, _: rustc_middle::mir::visit::TyContext) {
         if !self.valid {
             return;
@@ -471,7 +623,7 @@ impl<'tcx> rustc_middle::mir::visit::Visitor<'tcx> for CoreTemplateVisitor {
             return;
         }
         if let rustc_middle::mir::Const::Unevaluated(value, _) = constant.const_ {
-            self.valid &= value.def.krate == self.types.core && value.promoted.is_none();
+            self.valid &= self.types.permits(value.def.krate) && value.promoted.is_none();
         }
         self.super_const_operand(constant, location);
     }
@@ -518,7 +670,7 @@ impl<'tcx> rustc_middle::mir::visit::Visitor<'tcx> for CoreTemplateVisitor {
                     None
                 }
             };
-            self.valid &= id.is_none_or(|id| id.krate == self.types.core);
+            self.valid &= id.is_none_or(|id| self.types.permits(id.krate));
         }
         self.super_rvalue(value, location);
     }

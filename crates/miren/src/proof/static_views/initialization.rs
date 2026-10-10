@@ -89,6 +89,10 @@ impl Engine<'_> {
             return Ok(());
         }
         match value {
+            Value::OwnedRegion { .. } => self.validate_owned_region(value, &state.memory),
+            Value::OwnedSnapshot(_) => {
+                Err("contract owned-region ghost is not executable storage".into())
+            }
             Value::ScalarSlice { length, .. } | Value::CompositeSlice { length, .. } => {
                 self.validate_static_initialization_graph(length, state, visited)
             }
