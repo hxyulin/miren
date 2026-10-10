@@ -651,17 +651,20 @@ and custom comparisons retain their existing comparison work bounds. Custom fini
 execute actual `PartialEq` bodies and retain their effects. Solver limits, unresolved results and
 budget exhaustion in iterative consumers remain explicit `UNKNOWN`.
 
-Single incoming immutable Rust borrows also support arbitrary-length slices of exact pure tuple
-and fixed-array primitive elements. A compiler type descriptor preserves each expanded primitive
-field occurrence in its own logical array; checked indexing reconstructs all fields with the same
-index. Nested Float fields retain storage bits and Char fields decode valid Unicode values. Reads,
-owned copies, caller-backed field borrows and checked range views retain the original allocation
-and projections. Runtime length has only the valid Rust allocation-size bound; type shapes retain
-the existing depth and node budgets and a 128-element fixed-array shape limit. Fully zero-sized
-elements, refined or identity-bearing leaves, mutable/competing roots and raw access remain
-unsupported. Logical field storage gives no padding-byte or physical representation rights. Whole
-composite membership and equality remain explicit semantic `UNKNOWN` boundaries. Readonly shared
-iteration retains the same compiler type, source graph and original caller allocation.
+Single incoming immutable Rust borrows also support arbitrary-length slices of exact pure tuple and
+fixed-array primitive elements. A compiler type descriptor preserves each expanded primitive field
+occurrence in its own logical array; checked indexing reconstructs all fields with the same index.
+Nested Float fields retain storage bits and Char fields decode valid Unicode values. Reads, owned
+copies, caller-backed field borrows and checked range views retain the original allocation and
+projections. Runtime length has only the valid Rust allocation-size bound; type shapes retain the
+existing depth and node budgets and a 128-element fixed-array shape limit. Exact pure zero-sized
+tuple/array elements retain the full target-usize length domain and reconstruct only their unique
+values; original element types are certified even beneath empty arrays. Their source lifetime and
+iterator bounds remain checked. Refined or identity-bearing leaves, mutable/competing roots and raw
+access remain unsupported. Logical field storage gives no padding-byte or physical representation
+rights. Whole composite membership and equality remain explicit semantic `UNKNOWN` boundaries.
+Readonly shared iteration retains the same compiler type, source graph and original caller
+allocation.
 
 Concrete synchronous closures can carry supported read-only scalar slices and initialized pure
 `MaybeUninit` values through their exact compiler capture types. Shared capture metadata checks

@@ -92,11 +92,7 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
         }
         if *expected == ProofStatus::Unknown {
             let (category, reason) = match *name {
-                "mutable_input"
-                | "raw_elements"
-                | "zero_sized_elements"
-                | "pattern_elements"
-                | "competing_inputs" => (
+                "mutable_input" | "raw_elements" | "pattern_elements" | "competing_inputs" => (
                     UnknownCategory::Semantics,
                     "only read-only byte slices and byte arrays are modeled",
                 ),
@@ -166,7 +162,7 @@ fn arbitrary_readonly_scalars_preserve_domains_correlations_and_extent() {
         ("float_reflexivity", ProofStatus::Refuted),
         ("mutable_input", ProofStatus::Unknown),
         ("raw_elements", ProofStatus::Unknown),
-        ("zero_sized_elements", ProofStatus::Unknown),
+        ("zero_sized_elements", ProofStatus::Proved),
         ("pattern_elements", ProofStatus::Unknown),
         ("competing_inputs", ProofStatus::Unknown),
         ("dead_handle", ProofStatus::Unknown),

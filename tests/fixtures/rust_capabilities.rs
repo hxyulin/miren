@@ -489,6 +489,34 @@ pub fn composite_iterator_missing_body(values: &[(u16, u16)], index: usize) -> u
     }
 }
 
+pub fn zero_sized_slice_cursor(values: &[()], index: usize) {
+    let mut iter = values.iter();
+    assert!(iter.len() == values.len());
+    if index < values.len() {
+        assert!(iter.nth(index).is_some());
+        assert!(iter.count() == values.len() - index - 1);
+    } else {
+        assert!(iter.nth(index).is_none());
+        assert!(iter.count() == 0);
+    }
+}
+
+pub fn zero_sized_slice_wrong_claim(values: &[()]) {
+    if values.len() > 128 {
+        assert!(values.iter().nth(128).is_none());
+    }
+}
+
+#[cfg(not(test))]
+unsafe extern "Rust" {
+    fn opaque_zero_sized_slice_length(length: usize) -> usize;
+}
+
+#[cfg(not(test))]
+pub fn zero_sized_slice_missing_body(values: &[[u32; 0]]) -> usize {
+    unsafe { opaque_zero_sized_slice_length(values.len()) }
+}
+
 #[cfg(test)]
 mod native {
     use super::*;
@@ -497,6 +525,9 @@ mod native {
     #[test]
     fn positives() {
         integers(199);
+        zero_sized_slice_cursor(&[], usize::MAX);
+        zero_sized_slice_cursor(&[(); 129], 128);
+        zero_sized_slice_cursor(&[(); 129], usize::MAX);
         composite_iterator_nth(&[], usize::MAX);
         composite_iterator_nth(&[(3, 7), (11, 13)], 1);
         composite_iterator_nth(&[(3, 7); 129], 128);
@@ -600,5 +631,10 @@ mod native {
     #[should_panic]
     fn composite_iterator_wrong_claim_panics() {
         composite_iterator_wrong_claim(&[(3, 7); 129]);
+    }
+    #[test]
+    #[should_panic]
+    fn zero_sized_slice_wrong_claim_panics() {
+        zero_sized_slice_wrong_claim(&[(); 129]);
     }
 }

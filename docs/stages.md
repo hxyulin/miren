@@ -3302,6 +3302,7 @@ composite iteration-count control advances to PROVED and adds cursor nth P/R and
 body U controls: 67 cases across 24 families, expecting 28 PROVED, 25 REFUTED and 14 UNKNOWN
 per configuration. Original arbitrary-zero claims remain REFUTED.
 
+
 Final isolated and merged validation each passes 635 Rust tests and 68 Python tests, formatting,
 cargo lint, release builds, cargo deny, documentation build and manual hooks. Frozen evidence at
 `/tmp/miren-stage151-capabilities-20261010` and
@@ -3310,3 +3311,41 @@ cargo lint, release builds, cargo deny, documentation build and manual hooks. Fr
 completed P/R roots retain byte-identical obligation statuses, details and query text across all
 four configurations. Independent source and focused-evidence review approves the retained source,
 exact type/body gates and cursor protocol.
+
+
+## Stage 152: pure zero-sized read-only slice elements
+
+Exact pure tuple and fixed-array shapes now admit whole zero-byte elements only with an empty
+primitive leaf inventory. Original compiler kinds, Copy/Freeze/no-drop properties, alignment and
+all expanded shape budgets remain certified, including original inner types below zero arrays.
+A common extent helper preserves isize::MAX divided by stride for nonzero elements and uses the
+full target-usize length domain for zero stride. Input and later descriptor validation share it.
+Checked observations reconstruct each unique unit/empty-array/tuple value without adding storage
+leaves, padding access, raw permissions or identity synthesis.
+
+Existing checked ranges and shared cursor operations retain original source lifetime, selected
+body and ordered bounds. Full-length cursors can select index usize::MAX - 1 and reach exhaustion
+without wrapping; nth(usize::MAX) exhausts. Unsupported element types still refuse beneath empty
+arrays. Mutable/competing roots, raw construction and retired backing remain conservative.
+Whole-composite predicates and dynamic size_of_val observations remain separate unsupported APIs.
+
+The dedicated 25-root compiler matrix yields 9 PROVED, 4 REFUTED and 12 UNKNOWN per host/ARM O0/O2
+build. Same-obligation models and queries refute both an isize element-count cap and exclusion of
+exact usize::MAX. Valid safe native [(); usize::MAX] arrays exercise last-item reads, counts and
+exhaustion at O0/O2. Actual helper nth-offset mutation refutes every profile and fails valid native
+129-element tests with original assertions unchanged. Exact UNKNOWN categories and actual
+profile-dependent raw frontiers remain pinned. Existing scalar/composite zero-size fixtures
+advance to PROVED without source changes; six focused and six related tests pass.
+
+The shared manifest adds zero-size cursor P/R and missing invoked body U controls: 70 cases across
+25 families, expecting 29 PROVED, 26 REFUTED and 15 UNKNOWN per configuration. Its two baseline
+integration tests pass. Independent source and focused-evidence review approves the narrow stage.
+
+Final isolated and merged validation each passes 638 Rust tests and 68 Python tests, formatting,
+cargo lint, release builds, cargo deny, documentation build and manual hooks. Frozen evidence at
+`/tmp/miren-stage152-capabilities-20261010` and
+`/tmp/miren-stage152-merged-capabilities-20261010` each records 116 PROVED, 104 REFUTED and
+60 UNKNOWN with unchanged frozen inputs/binaries and no collection errors. The 212 previously
+completed P/R roots retain byte-identical obligation statuses, details and query text across all
+four configurations. Independent review approves the exact zero-byte/no-leaf certificate and
+retained source/bounds protocol.

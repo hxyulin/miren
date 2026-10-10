@@ -93,8 +93,7 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
                 | "nonzero_leaf"
                 | "drop_leaf"
                 | "empty_reference_array"
-                | "empty_refined_array"
-                | "wholly_zero_sized" => (
+                | "empty_refined_array" => (
                     UnknownCategory::Semantics,
                     "only read-only byte slices and byte arrays are modeled",
                 ),
@@ -214,7 +213,7 @@ fn typed_composite_slices_retain_fields_views_and_caller_sources() {
         ("drop_leaf", ProofStatus::Unknown),
         ("empty_reference_array", ProofStatus::Unknown),
         ("empty_refined_array", ProofStatus::Unknown),
-        ("wholly_zero_sized", ProofStatus::Unknown),
+        ("wholly_zero_sized", ProofStatus::Proved),
         ("full_composite_contains", ProofStatus::Unknown),
         ("full_composite_equality", ProofStatus::Unknown),
         ("deferred_iteration", ProofStatus::Proved),

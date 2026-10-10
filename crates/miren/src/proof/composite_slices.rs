@@ -7,6 +7,18 @@ const MAX_SHAPE_NODES: usize = 512;
 const MAX_SHAPE_DEPTH: usize = 16;
 const MAX_TYPE_ARRAY: u64 = 128;
 
+fn slice_extent_limit(pointer_bits: u32, stride: u64) -> Result<u128, String> {
+    if !(1..=128).contains(&pointer_bits) {
+        return Err("slice extent requires a valid target pointer width".into());
+    }
+    let unsigned_max = u128::MAX >> (128 - pointer_bits);
+    Ok(if stride == 0 {
+        unsigned_max
+    } else {
+        (unsigned_max >> 1) / u128::from(stride)
+    })
+}
+
 #[derive(Clone, Debug)]
 pub(super) enum CompositeShape {
     Primitive(ScalarSliceElement),
@@ -35,11 +47,11 @@ impl<'tcx> Engine<'tcx> {
             return Ok(None);
         };
         let bytes = self.static_layout(ty)?.size.bytes();
-        if bytes == 0 {
-            return Ok(None);
-        }
         let mut leaves = Vec::new();
         shape.leaves(&mut leaves);
+        if bytes == 0 && !leaves.is_empty() {
+            return Err("zero-sized composite shape has primitive storage leaves".into());
+        }
         Ok(Some(CompositeType {
             ty,
             shape,
@@ -135,7 +147,7 @@ impl<'tcx> Engine<'tcx> {
         let descriptor = self.composite_slice_shape(ty)?.ok_or_else(|| {
             self.categorized_error(
                 UnknownCategory::Semantics,
-                "composite slice requires a nonzero-sized pure tuple or array element".into(),
+                "composite slice requires a pure tuple or array element".into(),
             )
         })?;
         let count = descriptor.leaves.len() + 1;
@@ -152,7 +164,7 @@ impl<'tcx> Engine<'tcx> {
         self.input_values += count;
         let bits = u32::from(self.tcx.sess.target.pointer_width);
         let length = self.fresh(Sort::BitVec(bits));
-        let max = ((1_u128 << (bits - 1)) - 1) / u128::from(descriptor.bytes);
+        let max = slice_extent_limit(bits, descriptor.bytes)?;
         conditions.push(self.terms.apply(
             Op::BvUnsignedLe,
             &[length.clone(), self.terms.bit_vector(max, bits)?],
@@ -201,9 +213,12 @@ impl<'tcx> Engine<'tcx> {
             .composite_slice_types
             .get(*id)
             .ok_or("composite slice compiler descriptor is absent")?;
+        if descriptor.bytes == 0 && !descriptor.leaves.is_empty() {
+            return Err("zero-sized composite descriptor has primitive storage leaves".into());
+        }
         let bits = u32::from(self.tcx.sess.target.pointer_width);
         validate_terms(&self.terms, bits, &descriptor.leaves, length, leaves)?;
-        let max = ((1_u128 << (bits - 1)) - 1) / u128::from(descriptor.bytes);
+        let max = slice_extent_limit(bits, descriptor.bytes)?;
         let safe = self.terms.apply(
             Op::BvUnsignedLe,
             &[length.integer()?.0, self.terms.bit_vector(max, bits)?],
@@ -366,6 +381,35 @@ impl CompositeShape {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn zero_sized_slice_extent_and_values_preserve_full_target_length() {
+        for bits in [32, 64] {
+            let max = (1_u128 << bits) - 1;
+            assert_eq!(slice_extent_limit(bits, 0).unwrap(), max);
+            assert_eq!(slice_extent_limit(bits, 1).unwrap(), max >> 1);
+            assert_eq!(slice_extent_limit(bits, 4).unwrap(), (max >> 1) / 4);
+            let context = Context::default();
+            let length = symbolic::integer(&context, max, bits, false);
+            assert!(validate_terms(&context, bits, &[], &length, &[]).is_ok());
+            let shape = CompositeShape::Tuple(vec![
+                CompositeShape::Tuple(vec![]),
+                CompositeShape::Array(vec![]),
+            ]);
+            let mut leaves = Vec::new();
+            shape.leaves(&mut leaves);
+            assert!(leaves.is_empty());
+            let index = context.bit_vector(max - 1, bits).unwrap();
+            let mut cursor = 0;
+            let value = shape.observe(&context, &[], &index, &mut cursor).unwrap();
+            assert!(matches!(value, Value::Tuple(fields)
+                if matches!(&fields[0], Value::Unit)
+                && matches!(&fields[1], Value::Elements(values) if values.is_empty())));
+            assert_eq!(cursor, 0);
+        }
+        assert!(slice_extent_limit(0, 0).is_err());
+        assert!(slice_extent_limit(129, 0).is_err());
+    }
 
     #[test]
     fn composite_metadata_rejects_foreign_sorts_lengths_and_leaf_inventories() {

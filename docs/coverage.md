@@ -1270,3 +1270,19 @@ and retired source metadata remain UNKNOWN. Existing aggregate next/nth controls
 original sources unchanged. The shared 67-case/24-family baseline expects 112 PROVED, 100 REFUTED
 and 56 UNKNOWN across the four configurations. Unrestricted callback loops still require complete
 execution or a separate supported invariant; cursor support supplies no loop summary.
+
+
+Stage 152 admits exact pure zero-sized tuple/array elements in the same read-only composite slice
+representation. Their empty primitive inventory supplies only each unique typed value. The original
+inner type is still certified beneath empty arrays, and source lifetime, selected bodies and checked
+index/view/cursor bounds remain required. Zero stride permits every target-usize length; nonzero
+strides retain their original allocation extent. No physical storage, alias or raw rights follow.
+
+The 25-root host/ARM O0/O2 matrix yields 9 PROVED, 4 REFUTED and 12 UNKNOWN per build. Exact MAX and
+above-isize counterexamples establish that the large length domain is admitted. Safe native
+[(); usize::MAX] arrays check last-item reads and exhausted cursors; actual helper nth-offset
+mutation refutes and fails native 129-element tests. Two original zero-size input fixtures now
+prove without source changes. Unsupported original leaves, mutable/competing roots, raw sources,
+missing bodies and dead backing retain their actual UNKNOWN frontiers. Whole-composite comparison
+and size_of_val remain separate boundaries. The shared 70-case/25-family baseline expects
+116 PROVED, 104 REFUTED and 60 UNKNOWN across all four configurations.
