@@ -3238,3 +3238,40 @@ cargo lint, release builds, cargo deny, documentation build and manual hooks. Fr
 `/tmp/miren-stage149-merged-capabilities-20261010` each records 100 PROVED, 92 REFUTED and
 52 UNKNOWN, with unchanged frozen inputs/binaries and no collection errors. Independent source
 and focused-evidence review approves the descriptor, source/type/body gates and mutation controls.
+
+
+## Stage 150: checked pure nested-array choices
+
+The private tuple-choice helper becomes a common pure aggregate-choice helper. It recursively
+validates and merges exact fixed-array carriers alongside tuples, primitives and unit. Candidate
+kinds, counts, sorts, contexts, widths and signs must match; every candidate occurrence is charged
+against the unchanged depth-16 and 512-node limits. The actual checked read still establishes index
+bounds. Every descendant follows the same index condition, including Float numeric expressions
+and certified raw bits. Raw bits survive only when every candidate carries their certificate.
+Existing valid Char values are selected unchanged, and empty arrays remain array carriers.
+
+This closes whole nested-array reads within arbitrary composite slice elements as well as fixed
+owned inputs. Owned copies retain mutation isolation. Byte snapshots and views lack a fixed owned
+array certificate at this boundary and remain outside the new domain. Identity-bearing values,
+references, wrappers and ADTs remain excluded from conditional synthesis. Existing constant,
+uniquely proved and singleton retained-handle selection keeps its behavior. Ambiguous writes
+continue to refuse; no allocation, reference, raw access, type-domain or effect policy changes.
+
+The dedicated 21-root matrix yields 12 PROVED, 4 REFUTED and 5 UNKNOWN per host/ARM O0/O2 build.
+Controls cover nested integer, Bool, Char and Float arrays, mixed tuple shapes, empty arrays,
+caller composite inputs and owned-copy isolation. Actual helper inner-position mutation refutes
+and fails valid native O0/O2 executions. Same-obligation counterexample query/model evidence and
+precise UNKNOWN categories/reasons are retained. The Drop case reaches an earlier actual
+core drop-glue layout frontier, not the aggregate selector; metadata units independently refuse
+identity synthesis. Existing tuple and finite projection regression controls remain unchanged.
+
+The shared manifest adds pure nested-array P/R and deferred byte-array selection U controls:
+64 cases across 23 families, expecting 26 PROVED, 24 REFUTED and 14 UNKNOWN per build.
+
+Final isolated and merged validation each passes 633 Rust tests and 68 Python tests, formatting,
+cargo lint, release builds, cargo deny, documentation build and manual hooks. Frozen evidence at
+`/tmp/miren-stage150-capabilities-20261010` and
+`/tmp/miren-stage150-merged-capabilities-20261010` each records 104 PROVED, 96 REFUTED and
+56 UNKNOWN with unchanged frozen inputs/binaries and no collection errors. The 192 previously
+completed P/R roots retain byte-identical obligation statuses, details and query text across all
+four compiler configurations. Independent review approves the source and focused failure evidence.

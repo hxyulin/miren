@@ -11,8 +11,8 @@ execution at O0 and O2, positive/refuted/unknown controls, a source mutation tha
 structured UNKNOWN reporting, and passing repository checks. Completion establishes a repeatable
 baseline. It does not establish full Rust support or a completed memory-model refactor.
 
-The manifest contains 61 cases across 22 families. Each build configuration expects 25 PROVED,
-23 REFUTED and 13 UNKNOWN results. Stage 133 originally had 23 cases with 10 PROVED, 9 REFUTED
+The manifest contains 64 cases across 23 families. Each build configuration expects 26 PROVED,
+24 REFUTED and 14 UNKNOWN results. Stage 133 originally had 23 cases with 10 PROVED, 9 REFUTED
 and 4 UNKNOWN; stage 134 closed its retained-prefix projection gap. Stage 136 adds raw-pointer
 metadata P/R controls and a safe core reference-array grant that remains UNKNOWN without a
 temporal permission certificate. Stage 137 adds tuple-array P/R and unsupported symbolic-write
@@ -39,6 +39,9 @@ Byte and finite/custom comparison policies retain their separate work bounds and
 Stage 149 advances the unchanged original aggregate-slice false claim to REFUTED and adds
 composite slice view P/R and deferred iterator U controls. Exact pure tuple and fixed-array element
 shapes use independent per-occurrence primitive arrays and checked common-index observations.
+Stage 150 adds pure nested-array conditional read P/R and deferred byte-array choice U controls.
+Checked reads select exact matching tuple and fixed-array shapes while preserving every field's
+condition, Float storage bits and existing valid Char values.
 These additions change the denominator, not a coverage percentage.
 Covered examples exercise arithmetic, enum payloads, array indexing, reference effects, concrete
 generics, closures, iterator callbacks, finite loops, destructors, fresh future polling and raw
@@ -49,12 +52,14 @@ actual target byte extent; it has no 128-element input cap. Exact pure tuple and
 primitive elements likewise admit arbitrary runtime lengths. Their expanded type shapes retain
 node/depth limits and a 128-element array shape budget, independently of the slice length.
 Fully zero-sized, refined and identity-bearing element shapes remain unsupported. Whole composite
-membership, equality and iteration require separate consumer models. Dynamic selection between
-whole nested aggregate arrays also remains a separate finite-value choice gap. Mutable and competing incoming
+membership, equality and iteration require separate consumer models. Checked symbolic selection between
+whole pure nested tuple and fixed-array values is supported by stage 150 under the existing
+16-level and 512-candidate-node limits. Byte snapshots, identity-bearing alternatives and
+ambiguous symbolic writes retain separate unsupported boundaries. Mutable and competing incoming
 references retain conservative boundaries. Indexed retained mutable integer/tuple prefixes use
 checked projection snapshots with a uniquely determined length of at most 128. Bounded tuple reads
 can select symbolic offsets while preserving field correlation; symbolic composite writes still
-require a unique location. Pure tuple choices are bounded to depth 16 and 512 total candidate nodes,
+require a unique location. Pure tuple and fixed-array choices are bounded to depth 16 and 512 total candidate nodes,
 validate exact sorts/contexts and restore no identity or reference rights. Existing immutable
 incoming shared-reference snapshots can supply values in this domain. Retained handles, ADTs and
 Drop-bearing identities remain excluded.

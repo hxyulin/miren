@@ -524,8 +524,8 @@ gaps by category and exact reason, preserving all root names. Saved coverage gap
 absent optional category. Existing schema version and safety statuses are unchanged.
 
 The Rust capability baseline is independent of fleet and hardware contracts. Run
-`cargo test --locked -p miren --test rust_capabilities`; its shared manifest selects 61 cases across
-22 families on host/ARM at O0/O2, with positive/refuted/unknown and actual source-mutation controls.
+`cargo test --locked -p miren --test rust_capabilities`; its shared manifest selects 64 cases across
+23 families on host/ARM at O0/O2, with positive/refuted/unknown and actual source-mutation controls.
 The standalone [survey](../../tools/rust_capability_survey.py) retains full reports and provenance.
 The typed SMT foundation supports explicit universal and existential Symbol bindings. Free-symbol
 metadata is lexical: the same Symbol may be bound in one term and free in another, and nested
@@ -545,20 +545,24 @@ unfinished nonzero proof remains UNKNOWN; the model adds no nonzero premise. Saf
 `NonZero::trailing_zeros` follows its actual core body, preserving primitive width, signedness
 and the exact `u32` count. Local lookalike functions execute their bodies rather than this model.
 
-Fixed arrays support bounded symbolic selection of primitive tuple values, including nested bool,
-integer, float and unit fields. Every field follows the same index, preserving correlations after
-existing bounds proofs. Selection validates exact leaf shapes, widths, sorts and term contexts,
-with a 16-level and 512-node budget. Retained references, identity-bearing values, ADTs and symbolic
-composite writes remain outside this capability. Existing incoming shared-reference snapshots may
-already contain primitive values; selecting those values restores no reference identity, liveness
-or access rights. Float selection preserves available raw bits, including signed zero and NaNs.
+Fixed arrays support bounded symbolic selection of pure tuple and fixed-array values, including
+nested bool, integer, float, char and unit fields. Tuple arities and array lengths must match
+exactly; tuple and array carriers remain distinct. Every field follows the same index, preserving
+correlations after existing bounds proofs. Selection validates exact leaf shapes, widths, sorts and
+term contexts, with a 16-level and 512-node budget. Retained references, identity-bearing values,
+ADTs and symbolic composite writes remain outside this capability. Existing incoming shared-
+reference snapshots may already contain primitive values; selecting those values restores no
+reference identity, liveness or access rights. Float selection preserves raw bits only when every
+candidate has a certificate, including exact signed-zero and NaN storage bits. Byte-array snapshots
+and views remain outside conditional aggregate selection; their metadata does not certify an owned
+fixed-array carrier.
 
 The same value-selection domain handles bounded tuple reads through checked finite slice
 snapshots. A symbolic offset can select correlated values after the region is proved in bounds.
 Symbolic composite writes still require a uniquely determined location and report a Semantics
 UNKNOWN otherwise; read support does not grant additional write or reference rights.
 
-The conditional tuple domain does not replace existing unique-index or singleton selection
+The conditional aggregate domain does not replace existing unique-index or singleton selection
 of retained handles. Those paths keep their prior behavior; only pure values obtain new
 conditional field selections.
 

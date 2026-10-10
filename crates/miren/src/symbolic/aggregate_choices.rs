@@ -3,12 +3,15 @@ use super::{Context, Op, Sort, Term, Value};
 const MAX_DEPTH: usize = 16;
 const MAX_NODES: usize = 512;
 
-pub(super) fn tuple_choice(
+pub(super) fn aggregate_choice(
     context: &Context,
     elements: &[Value],
     index: &Value,
 ) -> Result<Option<Value>, String> {
-    if !matches!(elements.first(), Some(Value::Tuple(_) | Value::Unit)) {
+    if !matches!(
+        elements.first(),
+        Some(Value::Tuple(_) | Value::Elements(_) | Value::Unit)
+    ) {
         return Ok(None);
     }
     let (index, bits, signed) = index.integer()?;
@@ -89,6 +92,13 @@ fn validate(
             }
             Ok(pure)
         }
+        Value::Elements(elements) => {
+            let mut pure = true;
+            for element in elements.iter() {
+                pure &= validate(context, element, depth + 1, nodes)?;
+            }
+            Ok(pure)
+        }
         Value::Unit => Ok(true),
         Value::Bool(_) | Value::Int { .. } => {
             Err("tuple array choice primitive has an invalid width, sort or context".into())
@@ -111,7 +121,6 @@ fn validate(
         | Value::LocalAtomic { .. }
         | Value::Reference { .. }
         | Value::SliceIterator { .. }
-        | Value::Elements(_)
         | Value::MetadataPointer(_)
         | Value::TraitObject { .. }
         | Value::DebugReference { .. }
@@ -137,6 +146,13 @@ fn merge(
                 .zip(b)
                 .map(|(a, b)| merge(context, condition, a, b))
                 .collect::<Result<_, _>>()?,
+        )),
+        (Value::Elements(a), Value::Elements(b)) if a.len() == b.len() => Ok(Value::Elements(
+            a.iter()
+                .zip(b.iter())
+                .map(|(a, b)| merge(context, condition, a, b))
+                .collect::<Result<Vec<_>, _>>()?
+                .into(),
         )),
         (Value::Bool(a), Value::Bool(b)) => Ok(Value::Bool(ite(a, b)?)),
         (
@@ -175,7 +191,10 @@ fn merge(
                 .map(|(a, b)| ite(a, b))
                 .transpose()?,
         }),
-        _ => Err("tuple array choice requires exactly matching primitive tuple shapes".into()),
+        _ => Err(
+            "tuple array choice requires exactly matching primitive tuple or fixed-array shapes"
+                .into(),
+        ),
     }
 }
 
@@ -185,7 +204,126 @@ mod tests {
     use crate::symbolic::{integer, select_element};
 
     #[test]
-    fn tuple_choices_reject_forged_shapes_contexts_and_unbounded_trees() {
+    fn nested_array_choices_preserve_carriers_correlations_and_identity_fallback() {
+        let context = Context::default();
+        let foreign = Context::default();
+        let index = Value::Int {
+            expression: context.symbol(901, Sort::BitVec(8)).unwrap(),
+            bits: 8,
+            signed: false,
+        };
+        let array = |values: Vec<Value>| Value::Elements(values.into());
+        let a = array(vec![
+            integer(&context, 3, 16, false),
+            Value::Tuple(vec![crate::symbolic::float(&context, 0x80000000, 32)]),
+        ]);
+        let b = array(vec![
+            integer(&context, 7, 16, false),
+            Value::Tuple(vec![crate::symbolic::float(&context, 0x7fc00015, 32)]),
+        ]);
+        let selected = select_element(&context, &[a.clone(), b.clone()], &index).unwrap();
+        let Value::Elements(values) = selected else {
+            panic!("selected array must retain its carrier");
+        };
+        let condition = context
+            .apply(
+                Op::Equal,
+                &[
+                    index.integer().unwrap().0,
+                    context.bit_vector(0, 8).unwrap(),
+                ],
+            )
+            .unwrap();
+        assert_eq!(
+            values[0].integer().unwrap().0,
+            context
+                .apply(
+                    Op::Ite,
+                    &[
+                        condition.clone(),
+                        context.bit_vector(3, 16).unwrap(),
+                        context.bit_vector(7, 16).unwrap(),
+                    ]
+                )
+                .unwrap()
+        );
+        let Value::Tuple(fields) = &values[1] else {
+            panic!("nested tuple carrier");
+        };
+        let Value::Float {
+            raw_bits: Some(raw),
+            ..
+        } = &fields[0]
+        else {
+            panic!("selected float must retain certified bits");
+        };
+        assert_eq!(
+            *raw,
+            context
+                .apply(
+                    Op::Ite,
+                    &[
+                        condition,
+                        context.bit_vector(0x80000000, 32).unwrap(),
+                        context.bit_vector(0x7fc00015, 32).unwrap(),
+                    ]
+                )
+                .unwrap()
+        );
+        assert!(select_element(&context, &[a.clone(), array(vec![])], &index).is_err());
+        assert!(select_element(&context, &[a.clone(), Value::Tuple(vec![])], &index).is_err());
+        assert!(
+            select_element(
+                &context,
+                &[array(vec![integer(&foreign, 3, 16, false)])],
+                &index
+            )
+            .is_err()
+        );
+        assert!(
+            matches!(select_element(&context, &[array(vec![]), array(vec![])], &index),
+            Ok(Value::Elements(values)) if values.is_empty())
+        );
+        let handle = array(vec![Value::Reference {
+            allocation: 0,
+            projection: vec![],
+            mutable: false,
+        }]);
+        assert!(
+            aggregate_choice(&context, std::slice::from_ref(&handle), &index)
+                .unwrap()
+                .is_none()
+        );
+        assert!(select_element(&context, std::slice::from_ref(&handle), &index).is_ok());
+        assert!(select_element(&context, &[handle.clone(), handle.clone()], &index).is_err());
+        let malformed = array(vec![handle, integer(&foreign, 1, 16, false)]);
+        assert!(aggregate_choice(&context, &[malformed], &index).is_err());
+        assert!(select_element(&context, &[array(vec![Value::Unit; MAX_NODES])], &index).is_err());
+        let mut deep = Value::Unit;
+        for _ in 0..=MAX_DEPTH {
+            deep = array(vec![deep]);
+        }
+        assert!(select_element(&context, &[deep], &index).is_err());
+        // One absent raw-bit certificate prevents inventing one for the merged result.
+        let mut no_raw = crate::symbolic::float(&context, 0, 32);
+        if let Value::Float { raw_bits, .. } = &mut no_raw {
+            *raw_bits = None;
+        }
+        let selected = select_element(
+            &context,
+            &[
+                array(vec![no_raw]),
+                array(vec![crate::symbolic::float(&context, 1, 32)]),
+            ],
+            &index,
+        )
+        .unwrap();
+        assert!(matches!(selected, Value::Elements(values)
+            if matches!(&values[0], Value::Float { raw_bits: None, .. })));
+    }
+
+    #[test]
+    fn aggregate_choices_reject_forged_shapes_contexts_and_unbounded_trees() {
         let context = Context::default();
         let foreign = Context::default();
         let index = integer(&context, 0, 8, false);
@@ -226,7 +364,7 @@ mod tests {
             mutable: false,
         }]);
         assert!(
-            tuple_choice(&context, std::slice::from_ref(&unsupported), &index)
+            aggregate_choice(&context, std::slice::from_ref(&unsupported), &index)
                 .unwrap()
                 .is_none()
         );
@@ -241,7 +379,7 @@ mod tests {
             payload: Some(Box::new(integer(&context, 7, 16, false))),
         }]);
         assert!(
-            tuple_choice(&context, std::slice::from_ref(&initialized), &index)
+            aggregate_choice(&context, std::slice::from_ref(&initialized), &index)
                 .unwrap()
                 .is_none()
         );
@@ -266,7 +404,7 @@ mod tests {
             fields: vec![].into(),
         };
         assert!(
-            tuple_choice(&context, &[Value::Tuple(vec![empty_adt])], &index)
+            aggregate_choice(&context, &[Value::Tuple(vec![empty_adt])], &index)
                 .unwrap()
                 .is_none()
         );

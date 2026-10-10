@@ -1234,3 +1234,20 @@ identity-bearing leaves, oversized type arrays and deferred whole-composite cons
 specific UNKNOWN causes. Whole nested-array dynamic selection remains a separate finite-value gap.
 The original aggregate-slice false assertion now refutes without a source rewrite. The shared
 61-case/22-family baseline expects 100 PROVED, 92 REFUTED and 52 UNKNOWN across four builds.
+
+
+Stage 150 extends bounded pure value selection from tuples to nested fixed arrays. Every candidate
+is validated before constructing conditions, with exact carrier kind, arity/count, leaf width/sign,
+sort and term context. All fields share the same index condition. Float numeric expressions and
+available storage bits follow that condition; raw bits survive only when every candidate retains
+a certificate. Existing valid Char values are selected without repair or added premises. Empty
+inner arrays retain their array carrier. Constant, uniquely proved and singleton handle selection
+keeps its prior behavior; new reads do not grant writes or create conditional reference identities.
+
+The 21-root matrix yields 12 PROVED, 4 REFUTED and 5 UNKNOWN per host/ARM O0/O2 build. It includes
+whole inner-array choices from arbitrary-length composite slices, owned-copy mutation isolation,
+Float bits, Unicode, mixed tuples/arrays, bounds and actual helper mutation with valid native
+failure. Byte snapshots and ambiguous references/ADTs retain their actual selection frontiers;
+symbolic writes retain their Semantics refusal. The Drop control reaches an earlier actual
+`core::ptr::drop_glue` layout gap, recorded separately from conditional-selection eligibility.
+The shared 64-case/23-family baseline expects 104 PROVED, 96 REFUTED and 56 UNKNOWN across builds.

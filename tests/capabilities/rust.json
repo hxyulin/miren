@@ -332,6 +332,23 @@
       "expected": "unknown",
       "unknown_reason": "readonly composite slice iteration is unsupported",
       "unknown_category": "semantics"
+    },
+    {
+      "entry": "nested_array_choice",
+      "family": "nested_array_choice",
+      "expected": "proved"
+    },
+    {
+      "entry": "nested_array_choice_wrong_claim",
+      "family": "nested_array_choice",
+      "expected": "refuted"
+    },
+    {
+      "entry": "nested_byte_array_choice",
+      "family": "nested_array_choice",
+      "expected": "unknown",
+      "unknown_reason": "non-scalar array index is not uniquely determined on this path",
+      "unknown_category": "unclassified"
     }
   ]
 }

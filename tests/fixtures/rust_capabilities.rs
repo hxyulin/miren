@@ -435,6 +435,31 @@ pub fn composite_slice_iteration(values: &[(u16, u16)]) -> usize {
     values.iter().count()
 }
 
+pub fn nested_array_choice(index: usize) {
+    let values = [[3_u16, 7], [5, 11]];
+    if index < values.len() {
+        let selected = values[index];
+        assert!(selected[1] == selected[0] * 2 + 1);
+    }
+}
+
+pub fn nested_array_choice_wrong_claim(index: usize) {
+    let values = [[3_u16, 7], [5, 11]];
+    if index < values.len() {
+        let selected = values[index];
+        assert!(selected[0] == selected[1]);
+    }
+}
+
+pub fn nested_byte_array_choice(index: usize) -> [u8; 2] {
+    let values = [[3_u8, 7], [5, 11]];
+    if index < values.len() {
+        values[index]
+    } else {
+        [0, 0]
+    }
+}
+
 #[cfg(test)]
 mod native {
     use super::*;
@@ -443,6 +468,9 @@ mod native {
     #[test]
     fn positives() {
         integers(199);
+        nested_array_choice(0);
+        nested_array_choice(1);
+        nested_array_choice(usize::MAX);
         composite_slice_views(&[], usize::MAX);
         composite_slice_views(&[(3, [5, 7]), (11, [13, 17])], 1);
         composite_slice_views(&[(3, [5, 7]); 129], 128);
@@ -530,5 +558,10 @@ mod native {
     #[should_panic]
     fn open_aggregate_slice_panics() {
         open_aggregate_slice(&[(1, 0)]);
+    }
+    #[test]
+    #[should_panic]
+    fn nested_array_choice_wrong_claim_panics() {
+        nested_array_choice_wrong_claim(0);
     }
 }
