@@ -919,9 +919,7 @@
     {
       "entry": "mutable_u16_child_unknown",
       "family": "mutable_u16_store",
-      "expected": "unknown",
-      "unknown_reason": "mutable u16 child reborrow requires child lease protocol",
-      "unknown_category": "semantics"
+      "expected": "proved"
     },
     {
       "entry": "nominal_zst_box",
@@ -938,6 +936,23 @@
       "family": "nominal_zst_box",
       "expected": "unknown",
       "unknown_reason": "owned nominal Box payload requires compiler size zero and alignment one",
+      "unknown_category": "semantics"
+    },
+    {
+      "entry": "scoped_mutable_child_call",
+      "family": "scoped_mutable_child",
+      "expected": "proved"
+    },
+    {
+      "entry": "scoped_mutable_child_wrong_claim",
+      "family": "scoped_mutable_child",
+      "expected": "refuted"
+    },
+    {
+      "entry": "scoped_mutable_nested_unknown",
+      "family": "scoped_mutable_child",
+      "expected": "unknown",
+      "unknown_reason": "mutable u16 staging needs a pending child",
       "unknown_category": "semantics"
     }
   ]

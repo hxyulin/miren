@@ -77,6 +77,11 @@ impl<'tcx> Engine<'tcx> {
                         .mutable_u16
                         .get(*id)
                         .ok_or("mutable u16 identity was not issued")?;
+                    if !super::mutable_u16_children::role_live(backing, role) {
+                        return Err(
+                            "mutable u16 graph retains suspended or expired child role".into()
+                        );
+                    }
                     state
                         .memory
                         .check_projection_initialization(backing.allocation, &[])?;

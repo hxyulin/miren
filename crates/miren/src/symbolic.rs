@@ -53,7 +53,9 @@ pub enum OwnedRegionKind {
 #[derive(Clone, Debug)]
 pub enum MutableU16Role {
     Root,
-    Metadata,
+    Metadata { generation: u64 },
+    Child { generation: u64 },
+    ChildMetadata { generation: u64 },
     Ghost { length: Box<Value>, data: Term },
 }
 
@@ -361,7 +363,9 @@ impl Value {
             Self::MaybeUninit { payload, .. } => {
                 payload.as_ref().is_some_and(|v| v.contains_mutable())
             }
-            Self::MutableU16 { role, .. } => matches!(role, MutableU16Role::Root),
+            Self::MutableU16 { role, .. } => {
+                matches!(role, MutableU16Role::Root | MutableU16Role::Child { .. })
+            }
             Self::OwnedRegion { .. } | Self::OwnedSnapshot(_) | Self::Input(_) => false,
             Self::Reference { mutable: true, .. } => true,
             Self::StaticSlice { mutable, .. } => *mutable,

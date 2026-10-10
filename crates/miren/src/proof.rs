@@ -61,6 +61,7 @@ mod membership;
 mod memory;
 mod mutable_slice_ranges;
 mod mutable_u16;
+mod mutable_u16_children;
 mod nominal_comparisons;
 mod nonzero_options;
 mod opaque_function_inputs;
@@ -182,6 +183,8 @@ struct Engine<'tcx> {
     limits: miren::AnalysisLimits,
     resolved_contracts: BTreeMap<String, DefId>,
     solver: std::cell::RefCell<Solver>,
+    mutable_u16_frames: std::cell::RefCell<Vec<std::rc::Weak<Body<'tcx>>>>,
+    mutable_u16_staging: std::cell::RefCell<Vec<mutable_u16_children::Staging<'tcx>>>,
     coroutine_places:
         std::cell::RefCell<Vec<(std::rc::Weak<Body<'tcx>>, coroutines::OriginalPlace<'tcx>)>>,
     bodies:
@@ -255,6 +258,8 @@ pub fn verify(
         limits,
         resolved_contracts: BTreeMap::new(),
         solver: std::cell::RefCell::new(Solver::with_limits(limits)),
+        mutable_u16_frames: Default::default(),
+        mutable_u16_staging: Default::default(),
         coroutine_places: Default::default(),
         bodies: std::cell::RefCell::new(std::collections::HashMap::new()),
         call_signatures: std::cell::RefCell::new(std::collections::HashMap::new()),
@@ -1204,6 +1209,11 @@ impl<'tcx> Engine<'tcx> {
             memory,
         };
         let incoming_allocations = state.memory.len();
+        let mutable_u16_arguments = if state.memory.mutable_u16.is_empty() {
+            Vec::new()
+        } else {
+            arguments.clone()
+        };
         for (local, argument) in body.args_iter().zip(arguments) {
             state.locals[local.as_usize()] = Some(argument);
         }
@@ -1331,6 +1341,7 @@ impl<'tcx> Engine<'tcx> {
                     } else {
                         self.local(&state, 0)?
                     };
+                    self.mutable_u16_exit(body, &mutable_u16_arguments, &state.memory)?;
                     self.owned_box_type_value(body.return_ty(), &value, &state.memory)?;
                     self.validate_owned_exit(
                         &state.memory,
@@ -1480,6 +1491,34 @@ impl<'tcx> Engine<'tcx> {
                         _ => return Err("unresolved indirect call".to_owned()),
                     };
                     let callee = instance.def_id();
+                    if let Some(results) = self.mutable_u16_child_call(
+                        &mut state,
+                        mutable_u16_children::ChildCall {
+                            body,
+                            block,
+                            instance,
+                            args,
+                            destination: *destination,
+                            target: *target,
+                            stack: &stack,
+                            site: (id, terminator.source_info.span),
+                        },
+                    )? {
+                        let target = target.ok_or("mutable u16 child has no normal return edge")?;
+                        for result in results {
+                            let mut continuation =
+                                state.continuation(result.conditions, result.memory);
+                            self.store_call_result(
+                                body,
+                                &mut continuation,
+                                *destination,
+                                destination_indices.as_ref(),
+                                result.value,
+                            )?;
+                            queue.push_back((target, continuation, retry_path.clone()));
+                        }
+                        continue;
+                    }
                     self.mutable_u16_call_allowed(body, &state, instance, args)?;
                     if super::identity::is_panic_call(self.tcx, callee)
                         || self.is_core_panic_helper(callee)
@@ -1909,6 +1948,9 @@ impl<'tcx> Engine<'tcx> {
             },
             StatementKind::Assign(assignment) => {
                 let (place, value) = assignment.as_ref();
+                if self.mutable_u16_stage(body, state, *place, value, statement)? {
+                    return Ok(());
+                }
                 let value = self.rvalue(id, body, state, value)?;
                 self.store_assignment_value(body, state, *place, value, statement)
             }
@@ -2262,6 +2304,7 @@ impl<'tcx> Engine<'tcx> {
                     value,
                     Value::MutableU16 {
                         role: symbolic::MutableU16Role::Root
+                            | symbolic::MutableU16Role::Child { .. }
                             | symbolic::MutableU16Role::Ghost { .. },
                         ..
                     }
@@ -2680,12 +2723,18 @@ impl<'tcx> Engine<'tcx> {
                 Ok(self.materialize_float(value))
             }
             Rvalue::UnaryOp(operation, operand) => {
+                if matches!(operation, UnOp::PtrMetadata)
+                    && let Some(length) = self.mutable_u16_direct_metadata(body, state, operand)?
+                {
+                    return Ok(length);
+                }
                 let value = self.evaluate_operand(id, body, state, operand)?;
                 if matches!(operation, UnOp::PtrMetadata)
                     && matches!(
                         value,
                         Value::MutableU16 {
-                            role: symbolic::MutableU16Role::Metadata,
+                            role: symbolic::MutableU16Role::Metadata { .. }
+                                | symbolic::MutableU16Role::ChildMetadata { .. },
                             ..
                         }
                     )

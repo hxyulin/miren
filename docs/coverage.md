@@ -2229,3 +2229,50 @@ Global release captures at `/tmp/miren-stage188-global-final-evidence` match 16 
 eight queries. Native records retain their final corrected author execution scope. Source, input
 and release hashes are verified. No production semantic correction followed the corrected
 thirteen-path author freeze. Final documentation reflow leaves the validated code unchanged.
+
+Stage 189 executes one whole incoming mutable u16 slice through an actual available safe Rust
+child body. An exact callsite Copy or private occurrence-authenticated reborrow issues a
+branch-local generation. The parent remains suspended until its owning child's normal Return;
+current array data, conditions and initialization masks return together. Primitive scalar
+helpers use an authenticated weak body-frame stack and release only their own frame. The owning
+child alone revokes the grant and resumes the parent. Abort-only signatures and edges, original
+types, available bodies and bounded combined body work are checked before operand effects.
+
+Direct optimized PtrMetadata observes length under the exact original whole Root/Child source,
+current generation and initialization mask. It grants no data reference or generic role Copy.
+Root Move, nested child, shared/duplicate/escaping roles, unwind, induction and missing selected
+bodies remain UNKNOWN. Active frames, mutable backing, weighted owned regions and ordinary
+allocations share the existing 512-storage budget. No assumptions, input caps, firmware changes
+or increased limits are introduced.
+
+The 21-root dedicated matrix yields eight PROVED, two REFUTED and eleven UNKNOWN per host/ARM
+O0/O2 profile; all exact sources are UNKNOWN under committed Stage 188. Both actual child and
+scalar-helper mutations refute unchanged claims with actual body entries and a query/model on
+the same failing obligation. Safe native originals pass two tests; both mutation guards exit 101
+at O0/O2 with ten-second timeouts. Auxiliary evidence covers explicit mir-opt-level-zero staging,
+strict unwind refusal and genuine retained/omitted foreign helper MIR. Current evidence is at
+`/tmp/miren-stage189-final-evidence`; historical actual-184 source, binary and captures retain
+their original scope in `/tmp/miren-stage189-parent184-history`. All 92 original/mutant proof
+objects match after the controlled parent adoption.
+
+Historical fidelity preserves 144 entry/profile statuses, models and premises, and all 124
+completed queries. Twelve query-free UNKNOWN details change and are explicitly recorded;
+no full diagnostic identity is claimed for them. The original direct child-call assertion
+advances from UNKNOWN to PROVED in four profiles. Harness upkeep pins the actual child body;
+three other old controls remain Semantics UNKNOWN with precise protocol refusals. Original
+fixtures and claims stay unchanged. Global P/R/U and scalar-helper mutation/native controls are at
+`/tmp/miren-stage189-global-after-evidence`. The combined manifest has 173 cases in 59 families.
+
+Root validation passes 768 workspace Rust tests and 80 focused Rust tests, with 68 Python
+checks in each workspace. Formatting, Clippy, debug/release builds, deny, docs and manual hooks
+pass. Initial full/focused stale iterator-reason failures remain in their original logs;
+only the harness reason changes, supported by eight actual before/after reports preserving
+Semantics UNKNOWN and unchanged fixture bytes. The fresh main release matches 116 dedicated
+proof objects and 158 queries, plus 16 new global proof objects and 32 queries. Native executions
+retain their final author scope explicitly. All 504 previously completed global pairs preserve
+status, inputs, models, premises and obligation queries; append-only replay fingerprints are
+excluded from that historical comparison. Of 692 current global pairs, 691 normalized proof
+objects match exactly; one query-free
+30-second UNKNOWN resource refusal differs only in its active call-stack context. All 829
+tracked files are byte-identical.
+Checks and ledgers retain their precise scopes under `/tmp/miren-stage189-*`.

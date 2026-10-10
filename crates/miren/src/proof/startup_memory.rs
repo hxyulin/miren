@@ -47,6 +47,16 @@ impl Memory {
             .len()
             .saturating_add(self.owned_regions.iter().map(|region| region.slots).sum())
             .saturating_add(self.mutable_u16.len())
+            .saturating_add(
+                self.mutable_u16
+                    .iter()
+                    .map(|backing| match &backing.phase {
+                        super::mutable_u16_children::Phase::Active { frames } => frames.len(),
+                        super::mutable_u16_children::Phase::Idle
+                        | super::mutable_u16_children::Phase::Pending { .. } => 0,
+                    })
+                    .sum::<usize>(),
+            )
     }
 
     pub(super) fn owned_region(

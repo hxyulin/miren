@@ -7,6 +7,8 @@ pub(super) struct Backing {
     pub(super) allocation: usize,
     pub(super) length: Value,
     pub(super) data: Term,
+    pub(super) generation: u64,
+    pub(super) phase: super::mutable_u16_children::Phase,
 }
 
 impl<'tcx> Engine<'tcx> {
@@ -66,6 +68,8 @@ impl<'tcx> Engine<'tcx> {
                 signed: false,
             },
             data,
+            generation: 0,
+            phase: super::mutable_u16_children::Phase::Idle,
         });
         Ok(Value::MutableU16 {
             id,
@@ -114,7 +118,11 @@ impl<'tcx> Engine<'tcx> {
             return Err("expected a private mutable u16 role".into());
         };
         match role {
-            MutableU16Role::Root | MutableU16Role::Metadata => {
+            MutableU16Role::Root
+            | MutableU16Role::Metadata { .. }
+            | MutableU16Role::Child { .. }
+            | MutableU16Role::ChildMetadata { .. } => {
+                self.mutable_u16_role_live(*id, role, memory)?;
                 Ok(self.mutable_u16_backing(*id, memory)?.length.clone())
             }
             MutableU16Role::Ghost { length, data } => {
@@ -133,7 +141,8 @@ impl<'tcx> Engine<'tcx> {
             return Err("expected mutable u16 snapshot source".into());
         };
         match role {
-            MutableU16Role::Root => {
+            MutableU16Role::Root | MutableU16Role::Child { .. } => {
+                self.mutable_u16_role_live(*id, role, memory)?;
                 let backing = self.mutable_u16_backing(*id, memory)?;
                 Ok(Value::MutableU16 {
                     id: *id,
@@ -143,7 +152,8 @@ impl<'tcx> Engine<'tcx> {
                     },
                 })
             }
-            MutableU16Role::Metadata => {
+            MutableU16Role::Metadata { .. } | MutableU16Role::ChildMetadata { .. } => {
+                self.mutable_u16_role_live(*id, role, memory)?;
                 self.mutable_u16_backing(*id, memory)?;
                 Ok(value.clone())
             }
@@ -169,10 +179,11 @@ impl<'tcx> Engine<'tcx> {
         };
         self.check_local_initialization(state, place.local.as_usize(), &[])?;
         let backing = self.mutable_u16_backing(id, &state.memory)?;
+        self.mutable_u16_role_live(id, &role, &state.memory)?;
         if place.projection.is_empty() {
             return Ok(Some(Value::MutableU16 { id, role }));
         }
-        if !matches!(role, MutableU16Role::Root) {
+        if !matches!(role, MutableU16Role::Root | MutableU16Role::Child { .. }) {
             return Err(self.mutable_u16_error("mutable u16 metadata cannot observe data"));
         }
         let [ProjectionElem::Deref, ProjectionElem::Index(index)] = place.projection.as_ref()
@@ -242,16 +253,17 @@ impl<'tcx> Engine<'tcx> {
             return Ok(false);
         };
         if place.projection.is_empty() {
-            return if matches!(role, MutableU16Role::Root) {
+            return if matches!(role, MutableU16Role::Root | MutableU16Role::Child { .. }) {
                 Err(self.mutable_u16_error("mutable u16 root assignment transport is unsupported"))
             } else {
                 Ok(false)
             };
         }
-        if !matches!(role, MutableU16Role::Root) {
+        if !matches!(role, MutableU16Role::Root | MutableU16Role::Child { .. }) {
             return Err(self.mutable_u16_error("mutable u16 metadata has no write authority"));
         }
         self.check_local_initialization(state, place.local.as_usize(), &[])?;
+        self.mutable_u16_role_live(id, &role, &state.memory)?;
         let [ProjectionElem::Deref, ProjectionElem::Index(index)] = place.projection.as_ref()
         else {
             return Err(self.mutable_u16_error("mutable u16 store requires direct whole element"));
@@ -295,7 +307,7 @@ impl<'tcx> Engine<'tcx> {
         let Value::MutableU16 { id, role } = root else {
             return Ok(None);
         };
-        if !matches!(role, MutableU16Role::Root)
+        if !matches!(role, MutableU16Role::Root | MutableU16Role::Child { .. })
             || place.projection.as_ref() != [ProjectionElem::Deref]
             || !self.mutable_u16_type(body.local_decls[place.local].ty)
         {
@@ -303,9 +315,22 @@ impl<'tcx> Engine<'tcx> {
         }
         self.check_local_initialization(state, place.local.as_usize(), &[])?;
         self.mutable_u16_backing(id, &state.memory)?;
+        self.mutable_u16_role_live(id, &role, &state.memory)?;
         Ok(Some(Value::MutableU16 {
             id,
-            role: MutableU16Role::Metadata,
+            role: match role {
+                MutableU16Role::Child { generation } => {
+                    MutableU16Role::ChildMetadata { generation }
+                }
+                MutableU16Role::Root => MutableU16Role::Metadata {
+                    generation: self.mutable_u16_backing(id, &state.memory)?.generation,
+                },
+                MutableU16Role::Metadata { .. }
+                | MutableU16Role::ChildMetadata { .. }
+                | MutableU16Role::Ghost { .. } => {
+                    return Err("mutable u16 metadata source has no data authority".into());
+                }
+            },
         }))
     }
     pub(super) fn mutable_u16_store_role(
@@ -324,8 +349,13 @@ impl<'tcx> Engine<'tcx> {
             return Err(self.mutable_u16_error("mutable u16 roles cannot enter aggregate storage"));
         }
         if let Value::MutableU16 { id, role } = value {
-            if !matches!(role, MutableU16Role::Metadata)
-                || !place.projection.is_empty()
+            if matches!(role, MutableU16Role::Child { .. }) {
+                return self.mutable_u16_staging_store(body, state, place, *id, role);
+            }
+            if !matches!(
+                role,
+                MutableU16Role::Metadata { .. } | MutableU16Role::ChildMetadata { .. }
+            ) || !place.projection.is_empty()
                 || place.local.as_usize() <= body.arg_count
                 || state.addresses[place.local.as_usize()].is_some()
             {
@@ -343,6 +373,7 @@ impl<'tcx> Engine<'tcx> {
                 return Err("mutable u16 metadata destination needs original u16 slice".into());
             }
             self.mutable_u16_backing(*id, &state.memory)?;
+            self.mutable_u16_role_live(*id, role, &state.memory)?;
         }
         Ok(())
     }
@@ -372,7 +403,10 @@ impl<'tcx> Engine<'tcx> {
                     self.mutable_u16_backing(id, &state.memory)?;
                     if args.len() != 1
                         || !place.projection.is_empty()
-                        || !matches!(role, MutableU16Role::Metadata)
+                        || !matches!(
+                            role,
+                            MutableU16Role::Metadata { .. } | MutableU16Role::ChildMetadata { .. }
+                        )
                         || self.tcx.lang_items().get(LangItem::SliceLen) != Some(instance.def_id())
                         || !self.mutable_u16_shared_type(body.local_decls[place.local].ty)
                     {
@@ -639,6 +673,8 @@ mod tests {
                     limits,
                     resolved_contracts: BTreeMap::new(),
                     solver: std::cell::RefCell::new(Solver::with_limits(limits)),
+                    mutable_u16_frames: Default::default(),
+                    mutable_u16_staging: Default::default(),
                     coroutine_places: Default::default(),
                     owned_box_types: Vec::new(),
                     next_owned_region: 0,
@@ -733,6 +769,7 @@ mod tests {
                         ProjectionElem::Index(rustc_middle::mir::Local::from_usize(2)),
                     ]),
                 };
+                engine.check_mutable_u16_child_roles(&body, &state);
                 let original_state = state.clone();
                 let word = state.locals[3].clone().unwrap();
                 assert!(
@@ -800,7 +837,7 @@ mod tests {
                 );
                 let metadata = Value::MutableU16 {
                     id,
-                    role: MutableU16Role::Metadata,
+                    role: MutableU16Role::Metadata { generation: 0 },
                 };
                 assert!(
                     engine
@@ -838,7 +875,7 @@ mod tests {
                 metadata_state.addresses = vec![None; shared_body.local_decls.len()];
                 metadata_state.locals[1] = Some(Value::MutableU16 {
                     id,
-                    role: MutableU16Role::Metadata,
+                    role: MutableU16Role::Metadata { generation: 0 },
                 });
                 let argument = rustc_span::Spanned {
                     node: Operand::Copy(Place::from(rustc_middle::mir::Local::from_usize(1))),
@@ -879,6 +916,7 @@ mod tests {
             &source,
             r#"#![no_std]
 pub fn shared(values: &[u16]) -> usize { values.len() }
+pub fn scalar(word: u16) -> u16 { word ^ 0 }
 pub fn probe(values: &mut [u16], index: usize, word: u16) {
     if index < values.len() { values[index] = word; }
 }

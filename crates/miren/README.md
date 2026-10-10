@@ -977,8 +977,8 @@ Compiler length lowering uses a private metadata-only role. The actual selected 
 body must be available and return exactly its receiver's pointer metadata. Compiler fake metadata
 pointers carry length only. These roles cannot acquire shared data or mutable access, enter
 aggregate/caller storage, ordinary borrowed helper calls, raw pointers, or returns. Root handle
-Copy/Move transport, mutable reborrows, retained shared views, multiple incoming borrows, slices
-passed to helpers, and inductive backing transport remain UNKNOWN. Existing readonly slice,
+Copy/Move outside the child protocol, retained shared views, multiple incoming borrows,
+and inductive backing transport remain UNKNOWN. Existing readonly slice,
 finite mutable byte storage, ownership initialization and raw permission policies are unchanged.
 
 The private zero-sized Box protocol also accepts exact local ordinary nominal payloads with
@@ -1001,3 +1001,19 @@ Tracked raw-local, iterator-find temporary and async-factory storage growth also
 existing cumulative budget, including owned region nodes and private mutable backing. Weighted
 regions cannot bypass that budget by creating ordinary frame temporaries. The corrected weighted
 boundary reports a resource UNKNOWN; raw permissions and the old frame-only refusal remain.
+
+A direct safe Rust function can receive the whole mutable u16 slice for one synchronous child
+call and return Unit or an owned primitive. The selected signature and actual compiler body
+must be available, with abort-only edges. The caller's root suspends while a branch-private
+generation grants the child access to the same current array. Actual Copy at that call and
+fixed private mutable reborrow staging carry one grant; generic handle copying remains refused.
+Normal child return revokes its generation and resumes the parent with current data, preserving
+all source consumption masks. An actual moved parent remains outside this first protocol.
+
+The child may execute ordinary primitive-only functions under an authenticated bounded stack
+of actual compiler bodies. Each normal scalar return restores only that ancestor frame; only
+the owning child can release the grant. Compiler pointer-metadata Copy observes only length
+under original mutable-slice, initialization, generation and current-source checks. Prestate
+ghosts remain detached. Nested mutable children, shared views, role-bearing aggregates,
+reference returns, stale aliases, unwinding and missing selected bodies remain UNKNOWN.
+Private backing, frame entries and ordinary allocations share the existing storage budget.

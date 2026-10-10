@@ -80,7 +80,7 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
             let (category, reason) = match *name {
                 "mutable_input" => (
                     UnknownCategory::Semantics,
-                    "mutable u16 child reborrow requires child lease protocol",
+                    "mutable u16 child needs direct abort-only Rust body",
                 ),
                 "dead_metadata" | "dead_exhausted_hint" | "dead_count" | "dead_clone" => (
                     UnknownCategory::Unclassified,

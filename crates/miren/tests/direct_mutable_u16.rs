@@ -106,9 +106,17 @@ fn verify(
         }
         if *expected == ProofStatus::Unknown {
             let (category, reason) = match *name {
-                "child_unknown" | "closure_unknown" | "raw_unknown" | "return_unknown" => (
+                "raw_unknown" => (
                     UnknownCategory::Semantics,
-                    "child reborrow requires child lease",
+                    "child needs direct abort-only Rust body",
+                ),
+                "return_unknown" => (
+                    UnknownCategory::Semantics,
+                    "staging needs a private whole tip",
+                ),
+                "closure_unknown" => (
+                    UnknownCategory::Semantics,
+                    "role is suspended or its child generation has ended",
                 ),
                 "retained_shared" => (
                     UnknownCategory::Semantics,
@@ -156,6 +164,9 @@ fn verify(
                     .any(|e| e.function == "replacement")
             );
         }
+        if *name == "child_unknown" {
+            assert!(proof.body_entries.iter().any(|e| e.function == "child"));
+        }
         if *expected == ProofStatus::Proved {
             assert!(
                 proof
@@ -187,7 +198,7 @@ fn direct_root_storage_and_restricted_metadata_cover_four_compiler_profiles() {
         ("empty", P),
         ("ghost_length", P),
         ("bounds", R),
-        ("child_unknown", U),
+        ("child_unknown", P),
         ("retained_shared", U),
         ("raw_unknown", U),
         ("duplicate_root", U),

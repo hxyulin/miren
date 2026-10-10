@@ -2432,3 +2432,51 @@ mod native_nominal_zst_box {
         nominal_zst_box();
     }
 }
+
+#[inline(never)]
+pub fn scoped_mutable_child_word(word: u16) -> u16 {
+    word ^ 0
+}
+
+#[inline(never)]
+pub fn scoped_mutable_child(values: &mut [u16], index: usize, word: u16) {
+    values[index] = scoped_mutable_child_word(word);
+}
+
+pub fn scoped_mutable_child_call(values: &mut [u16], index: usize, word: u16) {
+    if index < values.len() {
+        scoped_mutable_child(values, index, word);
+        assert!(values[index] == word);
+    }
+}
+
+pub fn scoped_mutable_child_wrong_claim(values: &mut [u16], index: usize, word: u16) {
+    if index < values.len() {
+        scoped_mutable_child(values, index, word);
+        assert!(values[index] != word);
+    }
+}
+
+#[inline(never)]
+pub fn scoped_mutable_nested(values: &mut [u16], index: usize, word: u16) {
+    scoped_mutable_child(values, index, word);
+}
+
+pub fn scoped_mutable_nested_unknown(values: &mut [u16], index: usize, word: u16) {
+    if index < values.len() {
+        scoped_mutable_nested(values, index, word);
+        assert!(values[index] == word);
+    }
+}
+
+#[cfg(test)]
+mod native_scoped_mutable_child {
+    use super::*;
+
+    #[test]
+    fn scalar_child_body_preserves_word() {
+        let mut values = [0_u16; 129];
+        scoped_mutable_child_call(&mut values, 128, u16::MAX);
+        assert_eq!(values[128], u16::MAX);
+    }
+}
