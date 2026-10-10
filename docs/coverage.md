@@ -2594,3 +2594,41 @@ remain explicitly adopted, rather than relabeled as fresh main executions. The i
 automatic solver selection while the author had explicitly selected the solver; its 24 model-only
 differences remain archived. Corrected same-mode replay matches complete objects without model
 normalization. Final checks and captures are retained under `/tmp/miren-stage195-*`.
+
+Stage 197 shares the compiler-free mapping from primitive slice codecs to logical sorts. Bool,
+Char, admitted integer widths and f32/f64 keep their existing representations. Unsupported widths
+remain rejected. The proof-local Result wrapper and contract diagnostics are unchanged. The Ghost
+codec lookup stays inside the original short-circuit data-sort expression, after length/context
+checks, so competing malformed metadata retains the same error priority.
+
+This helper constructs no solver term, compiler certificate, source evidence or permission. It
+changes no lease, transaction, original type/layout gate, Float pair authority, public issuer,
+Debug representation or budget. Four author paths change; all 860 other committed-parent paths
+remain exact. New malformed Ghost tests exercise valid codecs, wrong sorts and contexts, target
+widths, unsupported widths, indexing refusal and competing error priority. Changing the Bool
+codec to BV8 makes the actual regression test fail; the original source is restored.
+
+Fresh actual-parent fidelity compares 1,368 full proof objects exactly, including 424 UNKNOWN
+objects and their full input, replay and body provenance. Of those, 372 are query-free and 52
+contain 64 partial queries. All 944 completed objects and their 2,252 queries match; all 2,316
+queries match without node renumbering or model normalization. There are no intended promotions,
+diagnostic changes or exceptions. Genuine missing bodies remain UNKNOWN; Ghost length and actual
+helper mutations retain their P/R/U outcomes. Safe native originals pass three tests and actual
+129-element mutation guards exit 101 at O0/O2 under ten-second limits.
+
+The initial baseline-only capture's generic planned-equality label is clarified separately; raw
+reports and earlier failed test/script setup checks remain preserved. Final author evidence is
+`/tmp/miren-stage197-parent195-query-fidelity`, `/tmp/miren-stage197-parent195-fp-fidelity` and
+`/tmp/miren-stage197-aux-fidelity`. Stage 196 is absent from this scope. No global fixture or
+manifest case is changed; the baseline remains 191 cases in 65 families.
+Root validation passes 797 Rust tests in the full worktree and 114 focused tests in main,
+plus 68 Python tests, formatting, lint, debug/release builds, dependency checks, docs and hooks.
+Both surveys retain 304 PROVED, 264 REFUTED and 196 UNKNOWN outcomes. All 568 previously
+completed root/profile pairs match in both surveys. Of 764 current full objects, 763 match;
+the ARM optimized unbounded fold has only a query-free time-budget call-stack difference.
+Its status, category, identical detail and every remaining field match; no query or model exists.
+Fresh main release replay matches all 1,368 full objects and all 2,316 queries after explicit
+source-path aliases only. Fingerprints, models, queries, node IDs and diagnostics remain exact.
+Native evidence is adopted with verified source/executable hashes and its original execution
+scope. The initial path-only comparison failure is retained separately. Final documentation
+checks run after this prose update; no production code changes after validation.

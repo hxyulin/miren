@@ -40,6 +40,19 @@ pub enum ScalarSliceElement {
     Char,
 }
 
+// Describes a logical codec only; it does not issue type, source or access evidence.
+pub(crate) fn scalar_slice_element_sort(element: ScalarSliceElement) -> Option<Sort> {
+    match element {
+        ScalarSliceElement::Bool => Some(Sort::Bool),
+        ScalarSliceElement::Char => Some(Sort::BitVec(32)),
+        ScalarSliceElement::Integer { bits, .. } if matches!(bits, 8 | 16 | 32 | 64 | 128) => {
+            Some(Sort::BitVec(bits))
+        }
+        ScalarSliceElement::Float { bits } if matches!(bits, 32 | 64) => Some(Sort::BitVec(bits)),
+        ScalarSliceElement::Integer { .. } | ScalarSliceElement::Float { .. } => None,
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum OwnedRegionKind {
     Owner,

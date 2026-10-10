@@ -4,17 +4,8 @@ use super::*;
 use symbolic::ScalarSliceElement;
 
 pub(super) fn scalar_slice_sort(element: ScalarSliceElement) -> Result<Sort, String> {
-    match element {
-        ScalarSliceElement::Bool => Ok(Sort::Bool),
-        ScalarSliceElement::Integer { bits, .. } if matches!(bits, 8 | 16 | 32 | 64 | 128) => {
-            Ok(Sort::BitVec(bits))
-        }
-        ScalarSliceElement::Float { bits } if matches!(bits, 32 | 64) => Ok(Sort::BitVec(bits)),
-        ScalarSliceElement::Char => Ok(Sort::BitVec(32)),
-        ScalarSliceElement::Integer { .. } | ScalarSliceElement::Float { .. } => {
-            Err("scalar slice descriptor has an unsupported primitive width".into())
-        }
-    }
+    symbolic::scalar_slice_element_sort(element)
+        .ok_or_else(|| "scalar slice descriptor has an unsupported primitive width".into())
 }
 
 fn validate_slice_terms(

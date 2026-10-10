@@ -1086,3 +1086,8 @@ reborrows, competing roots and executable role escape remain unsupported. Unauth
 aggregate selection pairs remain UNKNOWN. No floating induction, allocator or alias permission
 is added. Native controls use valid finite 129-element slices; arithmetic NaN payload claims
 remain subject to the analyzer's existing permitted-encoding overapproximation.
+
+Logical scalar slice codecs and detached mutable ghost lengths share one compiler-free sort map.
+The map describes Bool, integer, Char and supported Float storage sorts; it issues no compiler
+certificate or access permission. Original caller validation order, diagnostics and codec widths
+remain unchanged, including executable ghost-index refusal and unavailable-body boundaries.

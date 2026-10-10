@@ -360,27 +360,9 @@ fn evaluate(
                         || data.sort()
                             != &symbolic::Sort::Array(
                                 Box::new(symbolic::Sort::BitVec(pointer_bits)),
-                                Box::new(match element {
-                                    symbolic::ScalarSliceElement::Bool => symbolic::Sort::Bool,
-                                    symbolic::ScalarSliceElement::Char => {
-                                        symbolic::Sort::BitVec(32)
-                                    }
-                                    symbolic::ScalarSliceElement::Float { bits }
-                                        if matches!(bits, 32 | 64) =>
-                                    {
-                                        symbolic::Sort::BitVec(bits)
-                                    }
-                                    symbolic::ScalarSliceElement::Integer { bits, .. }
-                                        if matches!(bits, 8 | 16 | 32 | 64 | 128) =>
-                                    {
-                                        symbolic::Sort::BitVec(bits)
-                                    }
-                                    _ => {
-                                        return Err(
-                                            "mutable integer ghost requires integer codec".into()
-                                        );
-                                    }
-                                }),
+                                Box::new(symbolic::scalar_slice_element_sort(element).ok_or_else(
+                                    || "mutable integer ghost requires integer codec".to_owned(),
+                                )?),
                             )
                         || !data.belongs_to(context)
                     {
@@ -774,6 +756,118 @@ mod tests {
                 make(data, symbolic::integer(&context, 5, 8, false)),
             );
             assert!(predicate(&context, "values.len() == 5", &bindings, bits).is_err());
+        }
+    }
+
+    #[test]
+    fn mutable_ghost_codec_validation_preserves_short_circuit_errors() {
+        use super::{BTreeMap, Context, Value, predicate, symbolic};
+        use symbolic::{ScalarSliceElement, Sort};
+        let mut codecs = vec![
+            (ScalarSliceElement::Bool, Sort::Bool),
+            (ScalarSliceElement::Char, Sort::BitVec(32)),
+            (ScalarSliceElement::Float { bits: 32 }, Sort::BitVec(32)),
+            (ScalarSliceElement::Float { bits: 64 }, Sort::BitVec(64)),
+        ];
+        for bits in [8, 16, 32, 64, 128] {
+            for signed in [false, true] {
+                codecs.push((
+                    ScalarSliceElement::Integer { bits, signed },
+                    Sort::BitVec(bits),
+                ));
+            }
+        }
+        for pointer_bits in [32, 64] {
+            let context = Context::default();
+            let foreign = Context::default();
+            let length = symbolic::integer(&context, 5, pointer_bits, false);
+            let make = |element, data, length| Value::MutableU16 {
+                id: 0,
+                role: symbolic::MutableU16Role::Ghost {
+                    certificate: 0,
+                    element,
+                    length: Box::new(length),
+                    data,
+                },
+            };
+            let mut bindings = BTreeMap::new();
+            for (index, (element, sort)) in codecs.iter().enumerate() {
+                let symbol = u32::try_from(index).unwrap() * 2;
+                let array =
+                    Sort::Array(Box::new(Sort::BitVec(pointer_bits)), Box::new(sort.clone()));
+                let data = context.symbol(symbol, array.clone()).unwrap();
+                bindings.insert(
+                    "values".into(),
+                    make(*element, data.clone(), length.clone()),
+                );
+                assert!(predicate(&context, "values.len() == 5", &bindings, pointer_bits).is_ok());
+                assert!(predicate(&context, "values[0] == 0", &bindings, pointer_bits).is_err());
+                let wrong_sort = if *sort == Sort::Bool {
+                    Sort::BitVec(1)
+                } else {
+                    Sort::Bool
+                };
+                let wrong = context
+                    .symbol(
+                        symbol + 1,
+                        Sort::Array(Box::new(Sort::BitVec(pointer_bits)), Box::new(wrong_sort)),
+                    )
+                    .unwrap();
+                for data in [wrong, foreign.symbol(symbol, array).unwrap()] {
+                    bindings.insert("values".into(), make(*element, data, length.clone()));
+                    assert_eq!(
+                        predicate(&context, "values.len() == 5", &bindings, pointer_bits)
+                            .unwrap_err(),
+                        "mutable u16 ghost metadata has a different context or sort"
+                    );
+                }
+                for bad_length in [
+                    symbolic::integer(&context, 5, pointer_bits, true),
+                    symbolic::integer(&context, 5, 8, false),
+                    symbolic::integer(&foreign, 5, pointer_bits, false),
+                ] {
+                    bindings.insert("values".into(), make(*element, data.clone(), bad_length));
+                    assert_eq!(
+                        predicate(&context, "values.len() == 5", &bindings, pointer_bits)
+                            .unwrap_err(),
+                        "mutable u16 ghost metadata has a different context or sort"
+                    );
+                }
+            }
+            let data = context
+                .symbol(
+                    0,
+                    Sort::Array(Box::new(Sort::BitVec(pointer_bits)), Box::new(Sort::Bool)),
+                )
+                .unwrap();
+            for element in [
+                ScalarSliceElement::Integer {
+                    bits: 0,
+                    signed: false,
+                },
+                ScalarSliceElement::Integer {
+                    bits: 7,
+                    signed: true,
+                },
+                ScalarSliceElement::Integer {
+                    bits: 129,
+                    signed: false,
+                },
+                ScalarSliceElement::Float { bits: 16 },
+                ScalarSliceElement::Float { bits: 128 },
+            ] {
+                bindings.insert("values".into(), make(element, data.clone(), length.clone()));
+                assert_eq!(
+                    predicate(&context, "values.len() == 5", &bindings, pointer_bits).unwrap_err(),
+                    "mutable integer ghost requires integer codec"
+                );
+                let bad_length = symbolic::integer(&context, 5, 8, false);
+                bindings.insert("values".into(), make(element, data.clone(), bad_length));
+                assert_eq!(
+                    predicate(&context, "values.len() == 5", &bindings, pointer_bits).unwrap_err(),
+                    "mutable u16 ghost metadata has a different context or sort"
+                );
+            }
         }
     }
 }
