@@ -90,7 +90,7 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
         }
         if *expected == ProofStatus::Unknown {
             let (category, reason) = match *name {
-                "dynamic_inner" | "retained" => (
+                "retained" => (
                     UnknownCategory::Semantics,
                     "array write index is not uniquely determined",
                 ),
@@ -188,7 +188,7 @@ fn fixed_inner_paths_preserve_siblings_and_original_storage() {
         ("wrong_outer", ProofStatus::Refuted),
         ("bounds_outer", ProofStatus::Refuted),
         ("bounds_inner", ProofStatus::Refuted),
-        ("dynamic_inner", ProofStatus::Unknown),
+        ("dynamic_inner", ProofStatus::Proved),
         ("retained", ProofStatus::Unknown),
         ("reference_zero", ProofStatus::Unknown),
         ("refined_zero", ProofStatus::Unknown),

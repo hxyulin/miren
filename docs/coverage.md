@@ -1489,3 +1489,17 @@ The original shared read-before-write source proves, while the longer dedicated 
 its later borrowed-array comparison frontier. A distinct over-cap observation retains the actual
 shape resource limit. The shared 110-case/38-family baseline expects 180 PROVED, 156 REFUTED and
 104 UNKNOWN across all four configurations; final frozen validation remains pending.
+
+
+Stage 167 supports one symbolic nested fixed-array index within the existing owned outer-index
+write path. Exact original parent and child types certify homogeneous disjoint logical spans;
+joint outer/inner equality masks update only selected leaves. Replacement and complete old values
+are flattened once before full reconstruction and same-owner commit. Existing source, bounds,
+scalar validity, rvalue effects, candidate/depth limits and single-target behavior remain required.
+Two symbolic nested indices and reference/raw/call destinations stay outside this extension.
+
+The dedicated 24-root host/ARM O0/O2 matrix yields 12 PROVED, 4 REFUTED and 8 UNKNOWN
+per build. The original earlier dynamic_inner source proves in all four profiles before harness
+maintenance. The shared 113-case/39-family baseline expects 184 PROVED, 160 REFUTED and 108 UNKNOWN
+across all configurations. Real inner-index XOR 1 mutation refutes unchanged claims in all four
+profiles and fails valid two-by-two native controls. Full required validation remains pending.

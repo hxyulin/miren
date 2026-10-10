@@ -4082,3 +4082,52 @@ across four configurations. Actual reader mutation and valid 64-element native c
 at `/tmp/miren-stage166-final-evidence`; independent review approves final source and evidence.
 No assumptions, input caps or resource-budget changes are introduced. The earlier longer borrowed
 comparison claim remains UNKNOWN at its recorded frontier.
+
+
+## Stage 167: one symbolic nested index in owned array writes
+
+The certified destination plan admits one symbolic nested fixed-array Index among existing
+Field and constant-index projections after a nonunique owned outer Index. Original parent purity,
+raw child types, homogeneous child shapes and checked disjoint logical spans precede the update.
+Actual target-usize type, scalar context and inner bounds are required. Two symbolic nested
+indices, retained references, raw/Deref and call destinations gain no new rule.
+
+Each target leaf uses the joint outer/inner equality condition. Replacement and every complete
+old candidate are prepared and flattened once, then complete reconstruction precedes one commit
+to the same live owned local or allocation. Candidate and depth limits remain unchanged; expanded
+mask work uses the existing 512-node bound. Zero-leaf targets retain effects, body, bounds, type and
+context checks. Single-target conditional helpers and constant/solver-unique outer priority remain
+unchanged, with query compatibility checked separately.
+
+The dedicated 24-root matrix yields 12 PROVED, 4 REFUTED and 8 UNKNOWN per host/ARM
+O0/O2 build. The unchanged earlier dynamic_inner source independently proves in all four profiles
+before its harness expectation and obsolete UNKNOWN arm are maintained. Source claims remain
+unchanged. Four new/earlier focused tests and 23 related compiler tests pass. Final build, lint,
+fmt and seven product metadata tests pass.
+
+Three shared controls use actual three-root 64-element arrays. Before implementation all four
+compiler profiles return UNKNOWN for supported and false claims at the symbolic nested-write
+frontier, while the missing actual replacement body retains its compiler-evidence frontier.
+Initial after-probes yield P/R/U with empty assumptions. Commands, source/analyzer hashes and
+reports remain at `/tmp/miren-stage167-shared-expanded-before` and
+`/tmp/miren-stage167-shared-expanded-after`; frozen after-evidence retains those exact outcomes
+and verifies current source/analyzer hashes. Three controls yield 113 cases across 39 families,
+expecting 46 PROVED, 40 REFUTED and 27 UNKNOWN per configuration.
+
+A real noinline helper assignment changes the selected inner index to inner XOR 1. The unchanged
+claim refutes in all four compiler profiles with actual helper entry and same-obligation
+query/model.
+Valid originals use the actual two-by-two array domain and pass six native tests at O0/O2; mutant
+guards fail. Complete commands, hashes, reports, outputs and ten-second native timeouts remain at
+`/tmp/miren-stage167-final-evidence`. Full required validation remains pending.
+
+Final validation passes all 683 Rust tests in the isolated frozen workspace and 68 Python tests.
+All 627 tracked main files match the validated snapshot byte for byte. Fresh main debug/release
+builds, nineteen new/related integration tests, 68 Python tests and all remaining required checks
+also pass. Frozen isolated and main surveys retain 184 PROVED, 160 REFUTED and 108 UNKNOWN at
+`/tmp/miren-stage167-capabilities-20261010` and
+`/tmp/miren-stage167-merged-capabilities-20261010`, with source/input/release hashes verified.
+All 336 earlier completed P/R roots retain identical obligation results, details and query text
+across four configurations. Actual inner-index mutation and valid two-by-two native controls
+remain at `/tmp/miren-stage167-final-evidence`; independent review approves final source and
+complete evidence. No assumptions, input caps or resource-budget changes are introduced.

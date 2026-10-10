@@ -4,7 +4,7 @@ use composite_slices::CompositeShape;
 use storage_locations::StorageLocation;
 use symbolic::ScalarSliceElement;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) enum OwnedChoiceShape {
     Primitive(ScalarSliceElement),
     Tuple(Vec<OwnedChoiceShape>),
@@ -20,6 +20,14 @@ struct ProductPathTarget<'tcx> {
     original: Ty<'tcx>,
     shape: OwnedChoiceShape,
     span: std::ops::Range<usize>,
+}
+
+enum ProductWritePlan<'tcx> {
+    Single(ProductPathTarget<'tcx>),
+    Indexed {
+        index: Term,
+        targets: Vec<ProductPathTarget<'tcx>>,
+    },
 }
 
 struct ProductUpdate<'a> {
@@ -197,7 +205,7 @@ impl<'tcx> Engine<'tcx> {
         let Some(shape) = self.owned_product_shape(*element)? else {
             return Ok(false);
         };
-        let Some(target) = self.owned_product_path_target(body, state, *element, &shape, fields)?
+        let Some(plan) = self.owned_product_write_plan(body, state, *element, &shape, fields)?
         else {
             return Ok(false);
         };
@@ -206,6 +214,21 @@ impl<'tcx> Engine<'tcx> {
             &symbolic::integer(&self.terms, elements.len() as u128, bits, false),
             &state.conditions,
         )?;
+        let target = match &plan {
+            ProductWritePlan::Single(target) => target,
+            ProductWritePlan::Indexed { targets, .. } => {
+                if elements
+                    .len()
+                    .checked_mul(targets.len())
+                    .is_none_or(|work| work > MAX_CHOICE_NODES)
+                {
+                    return Err("owned indexed write exceeds its expanded node budget".into());
+                }
+                targets
+                    .first()
+                    .ok_or("owned indexed write has no feasible target")?
+            }
+        };
         let mut nodes = 0;
         let replacement = self
             .product_leaves(
@@ -226,10 +249,36 @@ impl<'tcx> Engine<'tcx> {
                 Op::Equal,
                 &[term.clone(), self.terms.bit_vector(position as u128, bits)?],
             )?;
-            updated.push(if fields.is_empty() {
-                conditional_product(&self.terms, bits, &shape, &condition, &replacement, &old)?
-            } else {
-                conditional_product_field(
+            updated.push(match &plan {
+                ProductWritePlan::Indexed { index, targets } => {
+                    let masks = targets
+                        .iter()
+                        .enumerate()
+                        .map(|(position, target)| {
+                            let equal = self.terms.apply(
+                                Op::Equal,
+                                &[
+                                    index.clone(),
+                                    self.terms.bit_vector(position as u128, bits)?,
+                                ],
+                            )?;
+                            let mask = self.terms.apply(Op::And, &[condition.clone(), equal])?;
+                            Ok((target.span.clone(), mask))
+                        })
+                        .collect::<Result<Vec<_>, String>>()?;
+                    conditional_indexed_product(
+                        &self.terms,
+                        bits,
+                        &shape,
+                        &masks,
+                        &replacement,
+                        &old,
+                    )?
+                }
+                ProductWritePlan::Single(_) if fields.is_empty() => {
+                    conditional_product(&self.terms, bits, &shape, &condition, &replacement, &old)?
+                }
+                ProductWritePlan::Single(target) => conditional_product_field(
                     &self.terms,
                     bits,
                     &shape,
@@ -239,7 +288,7 @@ impl<'tcx> Engine<'tcx> {
                         leaves: &replacement,
                     },
                     &old,
-                )?
+                )?,
             });
         }
         let updated = Value::Elements(updated.into());
@@ -249,6 +298,111 @@ impl<'tcx> Engine<'tcx> {
             state.locals[local] = Some(updated);
         }
         Ok(true)
+    }
+
+    fn owned_product_write_plan(
+        &self,
+        body: &Body<'tcx>,
+        state: &State,
+        original: Ty<'tcx>,
+        shape: &OwnedChoiceShape,
+        projections: &[rustc_middle::mir::PlaceElem<'tcx>],
+    ) -> Result<Option<ProductWritePlan<'tcx>>, String> {
+        let bits = u32::from(self.tcx.sess.target.pointer_width);
+        for (position, projection) in projections.iter().enumerate() {
+            let ProjectionElem::Index(local) = projection else {
+                continue;
+            };
+            if body.local_decls[*local].ty != self.tcx.types.usize {
+                return Err("owned nested array index requires compiler usize".into());
+            }
+            let value = self.local(state, local.as_usize())?;
+            if fixed_index_value(&self.terms, &value, bits)?.is_some() {
+                continue;
+            }
+            let Some(prefix) = self.owned_product_path_target(
+                body,
+                state,
+                original,
+                shape,
+                &projections[..position],
+            )?
+            else {
+                return Ok(None);
+            };
+            let ty::Array(_, count) = prefix.original.kind() else {
+                return Err("owned symbolic nested index requires original fixed array".into());
+            };
+            let count = count
+                .try_to_target_usize(self.tcx)
+                .ok_or("owned symbolic nested array requires compiler length")?;
+            let count = usize::try_from(count)
+                .map_err(|_| "owned symbolic nested length exceeds host capacity")?;
+            if count > MAX_CHOICE_NODES {
+                return Err("owned indexed targets exceed their node budget".into());
+            }
+            self.memory_bounds(
+                &value,
+                &symbolic::integer(&self.terms, count as u128, bits, false),
+                &state.conditions,
+            )?;
+            let mut targets: Vec<ProductPathTarget<'tcx>> = Vec::new();
+            for index in 0..count {
+                let (child_ty, child_shape, offset) =
+                    self.owned_product_array_target(prefix.original, &prefix.shape, index, None)?;
+                let Some(mut target) = self.owned_product_path_target(
+                    body,
+                    state,
+                    child_ty,
+                    &child_shape,
+                    &projections[position + 1..],
+                )?
+                else {
+                    return Ok(None);
+                };
+                if targets.first().is_some_and(|first| {
+                    first.original != target.original || first.shape != target.shape
+                }) {
+                    return Err("owned indexed targets differ in original type or shape".into());
+                }
+                let offset = prefix
+                    .span
+                    .start
+                    .checked_add(offset)
+                    .ok_or("owned indexed target offset overflow")?;
+                target.span.start = target
+                    .span
+                    .start
+                    .checked_add(offset)
+                    .ok_or("owned indexed target offset overflow")?;
+                target.span.end = target
+                    .span
+                    .end
+                    .checked_add(offset)
+                    .ok_or("owned indexed target extent overflow")?;
+                targets.push(target);
+            }
+            let leaves = targets
+                .first()
+                .map(|target| product_leaf_count(&target.shape))
+                .transpose()?
+                .unwrap_or(0);
+            validate_indexed_spans(
+                &targets
+                    .iter()
+                    .map(|target| target.span.clone())
+                    .collect::<Vec<_>>(),
+                product_leaf_count(shape)?,
+                leaves,
+            )?;
+            return Ok(Some(ProductWritePlan::Indexed {
+                index: value.integer()?.0,
+                targets,
+            }));
+        }
+        Ok(self
+            .owned_product_path_target(body, state, original, shape, projections)?
+            .map(ProductWritePlan::Single))
     }
 
     fn owned_product_path_target(
@@ -815,6 +969,81 @@ fn conditional_product_field(
     Ok(result)
 }
 
+fn validate_indexed_spans(
+    spans: &[std::ops::Range<usize>],
+    count: usize,
+    width: usize,
+) -> Result<(), String> {
+    if spans.len() > MAX_CHOICE_NODES {
+        return Err("owned indexed span budget exceeded".into());
+    }
+    let mut end = 0;
+    for span in spans {
+        if span.start > span.end
+            || span.end > count
+            || span.len() != width
+            || (!span.is_empty() && span.start < end)
+        {
+            return Err("owned indexed spans are invalid or overlap".into());
+        }
+        if !span.is_empty() {
+            end = span.end;
+        }
+    }
+    Ok(())
+}
+
+fn conditional_indexed_product(
+    context: &Context,
+    pointer_bits: u32,
+    shape: &OwnedChoiceShape,
+    masks: &[(std::ops::Range<usize>, Term)],
+    replacement: &[Value],
+    old: &[Value],
+) -> Result<Value, String> {
+    if masks.len() > MAX_CHOICE_NODES {
+        return Err("owned indexed span budget exceeded".into());
+    }
+    if old.len() != product_leaf_count(shape)? {
+        return Err("owned indexed write differs in complete leaf inventory".into());
+    }
+    validate_indexed_spans(
+        &masks
+            .iter()
+            .map(|(span, _)| span.clone())
+            .collect::<Vec<_>>(),
+        old.len(),
+        replacement.len(),
+    )?;
+    for (_, mask) in masks {
+        if mask.sort() != &Sort::Bool || !mask.belongs_to(context) {
+            return Err("owned indexed write mask has invalid sort or context".into());
+        }
+    }
+    let selected = old
+        .iter()
+        .enumerate()
+        .map(|(position, old)| {
+            if let Some((span, mask)) = masks.iter().find(|(span, _)| span.contains(&position)) {
+                symbolic::conditional_scalar(
+                    context,
+                    mask,
+                    &replacement[position - span.start],
+                    old,
+                )
+            } else {
+                Ok(old.clone())
+            }
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let mut cursor = 0;
+    let result = rebuild(context, pointer_bits, shape, &selected, &mut cursor)?;
+    if cursor != selected.len() {
+        return Err("owned indexed write omitted leaves".into());
+    }
+    Ok(result)
+}
+
 fn fixed_index_value(
     context: &Context,
     value: &Value,
@@ -1010,6 +1239,127 @@ pub(super) fn rebuild(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn indexed_product_updates_preserve_disjoint_correlation_bits_and_empty_validation() {
+        let context = Context::default();
+        let outer = context.symbol(90, Sort::Bool).unwrap();
+        let inner = context.symbol(91, Sort::Bool).unwrap();
+        let first = context
+            .apply(Op::And, &[outer.clone(), inner.clone()])
+            .unwrap();
+        let second = context
+            .apply(Op::And, &[outer, symbolic::not(&inner)])
+            .unwrap();
+        let row = OwnedChoiceShape::Tuple(vec![
+            OwnedChoiceShape::Primitive(ScalarSliceElement::Float { bits: 32 }),
+            OwnedChoiceShape::Primitive(ScalarSliceElement::Integer {
+                bits: 16,
+                signed: false,
+            }),
+        ]);
+        let shape = OwnedChoiceShape::Array(vec![row.clone(), row]);
+        let old = vec![
+            symbolic::float_from_bits(&context, context.bit_vector(0x7fc0_1234, 32).unwrap(), 32),
+            symbolic::integer(&context, 7, 16, false),
+            symbolic::float_from_bits(&context, context.bit_vector(0, 32).unwrap(), 32),
+            symbolic::integer(&context, 11, 16, false),
+        ];
+        let replacement = vec![symbolic::float_from_bits(
+            &context,
+            context.bit_vector(0x8000_0000, 32).unwrap(),
+            32,
+        )];
+        let masks = vec![(0..1, first.clone()), (2..3, second.clone())];
+        let result =
+            conditional_indexed_product(&context, 64, &shape, &masks, &replacement, &old).unwrap();
+        let Value::Elements(rows) = result else {
+            panic!("expected array");
+        };
+        for (position, mask) in [first, second].iter().enumerate() {
+            let Value::Tuple(fields) = &rows[position] else {
+                panic!("expected tuple");
+            };
+            assert_eq!(
+                fields[1].integer().unwrap().0,
+                old[position * 2 + 1].integer().unwrap().0
+            );
+            let Value::Float {
+                raw_bits: Some(bits),
+                ..
+            } = &fields[0]
+            else {
+                panic!("expected certified bits");
+            };
+            let Value::Float {
+                raw_bits: Some(new),
+                ..
+            } = &replacement[0]
+            else {
+                unreachable!();
+            };
+            let Value::Float {
+                raw_bits: Some(old),
+                ..
+            } = &old[position * 2]
+            else {
+                unreachable!();
+            };
+            assert_eq!(
+                *bits,
+                context
+                    .apply(Op::Ite, &[mask.clone(), new.clone(), old.clone()])
+                    .unwrap()
+            );
+        }
+        assert!(validate_indexed_spans(&[0..2, 1..3], 4, 2).is_err());
+        assert!(validate_indexed_spans(&[std::ops::Range { start: 2, end: 1 }], 4, 1).is_err());
+        assert!(validate_indexed_spans(std::slice::from_ref(&(3..5)), 4, 2).is_err());
+        assert!(validate_indexed_spans(std::slice::from_ref(&(0..1)), 4, 2).is_err());
+        assert!(validate_indexed_spans(&vec![0..0; MAX_CHOICE_NODES + 1], 0, 0).is_err());
+        let zero = OwnedChoiceShape::Struct {
+            name: "Zero".into(),
+            fields: vec![],
+        };
+        let empty = conditional_indexed_product(
+            &context,
+            64,
+            &zero,
+            &[
+                (0..0, context.boolean(true)),
+                (0..0, context.boolean(false)),
+            ],
+            &[],
+            &[],
+        )
+        .unwrap();
+        assert!(
+            matches!(empty, Value::Adt { name, fields, .. } if name=="Zero" && fields.is_empty())
+        );
+        let foreign = Context::default();
+        assert!(
+            conditional_indexed_product(
+                &context,
+                64,
+                &zero,
+                &[(0..0, foreign.boolean(true))],
+                &[],
+                &[]
+            )
+            .is_err()
+        );
+        assert!(
+            conditional_indexed_product(
+                &context,
+                64,
+                &zero,
+                &[(0..0, context.bit_vector(0, 32).unwrap())],
+                &[],
+                &[]
+            )
+            .is_err()
+        );
+    }
 
     #[test]
     fn deferred_candidate_hint_is_bounded_and_does_not_observe_identity_carriers() {

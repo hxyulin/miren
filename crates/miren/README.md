@@ -715,10 +715,16 @@ physical offset or padding rights follow.
 Owned byte-array elements keep their exact u8/count certificate. Writes to existing owner
 allocations validate live writable storage and commit to that same allocation. These updates
 preserve the existing 512-node/depth-16 budgets, Char validity and Float bit certificates.
-Nested array indices require literal target-usize values or start-relative compiler constant
+Fixed nested-array paths require literal target-usize values or start-relative compiler constant
 indices, exact original fixed-array types and checked bounds. Exact u8 arrays retain their byte
-annotation when selecting one byte. Dynamic nested indices, reference/raw/static destinations,
-dereferences, downcasts and call destinations retain their existing unsupported frontiers.
+annotation when selecting one byte. One symbolic nested fixed-array index can update certified,
+disjoint logical child spans using the joint outer/inner index condition. Every complete old
+candidate is flattened once, and replacement fields share one condition at each target; untouched
+leaf terms and Float bit certificates survive the complete nominal rebuild. Both index bounds and
+exact homogeneous child types are certified before the same owned-storage transaction. A second
+symbolic nested index, reference/raw/static destinations, dereferences, downcasts and call
+destinations retain their existing unsupported frontiers. Known outer-index stores retain their
+existing paths, including any unsupported nested operations.
 Assignment targets retain complete parent and replacement validation, including siblings and
 zero-leaf fields. Deferred input products with no observable scalar leaves can be reconstructed
 after exact original-type and descriptor validation. Nominal zero-sized structs

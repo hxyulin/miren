@@ -1013,6 +1013,64 @@ pub fn registered_pure_array_missing_body(
     }
 }
 
+pub fn owned_array_dynamic_write(
+    mut first: [[u16; 2]; 64],
+    _second: [[u16; 2]; 64],
+    _third: [[u16; 2]; 64],
+    outer: usize,
+    inner: usize,
+    value: u16,
+) {
+    if outer < first.len() && inner < 2 {
+        let before = first[outer];
+        let other_before = first[outer ^ 1];
+        first[outer][inner] = value;
+        let selected = first[outer];
+        let unchanged = first[outer ^ 1];
+        assert!(selected[inner] == value);
+        assert!(selected[inner ^ 1] == before[inner ^ 1]);
+        assert!(unchanged[0] == other_before[0]);
+        assert!(unchanged[1] == other_before[1]);
+    }
+}
+
+pub fn owned_array_dynamic_wrong_claim(
+    mut first: [[u16; 2]; 64],
+    _second: [[u16; 2]; 64],
+    _third: [[u16; 2]; 64],
+    outer: usize,
+    inner: usize,
+    value: u16,
+) {
+    if outer < first.len() && inner < 2 {
+        first[outer][inner] = value;
+        let selected = first[outer];
+        assert!(selected[inner] == value.wrapping_add(1));
+    }
+}
+
+#[cfg(not(test))]
+unsafe extern "Rust" {
+    fn opaque_owned_dynamic_replacement(value: u16) -> u16;
+}
+
+#[cfg(not(test))]
+pub fn owned_array_dynamic_missing_body(
+    mut first: [[u16; 2]; 64],
+    _second: [[u16; 2]; 64],
+    _third: [[u16; 2]; 64],
+    outer: usize,
+    inner: usize,
+    value: u16,
+) {
+    if outer < first.len() && inner < 2 {
+        let replacement = unsafe { opaque_owned_dynamic_replacement(value) };
+        first[outer][inner] = replacement;
+        let selected = first[outer];
+        assert!(selected[inner] == replacement);
+    }
+}
+
 #[cfg(test)]
 mod native {
     use super::*;
@@ -1031,6 +1089,12 @@ mod native {
         for index in [0, 63, 64, usize::MAX] {
             registered_pure_array_read([(3, [5, 7]); 64], [(11, [13, 17]); 64],
                 [(19, [23, 29]); 64], index);
+        }
+        for outer in [0, 63, 64, usize::MAX] {
+            for inner in [0, 1, 2, usize::MAX] {
+                owned_array_dynamic_write([[3, 7]; 64], [[5, 11]; 64], [[13, 17]; 64],
+                    outer, inner, u16::MAX);
+            }
         }
         safe_sized_alignment(SizedLayoutZero);
         deferred_zero_owned_write([DeferredZero; 2], 0);
@@ -1218,6 +1282,11 @@ mod native {
         let first = [ReservedRecord { left: 3, right: 7 }; 64];
         let second = [ReservedRecord { left: 5, right: 11 }; 64];
         registered_product_wrong_claim(first, second, first, 63);
+    }
+    #[test]
+    #[should_panic]
+    fn owned_array_dynamic_wrong_claim_panics() {
+        owned_array_dynamic_wrong_claim([[3, 7]; 64], [[5, 11]; 64], [[13, 17]; 64], 63, 1, 0);
     }
     #[test]
     #[should_panic]
