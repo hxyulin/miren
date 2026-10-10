@@ -90,9 +90,13 @@ all original child types are checked, including inactive and zero-length payload
 tag decoder and independent per-variant payload columns retain each selected logical occurrence;
 inactive payload columns confer no initialized bytes or raw rights. Checked indexing, matches,
 readonly views, cursors and safe layout APIs preserve the retained source and actual body gates.
-Niche enums, other core wrappers, nominal struct payloads and whole sum comparison summaries
-remain UNKNOWN. Mutable/raw/static access policies and owned product choice/write admission are
-unchanged.
+Exact `Option<bool>` and ordinary local two-variant empty/Bool enums also admit the compiler's
+one-byte niche layout. Its initialized ABI must cover exactly false, true and the reserved empty
+tag; the original Bool payload and overlapping variant layouts are checked independently. Logical
+variant selection preserves active Bool values without initializing the empty variant's latent
+payload. Char, NonZero, reference and multi-alternative niches, other core wrappers, nominal struct
+payloads and whole sum comparison summaries remain UNKNOWN. Mutable/raw/static access policies and
+owned product choice/write admission are unchanged.
 
 Whole mutable Rust `bool` statics and certified boolean fields inside compiler-identified
 `UnsafeCell` storage support typed direct reads and writes through compiler-backed allocation

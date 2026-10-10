@@ -4608,3 +4608,49 @@ counterexample boundaries at `/tmp/miren-stage176-source-review.md`; the final g
 recapture is `/tmp/miren-stage176-global-final-evidence`. Historical dedicated/global binary
 identities retain their original scope. No assumptions, input caps or resource-budget changes
 are introduced. Stage 176 integrates after actual Stage 172 commit `fbb58ca`.
+
+
+## Stage 177: readonly exact Bool niche enum slices
+
+
+Stage 177 adds readonly slices of exact compiler `Option<bool>` and local two-variant enums
+with one original Bool payload and one empty alternative. The separate niche layout certificate
+checks the actual one-byte overlap, Bool range 0..1, complete enum range 0..2, niche value 2,
+variant identity and original fields. Reversed variant order is supported from compiler evidence.
+Existing legal-tag logical decoding, guarded active payloads, source lifetimes and extent checks
+are reused; no physical pointer, owned-write or comparison rights are added. Char, NonZero,
+reference and broader niche layouts remain UNKNOWN.
+
+The dedicated thirty-two-root matrix yields thirteen PROVED, five REFUTED and fourteen UNKNOWN
+per host/ARM O0/O2 profile. Exact final sources return UNKNOWN under the frozen Stage 176 build.
+Actual helper Bool-flip mutation refutes the unchanged claim in all profiles; seven valid native
+originals pass and mutant guards exit 101 at O0/O2 with ten-second timeouts. Evidence, commands
+and hashes remain at `/tmp/miren-stage177-final-evidence`. Full actual compiler layout probes
+remain at `/tmp/miren-stage177-final-layout`. Nine composite metadata units include the new
+malformed niche-certificate controls.
+
+The unchanged old `tagged_sum_slices::niche_bool` length control becomes PROVED across all four
+profiles. The initial stale expectation failure remains at
+`/tmp/miren-stage177-old-direct-initial.log` before harness-only upkeep. Thirty-one other old
+controls retain exact outcomes and obligations; 68 completed root/profile pairs and 156 completed
+queries remain identical at `/tmp/miren-stage177-direct-fidelity`. The global triplet yields
+P/R/missing-body U, with actual Bool-flip and native controls at
+`/tmp/miren-stage177-global-evidence`. Its manifest contains 140 cases in 48 families; these
+selected controls do not establish a Rust coverage percentage. These focused captures preceded full
+checks,
+final parent adoption and final-survey fidelity.
+
+
+Final validation passes all 716 Rust tests and 68 Python tests. Formatting, lint, debug/release
+builds, cargo deny, documentation and manual hooks pass. All 764 tracked main files match the
+final snapshot byte for byte. Fresh main builds, sixteen related integration tests, nine metadata
+tests and 68 Python tests pass. Both frozen surveys yield 220 PROVED, 196 REFUTED and 144 UNKNOWN
+at `/tmp/miren-stage177-capabilities-20261010` and
+`/tmp/miren-stage177-merged-capabilities-20261010`. All 408 previously completed parent roots
+retain identical outcomes, obligation details and query text; all 560 main/isolate outcomes,
+queries, models, premises and diagnostic details match. Source, input and release hashes are
+verified. Independent source and focused-evidence review approves the actual narrow niche
+certificate at `/tmp/miren-stage177-source-review.md`. Current global after/mutation evidence is
+`/tmp/miren-stage177-global-final-evidence`; historical dedicated/layout/native artifacts retain
+their original source and binary scope. No assumptions, input caps or resource-budget changes
+are introduced. Stage 177 integrates after actual Stage 176 commit `80beb48`.

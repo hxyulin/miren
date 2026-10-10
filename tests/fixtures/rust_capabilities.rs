@@ -1495,8 +1495,69 @@ pub fn tagged_sum_slice_missing_body(values: &[TaggedReading], index: usize) -> 
     0
 }
 
+#[derive(Clone, Copy)]
+pub enum BoolNicheReading {
+    Empty,
+    Flag(bool),
+}
+
+#[inline(never)]
+fn bool_niche_selected(value: BoolNicheReading) -> bool {
+    match value {
+        BoolNicheReading::Flag(flag) => flag,
+        BoolNicheReading::Empty => false,
+    }
+}
+
+pub fn bool_niche_slice(values: &[BoolNicheReading], index: usize) {
+    if index < values.len() {
+        if let BoolNicheReading::Flag(flag) = values[index] {
+            assert!(bool_niche_selected(values[index]) == flag);
+        }
+    }
+}
+
+pub fn bool_niche_slice_wrong_claim(values: &[BoolNicheReading], index: usize) {
+    if index < values.len() {
+        if let BoolNicheReading::Flag(flag) = values[index] {
+            assert!(!flag);
+        }
+    }
+}
+
+#[cfg(not(test))]
+unsafe extern "Rust" {
+    fn opaque_bool_niche_slice(value: BoolNicheReading) -> bool;
+}
+
+#[cfg(not(test))]
+pub fn bool_niche_slice_missing_body(values: &[BoolNicheReading], index: usize) -> bool {
+    if index < values.len() {
+        if let BoolNicheReading::Flag(flag) = values[index] {
+            assert!(bool_niche_selected(values[index]) == flag);
+            return unsafe { opaque_bool_niche_slice(values[index]) };
+        }
+    }
+    false
+}
+
 #[cfg(test)]
 mod native {
+    #[test]
+    fn bool_niche_slice_controls() {
+        for index in [0, 1, 128, 129, usize::MAX] {
+            bool_niche_slice(&[BoolNicheReading::Flag(true); 129], index);
+        }
+        bool_niche_slice(&[BoolNicheReading::Empty, BoolNicheReading::Flag(false)], 0);
+        bool_niche_slice(&[BoolNicheReading::Empty, BoolNicheReading::Flag(false)], 1);
+    }
+
+    #[test]
+    #[should_panic]
+    fn bool_niche_slice_wrong_claim_panics() {
+        bool_niche_slice_wrong_claim(&[BoolNicheReading::Flag(true)], 0);
+    }
+
     #[test]
     fn tagged_sum_slice_controls() {
         for index in [0, 1, 128, 129, usize::MAX] {

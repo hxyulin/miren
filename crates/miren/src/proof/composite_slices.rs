@@ -222,7 +222,7 @@ impl<'tcx> Engine<'tcx> {
                 Ok(Some(CompositeShape::Array(shapes)))
             }
             ty::Adt(def, args) if allow_sums && def.is_enum() => {
-                self.direct_sum_shape(ty, *def, args, depth, nodes)
+                self.readonly_sum_shape(ty, *def, args, depth, nodes)
             }
             ty::Adt(def, args) if !enum_payload && self.plain_composite_struct(*def) => {
                 if def.repr().pack.is_some()
@@ -275,7 +275,7 @@ impl<'tcx> Engine<'tcx> {
         }
     }
 
-    fn direct_sum_shape(
+    fn readonly_sum_shape(
         &self,
         original: Ty<'tcx>,
         def: ty::AdtDef<'tcx>,
@@ -288,7 +288,6 @@ impl<'tcx> Engine<'tcx> {
             && (def.flags() == AdtFlags::IS_ENUM
                 || def.flags() == (AdtFlags::IS_ENUM | AdtFlags::HAS_CTOR));
         if (!ordinary && !is_option)
-            || (is_option && args.type_at(0) != self.tcx.types.u16)
             || def.repr().pack.is_some()
             || def.variants().len() < 2
             || def.variants().len() > aggregates::MAX_ENUM_VARIANTS
@@ -296,6 +295,18 @@ impl<'tcx> Engine<'tcx> {
             return Ok(None);
         }
         let layout = self.static_layout(original)?;
+        if matches!(
+            layout.variants,
+            Variants::Multiple {
+                tag_encoding: TagEncoding::Niche { .. },
+                ..
+            }
+        ) {
+            return self.bool_niche_sum_shape(original, def, args, depth, nodes);
+        }
+        if is_option && args.type_at(0) != self.tcx.types.u16 {
+            return Ok(None);
+        }
         let Variants::Multiple {
             tag,
             tag_encoding: TagEncoding::Direct,
@@ -391,6 +402,118 @@ impl<'tcx> Engine<'tcx> {
             inventory.push(CompositeVariant {
                 name: variant.name.as_str().to_owned(),
                 discriminant: tag_value,
+                fields,
+            });
+        }
+        validate_sum_inventory(bits, &inventory)?;
+        Ok(Some(CompositeShape::Sum {
+            name: self.tcx.def_path_str(def.did()),
+            bits,
+            signed,
+            is_option,
+            variants: inventory,
+        }))
+    }
+
+    fn bool_niche_sum_shape(
+        &self,
+        original: Ty<'tcx>,
+        def: ty::AdtDef<'tcx>,
+        args: ty::GenericArgsRef<'tcx>,
+        depth: usize,
+        nodes: &mut usize,
+    ) -> Result<Option<CompositeShape>, String> {
+        let is_option = self.tcx.lang_items().get(LangItem::Option) == Some(def.did());
+        if def.variants().len() != 2 || (is_option && args.type_at(0) != self.tcx.types.bool) {
+            return Ok(None);
+        }
+        let layout = self.static_layout(original)?;
+        let Variants::Multiple {
+            tag,
+            tag_encoding:
+                TagEncoding::Niche {
+                    untagged_variant,
+                    niche_variants,
+                    niche_start,
+                },
+            tag_field,
+            variants,
+        } = &layout.variants
+        else {
+            return Ok(None);
+        };
+        let bool_layout = self.static_layout(self.tcx.types.bool)?;
+        let BackendRepr::Scalar(bool_scalar) = bool_layout.backend_repr else {
+            return Err("original Bool lacks its initialized scalar ABI".into());
+        };
+        if !bool_niche_mapping_matches(
+            *tag,
+            bool_scalar,
+            untagged_variant.as_usize(),
+            niche_variants.start.as_usize(),
+            niche_variants.last.as_usize(),
+            *niche_start,
+        ) || layout.uninhabited
+            || layout.size.bytes() != 1
+            || layout.align.abi.bytes() != 1
+            || bool_layout.size.bytes() != 1
+            || bool_layout.align.abi.bytes() != 1
+            || layout.fields.count() != 1
+            || tag_field.as_usize() != 0
+            || layout.fields.offset(tag_field.as_usize()).bytes() != 0
+            || layout.backend_repr != BackendRepr::Scalar(*tag)
+            || variants.len() != 2
+        {
+            return Ok(None);
+        }
+        let (bits, signed) = self
+            .integer_type(original.discriminant_ty(self.tcx))
+            .ok_or("Bool niche enum lacks its compiler discriminant type")?;
+        let mut inventory = Vec::new();
+        for (position, variant) in def.variants().iter_enumerated() {
+            if *nodes >= MAX_SHAPE_NODES {
+                return Err(self.categorized_error(
+                    UnknownCategory::ResourceLimit,
+                    "composite enum exceeds its expanded node budget".into(),
+                ));
+            }
+            *nodes += 1;
+            let actual = &variants[position];
+            let discriminant = def.discriminant_for_variant(self.tcx, position).val;
+            if discriminant != position.as_usize() as u128 || actual.is_uninhabited() {
+                return Ok(None);
+            }
+            let mut fields = Vec::new();
+            if position == *untagged_variant {
+                if variant.fields.len() != 1
+                    || actual.field_offsets.len() != 1
+                    || actual.field_offsets[rustc_abi::FieldIdx::from_usize(0)].bytes() != 0
+                    || actual.size != bool_layout.size
+                    || actual.backend_repr != BackendRepr::Scalar(bool_scalar)
+                {
+                    return Ok(None);
+                }
+                let field = &variant.fields[rustc_abi::FieldIdx::from_usize(0)];
+                let original_field = field.ty(self.tcx, args).skip_norm_wip();
+                if original_field != self.tcx.types.bool {
+                    return Ok(None);
+                }
+                let Some(shape) =
+                    self.composite_shape_depth(original_field, depth + 1, nodes, true, true)?
+                else {
+                    return Ok(None);
+                };
+                fields.push((field.name.as_str().to_owned(), shape));
+            } else if !variant.fields.is_empty()
+                || !actual.field_offsets.is_empty()
+                || actual.size.bytes() != 0
+                || actual.backend_repr != (BackendRepr::Memory { sized: true })
+            {
+                return Ok(None);
+            }
+            inventory.push(CompositeVariant {
+                name: variant.name.as_str().to_owned(),
+                discriminant,
                 fields,
             });
         }
@@ -857,6 +980,32 @@ fn validate_sum_inventory(bits: u32, variants: &[CompositeVariant]) -> Result<()
     Ok(())
 }
 
+// The niche tag overlaps Bool storage. Only the three concrete initialized encodings
+// are admitted; the empty variant never initializes or reads the latent Bool payload.
+fn bool_niche_mapping_matches(
+    tag: Scalar,
+    payload: Scalar,
+    untagged: usize,
+    first: usize,
+    last: usize,
+    niche_start: u128,
+) -> bool {
+    let bool_scalar = Scalar::Initialized {
+        value: Primitive::Int(rustc_abi::Integer::I8, false),
+        valid_range: rustc_abi::WrappingRange { start: 0, end: 1 },
+    };
+    let enum_scalar = Scalar::Initialized {
+        value: Primitive::Int(rustc_abi::Integer::I8, false),
+        valid_range: rustc_abi::WrappingRange { start: 0, end: 2 },
+    };
+    payload == bool_scalar
+        && tag == enum_scalar
+        && untagged < 2
+        && first == last
+        && first == 1 - untagged
+        && niche_start == 2
+}
+
 // The initialized tag is always present. A scalar-pair payload may be absent in a
 // fieldless variant; union/full-range ABI storage does not initialize that inactive payload.
 fn direct_enum_backend_matches(
@@ -897,6 +1046,61 @@ fn unrestricted_scalar_range(scalar: Scalar) -> bool {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn bool_niche_metadata_requires_exact_initialized_three_value_mapping() {
+        let payload = Scalar::Initialized {
+            value: Primitive::Int(rustc_abi::Integer::I8, false),
+            valid_range: rustc_abi::WrappingRange { start: 0, end: 1 },
+        };
+        let tag = Scalar::Initialized {
+            value: Primitive::Int(rustc_abi::Integer::I8, false),
+            valid_range: rustc_abi::WrappingRange { start: 0, end: 2 },
+        };
+        for untagged in [0, 1] {
+            let empty = 1 - untagged;
+            assert!(bool_niche_mapping_matches(
+                tag, payload, untagged, empty, empty, 2
+            ));
+            assert!(!bool_niche_mapping_matches(
+                tag, payload, untagged, empty, empty, 0
+            ));
+            assert!(!bool_niche_mapping_matches(
+                tag, payload, untagged, empty, empty, 1
+            ));
+            assert!(!bool_niche_mapping_matches(
+                tag, payload, untagged, empty, empty, 258
+            ));
+            assert!(!bool_niche_mapping_matches(
+                tag, payload, untagged, untagged, untagged, 2
+            ));
+        }
+        assert!(!bool_niche_mapping_matches(tag, payload, 2, 0, 0, 2));
+        assert!(!bool_niche_mapping_matches(tag, payload, 1, 0, 1, 2));
+        for scalar in [
+            Scalar::Initialized {
+                value: Primitive::Int(rustc_abi::Integer::I8, true),
+                valid_range: rustc_abi::WrappingRange { start: 0, end: 2 },
+            },
+            Scalar::Initialized {
+                value: Primitive::Int(rustc_abi::Integer::I16, false),
+                valid_range: rustc_abi::WrappingRange { start: 0, end: 2 },
+            },
+            Scalar::Initialized {
+                value: Primitive::Int(rustc_abi::Integer::I8, false),
+                valid_range: rustc_abi::WrappingRange { start: 0, end: 255 },
+            },
+            Scalar::Initialized {
+                value: Primitive::Int(rustc_abi::Integer::I8, false),
+                valid_range: rustc_abi::WrappingRange { start: 255, end: 2 },
+            },
+            Scalar::Union {
+                value: Primitive::Int(rustc_abi::Integer::I8, false),
+            },
+        ] {
+            assert!(!bool_niche_mapping_matches(scalar, payload, 1, 0, 0, 2));
+        }
+        assert!(!bool_niche_mapping_matches(tag, tag, 1, 0, 0, 2));
+    }
     use super::*;
 
     #[test]

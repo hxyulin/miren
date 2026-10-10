@@ -82,7 +82,6 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
                 | "reference_zero"
                 | "refined_zero"
                 | "dropped_zero"
-                | "niche_bool"
                 | "niche_char"
                 | "niche_nonzero"
                 | "nominal_payload_zero" => (
@@ -228,7 +227,7 @@ fn direct_tag_slices_preserve_active_payload_and_source_validity() {
         ("guarded_pair", ProofStatus::Proved),
         ("long_selected", ProofStatus::Proved),
         ("mutable_root", ProofStatus::Unknown),
-        ("niche_bool", ProofStatus::Unknown),
+        ("niche_bool", ProofStatus::Proved),
         ("niche_char", ProofStatus::Unknown),
         ("niche_nonzero", ProofStatus::Unknown),
         ("numerical_bits", ProofStatus::Proved),
