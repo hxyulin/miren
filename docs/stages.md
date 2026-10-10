@@ -4016,7 +4016,8 @@ write-first lazy source proves. Dynamic nested indices, retained/raw/restricted 
 actual bodies and existing resource limits remain UNKNOWN at their recorded frontiers.
 
 Four unchanged earlier sources prove independently in all four compiler profiles: pure array
-symbolic_mutation, owned array deeper_store, field-write second_index and byte-array ambiguous_store.
+symbolic_mutation, owned array deeper_store, field-write second_index and byte-array
+ambiguous_store.
 Only their harness expectations and obsolete UNKNOWN arms are maintained; source claims stay
 unchanged. Initial expectation failures remain in the related logs. Five product metadata tests,
 ten new/earlier focused compiler tests and 21 related integration tests pass. Final fmt, lint and
@@ -4033,3 +4034,51 @@ All 316 earlier completed P/R roots retain identical obligation results, details
 across four configurations. Actual inner-index assignment mutation and valid two-element native
 controls remain at `/tmp/miren-stage165-final-evidence`; independent review approves final source
 and evidence. No assumptions, input caps or resource-budget changes are introduced.
+
+
+## Stage 166: certified deferred pure tuple and array reads
+
+The next extension lets actual deferred Input candidates in original pure tuple/fixed-array
+products use the existing typed choice preparation. Earlier generic, constant and solver-unique
+selection paths retain their priority, with actual bounds and source checks before the typed
+route. The deferred marker only chooses a route; complete original type/shape, existing issued
+scalar or closed-zero preparation, scalar context and cumulative node/depth validation still
+certify every value. Each descriptor is certified before its own reserved symbols are observed;
+complete candidate preparation precedes selection.
+
+The original stage165 shared read-before-write source is retained. New tuple/array read-correlation,
+independent-root false claim and missing actual field body controls use three 64-element roots.
+All four compiler profiles return UNKNOWN before implementation at the earlier lazy read frontier.
+Commands, source/analyzer hashes and full reports are retained at
+`/tmp/miren-stage166-shared-expanded-before`. Final outcomes and validation are pending.
+
+The dedicated 20-root matrix yields 9 PROVED, 4 REFUTED and 7 UNKNOWN per host/ARM O0/O2 build.
+Registered pure tuple/fixed-array reads preserve repeated/copy correlations, independent roots,
+Float representation and zero children. The original oversized self-equality source proves
+without requiring a deep product observation; a separate over-cap observation uses three actual
+lazy roots and reaches the existing 128-element shape resource frontier. Neither source claim
+is weakened or relabeled to suggest deeper support.
+
+The unchanged longer stage165 lazy_roots source retains UNKNOWN at a later borrowed-array
+comparison/index frontier after its initial reads progress. Its original whole claim and harness
+expectation are preserved. The simpler original shared read-before-write source proves in all
+four profiles. A real noinline by-value reader changes inner index 0 to 1; unchanged claims refute
+across all
+four profiles with actual helper entry and same-obligation query/model. Valid originals use the
+actual 64-element roots and pass six native tests at O0/O2; mutant guards fail. Complete commands,
+source/analyzer/native hashes, reports, outputs and ten-second native timeouts remain at
+`/tmp/miren-stage166-final-evidence`. Frozen shared before/after reports retain the original P,
+new P/R and missing actual body U outcomes at `/tmp/miren-stage166-shared-expanded-after`.
+Six metadata tests and 23 related compiler tests pass. Full required validation remains pending.
+
+Final validation passes all 680 Rust tests in the isolated frozen workspace and 68 Python tests.
+All 625 tracked main files match the validated snapshot byte for byte. Fresh main debug/release
+builds, nineteen new/related integration tests, 68 Python tests and all remaining required checks
+also pass. Frozen isolated and main surveys retain 180 PROVED, 156 REFUTED and 104 UNKNOWN at
+`/tmp/miren-stage166-capabilities-20261010` and
+`/tmp/miren-stage166-merged-capabilities-20261010`, with source/input/release hashes verified.
+All 324 earlier completed P/R roots retain identical obligation results, details and query text
+across four configurations. Actual reader mutation and valid 64-element native controls remain
+at `/tmp/miren-stage166-final-evidence`; independent review approves final source and evidence.
+No assumptions, input caps or resource-budget changes are introduced. The earlier longer borrowed
+comparison claim remains UNKNOWN at its recorded frontier.

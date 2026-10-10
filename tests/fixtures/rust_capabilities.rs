@@ -965,6 +965,54 @@ pub fn owned_array_fixed_missing_body(
     }
 }
 
+pub fn registered_pure_array_read(
+    first: [(u16, [u16; 2]); 64],
+    _second: [(u16, [u16; 2]); 64],
+    _third: [(u16, [u16; 2]); 64],
+    index: usize,
+) {
+    if index < first.len() {
+        let selected = first[index];
+        let repeated = first[index];
+        assert!(selected.0 == repeated.0);
+        assert!(selected.1[0] == repeated.1[0]);
+        assert!(selected.1[1] == repeated.1[1]);
+    }
+}
+
+pub fn registered_pure_array_wrong_claim(
+    first: [(u16, [u16; 2]); 64],
+    second: [(u16, [u16; 2]); 64],
+    _third: [(u16, [u16; 2]); 64],
+    index: usize,
+) {
+    if index < first.len() {
+        let selected = first[index];
+        let different = second[index];
+        assert!(selected.0 == different.0);
+    }
+}
+
+#[cfg(not(test))]
+unsafe extern "Rust" {
+    fn opaque_registered_pure_field(value: u16) -> u16;
+}
+
+#[cfg(not(test))]
+pub fn registered_pure_array_missing_body(
+    first: [(u16, [u16; 2]); 64],
+    _second: [(u16, [u16; 2]); 64],
+    _third: [(u16, [u16; 2]); 64],
+    index: usize,
+) -> u16 {
+    if index < first.len() {
+        let selected = first[index];
+        unsafe { opaque_registered_pure_field(selected.0) }
+    } else {
+        0
+    }
+}
+
 #[cfg(test)]
 mod native {
     use super::*;
@@ -979,6 +1027,10 @@ mod native {
             owned_array_field_write(records, records, records, index, u16::MAX);
             owned_array_fixed_write([[3, 7]; 64], [[5, 11]; 64], [[13, 17]; 64], index, 0);
             owned_array_fixed_selected_write([[3, 7]; 64], [[5, 11]; 64], [[13, 17]; 64], index, 0);
+        }
+        for index in [0, 63, 64, usize::MAX] {
+            registered_pure_array_read([(3, [5, 7]); 64], [(11, [13, 17]); 64],
+                [(19, [23, 29]); 64], index);
         }
         safe_sized_alignment(SizedLayoutZero);
         deferred_zero_owned_write([DeferredZero; 2], 0);
@@ -1166,6 +1218,12 @@ mod native {
         let first = [ReservedRecord { left: 3, right: 7 }; 64];
         let second = [ReservedRecord { left: 5, right: 11 }; 64];
         registered_product_wrong_claim(first, second, first, 63);
+    }
+    #[test]
+    #[should_panic]
+    fn registered_pure_array_wrong_claim_panics() {
+        registered_pure_array_wrong_claim([(3, [5, 7]); 64], [(11, [13, 17]); 64],
+            [(19, [23, 29]); 64], 63);
     }
     #[test]
     #[should_panic]

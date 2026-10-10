@@ -731,6 +731,14 @@ unregistered products remain unsupported. Constant and uniquely determined store
 prior behavior.
 
 Actual MIR Copy/Move reads can select a finite ordinary-struct array at a symbolic checked index.
+Pure tuple and fixed-array candidates containing deferred inputs use that same typed path.
+Scalar-bearing descriptors require actual issued root and descendant reservation certificates;
+closed-zero products retain their existing symbol-free schema certificate. A bounded eligibility
+search observes no values. Each deferred descriptor is certified before its symbols are observed.
+Every candidate is validated before shared-index selection. Unregistered scalar-bearing products
+and primitive-only deferred choices remain unsupported. Existing eager scalar/aggregate, constant
+and uniquely determined reads
+retain their earlier selection paths and queries.
 The original compiler array-prefix type certifies every candidate's exact nominal fields and
 primitive metadata before a shared-index value merge. Float storage bits survive only when all
 alternatives carry them; Char leaves require validity under the current conditions. Existing

@@ -568,9 +568,7 @@
     {
       "entry": "owned_array_fixed_write",
       "family": "owned_array_fixed_path",
-      "expected": "unknown",
-      "unknown_reason": "non-scalar array index is not uniquely determined on this path",
-      "unknown_category": "unclassified"
+      "expected": "proved"
     },
     {
       "entry": "owned_array_fixed_wrong_claim",
@@ -588,6 +586,23 @@
       "entry": "owned_array_fixed_selected_write",
       "family": "owned_array_fixed_path",
       "expected": "proved"
+    },
+    {
+      "entry": "registered_pure_array_read",
+      "family": "registered_pure_array_read",
+      "expected": "proved"
+    },
+    {
+      "entry": "registered_pure_array_wrong_claim",
+      "family": "registered_pure_array_read",
+      "expected": "refuted"
+    },
+    {
+      "entry": "registered_pure_array_missing_body",
+      "family": "registered_pure_array_read",
+      "expected": "unknown",
+      "unknown_reason": "no compiler-exported Rust definition matches the foreign symbol",
+      "unknown_category": "missing_compiler_evidence"
     }
   ]
 }

@@ -1474,3 +1474,18 @@ The dedicated 25-root host/ARM O0/O2 matrix yields 13 PROVED, 4 REFUTED and 8 UN
 Four earlier unchanged constant-index sources now prove across all four profiles before harness
 maintenance. The shared 107-case/37-family baseline expects 172 PROVED, 152 REFUTED and 104 UNKNOWN
 across four configurations. Required full validation remains pending.
+
+
+Stage 166 routes deferred pure tuple/fixed-array candidates through the existing typed owned
+selection certificate after generic, constant and solver-unique paths. A bounded borrowed search
+is only an eligibility hint. Complete original types, existing issued scalar or closed-zero
+preparation, scalar representations and cumulative candidate limits remain mandatory before
+selection and full product reconstruction. No generic input observer or reference access changes.
+The original shared read-before-write source and new repeat-read/root-independence controls are
+retained, with final frozen outcomes and required validation pending.
+
+The dedicated 20-root host/ARM O0/O2 matrix yields 9 PROVED, 4 REFUTED and 7 UNKNOWN per build.
+The original shared read-before-write source proves, while the longer dedicated source retains
+its later borrowed-array comparison frontier. A distinct over-cap observation retains the actual
+shape resource limit. The shared 110-case/38-family baseline expects 180 PROVED, 156 REFUTED and
+104 UNKNOWN across all four configurations; final frozen validation remains pending.

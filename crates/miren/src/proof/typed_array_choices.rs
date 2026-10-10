@@ -47,7 +47,10 @@ impl<'tcx> Engine<'tcx> {
         let Some(shape) = self.owned_product_shape(*element)? else {
             return Ok(None);
         };
-        if !contains_owned_choice(&shape) {
+        if !contains_owned_choice(&shape)
+            && !(matches!(element.kind(), ty::Tuple(_) | ty::Array(..))
+                && contains_deferred_product(elements)?)
+        {
             return Ok(None);
         }
         let (term, bits, signed) = index.integer()?;
@@ -496,6 +499,59 @@ fn certified_byte_array_annotation(
         return Err("owned byte array annotation differs from certified primitive shape".into());
     }
     Ok(OwnedChoiceShape::ByteArray(fields.len()))
+}
+
+// This is only an eligibility hint. Preparation still certifies every complete candidate.
+fn contains_deferred_product(values: &[Value]) -> Result<bool, String> {
+    if values.len() > MAX_CHOICE_NODES {
+        return Err("deferred candidate search exceeds its node budget".into());
+    }
+    let mut pending = values.iter().map(|value| (value, 0)).collect::<Vec<_>>();
+    let mut nodes = 0_usize;
+    while let Some((value, depth)) = pending.pop() {
+        if depth >= MAX_CHOICE_DEPTH || nodes >= MAX_CHOICE_NODES {
+            return Err("deferred candidate search exceeds its depth or node budget".into());
+        }
+        nodes += 1;
+        let children: &[Value] = match value {
+            Value::Input(_) => return Ok(true),
+            Value::Tuple(children) => children,
+            Value::Elements(children) => children,
+            Value::Uninitialized
+            | Value::MaybeUninit { .. }
+            | Value::StaticSlice { .. }
+            | Value::StaticView { .. }
+            | Value::RawPointer { .. }
+            | Value::TrackedPointer { .. }
+            | Value::RawSlice { .. }
+            | Value::Bool(_)
+            | Value::Int { .. }
+            | Value::Float { .. }
+            | Value::Bytes { .. }
+            | Value::CompositeSlice { .. }
+            | Value::ScalarSlice { .. }
+            | Value::Adt { .. }
+            | Value::Enum { .. }
+            | Value::Cell { .. }
+            | Value::Atomic { .. }
+            | Value::LocalAtomic { .. }
+            | Value::Reference { .. }
+            | Value::SliceIterator { .. }
+            | Value::MetadataPointer(_)
+            | Value::TraitObject { .. }
+            | Value::DebugReference { .. }
+            | Value::StaticText
+            | Value::FormatArguments
+            | Value::FunctionPointer { .. }
+            | Value::Function
+            | Value::Unit => continue,
+        };
+        if children.len() > MAX_CHOICE_NODES.saturating_sub(nodes + pending.len()) {
+            return Err("deferred candidate search exceeds its node budget".into());
+        }
+        pending.extend(children.iter().map(|child| (child, depth + 1)));
+    }
+    Ok(false)
 }
 
 fn contains_owned_choice(shape: &OwnedChoiceShape) -> bool {
@@ -954,6 +1010,54 @@ pub(super) fn rebuild(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn deferred_candidate_hint_is_bounded_and_does_not_observe_identity_carriers() {
+        use std::rc::Rc;
+        use symbolic::input::{InputKind, InputShape, InputValue};
+        let context = Context::default();
+        let deferred = Value::Input(InputValue {
+            shape: Rc::new(InputShape {
+                kind: InputKind::Unit,
+                slots: 0,
+                height: 1,
+            }),
+            start: 0,
+            seed: context.boolean(false),
+        });
+        assert!(contains_deferred_product(std::slice::from_ref(&deferred)).unwrap());
+        let mixed = Value::Tuple(vec![
+            Value::Unit,
+            Value::Elements(vec![Value::Unit, deferred.clone()].into()),
+        ]);
+        assert!(contains_deferred_product(&[mixed]).unwrap());
+        assert!(!contains_deferred_product(&[Value::Tuple(vec![Value::Unit])]).unwrap());
+        let hidden = Value::Adt {
+            name: "Opaque".into(),
+            variant: 0,
+            discriminant: 0,
+            is_option: false,
+            fields: vec![("field".into(), deferred.clone())].into(),
+        };
+        assert!(!contains_deferred_product(&[hidden]).unwrap());
+        let raw = Value::RawSlice {
+            source: Box::new(deferred),
+            length: Box::new(Value::Unit),
+        };
+        assert!(!contains_deferred_product(&[raw]).unwrap());
+        assert!(contains_deferred_product(&vec![Value::Unit; MAX_CHOICE_NODES + 1]).is_err());
+        assert!(
+            contains_deferred_product(&[Value::Elements(
+                vec![Value::Unit; MAX_CHOICE_NODES].into()
+            )])
+            .is_err()
+        );
+        let mut nested = Value::Unit;
+        for _ in 0..MAX_CHOICE_DEPTH {
+            nested = Value::Tuple(vec![nested]);
+        }
+        assert!(contains_deferred_product(&[nested]).is_err());
+    }
 
     #[test]
     fn fixed_array_paths_validate_literal_metadata_bounds_and_logical_spans() {
