@@ -94,9 +94,18 @@ Exact `Option<bool>` and ordinary local two-variant empty/Bool enums also admit 
 one-byte niche layout. Its initialized ABI must cover exactly false, true and the reserved empty
 tag; the original Bool payload and overlapping variant layouts are checked independently. Logical
 variant selection preserves active Bool values without initializing the empty variant's latent
-payload. Char, NonZero, reference and multi-alternative niches, other core wrappers, nominal struct
-payloads and whole sum comparison summaries remain UNKNOWN. Mutable/raw/static access policies and
+payload. Char, NonZero, reference and multi-alternative niches, other core wrappers and whole sum
+comparison summaries remain UNKNOWN. Mutable/raw/static access policies and
 owned product choice/write admission are unchanged.
+
+Direct-tag sums also admit ordinary local nominal struct payloads, including nested structs,
+fixed arrays and zero-sized members. The original instantiated fields, declared identities,
+Copy/Freeze/NoDrop, alignment, scalar validity and complete type budgets are certified before
+recording any descriptor. Nominal payload observations keep exact struct carriers and independent
+same-index columns; inactive variants supply no initialized object bytes. External nominal
+payloads, unsupported ABI compositions and Bool-newtype niches remain UNKNOWN. Getters and other
+methods execute their actual Rust bodies. Whole sum comparators and owned enum writes/choices,
+mutable/static/raw source rights and all existing budgets remain unchanged.
 
 Whole mutable Rust `bool` statics and certified boolean fields inside compiler-identified
 `UnsafeCell` storage support typed direct reads and writes through compiler-backed allocation

@@ -56,10 +56,14 @@ pub(super) struct CompositeType<'tcx> {
     bytes: u64,
 }
 
-fn ordinary_external_struct_flags(flags: AdtFlags) -> bool {
+fn ordinary_struct_flags(flags: AdtFlags) -> bool {
     // Accept only ordinary structural flags. Unknown future compiler-special flags fail
     // conservatively, and tuple/fieldless constructors do not imply a value invariant.
     flags == AdtFlags::IS_STRUCT || flags == (AdtFlags::IS_STRUCT | AdtFlags::HAS_CTOR)
+}
+
+fn local_sum_payload_struct_policy(is_local: bool, flags: AdtFlags) -> bool {
+    is_local && ordinary_struct_flags(flags)
 }
 
 fn ordinary_external_struct_policy(
@@ -67,7 +71,7 @@ fn ordinary_external_struct_policy(
     core_crate: Option<CrateNum>,
     flags: AdtFlags,
 ) -> bool {
-    core_crate.is_some_and(|core| defining_crate != core && ordinary_external_struct_flags(flags))
+    core_crate.is_some_and(|core| defining_crate != core && ordinary_struct_flags(flags))
 }
 
 impl<'tcx> Engine<'tcx> {
@@ -224,55 +228,67 @@ impl<'tcx> Engine<'tcx> {
             ty::Adt(def, args) if allow_sums && def.is_enum() => {
                 self.readonly_sum_shape(ty, *def, args, depth, nodes)
             }
-            ty::Adt(def, args) if !enum_payload && self.plain_composite_struct(*def) => {
-                if def.repr().pack.is_some()
-                    || matches!(
-                        layout.backend_repr,
-                        BackendRepr::SimdVector { .. } | BackendRepr::SimdScalableVector { .. }
-                    )
-                {
-                    return Ok(None);
-                }
-                let mut fields = Vec::new();
-                let mut physical_fields = Vec::new();
-                for (position, field) in def.non_enum_variant().fields.iter().enumerate() {
-                    // Keep original instantiated kinds: normalization must not erase Pat or
-                    // turn opaque wrappers into ordinary primitive fields, even beneath N=0.
-                    let field_ty = field.ty(self.tcx, args).skip_norm_wip();
-                    let Some(shape) = self.composite_shape_depth(
-                        field_ty,
-                        depth + 1,
-                        nodes,
-                        allow_sums,
-                        enum_payload,
-                    )?
-                    else {
-                        return Ok(None);
-                    };
-                    let field_layout = self.static_layout(field_ty)?;
-                    if field_layout.size.bytes() != 0 {
-                        physical_fields.push((
-                            layout.fields.offset(position).bytes(),
-                            field_layout.backend_repr,
-                        ));
-                    }
-                    fields.push((field.name.as_str().to_owned(), shape));
-                }
-                physical_fields.sort_by_key(|(offset, _)| *offset);
-                if !scalar_fields_match(layout.backend_repr, &physical_fields) {
-                    return Err(
-                        "composite struct validity exceeds its original typed fields".into(),
-                    );
-                }
-                let shape = CompositeShape::Struct {
-                    name: self.tcx.def_path_str(def.did()),
-                    fields,
-                };
-                shape.validate_zero_storage(layout.size.bytes())?;
-                Ok(Some(shape))
+            ty::Adt(def, _)
+                if self.plain_composite_struct(*def)
+                    && (!enum_payload
+                        || local_sum_payload_struct_policy(def.did().is_local(), def.flags())) =>
+            {
+                self.composite_struct_shape(ty, layout, depth, nodes, allow_sums, enum_payload)
             }
             _ => Ok(None),
         }
+    }
+
+    fn composite_struct_shape(
+        &self,
+        original: Ty<'tcx>,
+        layout: rustc_middle::ty::layout::TyAndLayout<'tcx>,
+        depth: usize,
+        nodes: &mut usize,
+        allow_sums: bool,
+        enum_payload: bool,
+    ) -> Result<Option<CompositeShape>, String> {
+        let ty::Adt(def, args) = original.kind() else {
+            return Err("composite struct certificate requires original compiler ADT".into());
+        };
+        if def.repr().pack.is_some()
+            || matches!(
+                layout.backend_repr,
+                BackendRepr::SimdVector { .. } | BackendRepr::SimdScalableVector { .. }
+            )
+        {
+            return Ok(None);
+        }
+        let mut fields = Vec::new();
+        let mut physical_fields = Vec::new();
+        for (position, field) in def.non_enum_variant().fields.iter().enumerate() {
+            // Keep original instantiated kinds: normalization must not erase Pat or
+            // turn opaque wrappers into ordinary primitive fields, even beneath N=0.
+            let field_ty = field.ty(self.tcx, args).skip_norm_wip();
+            let Some(shape) =
+                self.composite_shape_depth(field_ty, depth + 1, nodes, allow_sums, enum_payload)?
+            else {
+                return Ok(None);
+            };
+            let field_layout = self.static_layout(field_ty)?;
+            if field_layout.size.bytes() != 0 {
+                physical_fields.push((
+                    layout.fields.offset(position).bytes(),
+                    field_layout.backend_repr,
+                ));
+            }
+            fields.push((field.name.as_str().to_owned(), shape));
+        }
+        physical_fields.sort_by_key(|(offset, _)| *offset);
+        if !scalar_fields_match(layout.backend_repr, &physical_fields) {
+            return Err("composite struct validity exceeds its original typed fields".into());
+        }
+        let shape = CompositeShape::Struct {
+            name: self.tcx.def_path_str(def.did()),
+            fields,
+        };
+        shape.validate_zero_storage(layout.size.bytes())?;
+        Ok(Some(shape))
     }
 
     fn readonly_sum_shape(
@@ -1104,6 +1120,164 @@ mod tests {
     use super::*;
 
     #[test]
+    fn sum_payload_struct_policy_does_not_widen_external_or_special_types() {
+        for flags in [
+            AdtFlags::IS_STRUCT,
+            AdtFlags::IS_STRUCT | AdtFlags::HAS_CTOR,
+        ] {
+            assert!(local_sum_payload_struct_policy(true, flags));
+            assert!(!local_sum_payload_struct_policy(false, flags));
+        }
+        for flags in [
+            AdtFlags::IS_ENUM,
+            AdtFlags::IS_UNION,
+            AdtFlags::IS_PHANTOM_DATA,
+            AdtFlags::IS_UNSAFE_CELL,
+            AdtFlags::IS_MANUALLY_DROP,
+            AdtFlags::IS_STRUCT | AdtFlags::IS_FUNDAMENTAL,
+            AdtFlags::IS_STRUCT | AdtFlags::from_bits_retain(1 << 15),
+        ] {
+            assert!(!local_sum_payload_struct_policy(true, flags));
+            assert!(!local_sum_payload_struct_policy(false, flags));
+        }
+    }
+
+    #[test]
+    fn nominal_sum_payloads_keep_field_identity_occurrences_and_zero_members() {
+        let context = Context::default();
+        let index = context.bit_vector(0, 32).unwrap();
+        let integer = CompositeShape::Primitive(ScalarSliceElement::Integer {
+            bits: 16,
+            signed: false,
+        });
+        let record = CompositeShape::Struct {
+            name: "Record".into(),
+            fields: vec![
+                ("left".into(), integer.clone()),
+                ("right".into(), integer),
+                (
+                    "marker".into(),
+                    CompositeShape::Struct {
+                        name: "Marker".into(),
+                        fields: vec![],
+                    },
+                ),
+            ],
+        };
+        let shape = CompositeShape::Sum {
+            name: "Packet".into(),
+            bits: 8,
+            signed: false,
+            is_option: false,
+            variants: vec![
+                CompositeVariant {
+                    name: "Empty".into(),
+                    discriminant: 3,
+                    fields: vec![],
+                },
+                CompositeVariant {
+                    name: "Repeated".into(),
+                    discriminant: 7,
+                    fields: vec![("0".into(), record.clone()), ("1".into(), record)],
+                },
+            ],
+        };
+        let mut kinds = Vec::new();
+        shape.leaves(&mut kinds);
+        assert_eq!(kinds.len(), 5);
+        let mut arrays = Vec::new();
+        for (column, kind) in kinds.iter().enumerate() {
+            let data = context
+                .symbol(
+                    u32::try_from(column).unwrap(),
+                    Sort::Array(
+                        Box::new(Sort::BitVec(32)),
+                        Box::new(scalar_slice_sort(*kind).unwrap()),
+                    ),
+                )
+                .unwrap();
+            arrays.push(
+                context
+                    .apply(
+                        Op::Store,
+                        &[
+                            data,
+                            index.clone(),
+                            context
+                                .bit_vector(
+                                    if column == 0 { 1 } else { column as u128 * 17 },
+                                    if column == 0 { 8 } else { 16 },
+                                )
+                                .unwrap(),
+                        ],
+                    )
+                    .unwrap(),
+            );
+        }
+        let Value::Enum { variants, .. } =
+            shape.observe(&context, &arrays, &index, &mut 0).unwrap()
+        else {
+            panic!("sum carrier lost");
+        };
+        let Value::Adt {
+            fields: variant_fields,
+            ..
+        } = &variants[1]
+        else {
+            panic!("active inventory lost");
+        };
+        for (position, (_, payload)) in variant_fields.iter().enumerate() {
+            let Value::Adt {
+                name,
+                variant,
+                discriminant,
+                is_option,
+                fields,
+            } = payload
+            else {
+                panic!("nominal payload collapsed");
+            };
+            assert_eq!(
+                (name.as_str(), *variant, *discriminant, *is_option),
+                ("Record", 0, 0, false)
+            );
+            assert_eq!(
+                fields
+                    .iter()
+                    .map(|(name, _)| name.as_str())
+                    .collect::<Vec<_>>(),
+                ["left", "right", "marker"]
+            );
+            for (column, (_, value)) in fields.iter().take(2).enumerate() {
+                assert_eq!(
+                    symbolic::constant(&value.integer().unwrap().0),
+                    Some(symbolic::Constant::BitVec {
+                        value: (position * 2 + column + 1) as u128 * 17,
+                        bits: 16,
+                    })
+                );
+            }
+            let Value::Adt { name, fields, .. } = &fields[2].1 else {
+                panic!("zero-sized nominal member collapsed");
+            };
+            assert_eq!(name, "Marker");
+            assert!(fields.is_empty());
+        }
+        let length = Value::Int {
+            expression: context.bit_vector(1, 32).unwrap(),
+            bits: 32,
+            signed: false,
+        };
+        assert!(validate_terms(&context, 32, &kinds, &length, &arrays).is_ok());
+        assert!(validate_terms(&context, 32, &kinds, &length, &arrays[..4]).is_err());
+        let mut wrong = arrays.clone();
+        wrong[1] = Context::default()
+            .symbol(0, arrays[1].sort().clone())
+            .unwrap();
+        assert!(validate_terms(&context, 32, &kinds, &length, &wrong).is_err());
+    }
+
+    #[test]
     fn direct_sum_columns_preserve_legal_tags_nominal_payloads_and_occurrences() {
         let context = Context::default();
         let index = context.bit_vector(0, 32).unwrap();
@@ -1359,8 +1533,8 @@ mod tests {
             None,
             AdtFlags::IS_STRUCT
         ));
-        assert!(ordinary_external_struct_flags(AdtFlags::IS_STRUCT));
-        assert!(ordinary_external_struct_flags(
+        assert!(ordinary_struct_flags(AdtFlags::IS_STRUCT));
+        assert!(ordinary_struct_flags(
             AdtFlags::IS_STRUCT | AdtFlags::HAS_CTOR
         ));
         for special in [
@@ -1378,18 +1552,14 @@ mod tests {
             AdtFlags::IS_FIELD_REPRESENTING_TYPE,
             AdtFlags::IS_MAYBE_DANGLING,
         ] {
-            assert!(!ordinary_external_struct_flags(special));
-            assert!(!ordinary_external_struct_flags(
-                AdtFlags::IS_STRUCT | special
-            ));
-            assert!(!ordinary_external_struct_flags(
+            assert!(!ordinary_struct_flags(special));
+            assert!(!ordinary_struct_flags(AdtFlags::IS_STRUCT | special));
+            assert!(!ordinary_struct_flags(
                 AdtFlags::IS_STRUCT | AdtFlags::HAS_CTOR | special
             ));
         }
-        assert!(!ordinary_external_struct_flags(AdtFlags::NO_ADT_FLAGS));
-        assert!(!ordinary_external_struct_flags(AdtFlags::from_bits_retain(
-            1 << 15
-        )));
+        assert!(!ordinary_struct_flags(AdtFlags::NO_ADT_FLAGS));
+        assert!(!ordinary_struct_flags(AdtFlags::from_bits_retain(1 << 15)));
     }
 
     #[test]

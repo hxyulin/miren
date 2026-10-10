@@ -1541,8 +1541,77 @@ pub fn bool_niche_slice_missing_body(values: &[BoolNicheReading], index: usize) 
     false
 }
 
+#[derive(Clone, Copy)]
+pub struct NominalTaggedRecord {
+    left: u16,
+    right: u16,
+}
+
+impl NominalTaggedRecord {
+    #[inline(never)]
+    fn selected(self) -> u16 {
+        self.left
+    }
+}
+
+#[derive(Clone, Copy)]
+#[repr(u8)]
+pub enum NominalTaggedReading {
+    Empty,
+    Data(NominalTaggedRecord),
+}
+
+pub fn nominal_enum_slice(values: &[NominalTaggedReading], index: usize) {
+    if index < values.len() {
+        if let NominalTaggedReading::Data(record) = values[index] {
+            assert!(record.selected() == record.left);
+        }
+    }
+}
+
+pub fn nominal_enum_slice_wrong_claim(values: &[NominalTaggedReading], index: usize) {
+    if index < values.len() {
+        if let NominalTaggedReading::Data(record) = values[index] {
+            assert!(record.left == 0);
+        }
+    }
+}
+
+#[cfg(not(test))]
+unsafe extern "Rust" {
+    fn opaque_nominal_enum_slice(value: NominalTaggedReading) -> u16;
+}
+
+#[cfg(not(test))]
+pub fn nominal_enum_slice_missing_body(values: &[NominalTaggedReading], index: usize) -> u16 {
+    if index < values.len() {
+        if let NominalTaggedReading::Data(record) = values[index] {
+            assert!(record.selected() == record.left);
+            return unsafe { opaque_nominal_enum_slice(values[index]) };
+        }
+    }
+    0
+}
+
 #[cfg(test)]
 mod native {
+    #[test]
+    fn nominal_enum_slice_controls() {
+        let data = NominalTaggedReading::Data(NominalTaggedRecord { left: 3, right: 7 });
+        for index in [0, 1, 128, 129, usize::MAX] {
+            nominal_enum_slice(&[data; 129], index);
+        }
+        nominal_enum_slice(&[NominalTaggedReading::Empty], 0);
+    }
+
+    #[test]
+    #[should_panic]
+    fn nominal_enum_slice_wrong_claim_panics() {
+        nominal_enum_slice_wrong_claim(&[
+            NominalTaggedReading::Data(NominalTaggedRecord { left: 3, right: 7 }),
+        ], 0);
+    }
+
     #[test]
     fn bool_niche_slice_controls() {
         for index in [0, 1, 128, 129, usize::MAX] {

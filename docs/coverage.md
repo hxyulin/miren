@@ -1702,3 +1702,49 @@ certificate at `/tmp/miren-stage177-source-review.md`. Current global after/muta
 `/tmp/miren-stage177-global-final-evidence`; historical dedicated/layout/native artifacts retain
 their original source and binary scope. No assumptions, input caps or resource-budget changes
 are introduced. Stage 177 integrates after actual Stage 176 commit `80beb48`.
+
+
+Stage 178 supports local ordinary Copy/Freeze structs inside certified readonly direct-tag enum
+payloads. The existing struct shape builder is extracted into a concrete helper; original field,
+layout, scalar validity, nominal identity and zero-length checks remain in place. The caller policy
+admits local payload structs while preserving the existing top-level struct policy. Exact Bool
+niches, owned storage, physical access and whole enum comparisons retain their existing boundaries.
+
+The dedicated 31-root matrix yields twelve PROVED, five REFUTED and fourteen UNKNOWN per
+host/ARM O0/O2 profile. Exact final sources are UNKNOWN under the frozen Stage 177 build.
+Actual getter left-to-right mutation refutes the unchanged claim in all profiles. Six native
+original tests pass and mutant guards exit 101 at O0/O2 with ten-second timeouts. Actual custom
+PartialEq and Clone bodies execute and refute their false claims. Evidence and original binary
+hashes remain at `/tmp/miren-stage178-final-evidence`; the source review is
+`/tmp/miren-stage178-source-review.md`. All 216 previously completed focused queries retain
+identical outcomes, details and query text at `/tmp/miren-stage178-query-fidelity`.
+
+The unchanged old `tagged_sum_slices::nominal_payload_zero` case becomes PROVED in all profiles.
+Its initial stale expectation failure is preserved at `/tmp/miren-stage178-old-tagged-initial.log`
+before harness-only upkeep. Global controls include a proof, a counterexample, a genuinely missing
+body and an actual getter mutation, with native originals and mutant guards. Their evidence is
+`/tmp/miren-stage178-global-evidence`. The manifest now contains 143 cases in 49 families;
+selected controls do not establish a Rust coverage percentage. These focused captures preceded
+full validation and final survey comparison. No assumptions, input caps or increased resource
+budgets are introduced. General niches, external nominal payloads and unsupported physical or
+comparison operations remain UNKNOWN.
+
+
+Final validation passes all 720 Rust tests and 68 Python tests. Formatting, lint, debug/release
+builds, cargo deny, documentation and manual hooks pass. The initial formatting failure in the
+old harness is retained before a whitespace-only correction and fresh formatting, lint and
+harness checks. All 766 tracked main files match the isolated snapshot byte for byte. Fresh main
+builds, eighteen related integration tests, eleven metadata tests and 68 Python tests pass.
+Both frozen surveys yield 224 PROVED, 200 REFUTED and 148 UNKNOWN at
+`/tmp/miren-stage178-capabilities-20261010` and
+`/tmp/miren-stage178-merged-capabilities-20261010`. All 416 previously completed parent roots
+retain identical outcomes, obligation details and query text. All 572 main/isolate outcomes,
+queries, models and premises match. One query-free ARM O0 resource-limit UNKNOWN differs only
+in its diagnostic call-context prefix; both original details are retained in
+`/tmp/miren-stage178-main-query-comparison.json`. No status, query or execution budget changes.
+Source, input and release hashes are verified. Current global after/mutation reports remain at
+`/tmp/miren-stage178-global-final-evidence`; historical dedicated and native captures retain
+their original binary scope. Independent source and focused evidence review approves the bounded
+local payload policy at `/tmp/miren-stage178-source-review.md`. No assumptions, input caps or
+increased resource budgets are introduced. Stage 178 integrates after actual Stage 177 commit
+`98dfc95`.
