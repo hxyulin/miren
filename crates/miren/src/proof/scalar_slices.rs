@@ -181,6 +181,18 @@ impl<'tcx> Engine<'tcx> {
         })
     }
 
+    pub(super) fn readonly_slice_length(
+        &self,
+        value: &Value,
+        conditions: &[Term],
+    ) -> Result<Value, String> {
+        match value {
+            Value::ScalarSlice { .. } => self.scalar_slice_length(value, conditions),
+            Value::CompositeSlice { .. } => self.composite_slice_length(value, conditions),
+            _ => Err("expected a certified readonly logical slice".into()),
+        }
+    }
+
     pub(super) fn scalar_slice_length(
         &self,
         value: &Value,
@@ -616,7 +628,7 @@ impl<'tcx> Engine<'tcx> {
                     conditions,
                     depth + 1,
                 )?;
-                let length = self.scalar_slice_length(&stored, conditions)?;
+                let length = self.readonly_slice_length(&stored, conditions)?;
                 let bits = u32::from(self.tcx.sess.target.pointer_width);
                 validate_cursor_terms(&self.terms, bits, front, back)?;
                 let ordered =

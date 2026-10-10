@@ -3275,3 +3275,38 @@ cargo lint, release builds, cargo deny, documentation build and manual hooks. Fr
 56 UNKNOWN with unchanged frozen inputs/binaries and no collection errors. The 192 previously
 completed P/R roots retain byte-identical obligation statuses, details and query text across all
 four compiler configurations. Independent review approves the source and focused failure evidence.
+
+
+## Stage 151: shared read-only composite slice cursors
+
+Exact core shared Iter cursors reuse the existing ordinary execution protocol for arbitrary
+composite slice inputs. Construction validates its immutable retained source, original element
+type, allocation extent and selected concrete body. The common read-only descriptor length helper
+serves both primitive and composite typed cursor validation. Every modeled method, including
+metadata, clone, count and exhausted operations, validates source lifetime and selected body.
+Typed cursor carriers retain target-usize terms and prove front <= back <= source length.
+Items remain projected references into the actual caller allocation; the existing checked
+composite reader reconstructs their fields. No owned descriptor is promoted to a reference.
+
+The dedicated 24-root matrix yields 13 PROVED, 5 REFUTED and 6 UNKNOWN per host/ARM O0/O2 build.
+Forward/reverse skips, metadata, count, clone, by-ref, returned cursors/items, 129-element inputs,
+Float bits, Char observations and copied-handle retirement retain their actual semantics.
+Actual helper field mutation refutes all four configurations and fails valid native O0/O2 tests.
+Mutable and competing roots, retired backing and missing invoked bodies retain conservative
+UNKNOWN results. Raw-source controls record the actual profile-dependent sized-pointee or raw
+construction frontier on the same obligation. Cursor support supplies no unbounded callback-loop
+summary, new alias rights, raw access, environment premise or larger proof budget.
+
+Original aggregate next and nth fixtures now prove without source changes. The shared original
+composite iteration-count control advances to PROVED and adds cursor nth P/R and missing invoked
+body U controls: 67 cases across 24 families, expecting 28 PROVED, 25 REFUTED and 14 UNKNOWN
+per configuration. Original arbitrary-zero claims remain REFUTED.
+
+Final isolated and merged validation each passes 635 Rust tests and 68 Python tests, formatting,
+cargo lint, release builds, cargo deny, documentation build and manual hooks. Frozen evidence at
+`/tmp/miren-stage151-capabilities-20261010` and
+`/tmp/miren-stage151-merged-capabilities-20261010` each records 112 PROVED, 100 REFUTED and
+56 UNKNOWN with unchanged frozen inputs/binaries and no collection errors. The 200 previously
+completed P/R roots retain byte-identical obligation statuses, details and query text across all
+four configurations. Independent source and focused-evidence review approves the retained source,
+exact type/body gates and cursor protocol.

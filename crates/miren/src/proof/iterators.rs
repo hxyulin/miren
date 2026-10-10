@@ -138,17 +138,22 @@ impl<'tcx> Engine<'tcx> {
             } else {
                 let snapshot = self.snapshot(source, &state.memory, &state.conditions, 0)?;
                 match snapshot {
-                    Value::CompositeSlice { .. } => {
-                        return Err(self.categorized_error(
-                            UnknownCategory::Semantics,
-                            "readonly composite slice iteration is unsupported".into(),
-                        ));
-                    }
-                    Value::ScalarSlice { .. } if !mutable => {
+                    Value::ScalarSlice { .. } | Value::CompositeSlice { .. } if !mutable => {
+                        if !matches!(source, Value::Reference { mutable: false, .. }) {
+                            return Err(
+                                "readonly iterator requires its retained shared source".into()
+                            );
+                        }
+                        self.validate_readonly_slice_value(
+                            *slice,
+                            &snapshot,
+                            &state.memory,
+                            &state.conditions,
+                        )?;
                         self.instantiated_body(instance)?;
                         (
                             source.clone(),
-                            self.scalar_slice_length(&snapshot, &state.conditions)?,
+                            self.readonly_slice_length(&snapshot, &state.conditions)?,
                         )
                     }
                     Value::Bytes { length, .. } => (source.clone(), *length),
@@ -233,7 +238,7 @@ impl<'tcx> Engine<'tcx> {
         else {
             return Err("slice iterator state is not modeled".to_owned());
         };
-        let scalar_source =
+        let readonly_source =
             self.validate_iterator_source(source, &state.memory, &state.conditions)?;
         if let Value::SliceIterator {
             mutable: true,
@@ -283,7 +288,7 @@ impl<'tcx> Engine<'tcx> {
         if !supported {
             return Ok(None);
         }
-        if scalar_source {
+        if readonly_source {
             // An exact ordinary core API still needs its selected concrete Rust body.
             self.instantiated_body(instance)?;
         }
@@ -611,7 +616,10 @@ impl<'tcx> Engine<'tcx> {
             .is_none()
         {
             let storage = self.snapshot(source, memory, conditions, 0)?;
-            return Ok(matches!(storage, Value::ScalarSlice { .. }));
+            return Ok(matches!(
+                storage,
+                Value::ScalarSlice { .. } | Value::CompositeSlice { .. }
+            ));
         }
         Ok(false)
     }

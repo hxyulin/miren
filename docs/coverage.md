@@ -1251,3 +1251,22 @@ failure. Byte snapshots and ambiguous references/ADTs retain their actual select
 symbolic writes retain their Semantics refusal. The Drop control reaches an earlier actual
 `core::ptr::drop_glue` layout gap, recorded separately from conditional-selection eligibility.
 The shared 64-case/23-family baseline expects 104 PROVED, 96 REFUTED and 56 UNKNOWN across builds.
+
+
+Stage 151 extends exact core shared slice cursors to the supported arbitrary-length composite
+input domain. Construction retains the original immutable reference and validates its exact
+compiler element type and selected body. Every modeled cursor API validates source availability;
+metadata, clones and exhaustion require the same body and lifetime checks as element reads.
+The typed Iter carrier proves target-usize front/back metadata, ordered positions and back within
+actual source length. Items retain source Index projections and reconstruct tuple/array fields
+through checked reads; no owned descriptor becomes a reference or gains mutation/raw rights.
+
+The 24-root compiler matrix yields 13 PROVED, 5 REFUTED and 6 UNKNOWN per host/ARM O0/O2 build,
+including forward/reverse skips, metadata, count, clone/by-ref, returns, long inputs, Float bits,
+Char observations, copied handles and retired backing. Actual nth-helper field mutation refutes
+and fails valid native O0/O2 tests. Raw-source controls stop at their actual sized-pointee or raw
+construction frontier according to compiler profile. Mutable/competing roots, unavailable bodies
+and retired source metadata remain UNKNOWN. Existing aggregate next/nth controls prove with their
+original sources unchanged. The shared 67-case/24-family baseline expects 112 PROVED, 100 REFUTED
+and 56 UNKNOWN across the four configurations. Unrestricted callback loops still require complete
+execution or a separate supported invariant; cursor support supplies no loop summary.

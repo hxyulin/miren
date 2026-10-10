@@ -82,10 +82,6 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
                     UnknownCategory::Semantics,
                     "only read-only byte slices and byte arrays are modeled",
                 ),
-                "aggregate_input" => (
-                    UnknownCategory::Semantics,
-                    "readonly composite slice iteration is unsupported",
-                ),
                 "dead_metadata" | "dead_exhausted_hint" | "dead_count" | "dead_clone" => (
                     UnknownCategory::Unclassified,
                     "reference points to dead or uninitialized storage",
@@ -155,7 +151,7 @@ fn scalar_cursors_preserve_arbitrary_lengths_values_and_live_sources() {
         ("wrong_large", ProofStatus::Refuted),
         ("wrong_clone", ProofStatus::Refuted),
         ("float_reflexivity", ProofStatus::Refuted),
-        ("aggregate_input", ProofStatus::Unknown),
+        ("aggregate_input", ProofStatus::Proved),
         ("mutable_input", ProofStatus::Unknown),
         ("unbounded_scan", ProofStatus::Unknown),
         ("dead_metadata", ProofStatus::Unknown),

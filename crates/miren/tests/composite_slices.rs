@@ -106,10 +106,6 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
                     UnknownCategory::Semantics,
                     "whole composite slice equality is unsupported",
                 ),
-                "deferred_iteration" => (
-                    UnknownCategory::Semantics,
-                    "readonly composite slice iteration is unsupported",
-                ),
                 "oversized_type_array" => (
                     UnknownCategory::ResourceLimit,
                     "composite slice type array exceeds the 128-element shape budget",
@@ -221,7 +217,7 @@ fn typed_composite_slices_retain_fields_views_and_caller_sources() {
         ("wholly_zero_sized", ProofStatus::Unknown),
         ("full_composite_contains", ProofStatus::Unknown),
         ("full_composite_equality", ProofStatus::Unknown),
-        ("deferred_iteration", ProofStatus::Unknown),
+        ("deferred_iteration", ProofStatus::Proved),
         ("oversized_type_array", ProofStatus::Unknown),
         (
             "analyzer_only::readonly_cannot_restore_mutation",

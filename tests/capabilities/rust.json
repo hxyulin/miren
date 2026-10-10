@@ -329,9 +329,7 @@
     {
       "entry": "composite_slice_iteration",
       "family": "composite_slice",
-      "expected": "unknown",
-      "unknown_reason": "readonly composite slice iteration is unsupported",
-      "unknown_category": "semantics"
+      "expected": "proved"
     },
     {
       "entry": "nested_array_choice",
@@ -349,6 +347,23 @@
       "expected": "unknown",
       "unknown_reason": "non-scalar array index is not uniquely determined on this path",
       "unknown_category": "unclassified"
+    },
+    {
+      "entry": "composite_iterator_nth",
+      "family": "composite_iterator",
+      "expected": "proved"
+    },
+    {
+      "entry": "composite_iterator_wrong_claim",
+      "family": "composite_iterator",
+      "expected": "refuted"
+    },
+    {
+      "entry": "composite_iterator_missing_body",
+      "family": "composite_iterator",
+      "expected": "unknown",
+      "unknown_reason": "no compiler-exported Rust definition matches the foreign symbol",
+      "unknown_category": "missing_compiler_evidence"
     }
   ]
 }

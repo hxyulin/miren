@@ -524,8 +524,8 @@ gaps by category and exact reason, preserving all root names. Saved coverage gap
 absent optional category. Existing schema version and safety statuses are unchanged.
 
 The Rust capability baseline is independent of fleet and hardware contracts. Run
-`cargo test --locked -p miren --test rust_capabilities`; its shared manifest selects 64 cases across
-23 families on host/ARM at O0/O2, with positive/refuted/unknown and actual source-mutation controls.
+`cargo test --locked -p miren --test rust_capabilities`; its shared manifest selects 67 cases across
+24 families on host/ARM at O0/O2, with positive/refuted/unknown and actual source-mutation controls.
 The standalone [survey](../../tools/rust_capability_survey.py) retains full reports and provenance.
 The typed SMT foundation supports explicit universal and existential Symbol bindings. Free-symbol
 metadata is lexical: the same Symbol may be bound in one term and free in another, and nested
@@ -627,11 +627,12 @@ and compose element projections; copied handles do not renew dead storage. Primi
 logical SMT arrays, with floating storage bits preserved. Char observations encode every valid
 Unicode scalar; their unrestricted seed is not physical storage or a native Char witness. Exact
 compiler element identities, layout, array sorts and contexts are checked at typed boundaries.
-Competing borrowed roots, mutable slices, refined or composite elements, raw access and unbounded
+Competing borrowed roots, mutable slices, refined elements, raw access and unbounded
 iteration retain their existing unsupported frontiers. Byte slice
 representations and their input policy remain unchanged.
 
-Read-only scalar slices support exact core shared iterator cursors with arbitrary valid lengths.
+Read-only scalar and certified pure tuple/array slices support exact core shared iterator cursors
+with arbitrary valid lengths.
 Forward/reverse skips, exhaustion, length/count/size hints and cloning preserve the retained
 immutable source and validate its lifetime even for metadata or exhausted cursors. Selected ordinary
 core APIs require their available concrete Rust bodies before modeled success. Cursor bounds
@@ -659,7 +660,8 @@ and projections. Runtime length has only the valid Rust allocation-size bound; t
 the existing depth and node budgets and a 128-element fixed-array shape limit. Fully zero-sized
 elements, refined or identity-bearing leaves, mutable/competing roots and raw access remain
 unsupported. Logical field storage gives no padding-byte or physical representation rights. Whole
-composite membership, equality and iterators remain explicit semantic `UNKNOWN` boundaries.
+composite membership and equality remain explicit semantic `UNKNOWN` boundaries. Readonly shared
+iteration retains the same compiler type, source graph and original caller allocation.
 
 Concrete synchronous closures can carry supported read-only scalar slices and initialized pure
 `MaybeUninit` values through their exact compiler capture types. Shared capture metadata checks

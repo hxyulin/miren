@@ -460,6 +460,35 @@ pub fn nested_byte_array_choice(index: usize) -> [u8; 2] {
     }
 }
 
+pub fn composite_iterator_nth(values: &[(u16, u16)], index: usize) {
+    if index < values.len() {
+        let item = values.iter().nth(index).unwrap();
+        assert!(item.0 == values[index].0);
+        assert!(item.1 == values[index].1);
+    }
+}
+
+pub fn composite_iterator_wrong_claim(values: &[(u16, u16)]) {
+    if values.len() > 128 {
+        assert!(values.iter().nth(128).unwrap().0 == 0);
+    }
+}
+
+#[cfg(not(test))]
+unsafe extern "Rust" {
+    fn opaque_composite_iterator_word(value: u16) -> u16;
+}
+
+#[cfg(not(test))]
+pub fn composite_iterator_missing_body(values: &[(u16, u16)], index: usize) -> u16 {
+    if index < values.len() {
+        let item = values.iter().nth(index).unwrap();
+        unsafe { opaque_composite_iterator_word(item.0) }
+    } else {
+        0
+    }
+}
+
 #[cfg(test)]
 mod native {
     use super::*;
@@ -468,6 +497,9 @@ mod native {
     #[test]
     fn positives() {
         integers(199);
+        composite_iterator_nth(&[], usize::MAX);
+        composite_iterator_nth(&[(3, 7), (11, 13)], 1);
+        composite_iterator_nth(&[(3, 7); 129], 128);
         nested_array_choice(0);
         nested_array_choice(1);
         nested_array_choice(usize::MAX);
@@ -563,5 +595,10 @@ mod native {
     #[should_panic]
     fn nested_array_choice_wrong_claim_panics() {
         nested_array_choice_wrong_claim(0);
+    }
+    #[test]
+    #[should_panic]
+    fn composite_iterator_wrong_claim_panics() {
+        composite_iterator_wrong_claim(&[(3, 7); 129]);
     }
 }
