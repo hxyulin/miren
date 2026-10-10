@@ -11,8 +11,8 @@ execution at O0 and O2, positive/refuted/unknown controls, a source mutation tha
 structured UNKNOWN reporting, and passing repository checks. Completion establishes a repeatable
 baseline. It does not establish full Rust support or a completed memory-model refactor.
 
-The manifest contains 100 cases across 35 families. Each build configuration expects 41 PROVED,
-36 REFUTED and 23 UNKNOWN results. Stage 133 originally had 23 cases with 10 PROVED, 9 REFUTED
+The manifest contains 103 cases across 36 families. Each build configuration expects 42 PROVED,
+37 REFUTED and 24 UNKNOWN results. Stage 133 originally had 23 cases with 10 PROVED, 9 REFUTED
 and 4 UNKNOWN; stage 134 closed its retained-prefix projection gap. Stage 136 adds raw-pointer
 metadata P/R controls and a safe core reference-array grant that remains UNKNOWN without a
 temporal permission certificate. Stage 137 adds tuple-array P/R and unsupported symbolic-write
@@ -61,6 +61,9 @@ the selected safe core API body precedes compiler ABI alignment metadata.
 Stage 163 adds registered scalar product choice P/R and missing invoked body U controls. Actual
 lazy input construction records original pure root types and exact symbol reservations;
 bounded typed preparation validates the requested descendant before observing those symbols.
+Stage 164 adds owned symbolic array field-write P/R and missing rvalue body U controls. Original
+numbered Field projections resolve a certified child and logical leaf span; complete candidates
+retain their existing bounds, source and typed preparation certificates.
 These additions change the denominator, not a coverage percentage.
 Covered examples exercise arithmetic, enum payloads, array indexing, reference effects, concrete
 generics, closures, iterator callbacks, finite loops, destructors, fresh future polling and raw
@@ -279,3 +282,14 @@ safe sized alignment; the closed zero-observable path still emits no symbols. Ge
 observers and symbol budgets remain unchanged. Enum-origin, newly encoded Char, forged or
 unregistered descriptors retain conservative boundaries; namespace evidence grants no storage
 lifetime, reference rights or raw access.
+
+
+Stage 164 extends actual owned Array-local Assign writes from a whole element to compiler Field
+paths within certified pure tuple or ordinary struct elements. The original field type and exact
+logical leaf span determine the replacement. Complete original candidates and child replacement
+are validated under existing budgets before a conditional span update and complete nominal
+rebuild. Untouched leaves retain their exact values, and commit uses the same owned local or live
+allocation. Rvalue effects and destination validators still precede the hook. Field spans convey
+no physical padding, alias or pointer access information. Retained-reference, raw, call destination
+and second-Index projections keep their separate frontiers; constants and solver-unique stores
+retain their prior writer.

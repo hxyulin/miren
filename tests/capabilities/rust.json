@@ -547,6 +547,23 @@
       "expected": "unknown",
       "unknown_reason": "no compiler-exported Rust definition matches the foreign symbol",
       "unknown_category": "missing_compiler_evidence"
+    },
+    {
+      "entry": "owned_array_field_write",
+      "family": "owned_array_field_write",
+      "expected": "proved"
+    },
+    {
+      "entry": "owned_array_field_wrong_claim",
+      "family": "owned_array_field_write",
+      "expected": "refuted"
+    },
+    {
+      "entry": "owned_array_field_missing_body",
+      "family": "owned_array_field_write",
+      "expected": "unknown",
+      "unknown_reason": "no compiler-exported Rust definition matches the foreign symbol",
+      "unknown_category": "missing_compiler_evidence"
     }
   ]
 }

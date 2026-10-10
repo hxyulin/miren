@@ -1439,3 +1439,22 @@ bounded. Copy/read/write/alignment correlations, distinct root/field/occurrence 
 actual getter mutation are checked. A Float-only lazy product is supported; the original
 Float/Char source retains its earlier input-producer budget frontier. The shared 100-case/
 35-family baseline expects 164 PROVED, 144 REFUTED and 92 UNKNOWN across four configurations.
+
+
+Stage 164 supports symbolic Field-path writes within owned array elements certified by original
+compiler types. Numbered fields resolve an exact original child type and logical leaf span;
+the existing typed product preparation validates the replacement and all complete candidates.
+One index condition updates only the affected leaves, preserving untouched values and complete
+nominal metadata before committing to the same owned local or live ordinary allocation. Existing
+bounds, rvalue effects, destination validators, constant/unique store priority and candidate budgets
+remain in force. Retained/raw references, second indexing and call destinations gain no new rule.
+
+The dedicated 27-root host/ARM O0/O2 matrix yields 15 PROVED, 4 REFUTED and 8 UNKNOWN per build.
+Named, tuple, generic, nested-field and subtree writes, untouched siblings/indices, sequential
+updates, allocated owners, lazy scalar roots, Float/Char and zero-leaf rvalue effects are checked.
+Existing typed readers also support direct field observations without a reader change. The
+unchanged earlier ambiguous_store source proves in all four profiles before harness maintenance.
+Second Index and retained/raw/identity/restricted/resource cases keep their separate frontiers.
+A real helper assignment changes left to right; unchanged claims refute and valid original
+2-element native inputs pass while mutants fail at O0/O2. The shared 103-case/36-family baseline
+expects 168 PROVED, 148 REFUTED and 96 UNKNOWN across four configurations.

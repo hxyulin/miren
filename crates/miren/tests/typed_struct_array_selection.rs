@@ -93,10 +93,6 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
                     UnknownCategory::Unclassified,
                     "non-scalar array index is not uniquely determined on this path",
                 ),
-                "ambiguous_store" => (
-                    UnknownCategory::Unclassified,
-                    "non-scalar array index is not uniquely determined on this path",
-                ),
                 "dropped_record" => (
                     UnknownCategory::Unclassified,
                     "static views require sized layouts",
@@ -204,7 +200,7 @@ fn typed_array_selection_preserves_nominal_fields_and_correlations() {
         ("wrong_candidate", ProofStatus::Refuted),
         ("bounds_at_end", ProofStatus::Refuted),
         ("ambiguous_reference", ProofStatus::Unknown),
-        ("ambiguous_store", ProofStatus::Unknown),
+        ("ambiguous_store", ProofStatus::Proved),
         ("raw_record", ProofStatus::Unknown),
         ("refined_zero_array", ProofStatus::Unknown),
         ("dropped_record", ProofStatus::Unknown),

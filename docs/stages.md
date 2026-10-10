@@ -3923,3 +3923,59 @@ query text across four configurations. The actual getter mutation and valid nati
 ledgers remain at `/tmp/miren-stage163-final-evidence`. The two shared baseline tests pass.
 Independent review approves the issued namespace, original-type and bounded observation
 certificates; no conditional assumptions or generic input-observer changes are added.
+
+
+## Stage 164: certified Field-path writes in owned array elements
+
+The actual Assign hook admits an owned Array-local Index followed only by compiler Field
+projections. Whole original element purity remains mandatory, including siblings and unused N=0
+children. Original numbered field identity and monomorphic raw field type resolve a child shape
+and checked logical leaf span; neither names nor physical offsets supply the certificate.
+
+The exact child replacement and all complete old candidates share typed product preparation,
+issued scalar reservation/closed-zero policy, scalar context/sort, Float bits and Char validity.
+Expanded costs retain the existing cumulative 512-node/depth-16 limits. One index condition per
+candidate updates the target span; untouched leaves remain exact. Complete nominal reconstruction
+precedes commit to the same owned local or live allocation, with existing require_write/read.
+Zero-leaf spans still validate replacement, effects, body, type and bounds. Constant and
+solver-unique stores retain their old path. Rvalue evaluation and destination validators precede
+the hook; retained references, raw/Deref, second Index and call destinations acquire no new rule.
+
+
+The dedicated 27-root matrix yields 15 PROVED, 4 REFUTED and 8 UNKNOWN per host/ARM O0/O2 build.
+Named, tuple, generic, nested-field, pure subtree and byte-subtree writes are covered with
+untouched siblings/indices, sequential updates, allocated owners, three actual lazy scalar roots,
+Float bits, Char validity and zero-leaf rvalue effects. Direct field observations also prove
+through the existing typed reader, without a new reader rule or source rewrite. Actual zero-leaf
+callback effects and panics execute; empty field spans do not bypass a body.
+
+The unchanged earlier typed_struct_array_selection ambiguous_store source independently proves
+in all four profiles before its harness expectation and obsolete UNKNOWN arm are maintained.
+Original second-Index controls stay UNKNOWN. Retained/raw/reference-bearing, restricted N=0,
+Drop, missing actual replacement body and existing resource cases retain their actual frontiers.
+A real noinline helper assignment is changed from left to right; unchanged claims refute in all
+four builds with actual helper entry and same-obligation query/model. Native originals use the
+actual two-element owned domain and pass at O0/O2, while valid mutant guards fail. Complete
+commands, hashes, reports, outputs and timeouts remain at `/tmp/miren-stage164-final-evidence`.
+
+Shared partial-field P/R sources are first UNKNOWN on all four profiles at the nonunique array
+write frontier; a missing actual rvalue body already stops at its separate compiler-evidence
+frontier. After implementation, the original claims produce P/R and the missing body stays U.
+Before/after commands, hashes and reports remain at `/tmp/miren-stage164-shared-before` and
+`/tmp/miren-stage164-shared-after`. Three new controls yield 103 cases across 36 families,
+expecting 42 PROVED, 37 REFUTED and 24 UNKNOWN per configuration.
+
+Four product metadata tests cover certified spans, nominal and byte reconstruction, untouched
+Float bits, malformed inventories/ranges, foreign conditions and zero-span validation. Nineteen
+related compiler tests and four final new/earlier focused tests pass, as do build/lint/fmt.
+
+Final validation passes all 674 Rust tests in the isolated frozen workspace and 68 Python tests.
+All 621 tracked main files match that snapshot byte for byte. Fresh main debug/release builds,
+22 new/related integration tests, 68 Python tests and all remaining required checks also pass.
+Frozen isolated and main surveys retain 168 PROVED, 148 REFUTED and 96 UNKNOWN at
+`/tmp/miren-stage164-capabilities-20261010` and
+`/tmp/miren-stage164-merged-capabilities-20261010`, with source/input/release hashes verified.
+All 308 earlier completed P/R roots retain identical obligation results, details and query text
+across four configurations. The two shared baseline tests pass. Actual source mutation and native
+execution evidence remains at `/tmp/miren-stage164-final-evidence`; independent review approves
+final source and evidence. No assumptions, input caps or resource-budget changes are introduced.

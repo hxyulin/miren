@@ -849,6 +849,57 @@ pub fn registered_product_missing_body(
     }
 }
 
+pub fn owned_array_field_write(
+    mut first: [ReservedRecord; 64],
+    _second: [ReservedRecord; 64],
+    _third: [ReservedRecord; 64],
+    index: usize,
+    value: u16,
+) {
+    if index < first.len() {
+        let before = first[index];
+        first[index].left = value;
+        let selected = first[index];
+        assert!(selected.left == value);
+        assert!(selected.right == before.right);
+    }
+}
+
+pub fn owned_array_field_wrong_claim(
+    mut first: [ReservedRecord; 64],
+    _second: [ReservedRecord; 64],
+    _third: [ReservedRecord; 64],
+    index: usize,
+    value: u16,
+) {
+    if index < first.len() {
+        first[index].left = value;
+        let selected = first[index];
+        assert!(selected.left == value.wrapping_add(1));
+    }
+}
+
+#[cfg(not(test))]
+unsafe extern "Rust" {
+    fn opaque_owned_field_replacement(value: u16) -> u16;
+}
+
+#[cfg(not(test))]
+pub fn owned_array_field_missing_body(
+    mut first: [ReservedRecord; 64],
+    _second: [ReservedRecord; 64],
+    _third: [ReservedRecord; 64],
+    index: usize,
+    value: u16,
+) {
+    if index < first.len() {
+        let replacement = unsafe { opaque_owned_field_replacement(value) };
+        first[index].left = replacement;
+        let selected = first[index];
+        assert!(selected.left == replacement);
+    }
+}
+
 #[cfg(test)]
 mod native {
     use super::*;
@@ -860,6 +911,7 @@ mod native {
         let records = [ReservedRecord { left: 3, right: 7 }; 64];
         for index in [0, 63, 64, usize::MAX] {
             registered_product_choice(records, records, records, index);
+            owned_array_field_write(records, records, records, index, u16::MAX);
         }
         safe_sized_alignment(SizedLayoutZero);
         deferred_zero_owned_write([DeferredZero; 2], 0);
@@ -1047,5 +1099,11 @@ mod native {
         let first = [ReservedRecord { left: 3, right: 7 }; 64];
         let second = [ReservedRecord { left: 5, right: 11 }; 64];
         registered_product_wrong_claim(first, second, first, 63);
+    }
+    #[test]
+    #[should_panic]
+    fn owned_array_field_wrong_claim_panics() {
+        let records = [ReservedRecord { left: 3, right: 7 }; 64];
+        owned_array_field_wrong_claim(records, records, records, 63, 0);
     }
 }

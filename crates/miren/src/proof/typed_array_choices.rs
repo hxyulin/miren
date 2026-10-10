@@ -16,6 +16,17 @@ pub(super) enum OwnedChoiceShape {
     ByteArray(usize),
 }
 
+struct ProductFieldTarget<'a, 'tcx> {
+    original: Ty<'tcx>,
+    shape: &'a OwnedChoiceShape,
+    span: std::ops::Range<usize>,
+}
+
+struct ProductUpdate<'a> {
+    span: std::ops::Range<usize>,
+    leaves: &'a [Value],
+}
+
 pub(super) const MAX_CHOICE_NODES: usize = 512;
 pub(super) const MAX_CHOICE_DEPTH: usize = 16;
 
@@ -125,12 +136,16 @@ impl<'tcx> Engine<'tcx> {
         place: Place<'tcx>,
         replacement: &Value,
     ) -> Result<bool, String> {
-        if place.projection.len() != 1 {
-            return Ok(false);
-        }
-        let ProjectionElem::Index(index_local) = place.projection[0] else {
+        let Some((ProjectionElem::Index(index_local), fields)) = place.projection.split_first()
+        else {
             return Ok(false);
         };
+        if fields
+            .iter()
+            .any(|field| !matches!(field, ProjectionElem::Field(..)))
+        {
+            return Ok(false);
+        }
         let original = body.local_decls[place.local].ty;
         let ty::Array(element, count) = original.kind() else {
             return Ok(false);
@@ -175,6 +190,7 @@ impl<'tcx> Engine<'tcx> {
         let Some(shape) = self.owned_product_shape(*element)? else {
             return Ok(false);
         };
+        let target = self.owned_product_field_target(*element, &shape, fields)?;
         self.memory_bounds(
             &index,
             &symbolic::integer(&self.terms, elements.len() as u128, bits, false),
@@ -183,9 +199,9 @@ impl<'tcx> Engine<'tcx> {
         let mut nodes = 0;
         let replacement = self
             .product_leaves(
-                *element,
+                target.original,
                 bits,
-                &shape,
+                target.shape,
                 replacement,
                 &state.conditions,
                 &mut nodes,
@@ -200,14 +216,21 @@ impl<'tcx> Engine<'tcx> {
                 Op::Equal,
                 &[term.clone(), self.terms.bit_vector(position as u128, bits)?],
             )?;
-            updated.push(conditional_product(
-                &self.terms,
-                bits,
-                &shape,
-                &condition,
-                &replacement,
-                &old,
-            )?);
+            updated.push(if fields.is_empty() {
+                conditional_product(&self.terms, bits, &shape, &condition, &replacement, &old)?
+            } else {
+                conditional_product_field(
+                    &self.terms,
+                    bits,
+                    &shape,
+                    &condition,
+                    ProductUpdate {
+                        span: target.span.clone(),
+                        leaves: &replacement,
+                    },
+                    &old,
+                )?
+            });
         }
         let updated = Value::Elements(updated.into());
         if let Some(allocation) = allocation {
@@ -216,6 +239,69 @@ impl<'tcx> Engine<'tcx> {
             state.locals[local] = Some(updated);
         }
         Ok(true)
+    }
+
+    fn owned_product_field_target<'a>(
+        &self,
+        mut original: Ty<'tcx>,
+        mut shape: &'a OwnedChoiceShape,
+        fields: &[rustc_middle::mir::PlaceElem<'tcx>],
+    ) -> Result<ProductFieldTarget<'a, 'tcx>, String> {
+        let mut start = 0_usize;
+        for field in fields {
+            let ProjectionElem::Field(index, recorded) = field else {
+                return Err("owned product target requires compiler Field projections".into());
+            };
+            let index = index.as_usize();
+            let child_ty = match (original.kind(), shape) {
+                (ty::Tuple(types), OwnedChoiceShape::Tuple(children))
+                    if types.len() == children.len() =>
+                {
+                    let ty = types
+                        .get(index)
+                        .ok_or("owned tuple field index is invalid")?;
+                    *ty
+                }
+                (ty::Adt(def, args), OwnedChoiceShape::Struct { name, fields })
+                    if self.plain_composite_struct(*def)
+                        && self.tcx.def_path_str(def.did()) == *name
+                        && def.non_enum_variant().fields.len() == fields.len() =>
+                {
+                    let declared = &def.non_enum_variant().fields;
+                    let field = declared
+                        .get(rustc_abi::FieldIdx::from_usize(index))
+                        .ok_or("owned struct field index is invalid")?;
+                    for (field, (name, _)) in declared.iter().zip(fields) {
+                        if field.name.as_str() != name {
+                            return Err("owned struct field identity mismatch".into());
+                        }
+                    }
+                    field.ty(self.tcx, args).skip_norm_wip()
+                }
+                _ => {
+                    return Err(
+                        "owned field target differs from exact compiler product shape".into(),
+                    );
+                }
+            };
+            if child_ty != *recorded {
+                return Err("owned field target differs from original compiler field type".into());
+            }
+            let (child, offset) = product_field(shape, index)?;
+            start = start
+                .checked_add(offset)
+                .ok_or("owned field leaf offset overflow")?;
+            shape = child;
+            original = child_ty;
+        }
+        let end = start
+            .checked_add(product_leaf_count(shape)?)
+            .ok_or("owned field leaf extent overflow")?;
+        Ok(ProductFieldTarget {
+            original,
+            shape,
+            span: start..end,
+        })
     }
 
     fn product_leaves(
@@ -539,17 +625,51 @@ fn conditional_product(
     replacement: &[Value],
     old: &[Value],
 ) -> Result<Value, String> {
+    conditional_product_field(
+        context,
+        pointer_bits,
+        shape,
+        condition,
+        ProductUpdate {
+            span: 0..old.len(),
+            leaves: replacement,
+        },
+        old,
+    )
+}
+
+fn conditional_product_field(
+    context: &Context,
+    pointer_bits: u32,
+    shape: &OwnedChoiceShape,
+    condition: &Term,
+    update: ProductUpdate<'_>,
+    old: &[Value],
+) -> Result<Value, String> {
     if condition.sort() != &Sort::Bool || !condition.belongs_to(context) {
         return Err("owned array write condition has invalid sort or context".into());
     }
-    if old.len() != replacement.len() {
-        return Err("owned array write differs in certified leaf count".into());
+    if update.span.start > update.span.end
+        || update.span.end > old.len()
+        || update.span.len() != update.leaves.len()
+        || old.len() != product_leaf_count(shape)?
+    {
+        return Err("owned array write differs in certified leaf count or field span".into());
     }
     let selected = old
         .iter()
-        .zip(replacement)
-        .map(|(old, replacement)| {
-            symbolic::conditional_scalar(context, condition, replacement, old)
+        .enumerate()
+        .map(|(position, old)| {
+            if update.span.contains(&position) {
+                symbolic::conditional_scalar(
+                    context,
+                    condition,
+                    &update.leaves[position - update.span.start],
+                    old,
+                )
+            } else {
+                Ok(old.clone())
+            }
         })
         .collect::<Result<Vec<_>, _>>()?;
     let mut cursor = 0;
@@ -558,6 +678,70 @@ fn conditional_product(
         return Err("owned array write omitted certified leaves".into());
     }
     Ok(result)
+}
+
+fn product_field(
+    shape: &OwnedChoiceShape,
+    index: usize,
+) -> Result<(&OwnedChoiceShape, usize), String> {
+    let mut offset = 0_usize;
+    match shape {
+        OwnedChoiceShape::Tuple(fields) => {
+            let field = fields
+                .get(index)
+                .ok_or("owned tuple field index is invalid")?;
+            for field in &fields[..index] {
+                offset = offset
+                    .checked_add(product_leaf_count(field)?)
+                    .ok_or("owned field leaf offset overflow")?;
+            }
+            Ok((field, offset))
+        }
+        OwnedChoiceShape::Struct { fields, .. } => {
+            let (_, field) = fields
+                .get(index)
+                .ok_or("owned struct field index is invalid")?;
+            for (_, field) in &fields[..index] {
+                offset = offset
+                    .checked_add(product_leaf_count(field)?)
+                    .ok_or("owned field leaf offset overflow")?;
+            }
+            Ok((field, offset))
+        }
+        _ => Err("owned field projection requires a tuple or ordinary struct".into()),
+    }
+}
+
+fn product_leaf_count(shape: &OwnedChoiceShape) -> Result<usize, String> {
+    fn count(shape: &OwnedChoiceShape, depth: usize, nodes: &mut usize) -> Result<usize, String> {
+        if depth >= MAX_CHOICE_DEPTH || *nodes >= MAX_CHOICE_NODES {
+            return Err("owned field shape exceeds its depth or node budget".into());
+        }
+        *nodes += 1;
+        match shape {
+            OwnedChoiceShape::Primitive(_) => Ok(1),
+            OwnedChoiceShape::ByteArray(count) => {
+                if *count > MAX_CHOICE_NODES.saturating_sub(*nodes) {
+                    return Err("owned field shape exceeds its byte budget".into());
+                }
+                *nodes += count;
+                Ok(*count)
+            }
+            OwnedChoiceShape::Tuple(fields) | OwnedChoiceShape::Array(fields) => {
+                fields.iter().try_fold(0_usize, |sum, field| {
+                    sum.checked_add(count(field, depth + 1, nodes)?)
+                        .ok_or_else(|| "owned field leaf count overflow".into())
+                })
+            }
+            OwnedChoiceShape::Struct { fields, .. } => {
+                fields.iter().try_fold(0_usize, |sum, (_, field)| {
+                    sum.checked_add(count(field, depth + 1, nodes)?)
+                        .ok_or_else(|| "owned field leaf count overflow".into())
+                })
+            }
+        }
+    }
+    count(shape, 0, &mut 0)
 }
 
 pub(super) fn rebuild(
@@ -647,6 +831,169 @@ pub(super) fn rebuild(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn field_updates_preserve_untouched_terms_float_bits_zero_identity_and_checked_spans() {
+        let context = Context::default();
+        let integer = OwnedChoiceShape::Primitive(ScalarSliceElement::Integer {
+            bits: 16,
+            signed: false,
+        });
+        let zero = OwnedChoiceShape::Struct {
+            name: "Zero".into(),
+            fields: Vec::new(),
+        };
+        let nested = OwnedChoiceShape::Tuple(vec![
+            OwnedChoiceShape::Primitive(ScalarSliceElement::Float { bits: 32 }),
+            zero.clone(),
+        ]);
+        let shape = OwnedChoiceShape::Struct {
+            name: "Record".into(),
+            fields: vec![
+                ("first".into(), integer.clone()),
+                ("nested".into(), nested.clone()),
+            ],
+        };
+        let (child, offset) = product_field(&shape, 1).unwrap();
+        assert_eq!(offset, 1);
+        let (empty, relative) = product_field(child, 1).unwrap();
+        assert_eq!(relative, 1);
+        assert_eq!(product_leaf_count(empty).unwrap(), 0);
+        assert!(product_field(&shape, 2).is_err());
+        assert!(product_field(&OwnedChoiceShape::Array(vec![integer.clone()]), 0).is_err());
+        assert!(product_leaf_count(&OwnedChoiceShape::Array(vec![integer; 513])).is_err());
+        assert!(product_leaf_count(&OwnedChoiceShape::ByteArray(513)).is_err());
+        let condition = context.symbol(0, Sort::Bool).unwrap();
+        let old = vec![
+            symbolic::integer(&context, 7, 16, false),
+            symbolic::float_from_bits(&context, context.bit_vector(0x8000_0000, 32).unwrap(), 32),
+        ];
+        let replacement = vec![symbolic::float_from_bits(
+            &context,
+            context.bit_vector(0x7fc0_0005, 32).unwrap(),
+            32,
+        )];
+        let result = conditional_product_field(
+            &context,
+            64,
+            &shape,
+            &condition,
+            ProductUpdate {
+                span: 1..2,
+                leaves: &replacement,
+            },
+            &old,
+        )
+        .unwrap();
+        let mut leaves = Vec::new();
+        flatten(&context, 64, &shape, &result, 0, &mut 0, &mut leaves).unwrap();
+        assert_eq!(
+            leaves[0].1.integer().unwrap().0,
+            old[0].integer().unwrap().0
+        );
+        let Value::Float {
+            raw_bits: Some(actual),
+            ..
+        } = &leaves[1].1
+        else {
+            panic!("lost Float bits");
+        };
+        let Value::Float {
+            raw_bits: Some(new),
+            ..
+        } = &replacement[0]
+        else {
+            unreachable!();
+        };
+        let Value::Float {
+            raw_bits: Some(previous),
+            ..
+        } = &old[1]
+        else {
+            unreachable!();
+        };
+        assert_eq!(
+            *actual,
+            context
+                .apply(Op::Ite, &[condition.clone(), new.clone(), previous.clone()])
+                .unwrap()
+        );
+        assert!(
+            conditional_product_field(
+                &context,
+                64,
+                &shape,
+                &condition,
+                ProductUpdate {
+                    span: std::ops::Range { start: 2, end: 1 },
+                    leaves: &[]
+                },
+                &old
+            )
+            .is_err()
+        );
+        assert!(
+            conditional_product_field(
+                &context,
+                64,
+                &shape,
+                &condition,
+                ProductUpdate {
+                    span: 1..3,
+                    leaves: &replacement
+                },
+                &old
+            )
+            .is_err()
+        );
+        assert!(
+            conditional_product_field(
+                &context,
+                64,
+                &shape,
+                &condition,
+                ProductUpdate {
+                    span: 0..1,
+                    leaves: &[]
+                },
+                &old
+            )
+            .is_err()
+        );
+        let unchanged = conditional_product_field(
+            &context,
+            64,
+            &shape,
+            &condition,
+            ProductUpdate {
+                span: 2..2,
+                leaves: &[],
+            },
+            &old,
+        )
+        .unwrap();
+        let Value::Adt { fields, .. } = unchanged else {
+            panic!("lost parent identity");
+        };
+        let Value::Tuple(fields) = &fields[1].1 else {
+            panic!("lost nested shape");
+        };
+        assert!(matches!(&fields[1], Value::Adt { name, .. } if name == "Zero"));
+        assert!(
+            conditional_product_field(
+                &context,
+                64,
+                &zero,
+                &Context::default().boolean(true),
+                ProductUpdate {
+                    span: 0..0,
+                    leaves: &[]
+                },
+                &[]
+            )
+            .is_err()
+        );
+    }
 
     #[test]
     fn conditional_owned_products_preserve_nominal_bytes_and_complete_leaf_inventory() {

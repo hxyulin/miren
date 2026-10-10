@@ -704,15 +704,21 @@ pinning and wrapper policies; missing core identity evidence refuses new depende
 Field privacy and constructors add no input invariant. Available ordinary dependency methods
 execute their actual MIR, and unavailable bodies remain UNKNOWN.
 
-Actual MIR assignments can update one complete element of a direct owned finite array at a
-symbolic, checked index. Primitive, pure tuple/fixed-array and eligible ordinary struct elements
+Actual MIR assignments can update one complete element or a compiler-identified tuple/struct
+field subtree of a direct owned finite array at a symbolic, checked index. Primitive, pure
+tuple/fixed-array and eligible ordinary struct elements
 use exact original compiler types and complete candidate/replacement validation. All fields of
 one candidate share the same conditional update; other elements retain their prior values.
+Field updates preserve exact untouched leaf terms and rebuild the complete nominal element.
+The original compiler field types and declaration order certify each logical field span; no
+physical offset or padding rights follow.
 Owned byte-array elements keep their exact u8/count certificate. Writes to existing owner
 allocations validate live writable storage and commit to that same allocation. These updates
 preserve the existing 512-node/depth-16 budgets, Char validity and Float bit certificates.
-Reference/raw/static destinations and projections after the symbolic index retain their existing
-unsupported frontiers. Deferred input products with no observable scalar leaves can be
+Reference/raw/static destinations, a second index, dereferences, downcasts and call destinations
+retain their existing unsupported frontiers. Field-only assignment targets retain complete parent
+and replacement validation, including siblings and zero-leaf fields. Deferred input products with
+no observable scalar leaves can be
 reconstructed after exact original-type and descriptor validation. Nominal zero-sized structs
 retain their names and fields; tuple/array children retain their exact shapes. Descriptor kinds,
 counts, ordered field identities, slot/height metadata, seeds and checked ranges are validated
