@@ -200,11 +200,11 @@ fn logical_char_stores_and_actual_child_bodies_cover_four_profiles() {
                 ),
                 (
                     "float64_unknown",
-                    "only read-only byte slices and byte arrays are modeled",
+                    "mutable u16 roles require selected metadata-only operation",
                 ),
                 (
                     "float_unknown",
-                    "only read-only byte slices and byte arrays are modeled",
+                    "mutable u16 roles require selected metadata-only operation",
                 ),
             ] {
                 let proof = report

@@ -56,11 +56,22 @@ impl<'tcx> Engine<'tcx> {
                 .apply(Op::Equal, &[decoded, expression.clone()])
                 .expect("matching float encoding sorts"),
         );
-        Value::Float {
+        let result = Value::Float {
             expression,
             bits,
             raw_bits: Some(raw_bits),
+        };
+        let symbol = match &result {
+            Value::Float {
+                raw_bits: Some(raw),
+                ..
+            } => raw.symbol_index(),
+            _ => None,
         }
+        .expect("actual materialized raw symbol");
+        self.float_pairs
+            .materialized(&self.terms, &result, symbol, &self.float_encodings[&symbol]);
+        result
     }
 
     pub(super) fn float_to_bits(
@@ -296,7 +307,7 @@ impl<'tcx> Engine<'tcx> {
                 return Err("float absolute value requires a modeled float".to_owned());
             };
             self.record_model(callee, "IEEE floating-point absolute value");
-            return Ok(Some(Value::Float {
+            let result = Value::Float {
                 expression: self
                     .terms
                     .apply(Op::FpAbs, std::slice::from_ref(expression))?,
@@ -313,7 +324,9 @@ impl<'tcx> Engine<'tcx> {
                         )
                     })
                     .transpose()?,
-            }));
+            };
+            self.float_pairs.absolute(&self.terms, &values[0], &result);
+            return Ok(Some(result));
         }
         let float_min = ["minimum_number_nsz_f32", "minimum_number_nsz_f64"]
             .iter()
@@ -550,10 +563,18 @@ impl<'tcx> Engine<'tcx> {
                 .map(|((raw, min_raw), max_raw)| {
                     let upper = self
                         .terms
-                        .apply(Op::Ite, &[above, max_raw.clone(), raw.clone()])?;
-                    self.terms.apply(Op::Ite, &[below, min_raw.clone(), upper])
+                        .apply(Op::Ite, &[above.clone(), max_raw.clone(), raw.clone()])?;
+                    self.terms
+                        .apply(Op::Ite, &[below.clone(), min_raw.clone(), upper])
                 })
                 .transpose()?;
+            if let Some(upper) =
+                self.float_pairs
+                    .selected(&self.terms, &above, &values[2], &values[0])
+            {
+                self.float_pairs
+                    .selected(&self.terms, &below, &values[1], &upper);
+            }
             return Ok(Some(Value::Float {
                 expression: result,
                 bits: *bits,

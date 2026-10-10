@@ -1037,6 +1037,23 @@
       "expected": "unknown",
       "unknown_reason": "byte copy source has uncertified transport or effects",
       "unknown_category": "semantics"
+    },
+    {
+      "entry": "float_slice_child_call",
+      "family": "mutable_float_child",
+      "expected": "proved"
+    },
+    {
+      "entry": "float_slice_child_wrong_claim",
+      "family": "mutable_float_child",
+      "expected": "refuted"
+    },
+    {
+      "entry": "float_slice_nested_unknown",
+      "family": "mutable_float_child",
+      "expected": "unknown",
+      "unknown_reason": "float_slice_nested bb0: mutable float staging needs a pending child",
+      "unknown_category": "semantics"
     }
   ]
 }

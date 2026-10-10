@@ -1273,3 +1273,67 @@ ordinary closure execution is unchanged. The original failed full run and earlie
 preserved separately. The unchanged closure regression suite passes all three tests, and fresh
 repaired captures match 88 prior feature proof objects with 244 queries and 140 old proof objects
 with 356 queries exactly. Corrected full validation passes all required checks.
+
+Stage 195 admits exact original f32/f64 elements through the existing single mutable-root and
+whole-child protocol. Each compiler type/layout certificate issues a BV32/BV64 logical array;
+reads retain both the numerical Float term and exact raw bits. Writes and scalar child boundaries
+require private authority for that exact numerical/raw pair before proving correspondence and
+committing effects. Numerical equality alone cannot authenticate a copied NaN payload. Actual
+arithmetic may select a permitted NaN encoding; it does not promise one fixed payload.
+
+Pair metadata is issued only by authenticated decoding, actual arithmetic materialization and
+paired copy/negation/absolute-value/selection paths. Wrong original types/layouts, missing or
+changed encoding bindings, forged raw payloads, foreign contexts and absent issuers are refused
+transactionally. Metadata work is precharged with 512 nodes and depth 16. Exhaustion leaves old
+producers intact and refuses unavailable new consumer authority. Existing storage, lifetime,
+generation, parent suspension and normal-return budgets remain unchanged. Ghosts observe exact
+length; executable Ghost indexing remains UNKNOWN.
+
+Only an actual new incoming mutable Float root activates the optional metadata namespace.
+Inactive hooks return before allocating solver terms. This preserves old read-only Float query
+node identifiers and all existing integer/Bool/Char formulas. No raw memory, allocator, device,
+shared view, competing root, nested mutable child or reference-return authority is added.
+
+The final 26-root matrix yields sixteen PROVED, five REFUTED and five UNKNOWN per host/ARM
+O0/O2 profile. Identical sources under committed Stage 193 yield twenty-six UNKNOWN. Thirty-two
+reports cover before/after, real helper data mutation, retained/omitted foreign bodies and Ghost
+length P/R/index U controls. Changing the actual helper else branch from 1.0 to 3.0 refutes the
+unchanged claim with actual body entries and a query/model on the same obligation. A genuine
+missing selected helper body remains missing-compiler-evidence UNKNOWN. Native originals pass
+three tests with valid 129-element arrays; mutation guards exit 101 at O0/O2 with ten-second
+limits. A permitted arithmetic NaN-encoding counterexample is not a guaranteed native panic.
+
+Controlled committed-193 adoption preserves the complete byte-copy implementation and its
+closure definition-kind correction. One new parent test Engine literal gains the default Float
+registry; no parent production behavior changes. Earlier pending-194 and actual-194 sources,
+binaries, captures and fidelity remain separately scoped. Fresh actual-parent fidelity covers
+1,240 old root/profile pairs: 1,236 statuses stay unchanged, four integer-suite Float controls
+advance from UNKNOWN to PROVED, and twelve Bool/Char Float controls remain query-free UNKNOWN
+at a later metadata-only refusal. Those twelve include input, replay and body provenance changes
+as new typed Float issuance reaches farther; they are not whole-object diagnostic-only equality.
+The 1,224 strict status/obligation pairs remain unchanged. All 840 previously completed whole
+proof objects and 1,980 completed queries match exactly, including 48 old read-only Float pairs
+and 52 queries. Old fixtures remain intact; narrow harness upkeep changes only status/reason pins.
+
+Global controls add a finite numerical Float child assertion, wrong claim and nested-child
+UNKNOWN frontier. The source guard is explicit Rust code; no analysis input cap or environmental
+premise is added. Actual helper +0.0-to-+1.0 mutation refutes the unchanged assertion and fails
+its safe 129-element native guard. This control claims numerical equality, with NaN payload and
+signed-zero bit behavior tested separately in the dedicated matrix. Saved actual-parent globals
+are `/tmp/miren-stage195-parent193-global-before-evidence` and
+`/tmp/miren-stage195-parent193-global-after-evidence`. The manifest has 191 cases in 65 families.
+Root validation passes 796 workspace Rust tests and 109 focused Rust tests, with 68 Python checks
+in each workspace. Formatting, Clippy, debug/release builds, deny, docs and manual hooks pass.
+Both surveys report 304 PROVED, 264 REFUTED and 196 UNKNOWN across four profiles. All 560
+previously completed global pairs preserve status, inputs, models, premises and obligations;
+append-only global replay fingerprints are excluded from this historical comparison. All 762
+current normalized global proof objects match exactly; two query-free ResourceLimit objects differ
+only in call-stack or exact closure/block time-budget context, recorded separately. All 864
+tracked files match byte-for-byte.
+
+The fresh main release matches 128 dedicated whole proof objects and 276 queries, plus 16 global
+objects and 32 queries. Original actual-parent native source/executable hashes and 0/101 results
+remain explicitly adopted, rather than relabeled as fresh main executions. The initial replay used
+automatic solver selection while the author had explicitly selected the solver; its 24 model-only
+differences remain archived. Corrected same-mode replay matches complete objects without model
+normalization. Final checks and captures are retained under `/tmp/miren-stage195-*`.

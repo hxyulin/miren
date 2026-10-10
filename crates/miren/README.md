@@ -1065,3 +1065,24 @@ liveness, initialization, write permission and every nested prefix before one wh
 Old fixed-capacity byte paths keep their existing priority and formulas. Shifted ranges, dynamic
 or returned sources, zero-length constants without initialized compiler bytes, and optimized
 foreign bodies with already inlined raw copy transport remain UNKNOWN in this extension.
+
+The direct incoming mutable primitive slice protocol also admits exact compiler f32 and f64.
+Storage keeps their BV32/BV64 encodings, while comparisons and arithmetic retain IEEE numeric
+semantics. Stores require an exact producer pair and a proved numeric/storage correspondence
+before committing data. Decoded values preserve all bits, including NaN payloads and signed zero.
+Arithmetic materialization retains every permitted NaN encoding rather than choosing a canonical
+payload. Paired negation, absolute value and clamp selections retain their exact
+bit transformations.
+
+Pair metadata is enabled only for the new mutable Float root namespace. Other Float analyses
+retain their existing query terms and models. Optional metadata uses the existing 512-node and
+16-depth bounds; exhaustion cannot fail an old readonly producer, and a new Store refuses missing
+authority. Numeric equality or matching FP/BV sorts alone cannot authenticate a copied NaN.
+
+Actual whole-child and scalar-return bodies use the existing exclusive frame protocol. Float
+scalar arguments and results need the same pair checks; unavailable invoked bodies remain UNKNOWN.
+Detached ghosts expose length only. Retained element borrows, raw transport, nested mutable
+reborrows, competing roots and executable role escape remain unsupported. Unauthenticated
+aggregate selection pairs remain UNKNOWN. No floating induction, allocator or alias permission
+is added. Native controls use valid finite 129-element slices; arithmetic NaN payload claims
+remain subject to the analyzer's existing permitted-encoding overapproximation.

@@ -238,6 +238,7 @@ mod tests {
                     terms: Context::default(),
                     next_symbol: std::cell::Cell::new(0),
                     float_encodings: BTreeMap::new(),
+                    float_pairs: super::float_pairs::Registry::default(),
                     abstraction_symbols: std::cell::RefCell::new(BTreeMap::new()),
                     static_views: std::cell::RefCell::new(Vec::new()),
                     static_origins: Default::default(),

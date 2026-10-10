@@ -365,6 +365,11 @@ fn evaluate(
                                     symbolic::ScalarSliceElement::Char => {
                                         symbolic::Sort::BitVec(32)
                                     }
+                                    symbolic::ScalarSliceElement::Float { bits }
+                                        if matches!(bits, 32 | 64) =>
+                                    {
+                                        symbolic::Sort::BitVec(bits)
+                                    }
                                     symbolic::ScalarSliceElement::Integer { bits, .. }
                                         if matches!(bits, 8 | 16 | 32 | 64 | 128) =>
                                     {

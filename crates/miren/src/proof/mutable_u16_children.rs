@@ -521,6 +521,11 @@ impl<'tcx> Engine<'tcx> {
             if *original == self.tcx.types.char {
                 self.prove_char_value(value, &state.conditions)?;
             }
+            if self.mutable_u16_float_domain(id, &state.memory)?
+                && let Some(bits) = self.float_type(*original)
+            {
+                self.prove_float_pair(value, bits, &state.conditions)?;
+            }
         }
         let frame = self.mutable_u16_register_frame(&selected)?;
         if state.memory.storage_slots().saturating_add(1) > MAX_INPUT_VALUES {
@@ -548,6 +553,11 @@ impl<'tcx> Engine<'tcx> {
         for result in &mut results {
             if signature.output() == self.tcx.types.char {
                 self.prove_char_value(&result.value, &result.conditions)?;
+            }
+            if self.mutable_u16_float_domain(id, &result.memory)?
+                && let Some(bits) = self.float_type(signature.output())
+            {
+                self.prove_float_pair(&result.value, bits, &result.conditions)?;
             }
             self.mutable_u16_role_live(id, &MutableU16Role::Child { generation }, &result.memory)?;
             if result.memory.mutable_u16[id].phase
@@ -736,6 +746,11 @@ impl<'tcx> Engine<'tcx> {
             if *original == self.tcx.types.char {
                 self.prove_char_value(value, &state.conditions)?;
             }
+            if self.mutable_u16_float_domain(*id, &state.memory)?
+                && let Some(bits) = self.float_type(*original)
+            {
+                self.prove_float_pair(value, bits, &state.conditions)?;
+            }
         }
         std::rc::Rc::make_mut(&mut state.memory.mutable_u16)[*id].phase = Phase::Active {
             frames: next_frames.clone(),
@@ -751,6 +766,11 @@ impl<'tcx> Engine<'tcx> {
         for result in &mut results {
             if signature.output() == self.tcx.types.char {
                 self.prove_char_value(&result.value, &result.conditions)?;
+            }
+            if self.mutable_u16_float_domain(*id, &result.memory)?
+                && let Some(bits) = self.float_type(signature.output())
+            {
+                self.prove_float_pair(&result.value, bits, &result.conditions)?;
             }
             let backing = self.mutable_u16_backing(*id, &result.memory)?;
             if backing.generation != *generation

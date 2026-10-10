@@ -1,4 +1,4 @@
-//! Direct incoming mutable integer, Bool and Char roots.
+//! Direct incoming mutable primitive roots; Float requires exact producer-pair authority.
 //! Metadata and ghosts have no data-write authority.
 use super::*;
 use symbolic::MutableU16Role;
@@ -33,6 +33,11 @@ impl<'tcx> Engine<'tcx> {
             original.kind(),
             ty::Bool | ty::Char | ty::Int(_) | ty::Uint(_)
         ) && original != self.tcx.types.u8
+            || (super::float_pairs::ENABLE_MUTABLE_FLOAT
+                && matches!(
+                    original.kind(),
+                    ty::Float(ty::FloatTy::F32 | ty::FloatTy::F64)
+                ))
     }
 
     fn mutable_integer_certificate(&self, id: usize) -> Result<&IntegerCertificate<'tcx>, String> {
@@ -70,6 +75,11 @@ impl<'tcx> Engine<'tcx> {
             } else if self.mutable_integer_certificate(certificate)?.original == self.tcx.types.char
             {
                 "mutable char staging needs a pending child"
+            } else if self
+                .float_type(self.mutable_integer_certificate(certificate)?.original)
+                .is_some()
+            {
+                "mutable float staging needs a pending child"
             } else {
                 "mutable integer staging needs a pending child"
             },
@@ -88,6 +98,19 @@ impl<'tcx> Engine<'tcx> {
         Ok(matches!(original.kind(), ty::Ref(_, inner, mutability)
             if mutability.is_mut() == mutable && matches!(inner.kind(), ty::Slice(element)
                 if *element == certificate.original)))
+    }
+
+    pub(super) fn mutable_u16_float_domain(
+        &self,
+        id: usize,
+        memory: &Memory,
+    ) -> Result<bool, String> {
+        let backing = self.mutable_u16_backing(id, memory)?;
+        Ok(matches!(
+            self.mutable_integer_certificate(backing.certificate)?
+                .element,
+            symbolic::ScalarSliceElement::Float { .. }
+        ))
     }
 
     fn mutable_u16_error(&self, detail: &str) -> String {
@@ -137,6 +160,9 @@ impl<'tcx> Engine<'tcx> {
             });
             id
         };
+        if matches!(element, symbolic::ScalarSliceElement::Float { .. }) {
+            self.float_pairs.activate();
+        }
         self.input_values += 2;
         let bits = u32::from(self.tcx.sess.target.pointer_width);
         let length = self.fresh(Sort::BitVec(bits));
@@ -413,6 +439,9 @@ impl<'tcx> Engine<'tcx> {
         if certificate.original == self.tcx.types.char {
             self.prove_char_value(replacement, &state.conditions)?;
         }
+        if let symbolic::ScalarSliceElement::Float { bits } = certificate.element {
+            self.prove_float_pair(replacement, bits, &state.conditions)?;
+        }
         let data = self.terms.apply(
             Op::Store,
             &[
@@ -445,6 +474,20 @@ impl<'tcx> Engine<'tcx> {
                 );
             }
             return Ok(term.clone());
+        }
+        if let symbolic::ScalarSliceElement::Float { bits } = certificate.element {
+            if self.float_type(certificate.original) != Some(bits) {
+                return Err("mutable Float replacement differs from original compiler type".into());
+            }
+            self.validate_float_pair(replacement, bits)?;
+            let Value::Float {
+                raw_bits: Some(raw),
+                ..
+            } = replacement
+            else {
+                return Err("mutable Float replacement requires exact encoded producer".into());
+            };
+            return Ok(raw.clone());
         }
         if certificate.element == symbolic::ScalarSliceElement::Char {
             let (term, bits, signed) = replacement.integer()?;
@@ -846,6 +889,7 @@ mod tests {
                     terms: Context::default(),
                     next_symbol: std::cell::Cell::new(0),
                     float_encodings: BTreeMap::new(),
+                    float_pairs: super::float_pairs::Registry::default(),
                     abstraction_symbols: std::cell::RefCell::new(BTreeMap::new()),
                     static_views: std::cell::RefCell::new(Vec::new()),
                     static_origins: Default::default(),
@@ -1544,6 +1588,185 @@ mod tests {
                         .mutable_u16_length(&ghost, &char_state.memory)
                         .is_ok()
                 );
+                for (original, name, width, nan) in [
+                    (tcx.types.f32, "fp32_probe", 32, 0x7fc00017_u128),
+                    (tcx.types.f64, "fp64_probe", 64, 0x7ff8000000000017_u128),
+                ] {
+                    let mut memory = Memory::default();
+                    let mut conditions = Vec::new();
+                    let root = engine
+                        .mutable_u16_input(original, &mut memory, &mut conditions)
+                        .unwrap();
+                    let certificate = memory.mutable_u16[0].certificate;
+                    let issued = engine.mutable_integer_types[certificate].clone();
+                    assert_eq!(
+                        issued.element,
+                        symbolic::ScalarSliceElement::Float { bits: width }
+                    );
+                    assert_eq!(issued.bytes * 8, u64::from(width));
+                    let definition = tcx
+                        .hir_body_owners()
+                        .find(|owner| tcx.item_name(owner.to_def_id()).as_str() == name)
+                        .unwrap();
+                    let instance = engine
+                        .resolve_function_item(definition.to_def_id(), tcx.mk_args(&[]))
+                        .unwrap();
+                    let selected = engine.instantiated_body(instance).unwrap();
+                    std::rc::Rc::make_mut(&mut memory.mutable_u16)[0].length =
+                        symbolic::integer(&engine.terms, 2, bits, false);
+                    let mut state = State {
+                        locals: vec![None; selected.local_decls.len()],
+                        addresses: vec![None; selected.local_decls.len()],
+                        conditions,
+                        memory,
+                        missing_places: Default::default(),
+                    };
+                    state.locals[1] = Some(root);
+                    state.locals[2] = Some(symbolic::integer(&engine.terms, 0, bits, false));
+                    let place = Place {
+                        local: rustc_middle::mir::Local::from_usize(1),
+                        projection: tcx.mk_place_elems(&[
+                            ProjectionElem::Deref,
+                            ProjectionElem::Index(rustc_middle::mir::Local::from_usize(2)),
+                        ]),
+                    };
+                    let valid = symbolic::float_from_bits(
+                        &engine.terms,
+                        engine.terms.bit_vector(nan, width).unwrap(),
+                        width,
+                    );
+                    let Value::Float {
+                        expression,
+                        raw_bits: Some(raw),
+                        ..
+                    } = &valid
+                    else {
+                        unreachable!()
+                    };
+                    let mut forged_nan = valid.clone();
+                    if let Value::Float { raw_bits, .. } = &mut forged_nan {
+                        *raw_bits = Some(engine.terms.bit_vector(nan + 1, width).unwrap());
+                    }
+                    let wrong_numeric = Value::Float {
+                        expression: engine.terms.boolean(true),
+                        bits: width,
+                        raw_bits: Some(raw.clone()),
+                    };
+                    let wrong_raw = Value::Float {
+                        expression: expression.clone(),
+                        bits: width,
+                        raw_bits: Some(engine.terms.boolean(true)),
+                    };
+                    let no_raw = Value::Float {
+                        expression: expression.clone(),
+                        bits: width,
+                        raw_bits: None,
+                    };
+                    let missing_issuer = Value::Float {
+                        expression: engine
+                            .terms
+                            .apply(Op::FpNeg, std::slice::from_ref(expression))
+                            .unwrap(),
+                        bits: width,
+                        raw_bits: Some(raw.clone()),
+                    };
+                    for replacement in [
+                        forged_nan,
+                        wrong_numeric,
+                        wrong_raw,
+                        no_raw,
+                        missing_issuer,
+                        symbolic::float_from_bits(
+                            &foreign,
+                            foreign.bit_vector(nan, width).unwrap(),
+                            width,
+                        ),
+                        symbolic::float_from_bits(
+                            &engine.terms,
+                            engine
+                                .terms
+                                .bit_vector(0, if width == 32 { 64 } else { 32 })
+                                .unwrap(),
+                            if width == 32 { 64 } else { 32 },
+                        ),
+                    ] {
+                        let before = state.memory.mutable_u16[0].clone();
+                        assert!(
+                            engine
+                                .mutable_u16_store(&selected, &mut state, place, &replacement)
+                                .is_err()
+                        );
+                        let after = &state.memory.mutable_u16[0];
+                        assert_eq!(before.data, after.data);
+                        assert_eq!(before.phase, after.phase);
+                        assert_eq!(before.generation, after.generation);
+                    }
+                    for wrong_type in [tcx.types.u32, tcx.types.char, tcx.types.bool] {
+                        engine.mutable_integer_types[certificate].original = wrong_type;
+                        assert!(engine.mutable_u16_backing(0, &state.memory).is_err());
+                        engine.mutable_integer_types[certificate] = issued.clone();
+                    }
+                    engine.mutable_integer_types[certificate].bytes += 1;
+                    assert!(engine.mutable_u16_backing(0, &state.memory).is_err());
+                    engine.mutable_integer_types[certificate] = issued.clone();
+                    engine.mutable_integer_types[certificate].alignment += 1;
+                    assert!(engine.mutable_u16_backing(0, &state.memory).is_err());
+                    engine.mutable_integer_types[certificate] = issued.clone();
+                    engine.mutable_integer_types[certificate].element =
+                        symbolic::ScalarSliceElement::Float {
+                            bits: if width == 32 { 64 } else { 32 },
+                        };
+                    assert!(engine.mutable_u16_backing(0, &state.memory).is_err());
+                    engine.mutable_integer_types[certificate] = issued;
+                    assert!(
+                        engine
+                            .mutable_u16_store(&selected, &mut state, place, &valid)
+                            .unwrap()
+                    );
+                    let observed = engine
+                        .mutable_u16_read(Some(&selected), &state, place)
+                        .unwrap()
+                        .unwrap();
+                    engine
+                        .prove_float_pair(&observed, width, &state.conditions)
+                        .unwrap();
+                    let arithmetic =
+                        symbolic::binary(&engine.terms, "add", valid.clone(), valid.clone())
+                            .unwrap();
+                    let materialized = engine.materialize_float(arithmetic);
+                    let Value::Float {
+                        raw_bits: Some(raw),
+                        ..
+                    } = &materialized
+                    else {
+                        unreachable!()
+                    };
+                    let symbol = raw.symbol_index().unwrap();
+                    let binding = engine.float_encodings.remove(&symbol).unwrap();
+                    let before = state.memory.mutable_u16[0].clone();
+                    assert!(
+                        engine
+                            .mutable_u16_store(&selected, &mut state, place, &materialized)
+                            .is_err()
+                    );
+                    engine
+                        .float_encodings
+                        .insert(symbol, engine.terms.boolean(false));
+                    assert!(
+                        engine
+                            .mutable_u16_store(&selected, &mut state, place, &materialized)
+                            .is_err()
+                    );
+                    assert_eq!(before.data, state.memory.mutable_u16[0].data);
+                    assert_eq!(before.phase, state.memory.mutable_u16[0].phase);
+                    assert_eq!(before.generation, state.memory.mutable_u16[0].generation);
+                    engine.float_encodings.insert(symbol, binding);
+                    assert!(
+                        engine
+                            .mutable_u16_store(&selected, &mut state, place, &materialized)
+                            .unwrap()
+                    );
+                }
                 self.checked = true;
                 rustc_driver::Compilation::Stop
             }
@@ -1602,6 +1825,12 @@ pub fn shared(values: &[u16]) -> usize {
 }
 pub fn scalar(word: u16) -> u16 {
     word ^ 0
+}
+pub fn fp32_probe(values: &mut [f32], index: usize, word: f32) {
+    if index < values.len() { values[index] = word; }
+}
+pub fn fp64_probe(values: &mut [f64], index: usize, word: f64) {
+    if index < values.len() { values[index] = word; }
 }
 pub fn char_probe(values: &mut [char], index: usize, word: char) {
     if index < values.len() { values[index] = word; }

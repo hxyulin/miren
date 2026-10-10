@@ -216,6 +216,7 @@ fn check_current_destination<'tcx>(tcx: TyCtxt<'tcx>, root: DefId, fixed: DefId)
         terms: Context::default(),
         next_symbol: std::cell::Cell::new(0),
         float_encodings: BTreeMap::new(),
+        float_pairs: float_pairs::Registry::default(),
         abstraction_symbols: std::cell::RefCell::new(BTreeMap::new()),
         static_views: std::cell::RefCell::new(Vec::new()),
         static_origins: Default::default(),

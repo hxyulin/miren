@@ -48,6 +48,7 @@ mod enum_tags;
 mod enum_transmutes;
 mod error_formatting;
 mod external;
+mod float_pairs;
 mod floating_intrinsics;
 mod foreign_calls;
 mod function_pointers;
@@ -147,6 +148,7 @@ struct Engine<'tcx> {
     terms: Context,
     next_symbol: std::cell::Cell<u32>,
     float_encodings: BTreeMap<u32, Term>,
+    float_pairs: float_pairs::Registry,
     abstraction_symbols: std::cell::RefCell<BTreeMap<u32, &'static str>>,
     static_views: std::cell::RefCell<Vec<static_views::StaticView<'tcx>>>,
     static_origins: std::cell::RefCell<
@@ -229,6 +231,7 @@ pub fn verify(
         terms: Context::default(),
         next_symbol: std::cell::Cell::new(0),
         float_encodings: BTreeMap::new(),
+        float_pairs: float_pairs::Registry::default(),
         abstraction_symbols: std::cell::RefCell::new(BTreeMap::new()),
         static_views: std::cell::RefCell::new(Vec::new()),
         static_origins: Default::default(),
@@ -569,6 +572,12 @@ impl<'tcx> Engine<'tcx> {
                     }
                 ) {
                     format!("single incoming mutable u16 root {id}; full typed extent")
+                } else if let symbolic::MutableU16Role::Ghost {
+                    element: symbolic::ScalarSliceElement::Float { bits },
+                    ..
+                } = role
+                {
+                    format!("single incoming mutable f{bits} root {id}; full typed extent")
                 } else {
                     format!("single incoming mutable integer root {id}; full typed extent")
                 }
@@ -2875,7 +2884,9 @@ impl<'tcx> Engine<'tcx> {
                 };
                 match (operation, value) {
                     (UnOp::Neg, value @ Value::Float { .. }) => {
-                        symbolic::float_negate(&self.terms, value)
+                        let result = symbolic::float_negate(&self.terms, value.clone())?;
+                        self.float_pairs.negated(&self.terms, &value, &result);
+                        Ok(result)
                     }
                     (UnOp::Not, Value::Bool(expression)) => {
                         Ok(Value::Bool(symbolic::not(&expression)))

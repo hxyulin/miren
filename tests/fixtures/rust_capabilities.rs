@@ -2713,3 +2713,52 @@ mod native_fixed_byte_prefix {
         super::fixed_byte_prefix_copy(&mut []);
     }
 }
+
+
+#[inline(never)]
+pub fn float_slice_child_value(value: f32) -> f32 {
+    value + 0.0
+}
+
+#[inline(never)]
+pub fn float_slice_child(values: &mut [f32], index: usize, value: f32) {
+    values[index] = float_slice_child_value(value);
+}
+
+pub fn float_slice_child_call(values: &mut [f32], index: usize, value: f32) {
+    if index < values.len() && value >= -100.0 && value <= 100.0 {
+        float_slice_child(values, index, value);
+        assert!(values[index] == value);
+    }
+}
+
+pub fn float_slice_child_wrong_claim(values: &mut [f32], index: usize, value: f32) {
+    if index < values.len() && value >= -100.0 && value <= 100.0 {
+        float_slice_child(values, index, value);
+        assert!(values[index] != value);
+    }
+}
+
+#[inline(never)]
+pub fn float_slice_nested(values: &mut [f32], index: usize, value: f32) {
+    float_slice_child(values, index, value);
+}
+
+pub fn float_slice_nested_unknown(values: &mut [f32], index: usize, value: f32) {
+    if index < values.len() && value >= -100.0 && value <= 100.0 {
+        float_slice_nested(values, index, value);
+        assert!(values[index] == value);
+    }
+}
+
+#[cfg(test)]
+mod native_float_slice_child {
+    #[test]
+    fn finite_float_arithmetic_preserves_numeric_value() {
+        for value in [-100.0_f32, -1.0, -0.0, 0.0, 1.0, 100.0] {
+            let mut values = [-7.0; 129];
+            super::float_slice_child_call(&mut values, 128, value);
+            assert_eq!(values[128], value);
+        }
+    }
+}
