@@ -3865,3 +3865,61 @@ query text across four configurations. The actual generic helper mutation and na
 ledgers remain at `/tmp/miren-stage162-final-evidence`. Independent review approves the exact
 safe API/source/type certificates and unchanged-source expectation maintenance; no conditional
 assumptions are added.
+
+
+## Stage 163: issued input reservations and bounded scalar product preparation
+
+Successful lazy input construction records an immutable original compiler root type, descriptor
+Rc, exact Boolean seed and checked reserved interval. The ledger records actual issuance rather
+than reconstructing provenance from matching sorts or numerical bounds. Complete original pure
+root eligibility precedes bounded descent through declaration-order fields and array occurrences.
+A requested descriptor must match its exact Rc, start offset and original child type. Repeated
+copies reuse symbols; cached shapes in distinct roots and repeated same-sort leaves remain
+independent. The ledger grants no allocation identity, lifetime, reference or write permission.
+
+The former closed-product module becomes shared typed product preparation. Original consumer
+type and each product's remaining cumulative 512-node/depth-16 budget precede descriptor metadata
+checks and issued
+source validation. Only then are existing reserved primitive symbols observed one level at a
+time. Scalar context/sort, Float bits, byte metadata and Char checks retain their existing policy.
+Closed zero-observable products still reconstruct without symbols. Generic input observers,
+root construction policy and the reserved-slot limit are unchanged. Unsupported enum origins,
+new Char descriptors, restricted original types and forged/unregistered inputs remain refused.
+
+Three unchanged shared sources are first UNKNOWN on all four profiles at the exact scalar
+reservation frontier. Actual input descriptions show three lazy arrays with 193 slots each.
+After the new certificate, copied selection proves, independent-root equality refutes and the
+missing invoked foreign body remains MissingCompilerEvidence UNKNOWN on its actual call.
+Before/after commands, hashes and reports remain at `/tmp/miren-stage163-shared-before` and
+`/tmp/miren-stage163-shared-after`. Three new controls yield 100 cases across 35 families,
+expecting 41 PROVED, 36 REFUTED and 23 UNKNOWN per configuration.
+
+
+The dedicated 21-root matrix yields 9 PROVED, 4 REFUTED and 8 UNKNOWN per host/ARM O0/O2 build.
+Repeated selection, copies, original root alignment, sequential owned writes and untouched
+root/occurrence correlations are checked. False equalities across roots, occurrences or fields
+refute, as do unchecked bounds. The original Float/Char source remains UNKNOWN at the existing
+input-producer budget; a separate Float-only source validates actual supported lazy observations.
+Restricted N=0, enum-origin and retained borrow sources keep their actual separate frontiers.
+
+An actual noinline getter is changed from left to right with the original claim and input domain
+unchanged. All four profiles refute with actual helper entry and same-obligation query/model.
+Six original native tests pass at O0/O2; valid 64-element mutation guards fail. Complete commands,
+source/binary hashes, reports, outputs and timeouts remain at `/tmp/miren-stage163-final-evidence`.
+Two new reservation units check root/seed/descriptor/offset identity, copied reuse, foreign and
+altered envelopes, overflow and empty-array paths. Existing two product and three candidate units,
+twenty-three related compiler tests and two final focused tests pass, as do build/lint/fmt.
+
+
+Full isolated validation passes 671 Rust tests and 68 Python tests, formatting, cargo lint,
+release builds, cargo deny, documentation build and manual hooks. Main's complete 619 tracked
+files match the validated snapshot byte for byte. Fresh debug/release builds, nineteen new/related
+integration tests, 68 Python tests and the remaining required checks also pass in main. Frozen
+isolated and merged surveys retain 164 PROVED, 144 REFUTED and 92 UNKNOWN at
+`/tmp/miren-stage163-capabilities-20261010` and
+`/tmp/miren-stage163-merged-capabilities-20261010`, with current source/input/release hashes
+verified. All 300 earlier completed P/R roots retain identical obligation statuses, details and
+query text across four configurations. The actual getter mutation and valid native execution
+ledgers remain at `/tmp/miren-stage163-final-evidence`. The two shared baseline tests pass.
+Independent review approves the issued namespace, original-type and bounded observation
+certificates; no conditional assumptions or generic input-observer changes are added.

@@ -674,8 +674,12 @@ metadata receive no new support. The exact safe core `align_of_val` API addition
 sized primitive and certified pure owned products, including nominal aligned zero-sized structs.
 It validates the original shared receiver graph, live projections, exact original pointee and
 complete typed carrier before requiring the selected API body and returning compiler ABI
-alignment. Closed deferred zero-observable products retain their nominal metadata; deferred scalar
-inputs require their separate source certificate. This gives no raw/static decoding or padding
+alignment. Closed deferred zero-observable products retain their nominal metadata. Scalar deferred
+products can additionally use actual Engine-issued root reservations: exact original pure root type,
+immutable descriptor identity, seed and descendant offsets certify existing symbols before
+bounded preparation. Copies preserve their correlations; separate roots and array occurrences
+retain distinct reservations. Unregistered scalar descriptors remain unsupported. Enum-origin
+and newly encoded Char descriptors receive no support. This gives no raw/static decoding or padding
 access rights. Existing sized `size_of_val` and raw sized size behavior remains unchanged.
 Readonly shared iteration retains the same compiler type, source
 graph and original caller allocation.
@@ -712,9 +716,10 @@ unsupported frontiers. Deferred input products with no observable scalar leaves 
 reconstructed after exact original-type and descriptor validation. Nominal zero-sized structs
 retain their names and fields; tuple/array children retain their exact shapes. Descriptor kinds,
 counts, ordered field identities, slot/height metadata, seeds and checked ranges are validated
-before expansion. Expanded occurrences share the existing candidate budget. This reconstruction
-emits no symbols and adds no assumptions. Deferred scalar-containing inputs remain unsupported
-without a source reservation certificate. Constant and uniquely determined stores keep their
+before expansion. Expanded occurrences share the existing candidate budget. Closed-zero
+reconstruction emits no symbols and adds no assumptions. Registered pure scalar products observe
+only their existing reserved symbols after exact root/path and descriptor certification;
+unregistered products remain unsupported. Constant and uniquely determined stores keep their
 prior behavior.
 
 Actual MIR Copy/Move reads can select a finite ordinary-struct array at a symbolic checked index.

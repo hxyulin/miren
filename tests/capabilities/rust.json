@@ -530,6 +530,23 @@
       "expected": "unknown",
       "unknown_reason": "no compiler-exported Rust definition matches the foreign symbol",
       "unknown_category": "missing_compiler_evidence"
+    },
+    {
+      "entry": "registered_product_choice",
+      "family": "registered_product_inputs",
+      "expected": "proved"
+    },
+    {
+      "entry": "registered_product_wrong_claim",
+      "family": "registered_product_inputs",
+      "expected": "refuted"
+    },
+    {
+      "entry": "registered_product_missing_body",
+      "family": "registered_product_inputs",
+      "expected": "unknown",
+      "unknown_reason": "no compiler-exported Rust definition matches the foreign symbol",
+      "unknown_category": "missing_compiler_evidence"
     }
   ]
 }

@@ -1423,3 +1423,19 @@ refute, and valid native original tests pass while mutation guards fail at O0/O2
 invalid/dead reference formation, opaque traits and unsupported wrappers retain their actual
 frontiers. The shared 97-case/34-family baseline expects 160 PROVED, 140 REFUTED and 88 UNKNOWN
 across four configurations; no fleet coverage claim follows from that inventory.
+
+
+Stage 163 adds an Engine-owned ledger of actual lazy input reservations and a shared typed
+product preparation module. Root seed, immutable descriptor identity, exact descendant offset
+and raw original compiler type certify already reserved symbols before bounded scalar expansion.
+The original complete pure root certificate and cumulative 512-node/depth-16 consumer budget
+remain separate gates. Copies preserve their symbol correlations; different roots and offsets
+stay independent. Closed zero products remain symbol-free, and no generic input observer,
+source lifetime, write authority, raw access or input-domain budget is broadened.
+
+The dedicated 21-root host/ARM O0/O2 matrix yields 9 PROVED, 4 REFUTED and 8 UNKNOWN per build.
+Actual three-array roots trigger lazy input construction while each requested product stays
+bounded. Copy/read/write/alignment correlations, distinct root/field/occurrence refutations and
+actual getter mutation are checked. A Float-only lazy product is supported; the original
+Float/Char source retains its earlier input-producer budget frontier. The shared 100-case/
+35-family baseline expects 164 PROVED, 144 REFUTED and 92 UNKNOWN across four configurations.

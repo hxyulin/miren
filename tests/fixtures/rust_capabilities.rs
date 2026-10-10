@@ -609,7 +609,13 @@ pub fn local_zero_struct_missing_body(values: &[NominalZero]) -> usize {
 }
 
 pub fn typed_struct_array_choice(index: usize) {
-    let values = [SliceSample { left: 3, right: 7 }, SliceSample { left: 11, right: 13 }];
+    let values = [
+        SliceSample { left: 3, right: 7 },
+        SliceSample {
+            left: 11,
+            right: 13,
+        },
+    ];
     if index < values.len() {
         let selected = values[index];
         assert!(selected.left == if index == 0 { 3 } else { 11 });
@@ -618,7 +624,13 @@ pub fn typed_struct_array_choice(index: usize) {
 }
 
 pub fn typed_struct_array_wrong_claim(index: usize) {
-    let values = [SliceSample { left: 3, right: 7 }, SliceSample { left: 11, right: 13 }];
+    let values = [
+        SliceSample { left: 3, right: 7 },
+        SliceSample {
+            left: 11,
+            right: 13,
+        },
+    ];
     if index < values.len() {
         assert!(values[index].left == 0);
     }
@@ -631,7 +643,13 @@ unsafe extern "Rust" {
 
 #[cfg(not(test))]
 pub fn typed_struct_array_missing_body(index: usize) -> u16 {
-    let values = [SliceSample { left: 3, right: 7 }, SliceSample { left: 11, right: 13 }];
+    let values = [
+        SliceSample { left: 3, right: 7 },
+        SliceSample {
+            left: 11,
+            right: 13,
+        },
+    ];
     if index < values.len() {
         unsafe { opaque_typed_struct_field(values[index].left) }
     } else {
@@ -778,6 +796,59 @@ pub fn safe_sized_alignment_missing_body(value: SizedLayoutZero) -> usize {
     unsafe { opaque_sized_alignment(sized_layout_alignment(&value)) }
 }
 
+#[derive(Clone, Copy)]
+pub struct ReservedRecord {
+    left: u16,
+    right: u16,
+}
+
+pub fn registered_product_choice(
+    first: [ReservedRecord; 64],
+    _second: [ReservedRecord; 64],
+    _third: [ReservedRecord; 64],
+    index: usize,
+) {
+    if index < first.len() {
+        let selected = first[index];
+        let again = first[index];
+        assert!(selected.left == again.left);
+        assert!(selected.right == again.right);
+    }
+}
+
+pub fn registered_product_wrong_claim(
+    first: [ReservedRecord; 64],
+    second: [ReservedRecord; 64],
+    _third: [ReservedRecord; 64],
+    index: usize,
+) {
+    if index < first.len() {
+        let left = first[index];
+        let right = second[index];
+        assert!(left.left == right.left);
+    }
+}
+
+#[cfg(not(test))]
+unsafe extern "Rust" {
+    fn opaque_registered_field(value: u16) -> u16;
+}
+
+#[cfg(not(test))]
+pub fn registered_product_missing_body(
+    first: [ReservedRecord; 64],
+    _second: [ReservedRecord; 64],
+    _third: [ReservedRecord; 64],
+    index: usize,
+) -> u16 {
+    if index < first.len() {
+        let selected = first[index];
+        unsafe { opaque_registered_field(selected.left) }
+    } else {
+        0
+    }
+}
+
 #[cfg(test)]
 mod native {
     use super::*;
@@ -786,6 +857,10 @@ mod native {
     #[test]
     fn positives() {
         integers(199);
+        let records = [ReservedRecord { left: 3, right: 7 }; 64];
+        for index in [0, 63, 64, usize::MAX] {
+            registered_product_choice(records, records, records, index);
+        }
         safe_sized_alignment(SizedLayoutZero);
         deferred_zero_owned_write([DeferredZero; 2], 0);
         deferred_zero_owned_write([DeferredZero; 2], 1);
@@ -966,4 +1041,11 @@ mod native {
         safe_sized_alignment_wrong_claim(SizedLayoutZero);
     }
 
+    #[test]
+    #[should_panic]
+    fn registered_product_wrong_claim_panics() {
+        let first = [ReservedRecord { left: 3, right: 7 }; 64];
+        let second = [ReservedRecord { left: 5, right: 11 }; 64];
+        registered_product_wrong_claim(first, second, first, 63);
+    }
 }

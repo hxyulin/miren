@@ -30,7 +30,6 @@ mod atomic_rmw;
 mod builtins;
 mod call_metadata;
 mod characters;
-mod closed_product_inputs;
 mod closure_captures;
 mod composite_slices;
 mod constants;
@@ -44,6 +43,7 @@ mod function_pointers;
 mod hardware;
 mod induction;
 mod input_references;
+mod input_reservations;
 mod inputs;
 mod integer_intrinsics;
 mod interior;
@@ -76,6 +76,7 @@ mod storage_layout;
 mod storage_locations;
 mod trusted_storage;
 mod typed_array_choices;
+mod typed_product_inputs;
 use startup::AtomicStorage;
 use startup_memory::Memory;
 mod raw_subobjects;
@@ -140,6 +141,7 @@ struct Engine<'tcx> {
     trait_objects: Vec<trait_objects::TraitObject<'tcx>>,
     input_depth: usize,
     input_values: usize,
+    input_reservations: Vec<input_reservations::IssuedInput<'tcx>>,
     input_shapes: std::collections::HashMap<Ty<'tcx>, std::rc::Rc<symbolic::input::InputShape>>,
     zero_sized_inputs:
         std::collections::HashMap<Ty<'tcx>, std::rc::Rc<symbolic::input::InputShape>>,
@@ -207,6 +209,7 @@ pub fn verify(
         trait_objects: Vec::new(),
         input_depth: 0,
         input_values: 0,
+        input_reservations: Vec::new(),
         input_shapes: std::collections::HashMap::new(),
         zero_sized_inputs: std::collections::HashMap::new(),
         zero_sized_input_nodes: 0,

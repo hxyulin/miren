@@ -1,4 +1,4 @@
-//! Symbol-free reconstruction of compiler-certified deferred owned products.
+//! Bounded preparation of closed or issued compiler-certified deferred owned products.
 use super::*;
 use symbolic::input::{InputKind, InputShape, InputValue};
 use typed_array_choices::{MAX_CHOICE_DEPTH, MAX_CHOICE_NODES, OwnedChoiceShape, rebuild};
@@ -14,7 +14,7 @@ struct DescriptorStats {
 }
 
 impl<'tcx> Engine<'tcx> {
-    pub(super) fn prepare_closed_product(
+    pub(super) fn prepare_typed_product(
         &self,
         original: Ty<'tcx>,
         shape: &OwnedChoiceShape,
@@ -28,10 +28,10 @@ impl<'tcx> Engine<'tcx> {
                 "typed struct array choice exceeds its depth or candidate node budget".into(),
             );
         }
-        self.prepare_closed_depth(original, shape, value, 0)
+        self.prepare_product_depth(original, shape, value, 0)
     }
 
-    fn prepare_closed_depth(
+    fn prepare_product_depth(
         &self,
         original: Ty<'tcx>,
         shape: &OwnedChoiceShape,
@@ -43,15 +43,14 @@ impl<'tcx> Engine<'tcx> {
         }
         if let Value::Input(input) = value {
             let mut nodes = 0;
-            self.closed_descriptor_type(original, &input.shape, depth, &mut nodes)?;
+            self.descriptor_type(original, &input.shape, depth, &mut nodes)?;
             let mut nodes = 0;
             let stats = descriptor_stats(&input.shape, input.shape.slots == 0, depth, &mut nodes)?;
             validate_envelope(&self.terms, input, stats)?;
             if stats.observable || product_observable(shape) {
-                return Err(self.categorized_error(
-                    UnknownCategory::Semantics,
-                    "deferred owned products with scalar leaves need a source reservation certificate".into(),
-                ));
+                self.validate_issued_product(original, input)?;
+                let materialized = input.materialize()?;
+                return self.prepare_product_depth(original, shape, &materialized, depth);
             }
             let mut cursor = 0;
             return rebuild(
@@ -72,7 +71,7 @@ impl<'tcx> Engine<'tcx> {
                         .zip(fields)
                         .zip(values)
                         .map(|((ty, field), value)| {
-                            self.prepare_closed_depth(ty, field, value, depth + 1)
+                            self.prepare_product_depth(ty, field, value, depth + 1)
                         })
                         .collect::<Result<_, _>>()?,
                 )
@@ -85,7 +84,7 @@ impl<'tcx> Engine<'tcx> {
                         .iter()
                         .zip(values.iter())
                         .map(|(field, value)| {
-                            self.prepare_closed_depth(*element, field, value, depth + 1)
+                            self.prepare_product_depth(*element, field, value, depth + 1)
                         })
                         .collect::<Result<Vec<_>, _>>()?
                         .into(),
@@ -117,7 +116,7 @@ impl<'tcx> Engine<'tcx> {
                         }
                         Ok((
                             name.clone(),
-                            self.prepare_closed_depth(
+                            self.prepare_product_depth(
                                 field.ty(self.tcx, args).skip_norm_wip(),
                                 shape,
                                 value,
@@ -161,7 +160,7 @@ impl<'tcx> Engine<'tcx> {
         })
     }
 
-    fn closed_descriptor_type(
+    fn descriptor_type(
         &self,
         original: Ty<'tcx>,
         shape: &InputShape,
@@ -188,7 +187,7 @@ impl<'tcx> Engine<'tcx> {
                 if !types.is_empty() && types.len() == fields.len() =>
             {
                 for (ty, field) in types.iter().zip(fields) {
-                    self.closed_descriptor_type(ty, field, depth + 1, nodes)?;
+                    self.descriptor_type(ty, field, depth + 1, nodes)?;
                 }
                 Ok(())
             }
@@ -200,7 +199,7 @@ impl<'tcx> Engine<'tcx> {
                 },
             ) if count.try_to_target_usize(self.tcx) == Some(*actual as u64) => {
                 // The original inner type is checked even when there are no actual elements.
-                self.closed_descriptor_type(*element, field, depth + 1, nodes)
+                self.descriptor_type(*element, field, depth + 1, nodes)
             }
             (
                 ty::Array(element, count),
@@ -223,7 +222,7 @@ impl<'tcx> Engine<'tcx> {
                     if field.name.as_str() != name {
                         return Err(mismatch());
                     }
-                    self.closed_descriptor_type(
+                    self.descriptor_type(
                         field.ty(self.tcx, args).skip_norm_wip(),
                         shape,
                         depth + 1,
@@ -576,10 +575,20 @@ mod tests {
         assert_eq!(cost, 3);
         assert!(!product_observable(&shape));
         let value = rebuild(&context, 64, &shape, &[], &mut 0).unwrap();
-        assert!(
-            matches!(value, Value::Adt { name, variant: 0, discriminant: 0, is_option: false, fields }
-            if name == "Token<7>" && fields.len() == 2 && matches!(fields[0].1, Value::Elements(_)))
-        );
+        let Value::Adt {
+            name,
+            variant,
+            discriminant,
+            is_option,
+            fields,
+        } = value
+        else {
+            panic!("closed nominal product lost its ADT identity");
+        };
+        assert_eq!(name, "Token<7>");
+        assert_eq!((variant, discriminant, is_option), (0, 0, false));
+        assert_eq!(fields.len(), 2);
+        assert!(matches!(fields[0].1, Value::Elements(_)));
         assert!(product_observable(&OwnedChoiceShape::ByteArray(1)));
         assert!(!product_observable(&OwnedChoiceShape::ByteArray(0)));
     }

@@ -11,8 +11,8 @@ execution at O0 and O2, positive/refuted/unknown controls, a source mutation tha
 structured UNKNOWN reporting, and passing repository checks. Completion establishes a repeatable
 baseline. It does not establish full Rust support or a completed memory-model refactor.
 
-The manifest contains 97 cases across 34 families. Each build configuration expects 40 PROVED,
-35 REFUTED and 22 UNKNOWN results. Stage 133 originally had 23 cases with 10 PROVED, 9 REFUTED
+The manifest contains 100 cases across 35 families. Each build configuration expects 41 PROVED,
+36 REFUTED and 23 UNKNOWN results. Stage 133 originally had 23 cases with 10 PROVED, 9 REFUTED
 and 4 UNKNOWN; stage 134 closed its retained-prefix projection gap. Stage 136 adds raw-pointer
 metadata P/R controls and a safe core reference-array grant that remains UNKNOWN without a
 temporal permission certificate. Stage 137 adds tuple-array P/R and unsupported symbolic-write
@@ -58,6 +58,9 @@ Zero-byte struct nodes retain exact Adt identity and certify every original chil
 Stage 162 adds exact safe sized alignment P/R and missing invoked body U controls. Original
 primitive or pure product receivers retain their existing type and live-source certificates;
 the selected safe core API body precedes compiler ABI alignment metadata.
+Stage 163 adds registered scalar product choice P/R and missing invoked body U controls. Actual
+lazy input construction records original pure root types and exact symbol reservations;
+bounded typed preparation validates the requested descendant before observing those symbols.
 These additions change the denominator, not a coverage percentage.
 Covered examples exercise arithmetic, enum payloads, array indexing, reference effects, concrete
 generics, closures, iterator callbacks, finite loops, destructors, fresh future polling and raw
@@ -265,3 +268,14 @@ ABI alignment, including explicit alignment, rather than a leaf count or payload
 Static views, raw/mutable receiver handles, opaque and unsupported product carriers acquire no
 new alignment path. Existing dynamic slice alignment and safe/raw sized size-query semantics
 remain separate; a sized raw metadata query does not establish pointee access or validity.
+
+
+Stage 163 records immutable reservations only for lazy inputs actually issued by the Engine.
+Exact root seed, descriptor identity, checked offset and original compiler type distinguish
+cached shapes in different roots and repeated array occurrences. Copies retain the same symbols.
+The complete original pure root certificate and bounded requested product preflight precede
+scalar observation. The shared typed product preparation serves owned reads, complete writes and
+safe sized alignment; the closed zero-observable path still emits no symbols. Generic input
+observers and symbol budgets remain unchanged. Enum-origin, newly encoded Char, forged or
+unregistered descriptors retain conservative boundaries; namespace evidence grants no storage
+lifetime, reference rights or raw access.

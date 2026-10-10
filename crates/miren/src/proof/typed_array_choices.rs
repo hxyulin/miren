@@ -51,7 +51,7 @@ impl<'tcx> Engine<'tcx> {
         let mut nodes = 0;
         for value in elements {
             let mut leaves = Vec::new();
-            let value = self.prepare_closed_product(*element, &shape, value, nodes)?;
+            let value = self.prepare_typed_product(*element, &shape, value, nodes)?;
             flatten(
                 &self.terms,
                 bits,
@@ -106,7 +106,10 @@ impl<'tcx> Engine<'tcx> {
         Ok(())
     }
 
-    fn owned_product_shape(&self, original: Ty<'tcx>) -> Result<Option<OwnedChoiceShape>, String> {
+    pub(super) fn owned_product_shape(
+        &self,
+        original: Ty<'tcx>,
+    ) -> Result<Option<OwnedChoiceShape>, String> {
         if let Some(kind) = self.scalar_slice_element(original)? {
             return Ok(Some(OwnedChoiceShape::Primitive(kind)));
         }
@@ -225,7 +228,7 @@ impl<'tcx> Engine<'tcx> {
         nodes: &mut usize,
     ) -> Result<Vec<Value>, String> {
         let mut leaves = Vec::new();
-        let value = self.prepare_closed_product(original, shape, value, *nodes)?;
+        let value = self.prepare_typed_product(original, shape, value, *nodes)?;
         flatten(&self.terms, bits, shape, &value, 0, nodes, &mut leaves)?;
         leaves
             .into_iter()

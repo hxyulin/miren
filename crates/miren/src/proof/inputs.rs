@@ -165,6 +165,16 @@ impl<'tcx> Engine<'tcx> {
         self.next_symbol.set(next);
         self.input_values += cost;
         self.input_shapes = cache;
+        self.input_reservations
+            .push(input_reservations::IssuedInput {
+                original: ty,
+                reservation: input_reservations::InputReservation {
+                    shape: shape.clone(),
+                    seed: seed.clone(),
+                    start,
+                    end: next,
+                },
+            });
         Ok(Some(Value::Input(symbolic::input::InputValue {
             shape,
             start,
