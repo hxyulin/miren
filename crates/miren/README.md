@@ -83,6 +83,17 @@ origin evidence remains UNKNOWN. These records establish construction provenance
 values, synchronization or a verified callee summary. Ordinary atomic interference stays
 conservative; startup histories still require explicit assumptions.
 
+Readonly slices also admit bounded pure ordinary local enum shapes with compiler-certified direct
+initialized tag encoding, and exact direct-tag `Option<u16>`. Original variant inventories, sparse
+or signed discriminants, payload field identities, ABI ranges/offsets, Copy/Freeze/NoDrop and
+all original child types are checked, including inactive and zero-length payloads. A total legal
+tag decoder and independent per-variant payload columns retain each selected logical occurrence;
+inactive payload columns confer no initialized bytes or raw rights. Checked indexing, matches,
+readonly views, cursors and safe layout APIs preserve the retained source and actual body gates.
+Niche enums, other core wrappers, nominal struct payloads and whole sum comparison summaries
+remain UNKNOWN. Mutable/raw/static access policies and owned product choice/write admission are
+unchanged.
+
 Whole mutable Rust `bool` statics and certified boolean fields inside compiler-identified
 `UnsafeCell` storage support typed direct reads and writes through compiler-backed allocation
 provenance. This includes core `Cell<bool>` storage. Interior reads require matching declared

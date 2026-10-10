@@ -1,7 +1,7 @@
 //! Typed incoming aggregate slice observations, without physical or mutable access rights.
 use super::*;
 use aggregate_validity::scalar_fields_match;
-use rustc_abi::BackendRepr;
+use rustc_abi::{BackendRepr, Primitive, Scalar, TagEncoding, Variants};
 use rustc_middle::ty::AdtFlags;
 use rustc_span::def_id::CrateNum;
 use scalar_slices::{decode_scalar_element, scalar_slice_sort};
@@ -32,6 +32,20 @@ pub(super) enum CompositeShape {
         name: String,
         fields: Vec<(String, CompositeShape)>,
     },
+    Sum {
+        name: String,
+        bits: u32,
+        signed: bool,
+        is_option: bool,
+        variants: Vec<CompositeVariant>,
+    },
+}
+
+#[derive(Clone, Debug)]
+pub(super) struct CompositeVariant {
+    name: String,
+    discriminant: u128,
+    fields: Vec<(String, CompositeShape)>,
 }
 
 #[derive(Clone, Debug)]
@@ -80,7 +94,7 @@ impl<'tcx> Engine<'tcx> {
         ty: Ty<'tcx>,
     ) -> Result<Option<CompositeShape>, String> {
         Ok(self
-            .composite_slice_shape(ty)?
+            .composite_shape_with_sums(ty, false)?
             .map(|descriptor| descriptor.shape))
     }
 
@@ -88,11 +102,19 @@ impl<'tcx> Engine<'tcx> {
         &self,
         ty: Ty<'tcx>,
     ) -> Result<Option<CompositeType<'tcx>>, String> {
+        self.composite_shape_with_sums(ty, true)
+    }
+
+    fn composite_shape_with_sums(
+        &self,
+        ty: Ty<'tcx>,
+        allow_sums: bool,
+    ) -> Result<Option<CompositeType<'tcx>>, String> {
         if !matches!(ty.kind(), ty::Tuple(_) | ty::Array(..) | ty::Adt(..)) {
             return Ok(None);
         }
         let mut nodes = 0;
-        let Some(shape) = self.composite_shape_depth(ty, 0, &mut nodes)? else {
+        let Some(shape) = self.composite_shape_depth(ty, 0, &mut nodes, allow_sums, false)? else {
             return Ok(None);
         };
         let bytes = self.static_layout(ty)?.size.bytes();
@@ -114,6 +136,8 @@ impl<'tcx> Engine<'tcx> {
         ty: Ty<'tcx>,
         depth: usize,
         nodes: &mut usize,
+        allow_sums: bool,
+        enum_payload: bool,
     ) -> Result<Option<CompositeShape>, String> {
         if depth >= MAX_SHAPE_DEPTH || *nodes >= MAX_SHAPE_NODES {
             return Err(self.categorized_error(
@@ -142,7 +166,14 @@ impl<'tcx> Engine<'tcx> {
             ty::Tuple(fields) => {
                 let mut shapes = Vec::new();
                 for field in fields.iter() {
-                    let Some(shape) = self.composite_shape_depth(field, depth + 1, nodes)? else {
+                    let Some(shape) = self.composite_shape_depth(
+                        field,
+                        depth + 1,
+                        nodes,
+                        allow_sums,
+                        enum_payload,
+                    )?
+                    else {
                         return Ok(None);
                     };
                     shapes.push(shape);
@@ -161,14 +192,27 @@ impl<'tcx> Engine<'tcx> {
                 }
                 // Certify the original element even for N=0, then charge every actual
                 // occurrence independently. A zero array's type probe is conservative.
-                let Some(first) = self.composite_shape_depth(*element, depth + 1, nodes)? else {
+                let Some(first) = self.composite_shape_depth(
+                    *element,
+                    depth + 1,
+                    nodes,
+                    allow_sums,
+                    enum_payload,
+                )?
+                else {
                     return Ok(None);
                 };
                 let mut shapes = Vec::new();
                 if count > 0 {
                     shapes.push(first);
                     for _ in 1..count {
-                        let Some(shape) = self.composite_shape_depth(*element, depth + 1, nodes)?
+                        let Some(shape) = self.composite_shape_depth(
+                            *element,
+                            depth + 1,
+                            nodes,
+                            allow_sums,
+                            enum_payload,
+                        )?
                         else {
                             return Ok(None);
                         };
@@ -177,7 +221,10 @@ impl<'tcx> Engine<'tcx> {
                 }
                 Ok(Some(CompositeShape::Array(shapes)))
             }
-            ty::Adt(def, args) if self.plain_composite_struct(*def) => {
+            ty::Adt(def, args) if allow_sums && def.is_enum() => {
+                self.direct_sum_shape(ty, *def, args, depth, nodes)
+            }
+            ty::Adt(def, args) if !enum_payload && self.plain_composite_struct(*def) => {
                 if def.repr().pack.is_some()
                     || matches!(
                         layout.backend_repr,
@@ -192,7 +239,13 @@ impl<'tcx> Engine<'tcx> {
                     // Keep original instantiated kinds: normalization must not erase Pat or
                     // turn opaque wrappers into ordinary primitive fields, even beneath N=0.
                     let field_ty = field.ty(self.tcx, args).skip_norm_wip();
-                    let Some(shape) = self.composite_shape_depth(field_ty, depth + 1, nodes)?
+                    let Some(shape) = self.composite_shape_depth(
+                        field_ty,
+                        depth + 1,
+                        nodes,
+                        allow_sums,
+                        enum_payload,
+                    )?
                     else {
                         return Ok(None);
                     };
@@ -222,6 +275,135 @@ impl<'tcx> Engine<'tcx> {
         }
     }
 
+    fn direct_sum_shape(
+        &self,
+        original: Ty<'tcx>,
+        def: ty::AdtDef<'tcx>,
+        args: ty::GenericArgsRef<'tcx>,
+        depth: usize,
+        nodes: &mut usize,
+    ) -> Result<Option<CompositeShape>, String> {
+        let is_option = self.tcx.lang_items().get(LangItem::Option) == Some(def.did());
+        let ordinary = def.did().is_local()
+            && (def.flags() == AdtFlags::IS_ENUM
+                || def.flags() == (AdtFlags::IS_ENUM | AdtFlags::HAS_CTOR));
+        if (!ordinary && !is_option)
+            || (is_option && args.type_at(0) != self.tcx.types.u16)
+            || def.repr().pack.is_some()
+            || def.variants().len() < 2
+            || def.variants().len() > aggregates::MAX_ENUM_VARIANTS
+        {
+            return Ok(None);
+        }
+        let layout = self.static_layout(original)?;
+        let Variants::Multiple {
+            tag,
+            tag_encoding: TagEncoding::Direct,
+            tag_field,
+            variants,
+        } = &layout.variants
+        else {
+            return Ok(None);
+        };
+        let Scalar::Initialized {
+            value: Primitive::Int(width, _),
+            valid_range,
+        } = tag
+        else {
+            return Ok(None);
+        };
+        let (bits, signed) = self
+            .integer_type(original.discriminant_ty(self.tcx))
+            .ok_or("direct enum lacks its compiler discriminant type")?;
+        let tag_bits = width.size().bits() as u32;
+        let tag_mask = if tag_bits == 128 {
+            u128::MAX
+        } else {
+            (1u128 << tag_bits) - 1
+        };
+        let tag_offset = layout.fields.offset(tag_field.as_usize()).bytes();
+        if variants.len() != def.variants().len()
+            || layout.uninhabited
+            || tag_offset != 0
+            || width.size() > layout.size
+            || tag_bits > bits
+        {
+            return Err("direct enum tag layout differs from original compiler schema".into());
+        }
+        let mut inventory = Vec::new();
+        let mut physical_tags = Vec::new();
+        for (position, variant) in def.variants().iter_enumerated() {
+            if *nodes >= MAX_SHAPE_NODES {
+                return Err(self.categorized_error(
+                    UnknownCategory::ResourceLimit,
+                    "composite enum exceeds its expanded node budget".into(),
+                ));
+            }
+            *nodes += 1;
+            let tag_value = def.discriminant_for_variant(self.tcx, position).val;
+            let physical_tag = tag_value & tag_mask;
+            if !valid_range.contains(physical_tag) || physical_tags.contains(&physical_tag) {
+                return Err("direct enum discriminants differ from its initialized tag".into());
+            }
+            physical_tags.push(physical_tag);
+            let variant_layout = &variants[position];
+            if variant_layout.is_uninhabited()
+                || variant_layout.field_offsets.len() != variant.fields.len()
+                || variant_layout.size > layout.size
+            {
+                return Err("direct enum variant extent differs from compiler inventory".into());
+            }
+            let mut fields = Vec::new();
+            let mut physical = Vec::new();
+            for (index, field) in variant.fields.iter().enumerate() {
+                let field_ty = field.ty(self.tcx, args).skip_norm_wip();
+                let Some(shape) =
+                    self.composite_shape_depth(field_ty, depth + 1, nodes, true, true)?
+                else {
+                    return Ok(None);
+                };
+                let field_layout = self.static_layout(field_ty)?;
+                let offset = variant_layout.field_offsets[rustc_abi::FieldIdx::from_usize(index)];
+                if offset.bytes() % field_layout.align.abi.bytes() != 0
+                    || offset
+                        .bytes()
+                        .checked_add(field_layout.size.bytes())
+                        .is_none_or(|end| end > variant_layout.size.bytes())
+                    || (field_layout.size.bytes() != 0 && offset < width.size())
+                {
+                    return Err(
+                        "direct enum payload offset differs from original field layout".into(),
+                    );
+                }
+                if field_layout.size.bytes() != 0 {
+                    physical.push((offset.bytes(), field_layout.backend_repr));
+                }
+                fields.push((field.name.as_str().to_owned(), shape));
+            }
+            physical.sort_by_key(|(offset, _)| *offset);
+            if !direct_enum_backend_matches(layout.backend_repr, *tag, &physical)
+                || !direct_enum_backend_matches(variant_layout.backend_repr, *tag, &physical)
+            {
+                return Err(
+                    "direct enum scalar validity exceeds its active payload certificate".into(),
+                );
+            }
+            inventory.push(CompositeVariant {
+                name: variant.name.as_str().to_owned(),
+                discriminant: tag_value,
+                fields,
+            });
+        }
+        validate_sum_inventory(bits, &inventory)?;
+        Ok(Some(CompositeShape::Sum {
+            name: self.tcx.def_path_str(def.did()),
+            bits,
+            signed,
+            is_option,
+            variants: inventory,
+        }))
+    }
+
     pub(super) fn composite_slice_input(
         &mut self,
         root: DefId,
@@ -237,7 +419,7 @@ impl<'tcx> Engine<'tcx> {
         let descriptor = self.composite_slice_shape(ty)?.ok_or_else(|| {
             self.categorized_error(
                 UnknownCategory::Semantics,
-                "composite slice requires a pure tuple, array or ordinary struct element".into(),
+                "composite slice requires a pure product or direct-tag enum element".into(),
             )
         })?;
         let count = descriptor.leaves.len() + 1;
@@ -278,7 +460,14 @@ impl<'tcx> Engine<'tcx> {
         };
         self.record_model(
             root,
-            "readonly composite slice; exact compiler shape and independent primitive leaf arrays",
+            if self.composite_slice_types[id].shape.contains_sum() {
+                "readonly tagged slice; legal tag and correlated latent payload columns"
+            } else {
+                concat!(
+                    "readonly composite slice; exact compiler shape ",
+                    "and independent primitive leaf arrays"
+                )
+            },
         );
         Ok(Value::CompositeSlice {
             id,
@@ -478,9 +667,18 @@ impl CompositeShape {
         Ok(())
     }
 
+    fn contains_sum(&self) -> bool {
+        match self {
+            Self::Sum { .. } => true,
+            Self::Primitive(_) => false,
+            Self::Tuple(fields) | Self::Array(fields) => fields.iter().any(Self::contains_sum),
+            Self::Struct { fields, .. } => fields.iter().any(|(_, field)| field.contains_sum()),
+        }
+    }
+
     fn has_primitive_storage(&self) -> bool {
         match self {
-            Self::Primitive(_) => true,
+            Self::Primitive(_) | Self::Sum { .. } => true,
             Self::Tuple(fields) | Self::Array(fields) => {
                 fields.iter().any(Self::has_primitive_storage)
             }
@@ -492,6 +690,22 @@ impl CompositeShape {
 
     fn leaves(&self, output: &mut Vec<ScalarSliceElement>) {
         match self {
+            Self::Sum {
+                bits,
+                signed,
+                variants,
+                ..
+            } => {
+                output.push(ScalarSliceElement::Integer {
+                    bits: *bits,
+                    signed: *signed,
+                });
+                for variant in variants {
+                    for (_, field) in &variant.fields {
+                        field.leaves(output);
+                    }
+                }
+            }
             Self::Primitive(leaf) => output.push(*leaf),
             Self::Tuple(fields) | Self::Array(fields) => {
                 for field in fields {
@@ -514,6 +728,68 @@ impl CompositeShape {
         cursor: &mut usize,
     ) -> Result<Value, String> {
         match self {
+            Self::Sum {
+                name,
+                bits,
+                signed,
+                is_option,
+                variants,
+            } => {
+                validate_sum_inventory(*bits, variants)?;
+                let data = leaves.get(*cursor).ok_or("sum tag storage missing")?;
+                *cursor += 1;
+                let selector = context.apply(Op::Select, &[data.clone(), index.clone()])?;
+                let mut tag = context.bit_vector(variants[0].discriminant, *bits)?;
+                for (position, variant) in variants.iter().enumerate().skip(1) {
+                    let choice = context.apply(
+                        Op::Equal,
+                        &[
+                            selector.clone(),
+                            context.bit_vector(position as u128, *bits)?,
+                        ],
+                    )?;
+                    tag = context.apply(
+                        Op::Ite,
+                        &[
+                            choice,
+                            context.bit_vector(variant.discriminant, *bits)?,
+                            tag,
+                        ],
+                    )?;
+                }
+                let payloads = variants
+                    .iter()
+                    .enumerate()
+                    .map(|(variant, schema)| {
+                        Ok(Value::Adt {
+                            name: name.clone(),
+                            variant,
+                            discriminant: schema.discriminant,
+                            is_option: *is_option,
+                            fields: schema
+                                .fields
+                                .iter()
+                                .map(|(name, field)| {
+                                    Ok((
+                                        name.clone(),
+                                        field.observe(context, leaves, index, cursor)?,
+                                    ))
+                                })
+                                .collect::<Result<Vec<_>, String>>()?
+                                .into(),
+                        })
+                    })
+                    .collect::<Result<Vec<_>, String>>()?;
+                Ok(Value::Enum {
+                    discriminant: Box::new(Value::Int {
+                        expression: tag,
+                        bits: *bits,
+                        signed: *signed,
+                    }),
+                    variants: payloads,
+                    is_option: *is_option,
+                })
+            }
             Self::Struct { name, fields } => Ok(Value::Adt {
                 name: name.clone(),
                 variant: 0,
@@ -547,16 +823,318 @@ impl CompositeShape {
                     Self::Tuple(_) if values.is_empty() => Ok(Value::Unit),
                     Self::Tuple(_) => Ok(Value::Tuple(values)),
                     Self::Array(_) => Ok(Value::Elements(values.into())),
-                    Self::Primitive(_) | Self::Struct { .. } => unreachable!(),
+                    Self::Primitive(_) | Self::Struct { .. } | Self::Sum { .. } => unreachable!(),
                 }
             }
         }
     }
 }
 
+fn validate_sum_inventory(bits: u32, variants: &[CompositeVariant]) -> Result<(), String> {
+    if !(1..=128).contains(&bits)
+        || variants.len() < 2
+        || variants.len() > aggregates::MAX_ENUM_VARIANTS
+    {
+        return Err("sum observation lacks its exact variant inventory".into());
+    }
+    let mask = u128::MAX >> (128 - bits);
+    for (position, variant) in variants.iter().enumerate() {
+        if variant.name.is_empty()
+            || variants[..position].iter().any(|prior| {
+                prior.name == variant.name
+                    || (prior.discriminant & mask) == (variant.discriminant & mask)
+            })
+            || variant.fields.iter().enumerate().any(|(index, (name, _))| {
+                name.is_empty()
+                    || variant.fields[..index]
+                        .iter()
+                        .any(|(prior, _)| prior == name)
+            })
+        {
+            return Err("sum observation has inconsistent nominal variant metadata".into());
+        }
+    }
+    Ok(())
+}
+
+// The initialized tag is always present. A scalar-pair payload may be absent in a
+// fieldless variant; union/full-range ABI storage does not initialize that inactive payload.
+fn direct_enum_backend_matches(
+    representation: BackendRepr,
+    tag: Scalar,
+    fields: &[(u64, BackendRepr)],
+) -> bool {
+    match representation {
+        BackendRepr::Memory { .. } => true,
+        BackendRepr::Scalar(actual) => actual == tag && fields.is_empty(),
+        BackendRepr::ScalarPair { a, b, b_offset } => {
+            a == tag
+                && match fields {
+                    [] => b.is_uninit_valid(),
+                    [(offset, BackendRepr::Scalar(field))] => {
+                        *offset == b_offset.bytes()
+                            && b.primitive() == field.primitive()
+                            && (b == *field || b.is_uninit_valid() || unrestricted_scalar_range(b))
+                    }
+                    _ => false,
+                }
+        }
+        BackendRepr::SimdVector { .. } | BackendRepr::SimdScalableVector { .. } => false,
+    }
+}
+
+fn unrestricted_scalar_range(scalar: Scalar) -> bool {
+    let Scalar::Initialized { value, valid_range } = scalar else {
+        return false;
+    };
+    let size = match value {
+        Primitive::Int(width, _) => width.size(),
+        Primitive::Float(width) => width.size(),
+        Primitive::Pointer(_) => return false,
+    };
+    valid_range.is_full_for(size)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn direct_sum_columns_preserve_legal_tags_nominal_payloads_and_occurrences() {
+        let context = Context::default();
+        let index = context.bit_vector(0, 32).unwrap();
+        let next = context.bit_vector(1, 32).unwrap();
+        let integer = CompositeShape::Primitive(ScalarSliceElement::Integer {
+            bits: 16,
+            signed: false,
+        });
+        let variants = vec![
+            CompositeVariant {
+                name: "Missing".into(),
+                discriminant: 3,
+                fields: vec![],
+            },
+            CompositeVariant {
+                name: "Word".into(),
+                discriminant: 7,
+                fields: vec![("0".into(), integer.clone())],
+            },
+            CompositeVariant {
+                name: "Pair".into(),
+                discriminant: 11,
+                fields: vec![("0".into(), integer.clone()), ("1".into(), integer)],
+            },
+        ];
+        let shape = CompositeShape::Sum {
+            name: "Reading".into(),
+            bits: 8,
+            signed: false,
+            is_option: false,
+            variants: variants.clone(),
+        };
+        let mut kinds = Vec::new();
+        shape.leaves(&mut kinds);
+        assert_eq!(kinds.len(), 4);
+        let mut arrays = Vec::new();
+        for (position, kind) in kinds.iter().enumerate() {
+            arrays.push(
+                context
+                    .symbol(
+                        u32::try_from(position).unwrap(),
+                        Sort::Array(
+                            Box::new(Sort::BitVec(32)),
+                            Box::new(scalar_slice_sort(*kind).unwrap()),
+                        ),
+                    )
+                    .unwrap(),
+            );
+        }
+        arrays[0] = context
+            .apply(
+                Op::Store,
+                &[
+                    arrays[0].clone(),
+                    index.clone(),
+                    context.bit_vector(1, 8).unwrap(),
+                ],
+            )
+            .unwrap();
+        arrays[0] = context
+            .apply(
+                Op::Store,
+                &[
+                    arrays[0].clone(),
+                    next.clone(),
+                    context.bit_vector(2, 8).unwrap(),
+                ],
+            )
+            .unwrap();
+        for (slot, value) in [(1, 37), (2, 71), (3, 19)] {
+            arrays[slot] = context
+                .apply(
+                    Op::Store,
+                    &[
+                        arrays[slot].clone(),
+                        index.clone(),
+                        context.bit_vector(value, 16).unwrap(),
+                    ],
+                )
+                .unwrap();
+        }
+        let Value::Enum {
+            discriminant,
+            variants: payloads,
+            is_option,
+        } = shape.observe(&context, &arrays, &index, &mut 0).unwrap()
+        else {
+            panic!("nominal enum lost");
+        };
+        assert!(!is_option);
+        assert_eq!(
+            symbolic::constant(&discriminant.integer().unwrap().0),
+            Some(symbolic::Constant::BitVec { value: 7, bits: 8 })
+        );
+        let Value::Adt {
+            name,
+            variant,
+            discriminant: tag,
+            fields,
+            ..
+        } = &payloads[1]
+        else {
+            panic!("active payload lost nominal metadata");
+        };
+        assert_eq!((name.as_str(), *variant, *tag), ("Reading", 1, 7));
+        assert_eq!(fields[0].0, "0");
+        assert_eq!(
+            symbolic::constant(&fields[0].1.integer().unwrap().0),
+            Some(symbolic::Constant::BitVec {
+                value: 37,
+                bits: 16
+            })
+        );
+        let Value::Adt {
+            variant, fields, ..
+        } = &payloads[2]
+        else {
+            panic!("latent payload lost nominal metadata");
+        };
+        assert_eq!((*variant, fields.len()), (2, 2));
+        assert_ne!(
+            fields[0].1.integer().unwrap().0,
+            fields[1].1.integer().unwrap().0
+        );
+        let Value::Enum { discriminant, .. } =
+            shape.observe(&context, &arrays, &next, &mut 0).unwrap()
+        else {
+            panic!("second occurrence lost");
+        };
+        assert_eq!(
+            symbolic::constant(&discriminant.integer().unwrap().0),
+            Some(symbolic::Constant::BitVec { value: 11, bits: 8 })
+        );
+        arrays[0] = context
+            .apply(
+                Op::Store,
+                &[
+                    arrays[0].clone(),
+                    next.clone(),
+                    context.bit_vector(255, 8).unwrap(),
+                ],
+            )
+            .unwrap();
+        let Value::Enum { discriminant, .. } =
+            shape.observe(&context, &arrays, &next, &mut 0).unwrap()
+        else {
+            panic!("fallback lost");
+        };
+        assert_eq!(
+            symbolic::constant(&discriminant.integer().unwrap().0),
+            Some(symbolic::Constant::BitVec { value: 3, bits: 8 })
+        );
+        assert!(validate_sum_inventory(8, &[]).is_err());
+        let mut changed = variants.clone();
+        changed[2].discriminant = 263;
+        assert!(validate_sum_inventory(8, &changed).is_err());
+        changed = variants;
+        changed[2].name = "Word".into();
+        assert!(validate_sum_inventory(8, &changed).is_err());
+        assert!(
+            shape
+                .observe(&context, &arrays[..3], &index, &mut 0)
+                .is_err()
+        );
+        let foreign = Context::default();
+        let length = symbolic::integer(&context, 2, 32, false);
+        arrays[0] = foreign
+            .symbol(
+                0,
+                Sort::Array(Box::new(Sort::BitVec(32)), Box::new(Sort::BitVec(8))),
+            )
+            .unwrap();
+        assert!(validate_terms(&context, 32, &kinds, &length, &arrays).is_err());
+    }
+
+    #[test]
+    fn direct_sum_abi_keeps_tag_and_inactive_storage_separate() {
+        use rustc_abi::{Integer, Size, WrappingRange};
+        let tag = Scalar::Initialized {
+            value: Primitive::Int(Integer::I8, false),
+            valid_range: WrappingRange { start: 0, end: 1 },
+        };
+        let payload = Scalar::Initialized {
+            value: Primitive::Int(Integer::I16, false),
+            valid_range: WrappingRange::full(Size::from_bytes(2)),
+        };
+        let pair = BackendRepr::ScalarPair {
+            a: tag,
+            b: payload.to_union(),
+            b_offset: Size::from_bytes(2),
+        };
+        assert!(direct_enum_backend_matches(pair, tag, &[]));
+        assert!(direct_enum_backend_matches(
+            pair,
+            tag,
+            &[(2, BackendRepr::Scalar(payload))]
+        ));
+        assert!(!direct_enum_backend_matches(
+            pair,
+            tag,
+            &[(1, BackendRepr::Scalar(payload))]
+        ));
+        let restricted = Scalar::Initialized {
+            value: payload.primitive(),
+            valid_range: WrappingRange { start: 1, end: 9 },
+        };
+        assert!(!direct_enum_backend_matches(
+            BackendRepr::ScalarPair {
+                a: tag,
+                b: restricted,
+                b_offset: Size::from_bytes(2)
+            },
+            tag,
+            &[(2, BackendRepr::Scalar(payload))]
+        ));
+        assert!(!direct_enum_backend_matches(
+            BackendRepr::ScalarPair {
+                a: tag,
+                b: payload,
+                b_offset: Size::from_bytes(2)
+            },
+            tag,
+            &[]
+        ));
+        assert!(!direct_enum_backend_matches(
+            BackendRepr::Scalar(payload),
+            tag,
+            &[]
+        ));
+        assert!(direct_enum_backend_matches(
+            BackendRepr::Scalar(tag),
+            tag,
+            &[]
+        ));
+    }
 
     #[test]
     fn dependency_struct_policy_admits_only_ordinary_structural_flags() {

@@ -739,6 +739,23 @@
       "expected": "unknown",
       "unknown_reason": "no compiler-exported Rust definition matches the foreign symbol",
       "unknown_category": "missing_compiler_evidence"
+    },
+    {
+      "entry": "tagged_sum_slice",
+      "family": "tagged_sum_slice",
+      "expected": "proved"
+    },
+    {
+      "entry": "tagged_sum_slice_wrong_claim",
+      "family": "tagged_sum_slice",
+      "expected": "refuted"
+    },
+    {
+      "entry": "tagged_sum_slice_missing_body",
+      "family": "tagged_sum_slice",
+      "expected": "unknown",
+      "unknown_reason": "no compiler-exported Rust definition matches the foreign symbol",
+      "unknown_category": "missing_compiler_evidence"
     }
   ]
 }

@@ -1448,8 +1448,69 @@ pub fn full_composite_predicates_missing_body(values: &[(u16, [u16; 2])], index:
     }
 }
 
+#[derive(Clone, Copy)]
+#[repr(u8)]
+pub enum TaggedReading {
+    Empty = 3,
+    Pair(u16, u16) = 11,
+}
+
+#[inline(never)]
+fn tagged_sum_selected(value: TaggedReading) -> u16 {
+    match value {
+        TaggedReading::Pair(left, _) => left,
+        TaggedReading::Empty => 0,
+    }
+}
+
+pub fn tagged_sum_slice(values: &[TaggedReading], index: usize) {
+    if index < values.len() {
+        if let TaggedReading::Pair(left, _) = values[index] {
+            assert!(tagged_sum_selected(values[index]) == left);
+        }
+    }
+}
+
+pub fn tagged_sum_slice_wrong_claim(values: &[TaggedReading], index: usize) {
+    if index < values.len() {
+        if let TaggedReading::Pair(left, _) = values[index] {
+            assert!(left == 0);
+        }
+    }
+}
+
+#[cfg(not(test))]
+unsafe extern "Rust" {
+    fn opaque_tagged_sum_slice(value: TaggedReading) -> u16;
+}
+
+#[cfg(not(test))]
+pub fn tagged_sum_slice_missing_body(values: &[TaggedReading], index: usize) -> u16 {
+    if index < values.len() {
+        if let TaggedReading::Pair(left, _) = values[index] {
+            assert!(tagged_sum_selected(values[index]) == left);
+            return unsafe { opaque_tagged_sum_slice(values[index]) };
+        }
+    }
+    0
+}
+
 #[cfg(test)]
 mod native {
+    #[test]
+    fn tagged_sum_slice_controls() {
+        for index in [0, 1, 128, 129, usize::MAX] {
+            tagged_sum_slice(&[TaggedReading::Pair(3, 7); 129], index);
+        }
+        tagged_sum_slice(&[TaggedReading::Empty], 0);
+    }
+
+    #[test]
+    #[should_panic]
+    fn tagged_sum_slice_wrong_claim_panics() {
+        tagged_sum_slice_wrong_claim(&[TaggedReading::Pair(3, 7)], 0);
+    }
+
     #[test]
     fn full_composite_predicate_controls() {
         for index in [0, 1, 128, 129, usize::MAX] {

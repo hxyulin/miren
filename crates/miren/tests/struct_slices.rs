@@ -75,10 +75,20 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
         assert!(proof.trusted_calls.is_empty());
         assert!(proof.entry_assumptions.is_empty());
         if matches!(*expected, ProofStatus::Proved | ProofStatus::Refuted) {
-            assert!(proof.models.iter().any(|model| model.contains(concat!(
-                "readonly composite slice; exact compiler shape ",
-                "and independent primitive leaf arrays"
-            ))));
+            let expected_model = if *name == "enum_field" {
+                "readonly tagged slice; legal tag and correlated latent payload columns"
+            } else {
+                concat!(
+                    "readonly composite slice; exact compiler shape ",
+                    "and independent primitive leaf arrays"
+                )
+            };
+            assert!(
+                proof
+                    .models
+                    .iter()
+                    .any(|model| model.contains(expected_model))
+            );
         }
         if matches!(*name, "layout" | "wrong_padding") {
             assert!(proof.models.iter().any(|model| {
@@ -99,7 +109,7 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
             let (category, reason) = match *name {
                 "mutable_root" | "competing_roots" | "reference_field" | "raw_field"
                 | "nonzero_field" | "core_wrapper" | "drop_field" | "packed"
-                | "refined_zero_array" | "enum_field" | "union_field" => (
+                | "refined_zero_array" | "union_field" => (
                     UnknownCategory::Semantics,
                     "only read-only byte slices and byte arrays are modeled",
                 ),
@@ -219,7 +229,7 @@ fn local_struct_slices_preserve_fields_layout_and_source_rights() {
         ("refined_zero_array", ProofStatus::Unknown),
         ("oversized_shape", ProofStatus::Unknown),
         ("ambiguous_nested_struct", ProofStatus::Refuted),
-        ("enum_field", ProofStatus::Unknown),
+        ("enum_field", ProofStatus::Proved),
         ("union_field", ProofStatus::Unknown),
         ("full_contains", ProofStatus::Unknown),
         ("full_equality", ProofStatus::Unknown),

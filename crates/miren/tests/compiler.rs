@@ -1504,7 +1504,7 @@ pub fn beyond_budget() {
 }
 
 #[test]
-fn arbitrary_enum_slices_and_ambiguous_enum_indices_remain_unknown() {
+fn arbitrary_enum_slice_failures_refute_and_ambiguous_owned_indices_remain_unknown() {
     let (output, report) = verify_vendored(&vendored_source(), &["bus::check"], &[]);
     assert!(!output.status.success());
     let proof = report
@@ -1515,7 +1515,12 @@ fn arbitrary_enum_slices_and_ambiguous_enum_indices_remain_unknown() {
         .proof
         .as_ref()
         .unwrap();
-    assert_eq!(proof.status, ProofStatus::Unknown);
+    assert_eq!(proof.status, ProofStatus::Refuted);
+    assert!(proof.obligations.iter().any(|obligation| {
+        obligation.status == ProofStatus::Refuted
+            && obligation.query.is_some()
+            && obligation.model.is_some()
+    }));
 
     let directory = Directory::new();
     let path = directory.0.join("ambiguous_index.rs");

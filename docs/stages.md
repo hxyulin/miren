@@ -4552,3 +4552,59 @@ verified. Independent source, composition and canonical correction reviews appro
 implementation; the correction review is `/tmp/miren-stage172-canonical-review.md`. The interrupted
 initial hook run remains excluded from these checks. No assumptions, input caps or resource-budget
 changes are introduced. This independently authored stage integrates after actual Stage 175.
+
+
+## Stage 176: readonly direct-tag enum slices
+
+
+Stage 176 adds readonly logical slices of certified ordinary direct-tag enums and exact direct-tag
+`Option<u16>`. Complete original variants, payload types and compiler layouts are checked before
+input construction. Legal tags and independent payload columns share the selected logical index;
+inactive payload access requires a feasible actual variant guard. Existing lifetime, extent and
+body checks apply. Niche encodings, unsupported children even at N=0, raw accesses, owned enum
+writes and whole enum comparison summaries remain UNKNOWN. No input assumptions or length caps
+are introduced.
+
+The dedicated thirty-two-root matrix yields thirteen PROVED, four REFUTED and fifteen UNKNOWN
+per host/ARM O0/O2 profile. Exact sources return UNKNOWN under the immutable Stage 175 build.
+Actual helper payload mutation refutes the unchanged claim in all profiles; valid native originals
+pass and mutant guards exit 101 at O0/O2. Reports, commands, hashes and ten-second timeouts remain
+at `/tmp/miren-stage176-final-evidence`. Two new metadata tests cover legal-tag decoding and
+original enum shape rejection. The global triplet yields P/R/missing-body U with actual helper
+mutation and native evidence at `/tmp/miren-stage176-global-evidence`; the expanded manifest has
+137 cases in 47 families. Counts describe selected controls, not a Rust coverage percentage.
+
+The unchanged vendored CAN `bus::check` now refutes arbitrary enum slices: a valid FdFrame with
+ID 0x800 reaches its 11-bit assertion. The exact old source changes from UNKNOWN to REFUTED in
+all four profiles; native checks confirm the actual panic and accept empty/valid-ID controls.
+The obsolete expectation failure remains at `/tmp/miren-stage176-old-enum-initial.log` before
+harness-only upkeep. Evidence remains at `/tmp/miren-stage176-old-enum-evidence`. Ambiguous
+owned enum indices retain UNKNOWN. These initial captures preceded full validation and final parent
+adoption.
+
+
+The initial full suite retained an obsolete UNKNOWN expectation for the unchanged
+`struct_slices::enum_field` length control. Its certified local struct contains a supported
+direct-tag enum. Exact old sources return UNKNOWN under Stage 172 and PROVED under Stage 176
+across all four profiles. The initial failed suite and expectation remain at
+`/tmp/miren-stage176-initial-checks`; harness-only outcome/model upkeep follows the actual evidence
+at `/tmp/miren-stage176-old-struct-enum-evidence`. The corrected full suite was rerun in full.
+The initial documentation failure was a missing local dependency link; restoring that link
+passes the build without changing source, with the original log preserved separately.
+
+
+Final validation passes the corrected full suite of 713 Rust tests and 68 Python tests. The
+initial failed suite remains excluded. Formatting, lint, debug/release builds, cargo deny,
+documentation and manual hooks pass. All 762 tracked main files match the final snapshot byte
+for byte. Fresh main builds, fourteen related integration tests, eight metadata tests, the CAN
+compiler control and 68 Python tests pass. Both frozen surveys yield 216 PROVED, 192 REFUTED
+and 140 UNKNOWN at `/tmp/miren-stage176-capabilities-20261010` and
+`/tmp/miren-stage176-merged-capabilities-20261010`. All 400 previously completed parent roots
+retain identical outcomes, obligations and query text; all 548 main/isolate outcomes, queries,
+models and premises match. One ARM O0 fold has the same thirty-second resource UNKNOWN with a
+closure-context prefix in only one diagnostic; both original details are retained explicitly.
+Source, input and release hashes are verified. Independent review approves the source and
+counterexample boundaries at `/tmp/miren-stage176-source-review.md`; the final global eight-report
+recapture is `/tmp/miren-stage176-global-final-evidence`. Historical dedicated/global binary
+identities retain their original scope. No assumptions, input caps or resource-budget changes
+are introduced. Stage 176 integrates after actual Stage 172 commit `fbb58ca`.
