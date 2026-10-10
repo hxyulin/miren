@@ -2887,3 +2887,64 @@ mod native_integer_function_table {
         }
     }
 }
+
+
+#[inline(never)]
+pub fn nested_whole_word(word: u16) -> u16 { word ^ 0 }
+
+#[inline(never)]
+pub fn nested_whole_leaf(values: &mut [u16], index: usize, word: u16) {
+    values[index] = nested_whole_word(word);
+}
+
+#[inline(never)]
+pub fn nested_whole_outer(values: &mut [u16], index: usize, word: u16) {
+    nested_whole_leaf(values, index, word);
+}
+
+pub fn nested_whole_child_call(values: &mut [u16], index: usize, word: u16) {
+    if index < values.len() {
+        nested_whole_outer(values, index, word);
+        assert!(values[index] == word);
+    }
+}
+
+pub fn nested_whole_wrong_claim(values: &mut [u16], index: usize, word: u16) {
+    if index < values.len() {
+        nested_whole_outer(values, index, word);
+        assert!(values[index] != word);
+    }
+}
+
+#[inline(never)]
+pub fn nested_whole_extra_parent(values: &mut [u16], index: usize, word: u16) {
+    nested_whole_outer(values, index, word);
+}
+
+pub fn nested_whole_deeper_unknown(values: &mut [u16], index: usize, word: u16) {
+    if index < values.len() { nested_whole_extra_parent(values, index, word); }
+}
+
+#[cfg(test)]
+mod native_nested_whole_u16 {
+    #[test]
+    fn valid_nested_child_preserves_current_data_and_tail() {
+        for size in 0..=128 {
+            let mut values = alloc::vec![7_u16; size];
+            if size > 0 {
+                super::nested_whole_child_call(&mut values, size - 1, 19);
+                assert_eq!(values[size - 1], 19);
+                assert!(values[..size - 1].iter().all(|word| *word == 7));
+            }
+            super::nested_whole_child_call(&mut values, size, 31);
+        }
+    }
+
+    #[test]
+    fn nested_data_mutation_guard() {
+        let mut values = [7; 129];
+        super::nested_whole_child_call(&mut values, 128, 19);
+        assert_eq!(values[128], 19);
+        assert_eq!(values[0], 7);
+    }
+}

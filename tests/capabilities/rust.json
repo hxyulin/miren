@@ -949,9 +949,7 @@
     {
       "entry": "scoped_mutable_nested_unknown",
       "family": "scoped_mutable_child",
-      "expected": "unknown",
-      "unknown_reason": "mutable u16 staging needs a pending child",
-      "unknown_category": "semantics"
+      "expected": "proved"
     },
     {
       "entry": "aligned_zero_box",
@@ -1105,6 +1103,23 @@
       "expected": "unknown",
       "unknown_reason": "non-scalar array index is not uniquely determined on this path",
       "unknown_category": "unclassified"
+    },
+    {
+      "entry": "nested_whole_child_call",
+      "family": "nested_whole_u16",
+      "expected": "proved"
+    },
+    {
+      "entry": "nested_whole_wrong_claim",
+      "family": "nested_whole_u16",
+      "expected": "refuted"
+    },
+    {
+      "entry": "nested_whole_deeper_unknown",
+      "family": "nested_whole_u16",
+      "expected": "unknown",
+      "unknown_reason": "hierarchy exceeds the single nested-child scope",
+      "unknown_category": "semantics"
     }
   ]
 }

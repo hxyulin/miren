@@ -42,6 +42,14 @@ impl<'tcx> Engine<'tcx> {
         Self::reference_graph(value, state, incoming, visited, true)
     }
 
+    #[cfg(test)]
+    pub(super) fn mutable_hierarchy_test_lifetime_graph(
+        value: &Value,
+        state: &State,
+    ) -> Result<(), String> {
+        Self::reference_graph(value, state, None, &mut Vec::new(), false)
+    }
+
     fn reference_graph(
         value: &Value,
         state: &State,
@@ -77,7 +85,14 @@ impl<'tcx> Engine<'tcx> {
                         .mutable_u16
                         .get(*id)
                         .ok_or("mutable u16 identity was not issued")?;
-                    if !super::mutable_u16_children::role_live(backing, role) {
+                    if backing.hierarchy.is_some() && state.memory.mutable_hierarchy != Some(*id) {
+                        return Err("hierarchy graph has no current Memory namespace".into());
+                    }
+                    let live = backing.hierarchy.as_ref().map_or_else(
+                        || super::mutable_u16_children::role_live(backing, role),
+                        |hierarchy| hierarchy.role_valid(role, initialized),
+                    );
+                    if !live {
                         return Err(
                             "mutable u16 graph retains suspended or expired child role".into()
                         );

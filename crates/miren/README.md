@@ -1111,3 +1111,18 @@ Return removes the descriptor and resumes the parent with current data. Metadata
 ghost length use view extent; ghost data indexing stays unsupported. Whole-slice formulas keep
 their original terms. Retained views, nested child leases, other range types, split operations,
 raw pointers, reference returns, induction and non-u16 interval codecs remain unsupported.
+
+One direct whole-u16 child may synchronously hand the same whole slice to one nested child.
+A distinct hierarchy namespace authenticates the original root Call and each current compiler
+staging occurrence. The parent remains suspended until the nested owner's normal Return; the
+returned current array resumes its ancestor without restoring old memory or consumed handles.
+Persistent issuance and observation counters reject old child and metadata handles, including
+after the final owner returns. The namespace cache grants no access and stays charged while dormant.
+Owned primitive calls in a dormant namespace require their original operand paths, actual selected
+body, safe Rust signature and normal continuation. They preserve the same origin and current data.
+Metadata requires the current lease and epoch; detached ghosts retain length-only observation.
+Explicit root reborrow staging, retained views, deeper nesting, shared child arguments, intervals,
+raw pointers, reference returns, induction and non-u16 hierarchies remain unsupported. Missing
+selected bodies remain UNKNOWN; optimized dependency bodies with unsupported store shapes also
+remain UNKNOWN. The test-only scoped issuer switch exercises the same public routing and lifecycle
+checks, including ordinary noncandidates and missing-cache refusal.

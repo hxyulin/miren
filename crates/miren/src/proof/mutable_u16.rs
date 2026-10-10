@@ -20,6 +20,7 @@ pub(super) struct Backing {
     pub(super) generation: u64,
     pub(super) phase: super::mutable_u16_children::Phase,
     pub(super) interval: Option<super::mutable_interval::Descriptor>,
+    pub(super) hierarchy: Option<super::mutable_hierarchy::Hierarchy>,
 }
 
 impl<'tcx> Engine<'tcx> {
@@ -191,6 +192,7 @@ impl<'tcx> Engine<'tcx> {
             generation: 0,
             phase: super::mutable_u16_children::Phase::Idle,
             interval: None,
+            hierarchy: None,
         });
         Ok(Value::MutableU16 {
             id,
@@ -207,6 +209,10 @@ impl<'tcx> Engine<'tcx> {
             .mutable_u16
             .get(id)
             .ok_or("mutable u16 root identity was not issued")?;
+        if backing.hierarchy.is_some() && memory.mutable_hierarchy != Some(id) {
+            return Err("hierarchy backing has no authenticated Memory namespace".into());
+        }
+        self.mutable_hierarchy_disabled_backing(backing)?;
         memory.check_projection_initialization(backing.allocation, &[])?;
         if !matches!(memory.get(backing.allocation), Some(Some(Value::Unit))) {
             return Err(self.mutable_u16_error("mutable u16 root backing is unavailable"));
@@ -257,7 +263,9 @@ impl<'tcx> Engine<'tcx> {
             MutableU16Role::Root
             | MutableU16Role::Metadata { .. }
             | MutableU16Role::Child { .. }
-            | MutableU16Role::ChildMetadata { .. } => {
+            | MutableU16Role::ChildMetadata { .. }
+            | MutableU16Role::HierarchyChild { .. }
+            | MutableU16Role::HierarchyMetadata { .. } => {
                 self.mutable_u16_role_live(*id, role, memory)?;
                 let backing = self.mutable_u16_backing(*id, memory)?;
                 Ok(backing
@@ -289,7 +297,9 @@ impl<'tcx> Engine<'tcx> {
             return Err("expected mutable u16 snapshot source".into());
         };
         match role {
-            MutableU16Role::Root | MutableU16Role::Child { .. } => {
+            MutableU16Role::Root
+            | MutableU16Role::Child { .. }
+            | MutableU16Role::HierarchyChild { .. } => {
                 self.mutable_u16_role_live(*id, role, memory)?;
                 let backing = self.mutable_u16_backing(*id, memory)?;
                 Ok(Value::MutableU16 {
@@ -305,6 +315,21 @@ impl<'tcx> Engine<'tcx> {
                                 |view| view.length().clone(),
                             ),
                         ),
+                        data: backing.data.clone(),
+                    },
+                })
+            }
+            MutableU16Role::HierarchyMetadata { .. } => {
+                self.mutable_u16_role_live(*id, role, memory)?;
+                let backing = self.mutable_u16_backing(*id, memory)?;
+                Ok(Value::MutableU16 {
+                    id: *id,
+                    role: MutableU16Role::Ghost {
+                        certificate: backing.certificate,
+                        element: self
+                            .mutable_integer_certificate(backing.certificate)?
+                            .element,
+                        length: Box::new(backing.length.clone()),
                         data: backing.data.clone(),
                     },
                 })
@@ -348,7 +373,12 @@ impl<'tcx> Engine<'tcx> {
         if place.projection.is_empty() {
             return Ok(Some(Value::MutableU16 { id, role }));
         }
-        if !matches!(role, MutableU16Role::Root | MutableU16Role::Child { .. }) {
+        if !matches!(
+            role,
+            MutableU16Role::Root
+                | MutableU16Role::Child { .. }
+                | MutableU16Role::HierarchyChild { .. }
+        ) {
             return Err(self.mutable_u16_error("mutable u16 metadata cannot observe data"));
         }
         let [ProjectionElem::Deref, ProjectionElem::Index(index)] = place.projection.as_ref()
@@ -422,13 +452,23 @@ impl<'tcx> Engine<'tcx> {
             return Ok(false);
         };
         if place.projection.is_empty() {
-            return if matches!(role, MutableU16Role::Root | MutableU16Role::Child { .. }) {
+            return if matches!(
+                role,
+                MutableU16Role::Root
+                    | MutableU16Role::Child { .. }
+                    | MutableU16Role::HierarchyChild { .. }
+            ) {
                 Err(self.mutable_u16_error("mutable u16 root assignment transport is unsupported"))
             } else {
                 Ok(false)
             };
         }
-        if !matches!(role, MutableU16Role::Root | MutableU16Role::Child { .. }) {
+        if !matches!(
+            role,
+            MutableU16Role::Root
+                | MutableU16Role::Child { .. }
+                | MutableU16Role::HierarchyChild { .. }
+        ) {
             return Err(self.mutable_u16_error("mutable u16 metadata has no write authority"));
         }
         self.check_local_initialization(state, place.local.as_usize(), &[])?;
@@ -554,8 +594,12 @@ impl<'tcx> Engine<'tcx> {
         let Value::MutableU16 { id, role } = root else {
             return Ok(None);
         };
-        if !matches!(role, MutableU16Role::Root | MutableU16Role::Child { .. })
-            || place.projection.as_ref() != [ProjectionElem::Deref]
+        if !matches!(
+            role,
+            MutableU16Role::Root
+                | MutableU16Role::Child { .. }
+                | MutableU16Role::HierarchyChild { .. }
+        ) || place.projection.as_ref() != [ProjectionElem::Deref]
             || !self.mutable_u16_matches(
                 body.local_decls[place.local].ty,
                 id,
@@ -566,7 +610,7 @@ impl<'tcx> Engine<'tcx> {
             return Err(self.mutable_u16_error("mutable u16 metadata needs original direct root"));
         }
         self.check_local_initialization(state, place.local.as_usize(), &[])?;
-        self.mutable_u16_backing(id, &state.memory)?;
+        let backing = self.mutable_u16_backing(id, &state.memory)?;
         self.mutable_u16_role_live(id, &role, &state.memory)?;
         Ok(Some(Value::MutableU16 {
             id,
@@ -574,11 +618,26 @@ impl<'tcx> Engine<'tcx> {
                 MutableU16Role::Child { generation } => {
                     MutableU16Role::ChildMetadata { generation }
                 }
-                MutableU16Role::Root => MutableU16Role::Metadata {
-                    generation: self.mutable_u16_backing(id, &state.memory)?.generation,
+                MutableU16Role::Root => match &backing.hierarchy {
+                    Some(h) => MutableU16Role::HierarchyMetadata {
+                        lease: 0,
+                        epoch: h.metadata_epoch(0)?,
+                    },
+                    None => MutableU16Role::Metadata {
+                        generation: backing.generation,
+                    },
                 },
+                MutableU16Role::HierarchyChild { lease } => {
+                    let epoch = backing
+                        .hierarchy
+                        .as_ref()
+                        .ok_or("hierarchy missing")?
+                        .metadata_epoch(lease)?;
+                    MutableU16Role::HierarchyMetadata { lease, epoch }
+                }
                 MutableU16Role::Metadata { .. }
                 | MutableU16Role::ChildMetadata { .. }
+                | MutableU16Role::HierarchyMetadata { .. }
                 | MutableU16Role::Ghost { .. } => {
                     return Err("mutable u16 metadata source has no data authority".into());
                 }
@@ -601,12 +660,17 @@ impl<'tcx> Engine<'tcx> {
             return Err(self.mutable_u16_error("mutable u16 roles cannot enter aggregate storage"));
         }
         if let Value::MutableU16 { id, role } = value {
-            if matches!(role, MutableU16Role::Child { .. }) {
+            if matches!(
+                role,
+                MutableU16Role::Child { .. } | MutableU16Role::HierarchyChild { .. }
+            ) {
                 return self.mutable_u16_staging_store(body, state, place, *id, role);
             }
             if !matches!(
                 role,
-                MutableU16Role::Metadata { .. } | MutableU16Role::ChildMetadata { .. }
+                MutableU16Role::Metadata { .. }
+                    | MutableU16Role::ChildMetadata { .. }
+                    | MutableU16Role::HierarchyMetadata { .. }
             ) || !place.projection.is_empty()
                 || place.local.as_usize() <= body.arg_count
                 || state.addresses[place.local.as_usize()].is_some()
@@ -660,7 +724,9 @@ impl<'tcx> Engine<'tcx> {
                         || !place.projection.is_empty()
                         || !matches!(
                             role,
-                            MutableU16Role::Metadata { .. } | MutableU16Role::ChildMetadata { .. }
+                            MutableU16Role::Metadata { .. }
+                                | MutableU16Role::ChildMetadata { .. }
+                                | MutableU16Role::HierarchyMetadata { .. }
                         )
                         || self.tcx.lang_items().get(LangItem::SliceLen) != Some(instance.def_id())
                         || !self.mutable_u16_matches(

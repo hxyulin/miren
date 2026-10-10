@@ -75,6 +75,13 @@ pub enum MutableU16Role {
     ChildMetadata {
         generation: u64,
     },
+    HierarchyChild {
+        lease: u64,
+    },
+    HierarchyMetadata {
+        lease: u64,
+        epoch: u64,
+    },
     Ghost {
         certificate: usize,
         element: ScalarSliceElement,

@@ -2761,3 +2761,68 @@ its recorded execution context, with every residual field identical. Fresh relea
 checks again refute four compiler profiles and observe native original/mutant exits 0/101.
 Evidence is preserved in `/tmp/miren-stage201-corrected-core-freeze.json`,
 `/tmp/miren-stage201-release-fidelity` and `/tmp/miren-stage201-release-global-mutation`.
+
+## Stage 198: one nested whole-u16 child lease
+
+One direct whole-u16 child can hand its current slice to one synchronous nested child. The distinct
+hierarchy namespace is selected at the original root Call; current compiler staging occurrences,
+source initialization, original types and live backing remain mandatory. The parent is suspended
+until normal child Return publishes current Memory. Persistent issuance and observation counters
+reject stale handles, metadata and returned-memory rollback. Dormant primitive calls authenticate
+the original compiler operand path and exact caller/selected body before ordinary execution. No
+split, retained view, deeper hierarchy, reference return, interval or non-u16 grant is added.
+
+This checkpoint uses actual Stage 200 parent `c86bc0ff48c1d6c537d68571f76645d4ef8e0594`. The
+immutable final analyzer is `/tmp/miren-stage198-final-analyzer`; source and scoped compiler
+evidence are pinned by `/tmp/miren-stage198-final-core-freeze.json` and
+`/tmp/miren-stage198-final-handoff.md`. The dedicated twenty-root matrix is 9 PROVED, 4 REFUTED and
+7 UNKNOWN in host/ARM O0/O2. Actual scalar-data mutation refutes the unchanged claim in all four;
+safe native originals pass and mutation guards exit 101 at O0/O2 across finite sizes 0..=128 and a
+129-element guard. Omitted selected foreign bodies remain MissingCompilerEvidence UNKNOWN; retained
+optimized foreign bodies with unsupported store shapes remain UNKNOWN rather than being summarized
+from an inventory.
+
+Two unchanged old nested-u16 harness cases and the old global scoped_mutable_nested_unknown case now
+prove; their source bodies are preserved. Three append-only global controls add nested-write PROVED,
+wrong-claim REFUTED and deeper-child UNKNOWN. The historical actual200 upkeep manifest had
+200 cases in 68 families,
+expecting 80 PROVED, 69 REFUTED and 51 UNKNOWN per profile. New global payload mutation changes only
+nested_whole_word from `word ^ 0` to `word ^ 1`; actual compiler and native guards reject the
+unchanged claim. Captures are `/tmp/miren-stage198-global-evidence-final` and
+`/tmp/miren-stage198-global-native-final`; the earlier failed no_std native compile is retained.
+
+Old-family replay preserves 1136 of 1144 whole proof objects; only eight intended nested-u16
+UNKNOWN-to-PROVED profile results change, with all 2316 old emitted queries exact. Old global replay
+preserves 782 of 788 objects, adds four corresponding promotions and records two query-free host
+ResourceLimit timing-context differences. All 1468 old emitted global queries remain exact.
+Automatic captures strip MIREN_*; custom global pairs use the same explicit Z3 v4.15.4. Original
+reports, scopes, diagnostic details and failed captures remain immutable. Final required full/main
+validation, final documentation hooks and any later controlled parent adoption remain pending; this
+paragraph claims the scoped author evidence, not a completed commit.
+
+
+Controlled adoption onto actual Stage 201 parent
+`c0d47e17238cdbf8a269d83a34838c303fbe36a2` preserves all hierarchy production bytes and
+868 disjoint parent files. The current append-only manifest contains 203 cases across 69 families,
+expecting 81 PROVED, 70 REFUTED and 52 UNKNOWN per profile. Fresh actual201 compiler captures and
+raw comparisons are under `/tmp/miren-stage198-parent201-final-evidence`,
+`/tmp/miren-stage198-parent201-fidelity` and `/tmp/miren-stage198-parent201-global-fidelity`.
+The dedicated native fixture is byte-identical to the historical source; its historical executions
+remain explicitly scoped. Global native controls were rerun against the new complete source in
+`/tmp/miren-stage198-parent201-global-native`. The fresh source freeze and handoff are
+`/tmp/miren-stage198-parent201-source-freeze.json` and
+`/tmp/miren-stage198-parent201-handoff.md`. Root integration and validation remain pending.
+
+
+Frozen actual201 owner validation passed all 813 workspace Rust tests, 68 Python tests, formatting,
+lint, release, dependency checks, documentation, example checks and manual hooks. The fresh survey
+of 203 cases
+across four profiles matched 81 PROVED, 70 REFUTED and 52 UNKNOWN per profile.
+The sealed owner release `/tmp/miren-stage198-parent201-release-analyzer` matches 2067 of 2068
+reviewed-debug whole proof objects and all 4034 emitted queries. The one query-free host O0 fold
+ResourceLimit detail-prefix difference retains the same status, category and 30-second execution
+limit; raw reports are preserved without normalization. Full owner logs, survey and release
+comparisons are `/tmp/miren-stage198-parent201-full-checks`,
+`/tmp/miren-stage198-parent201-full-survey` and `/tmp/miren-stage198-parent201-release-fidelity`.
+Final owner source is sealed by `/tmp/miren-stage198-parent201-final-owner-source-freeze.json`.
+Root integration, fresh main validation and commit readiness remain separate pending gates.

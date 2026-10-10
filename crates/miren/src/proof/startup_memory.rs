@@ -33,6 +33,7 @@ pub(super) struct Memory {
     pub(super) incoming_byte_roots: Vec<super::byte_copy_provenance::IncomingByteRoot>,
     pub(super) byte_copy_opaque: bool,
     pub(super) mutable_u16: Rc<Vec<super::mutable_u16::Backing>>,
+    pub(super) mutable_hierarchy: Option<usize>,
     allocations: Rc<Vec<Option<Value>>>,
     pub(super) owned_regions: Rc<Vec<OwnedRegion>>,
     pub(super) missing_places: initialized_places::MissingPlaces,
@@ -49,6 +50,14 @@ impl Memory {
             .len()
             .saturating_add(self.owned_regions.iter().map(|region| region.slots).sum())
             .saturating_add(self.mutable_u16.len())
+            .saturating_add(usize::from(self.mutable_hierarchy.is_some()))
+            .saturating_add(
+                self.mutable_u16
+                    .iter()
+                    .filter_map(|backing| backing.hierarchy.as_ref())
+                    .map(super::mutable_hierarchy::Hierarchy::storage_slots)
+                    .sum::<usize>(),
+            )
             .saturating_add(
                 self.mutable_u16
                     .iter()

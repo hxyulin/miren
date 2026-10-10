@@ -151,6 +151,7 @@ fn exact_integer_kinds_current_stores_and_child_calls_cover_four_profiles() {
                     format!("{module}::{root}"),
                     match root {
                         "wrong" | "bounds" => R,
+                        "nested" if *module == "unsigned16" => P,
                         "nested" | "shared" => U,
                         _ => P,
                     },

@@ -68,7 +68,10 @@ mod library;
 mod maybe_uninit;
 mod membership;
 mod memory;
+mod mutable_hierarchy;
 mod mutable_interval;
+#[cfg(test)]
+mod mutable_lease_probe;
 mod mutable_slice_ranges;
 mod mutable_u16;
 mod mutable_u16_children;
@@ -1596,6 +1599,34 @@ impl<'tcx> Engine<'tcx> {
                         queue.push_back((target, continuation, retry_path.clone()));
                         continue;
                     }
+                    if let Some(results) = self.mutable_hierarchy_call(
+                        &mut state,
+                        mutable_u16_children::ChildCall {
+                            body,
+                            block,
+                            instance,
+                            args,
+                            destination: *destination,
+                            target: *target,
+                            stack: &stack,
+                            site: (id, terminator.source_info.span),
+                        },
+                    )? {
+                        let target = target.ok_or("mutable u16 child has no normal return edge")?;
+                        for result in results {
+                            let mut continuation =
+                                state.continuation(result.conditions, result.memory);
+                            self.store_call_result(
+                                body,
+                                &mut continuation,
+                                *destination,
+                                destination_indices.as_ref(),
+                                result.value,
+                            )?;
+                            queue.push_back((target, continuation, retry_path.clone()));
+                        }
+                        continue;
+                    }
                     if let Some(results) = self.mutable_u16_child_call(
                         &mut state,
                         mutable_u16_children::ChildCall {
@@ -2459,6 +2490,7 @@ impl<'tcx> Engine<'tcx> {
                     Value::MutableU16 {
                         role: symbolic::MutableU16Role::Root
                             | symbolic::MutableU16Role::Child { .. }
+                            | symbolic::MutableU16Role::HierarchyChild { .. }
                             | symbolic::MutableU16Role::Ghost { .. },
                         ..
                     }
@@ -2923,7 +2955,8 @@ impl<'tcx> Engine<'tcx> {
                         value,
                         Value::MutableU16 {
                             role: symbolic::MutableU16Role::Metadata { .. }
-                                | symbolic::MutableU16Role::ChildMetadata { .. },
+                                | symbolic::MutableU16Role::ChildMetadata { .. }
+                                | symbolic::MutableU16Role::HierarchyMetadata { .. },
                             ..
                         }
                     )

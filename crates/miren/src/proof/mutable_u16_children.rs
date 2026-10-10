@@ -24,6 +24,9 @@ enum TipOccurrence {
 }
 
 pub(super) fn role_live(backing: &super::mutable_u16::Backing, role: &MutableU16Role) -> bool {
+    if let Some(hierarchy) = &backing.hierarchy {
+        return hierarchy.role_valid(role, true);
+    }
     match role {
         MutableU16Role::Root => backing.phase == Phase::Idle,
         MutableU16Role::Metadata { generation } => {
@@ -34,6 +37,7 @@ pub(super) fn role_live(backing: &super::mutable_u16::Backing, role: &MutableU16
                 && *generation == backing.generation
         }
         MutableU16Role::Ghost { .. } => true,
+        MutableU16Role::HierarchyChild { .. } | MutableU16Role::HierarchyMetadata { .. } => false,
     }
 }
 
@@ -76,6 +80,10 @@ impl<'tcx> Engine<'tcx> {
         memory: &Memory,
     ) -> Result<(), String> {
         for (id, backing) in memory.mutable_u16.iter().enumerate() {
+            if backing.hierarchy.is_some() {
+                self.mutable_hierarchy_exit(body, arguments, id, memory)?;
+                continue;
+            }
             if backing.interval.is_some() {
                 self.mutable_u16_backing(id, memory)?;
             }
@@ -109,7 +117,7 @@ impl<'tcx> Engine<'tcx> {
         Ok(())
     }
 
-    fn mutable_u16_body_budget(&self, body: &Body<'tcx>) -> Result<(), String> {
+    pub(super) fn mutable_u16_body_budget(&self, body: &Body<'tcx>) -> Result<(), String> {
         if body.coroutine.is_some() || body.tainted_by_errors.is_some() || body.spread_arg.is_some()
         {
             return Err(
@@ -154,7 +162,12 @@ impl<'tcx> Engine<'tcx> {
             return Ok(None);
         };
         if !place.projection.is_empty()
-            || !matches!(role, MutableU16Role::Root | MutableU16Role::Child { .. })
+            || !matches!(
+                role,
+                MutableU16Role::Root
+                    | MutableU16Role::Child { .. }
+                    | MutableU16Role::HierarchyChild { .. }
+            )
             || !self.mutable_u16_matches(
                 body.local_decls[place.local].ty,
                 id,
@@ -224,6 +237,39 @@ impl<'tcx> Engine<'tcx> {
             return Err(self.mutable_u16_child_error("mutable u16 staging identity differs"));
         }
         Ok(())
+    }
+
+    pub(super) fn mutable_u16_original_staging_source(
+        &self,
+        index: usize,
+        body: &Body<'tcx>,
+    ) -> Result<usize, String> {
+        self.mutable_u16_body_budget(body)?;
+        let certificates = self.mutable_u16_staging.borrow();
+        let certificate = certificates
+            .get(index)
+            .ok_or("staging certificate missing")?;
+        let original = certificate.body.upgrade().ok_or("staging Body expired")?;
+        if !std::ptr::eq(original.as_ref(), body) {
+            return Err("staging Body differs".into());
+        }
+        let TipOccurrence::Assignment(occurrence) = certificate.occurrence else {
+            return Err("root bootstrap needs original RefMut Assignment".into());
+        };
+        for b in body.basic_blocks.iter() {
+            for statement in &b.statements {
+                if std::ptr::from_ref(&statement.kind) as usize == occurrence {
+                    if let StatementKind::Assign(a) = &statement.kind
+                        && let Rvalue::Ref(_, BorrowKind::Mut { .. }, source) = &a.1
+                        && source.projection.as_ref() == [ProjectionElem::Deref]
+                    {
+                        return Ok(source.local.as_usize());
+                    }
+                    return Err("root bootstrap original source differs".into());
+                }
+            }
+        }
+        Err("root bootstrap source occurrence missing".into())
     }
 
     pub(super) fn mutable_u16_register_call_tip(
@@ -326,6 +372,9 @@ impl<'tcx> Engine<'tcx> {
         if state.memory.mutable_u16.is_empty() {
             return Ok(false);
         }
+        if self.mutable_hierarchy_stage(body, state, destination, value, occurrence)? {
+            return Ok(true);
+        }
         let Rvalue::Ref(_, BorrowKind::Mut { .. }, source) = value else {
             return Ok(false);
         };
@@ -375,7 +424,9 @@ impl<'tcx> Engine<'tcx> {
             }
             MutableU16Role::Metadata { .. }
             | MutableU16Role::ChildMetadata { .. }
-            | MutableU16Role::Ghost { .. } => {
+            | MutableU16Role::Ghost { .. }
+            | MutableU16Role::HierarchyChild { .. }
+            | MutableU16Role::HierarchyMetadata { .. } => {
                 return Err(
                     self.mutable_u16_child_error("mutable u16 metadata cannot stage a child")
                 );
@@ -442,7 +493,7 @@ impl<'tcx> Engine<'tcx> {
         ))
     }
 
-    fn mutable_u16_primitive(&self, original: Ty<'tcx>) -> bool {
+    pub(super) fn mutable_u16_primitive(&self, original: Ty<'tcx>) -> bool {
         matches!(
             original.kind(),
             ty::Bool | ty::Char | ty::Int(_) | ty::Uint(_) | ty::Float(_)
@@ -465,6 +516,9 @@ impl<'tcx> Engine<'tcx> {
             site,
         } = call;
         if state.memory.mutable_u16.is_empty() {
+            return Ok(None);
+        }
+        if state.memory.mutable_hierarchy.is_some() {
             return Ok(None);
         }
         let mut source = None;
@@ -607,7 +661,9 @@ impl<'tcx> Engine<'tcx> {
             }
             MutableU16Role::Metadata { .. }
             | MutableU16Role::ChildMetadata { .. }
-            | MutableU16Role::Ghost { .. } => {
+            | MutableU16Role::Ghost { .. }
+            | MutableU16Role::HierarchyChild { .. }
+            | MutableU16Role::HierarchyMetadata { .. } => {
                 return Err(
                     self.mutable_u16_child_error("mutable u16 child source lacks root authority")
                 );
@@ -697,7 +753,10 @@ impl<'tcx> Engine<'tcx> {
         }
         Ok(Some(results))
     }
-    fn mutable_u16_register_frame(&self, body: &std::rc::Rc<Body<'tcx>>) -> Result<usize, String> {
+    pub(super) fn mutable_u16_register_frame(
+        &self,
+        body: &std::rc::Rc<Body<'tcx>>,
+    ) -> Result<usize, String> {
         self.mutable_u16_body_budget(body)?;
         let mut frames = self.mutable_u16_frames.borrow_mut();
         if let Some(id) = frames.iter().position(|frame| {
@@ -722,7 +781,11 @@ impl<'tcx> Engine<'tcx> {
         Ok(id)
     }
 
-    fn mutable_u16_frame_top(&self, body: &Body<'tcx>, frames: &[usize]) -> Result<(), String> {
+    pub(super) fn mutable_u16_frame_top(
+        &self,
+        body: &Body<'tcx>,
+        frames: &[usize],
+    ) -> Result<(), String> {
         if frames.is_empty() || frames.len() > MAX_INPUT_DEPTH {
             return Err(self.categorized_error(
                 UnknownCategory::ResourceLimit,
@@ -1134,6 +1197,7 @@ mod tests {
             generation: 0,
             phase: Phase::Idle,
             interval: None,
+            hierarchy: None,
         });
         let sibling = memory.clone();
         let backing = &mut std::rc::Rc::make_mut(&mut memory.mutable_u16)[0];

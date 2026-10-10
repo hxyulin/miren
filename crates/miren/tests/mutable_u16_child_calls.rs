@@ -129,7 +129,7 @@ fn synchronous_whole_child_retains_current_data_and_refuses_other_leases() {
         ("scalar_nested", P),
         ("wrong", R),
         ("unreachable_panic", R),
-        ("nested", U),
+        ("nested", P),
         ("retained_metadata", U),
         ("shared_view", U),
         ("two_arguments", U),
@@ -190,7 +190,6 @@ fn synchronous_whole_child_retains_current_data_and_refuses_other_leases() {
                     .as_ref()
                     .unwrap();
                 let reason = match *name {
-                    "nested" => "staging needs a pending child",
                     "retained_metadata" | "shared_view" => "metadata needs original direct root",
                     "two_arguments" => "one original borrow",
                     "reference_escape" => "direct abort-only Rust body",
