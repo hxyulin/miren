@@ -911,8 +911,8 @@ counters. Certificates are rechecked against the selected instantiated MIR witho
 The slice source and comparator certificate are checked before empty or unequal-length shortcuts.
 Float fields retain numeric NaN and signed-zero semantics; Char observations retain their existing
 Unicode validation. Struct carriers must match exact nominal identity, field order and primitive
-width, signedness, sort and context. Array-field comparers, aggregate-to-integer casts and effects
-outside the certificate grammar remain UNKNOWN. Actual invoked
+width, signedness, sort and context. Noninteger array-field comparers, aggregate-to-integer casts
+and effects outside the certificate grammar remain UNKNOWN. Actual invoked
 missing helpers remain UNKNOWN; their diagnostic does not stand in for a missing comparator body.
 Existing finite custom-comparison calls still execute their actual bodies. The certificate supplies
 no new borrow, write, raw-pointer or allocation rights and imposes no input slice length cap.
@@ -946,3 +946,13 @@ readonly compiler-generated Box temporary cannot acquire mutable authority, move
 owner, or become caller-owned storage. Duplicate drops and shared borrows escaping a retired
 region remain UNKNOWN. No allocation-success premise or raw-memory grant follows from a zero-sized
 payload.
+
+Nominal comparison certificates expand fixed integer-array fields into distinct typed field and
+array-element paths. Whole-array child calls must pass their actual selected core comparator
+certificate before supplying a conjunction or excluding cleanup. Every occurrence is charged
+against the existing expanded type budget, including vacant arrays and their original children.
+Nested signed/unsigned integer arrays retain the existing count128, depth16 and node512 bounds.
+Nominal MIR indexing, casts, loops and raw transports remain unsupported; Float, Bool and Char
+array children are outside this extension. Scalar Float and Char siblings keep numeric equality
+and decoded observation semantics. Missing bodies and unsupported original N0 children remain
+unknown before empty or zero-field shortcuts.

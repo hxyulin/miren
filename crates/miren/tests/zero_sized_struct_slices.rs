@@ -82,6 +82,14 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
                 "and independent primitive leaf arrays"
             ))));
         }
+        if matches!(*name, "full_contains" | "full_equality") {
+            let model = if *name == "full_contains" {
+                "full-domain pure composite slice membership"
+            } else {
+                "full-domain pure composite slice equality"
+            };
+            assert!(proof.models.iter().any(|observed| observed.contains(model)));
+        }
         if *name == "layout" {
             assert!(proof.models.iter().any(|model| {
                 model.contains("compiler-sized value or slice length times compiler element size")
@@ -116,10 +124,6 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
                 "ambiguous_choices" => (
                     UnknownCategory::Unclassified,
                     "non-scalar array index is not uniquely determined on this path",
-                ),
-                "full_contains" | "full_equality" => (
-                    UnknownCategory::Semantics,
-                    "nominal comparison field type is outside its structural grammar",
                 ),
                 "analyzer_only::missing_body" => (
                     UnknownCategory::MissingCompilerEvidence,
@@ -255,8 +259,8 @@ fn nominal_zero_sized_struct_slices_preserve_values_lengths_and_sources() {
         ("drop_zero", ProofStatus::Unknown),
         ("oversized_shape", ProofStatus::Unknown),
         ("ambiguous_choices", ProofStatus::Unknown),
-        ("full_contains", ProofStatus::Unknown),
-        ("full_equality", ProofStatus::Unknown),
+        ("full_contains", ProofStatus::Proved),
+        ("full_equality", ProofStatus::Proved),
         ("analyzer_only::missing_body", ProofStatus::Unknown),
         ("analyzer_only::raw_source", ProofStatus::Unknown),
         ("analyzer_only::dead_exhausted", ProofStatus::Unknown),

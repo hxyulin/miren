@@ -2035,3 +2035,48 @@ unchanged native records retain their original execution scope. Global fresh rel
 at `/tmp/miren-stage182-global-final-evidence`. The historical author freeze remains immutable;
 a root README line reflow is recorded separately. No assumptions or resource budget changes are
 introduced.
+
+
+Stage 186 supports recursive fixed integer arrays inside ordinary nominal fields and tuples.
+Typed logical paths distinguish fields from array elements. Complete original owned-product
+eligibility, child types beneath zero lengths, compiler layout and the existing array, depth and
+expanded-node budgets are checked before a comparison is admitted. Whole-array child calls require
+the actual selected core family, signature, body, effects and totality certificate. The complete
+Boolean relation must compare every corresponding leaf. No nominal Index, Cast, raw transport,
+loop or new allocation operation is admitted.
+
+The dedicated retained-body matrix yields eleven PROVED, three REFUTED and twelve UNKNOWN per
+host/ARM O0/O2 profile. Genuine omitted external comparer bodies remain MissingCompilerEvidence,
+including empty and mismatched-length controls. Actual scalar helper mutation refutes the same
+claim with body entry and query/model; a same-receiver comparator mutation remains UNKNOWN.
+Safe native originals pass five tests and the mutant exits 101 at O0/O2 with ten-second limits.
+Parent-182 captures are `/tmp/miren-stage186-parent182-final-evidence`; historical parent-185
+sources, binary and evidence remain archived. Native evidence retains its original execution scope.
+Float, Bool and Char array fields, unsupported original children beneath zero lengths and default
+optimized external aggregate transport remain UNKNOWN.
+
+Three unchanged older roots advance from UNKNOWN to PROVED: nominal array-backed membership and
+zero-sized struct membership/equality with integer-array fields. Exact-source before/after
+captures are `/tmp/miren-stage186-parent182-old-frontiers-before` and
+`/tmp/miren-stage186-parent182-old-frontiers-after`; all four previous bounds queries retain their
+exact prefixes. Harness upkeep changes only those expectations and pins the actual full-domain
+models. Global controls and their independent actual-helper mutation/native guard are at
+`/tmp/miren-stage186-global-after-evidence`. The combined manifest has 161 cases in 55 families.
+Full integrated validation follows the frozen captures. No assumptions, input caps, firmware
+rewrites or resource budget increases are introduced.
+
+Final Stage 186 validation passes 753 Rust tests and 68 Python tests in the isolated workspace;
+fresh main passes 52 relevant Rust checks and 68 Python tests. Formatting, lint, workspace debug
+and release builds, documentation, dependency denial and manual hooks pass in both. All 813
+tracked files match byte for byte. Both surveys yield 252 PROVED, 224 REFUTED and 168 UNKNOWN:
+`/tmp/miren-stage186-capabilities-20261010` and
+`/tmp/miren-stage186-merged-capabilities-20261010`. All 468 previously completed parent roots
+retain identical outcomes, obligation details and queries. All 644 main/isolate outcomes, queries,
+models and premises match, with no diagnostic context differences. Source, input and release
+hashes are verified. Fresh release captures at `/tmp/miren-stage186-main-release-final-evidence`
+match 124 dedicated original and mutant proof objects, including 148 queries, after explicitly
+mapping source/replay paths. Native records retain their original execution scope. Fresh global
+release captures are at `/tmp/miren-stage186-global-final-evidence`. Dedicated historical fidelity
+preserves 172 unchanged outcome pairs and all 216 previous queries, including the four prefixes
+on advanced roots. Parent adoption preserves original fixtures and the archived evidence scope.
+No assumptions or resource budget changes are introduced.

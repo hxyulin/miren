@@ -23,10 +23,16 @@ impl From<String> for Failure {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum LeafStep {
+    Field(usize),
+    ArrayElement(usize),
+}
+
 #[derive(Clone)]
 struct Origin<'tcx> {
     right: bool,
-    path: Vec<usize>,
+    path: Vec<LeafStep>,
     original: Ty<'tcx>,
     shared: bool,
 }
@@ -117,7 +123,7 @@ impl Relations {
 struct Certificate<'a, 'tcx> {
     engine: &'a Engine<'tcx>,
     body: &'a Body<'tcx>,
-    leaves: Vec<Vec<usize>>,
+    leaves: Vec<Vec<LeafStep>>,
     relations: Relations,
     visited: Vec<BasicBlock>,
     steps: &'a mut usize,
@@ -242,7 +248,7 @@ impl<'tcx> Engine<'tcx> {
             }
         }
         let mut leaves = Vec::new();
-        self.nominal_comparison_leaves(original, &mut Vec::new(), &mut leaves, 0)?;
+        self.nominal_comparison_leaves(original, &mut Vec::new(), &mut leaves, 0, &mut 0, true)?;
         let mut certificate = Certificate {
             engine: self,
             body: &body,
@@ -281,17 +287,49 @@ impl<'tcx> Engine<'tcx> {
     fn nominal_comparison_leaves(
         &self,
         original: Ty<'tcx>,
-        path: &mut Vec<usize>,
-        leaves: &mut Vec<Vec<usize>>,
+        path: &mut Vec<LeafStep>,
+        leaves: &mut Vec<Vec<LeafStep>>,
         depth: usize,
+        nodes: &mut usize,
+        collect: bool,
     ) -> Result<(), Failure> {
-        if depth >= 16 || leaves.len() >= LIMIT {
+        *nodes += 1;
+        if depth >= 16 || *nodes > LIMIT {
             return Err(Failure::Resource(
                 "nominal comparison field traversal exceeds its type budget",
             ));
         }
         if self.scalar_slice_element(original)?.is_some() {
-            leaves.push(path.clone());
+            if collect {
+                leaves.push(path.clone());
+            }
+            return Ok(());
+        }
+        if let ty::Array(child, count) = original.kind() {
+            if !integer_array_child(*child, depth + 1) {
+                return Err("nominal comparison array requires exact integer children".into());
+            }
+            let count = count
+                .try_to_target_usize(self.tcx)
+                .ok_or("nominal comparison array lacks a concrete original length")?;
+            if count > 128 {
+                return Err(Failure::Resource(
+                    "nominal comparison array exceeds its type budget",
+                ));
+            }
+            // A vacant array still validates and charges its complete original child tree.
+            for index in 0..count.max(1) as usize {
+                path.push(LeafStep::ArrayElement(index));
+                self.nominal_comparison_leaves(
+                    *child,
+                    path,
+                    leaves,
+                    depth + 1,
+                    nodes,
+                    collect && count != 0,
+                )?;
+                path.pop();
+            }
             return Ok(());
         }
         let children: Vec<_> = match original.kind() {
@@ -302,7 +340,6 @@ impl<'tcx> Engine<'tcx> {
                 .into_iter()
                 .map(|(_, original)| original)
                 .collect(),
-            // Aggregate-to-integer lowering and array comparers need a separate bytewise proof.
             _ => {
                 return Err(
                     "nominal comparison field type is outside its structural grammar".into(),
@@ -310,11 +347,22 @@ impl<'tcx> Engine<'tcx> {
             }
         };
         for (index, original) in children.into_iter().enumerate() {
-            path.push(index);
-            self.nominal_comparison_leaves(original, path, leaves, depth + 1)?;
+            path.push(LeafStep::Field(index));
+            self.nominal_comparison_leaves(original, path, leaves, depth + 1, nodes, collect)?;
             path.pop();
         }
         Ok(())
+    }
+}
+
+fn integer_array_child(original: Ty<'_>, depth: usize) -> bool {
+    if depth >= 16 {
+        return false;
+    }
+    match original.kind() {
+        ty::Int(_) | ty::Uint(_) => true,
+        ty::Array(child, _) => integer_array_child(*child, depth + 1),
+        _ => false,
     }
 }
 
@@ -373,7 +421,7 @@ impl<'tcx> Certificate<'_, 'tcx> {
                     if actual != recorded {
                         return Err("nominal comparison has a different recorded FieldTy".into());
                     }
-                    origin.path.push(index.as_usize());
+                    origin.path.push(LeafStep::Field(index.as_usize()));
                     origin.original = actual;
                 }
                 _ => return Err("nominal comparison contains an unsupported projection".into()),
@@ -716,6 +764,10 @@ mod tests {
                 for (name, accepted) in [
                     ("record", true),
                     ("nested", true),
+                    ("integer_arrays", true),
+                    ("vacant_array", true),
+                    ("noninteger_array", false),
+                    ("wrong_array", false),
                     ("zero", true),
                     ("wrong", false),
                     ("missing", false),
@@ -740,6 +792,49 @@ mod tests {
                     let instance = engine.resolve_function_item(eq, args).unwrap();
                     let result = engine.certify_nominal_comparison(original, instance);
                     assert_eq!(result.is_ok(), accepted, "{name}: {result:?}");
+                    if name == "integer_arrays" || name == "vacant_array" {
+                        let mut leaves = Vec::new();
+                        let mut nodes = 0;
+                        engine
+                            .nominal_comparison_leaves(
+                                original,
+                                &mut Vec::new(),
+                                &mut leaves,
+                                0,
+                                &mut nodes,
+                                true,
+                            )
+                            .unwrap();
+                        if name == "integer_arrays" {
+                            assert_eq!(nodes, 9);
+                            assert_eq!(leaves.len(), 5);
+                            assert_eq!(
+                                leaves[0],
+                                vec![
+                                    LeafStep::Field(0),
+                                    LeafStep::ArrayElement(0),
+                                    LeafStep::ArrayElement(0),
+                                ]
+                            );
+                            assert_eq!(leaves[4], vec![LeafStep::Field(1)]);
+                        } else {
+                            assert_eq!(nodes, 6);
+                            assert!(leaves.is_empty());
+                        }
+                        let mut exhausted = LIMIT;
+                        assert!(
+                            engine
+                                .nominal_comparison_leaves(
+                                    original,
+                                    &mut Vec::new(),
+                                    &mut Vec::new(),
+                                    0,
+                                    &mut exhausted,
+                                    true,
+                                )
+                                .is_err()
+                        );
+                    }
                     if name == "record" {
                         let fields = engine.nominal_comparison_fields(original).unwrap().unwrap();
                         let plan = super::super::pure_comparisons::PureComparison::Struct {
@@ -848,6 +943,14 @@ mod tests {
 #[derive(Clone, Copy, PartialEq)] pub struct Record { left: u16, right: u16 }
 #[derive(Clone, Copy, PartialEq)] pub struct Nested { value: Record, flag: bool, c: char, f: f32 }
 #[derive(Clone, Copy, PartialEq)] pub struct Zero;
+#[derive(Clone, Copy, PartialEq)] pub struct IntegerArrays { arrays: [[i16; 2]; 2], flag: bool }
+#[derive(Clone, Copy, PartialEq)] pub struct VacantArray { arrays: [[u16; 0]; 2] }
+#[derive(Clone, Copy, PartialEq)] pub struct NonintegerArray { array: [f32; 0] }
+#[derive(Clone, Copy)] pub struct WrongArray { left: [u16; 2], right: [u16; 2] }
+impl PartialEq for WrongArray {
+    fn eq(&self, other: &Self) -> bool { self.left == other.left && self.right == other.left }
+}
+
 #[derive(Clone, Copy)] pub struct Wrong { left: u16, right: u16 }
 impl PartialEq for Wrong {
     fn eq(&self, other: &Self) -> bool { self.left == other.left && self.right == other.left }
@@ -856,6 +959,8 @@ impl PartialEq for Wrong {
 impl PartialEq for Missing { fn eq(&self, other: &Self) -> bool { self.left == other.left } }
 #[derive(Clone, Copy)] pub struct PanicEq;
 impl PartialEq for PanicEq { fn eq(&self, _: &Self) -> bool { panic!("effect") } }
+pub fn integer_arrays(_: IntegerArrays) {} pub fn vacant_array(_: VacantArray) {}
+pub fn noninteger_array(_: NonintegerArray) {} pub fn wrong_array(_: WrongArray) {}
 pub fn record(_: Record) {} pub fn nested(_: Nested) {} pub fn zero(_: Zero) {}
 pub fn wrong(_: Wrong) {} pub fn missing(_: Missing) {} pub fn panic_eq(_: PanicEq) {}
 "#,
@@ -874,6 +979,7 @@ pub fn wrong(_: Wrong) {} pub fn missing(_: Missing) {} pub fn panic_eq(_: Panic
                     source.to_str().unwrap().into(),
                     "--crate-type=lib".into(),
                     "--edition=2024".into(),
+                    "-Zmir-opt-level=0".into(),
                     "-Cpanic=abort".into(),
                     format!("-Copt-level={level}"),
                     "--out-dir".into(),

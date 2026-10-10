@@ -79,10 +79,6 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
         assert!(proof.entry_assumptions.is_empty());
         if *expected == ProofStatus::Unknown {
             let (category, reason) = match *name {
-                "array_lowering" => (
-                    UnknownCategory::Semantics,
-                    "nominal comparison field type is outside its structural grammar",
-                ),
                 "nonstructural" => (
                     UnknownCategory::Semantics,
                     "nominal comparison does not compute all corresponding field equalities",
@@ -127,6 +123,7 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
                     | "char_selected"
                     | "zero_contains"
                     | "zero_maximum"
+                    | "array_lowering"
             ) {
                 concat!(
                     "full-domain pure composite slice membership; ",
@@ -221,7 +218,7 @@ fn certified_nominal_comparisons_preserve_complete_numeric_field_relations() {
         ("absent", ProofStatus::Refuted),
         ("falsely_equal_views", ProofStatus::Refuted),
         ("falsely_float_self", ProofStatus::Refuted),
-        ("array_lowering", ProofStatus::Unknown),
+        ("array_lowering", ProofStatus::Proved),
         ("nonstructural", ProofStatus::Unknown),
         ("panicking_comparator", ProofStatus::Unknown),
         ("mutable_root", ProofStatus::Unknown),

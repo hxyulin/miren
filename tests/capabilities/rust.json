@@ -873,6 +873,23 @@
       "expected": "unknown",
       "unknown_reason": "owned Box constructor currently requires the exact Unit payload",
       "unknown_category": "semantics"
+    },
+    {
+      "entry": "nominal_array_predicates",
+      "family": "nominal_array_predicates",
+      "expected": "proved"
+    },
+    {
+      "entry": "nominal_array_wrong_claim",
+      "family": "nominal_array_predicates",
+      "expected": "refuted"
+    },
+    {
+      "entry": "nominal_float_array_unknown",
+      "family": "nominal_array_predicates",
+      "expected": "unknown",
+      "unknown_reason": "nominal comparison array requires exact integer children",
+      "unknown_category": "semantics"
     }
   ]
 }

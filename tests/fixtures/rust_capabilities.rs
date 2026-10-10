@@ -2233,3 +2233,55 @@ mod native_zst_boxes {
         zst_box_wrong_claim();
     }
 }
+
+#[derive(Clone, Copy, PartialEq)]
+pub struct ComparedArrayRecord {
+    words: [u16; 2],
+    marker: bool,
+}
+
+#[inline(never)]
+fn nominal_array_selected(values: &[ComparedArrayRecord], index: usize) -> ComparedArrayRecord {
+    let mut selected = values[index];
+    selected.words[1] = selected.words[1].wrapping_add(0);
+    selected
+}
+
+pub fn nominal_array_predicates(values: &[ComparedArrayRecord], index: usize) {
+    if index < values.len() {
+        assert!(values.contains(&nominal_array_selected(values, index)));
+    }
+}
+
+pub fn nominal_array_wrong_claim(values: &[ComparedArrayRecord], index: usize) {
+    if index < values.len() {
+        assert!(!values.contains(&nominal_array_selected(values, index)));
+    }
+}
+
+#[derive(Clone, Copy, PartialEq)]
+pub struct ComparedFloatArray {
+    values: [f32; 2],
+}
+
+pub fn nominal_float_array_unknown(values: &[ComparedFloatArray]) -> bool {
+    values == values
+}
+
+#[cfg(test)]
+mod native_nominal_array_predicates {
+    use super::*;
+
+    #[test]
+    fn selected_array_body_preserves_member() {
+        let value = ComparedArrayRecord { words: [3, 7], marker: true };
+        nominal_array_predicates(&[value; 129], 128);
+    }
+
+    #[test]
+    #[should_panic]
+    fn array_false_claim_panics() {
+        let value = ComparedArrayRecord { words: [3, 7], marker: true };
+        nominal_array_wrong_claim(&[value; 129], 128);
+    }
+}
