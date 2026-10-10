@@ -214,6 +214,100 @@ impl<'tcx> Engine<'tcx> {
         self.write_owned_array_element_mode(body, state, place, replacement, OwnedWriteMode::Known)
     }
 
+    pub(super) fn owned_field_array_write_candidate(
+        &self,
+        body: &Body<'tcx>,
+        place: Place<'tcx>,
+    ) -> bool {
+        matches!(
+            body.local_decls[place.local].ty.kind(),
+            ty::Tuple(_) | ty::Adt(..)
+        ) && matches!(place.projection.first(), Some(ProjectionElem::Field(..)))
+            && place.projection.iter().all(|part| {
+                matches!(
+                    part,
+                    ProjectionElem::Field(..)
+                        | ProjectionElem::Index(_)
+                        | ProjectionElem::ConstantIndex {
+                            from_end: false,
+                            ..
+                        }
+                )
+            })
+            && place
+                .projection
+                .iter()
+                .any(|part| matches!(part, ProjectionElem::Index(_)))
+    }
+
+    pub(super) fn write_owned_field_array(
+        &self,
+        body: &Body<'tcx>,
+        state: &mut State,
+        place: Place<'tcx>,
+        replacement: &Value,
+    ) -> Result<bool, String> {
+        if !self.owned_field_array_write_candidate(body, place) {
+            return Ok(false);
+        }
+        let original = body.local_decls[place.local].ty;
+        let Some(shape) = self.owned_product_shape(original)? else {
+            return Ok(false);
+        };
+        let Some(ProductWritePlan::Indexed { index, targets }) =
+            self.owned_product_write_plan(body, state, original, &shape, place.projection)?
+        else {
+            return Ok(false);
+        };
+        let target = targets
+            .first()
+            .ok_or("owned indexed write has no feasible target")?;
+        let local = place.local.as_usize();
+        let allocation = state.addresses[local];
+        let storage = if let Some(allocation) = allocation {
+            let location = StorageLocation::tracked(allocation, true);
+            location.require_write(&state.memory)?;
+            location.read(&state.memory)?.clone()
+        } else {
+            self.local(state, local)?
+        };
+        let bits = u32::from(self.tcx.sess.target.pointer_width);
+        let mut nodes = 0;
+        let replacement = self
+            .product_leaves(
+                target.original,
+                bits,
+                &target.shape,
+                replacement,
+                &state.conditions,
+                &mut nodes,
+            )
+            .map_err(|error| format!("owned product write replacement: {error}"))?;
+        let old = self
+            .product_leaves(
+                original,
+                bits,
+                &shape,
+                &storage,
+                &state.conditions,
+                &mut nodes,
+            )
+            .map_err(|error| format!("owned product write parent: {error}"))?;
+        let spans = targets
+            .iter()
+            .map(|target| target.span.clone())
+            .collect::<Vec<_>>();
+        let masks = indexed_product_masks(&self.terms, bits, &index, &spans)?;
+        let updated =
+            conditional_indexed_product(&self.terms, bits, &shape, &masks, &replacement, &old)?;
+        if let Some(allocation) = allocation {
+            state.memory[allocation] = Some(updated);
+        } else {
+            state.locals[local] = Some(updated);
+        }
+        Ok(true)
+    }
+
     fn write_owned_array_element_mode(
         &self,
         body: &Body<'tcx>,
@@ -1189,6 +1283,31 @@ fn conditional_indexed_product(
         return Err("owned indexed write omitted leaves".into());
     }
     Ok(result)
+}
+
+fn indexed_product_masks(
+    context: &Context,
+    bits: u32,
+    index: &Term,
+    spans: &[std::ops::Range<usize>],
+) -> Result<Vec<(std::ops::Range<usize>, Term)>, String> {
+    if index.sort() != &Sort::BitVec(bits) || !index.belongs_to(context) {
+        return Err("owned product write index has invalid width or context".into());
+    }
+    if spans.len() > MAX_CHOICE_NODES {
+        return Err("owned indexed span budget exceeded".into());
+    }
+    spans
+        .iter()
+        .enumerate()
+        .map(|(position, span)| {
+            let mask = context.apply(
+                Op::Equal,
+                &[index.clone(), context.bit_vector(position as u128, bits)?],
+            )?;
+            Ok((span.clone(), mask))
+        })
+        .collect()
 }
 
 fn owned_row_condition(
@@ -2328,5 +2447,36 @@ mod tests {
             )
             .is_err()
         );
+    }
+
+    #[test]
+    fn product_root_masks_preserve_absolute_spans_and_index_context() {
+        let context = Context::default();
+        let index = context.symbol(0, Sort::BitVec(64)).unwrap();
+        let spans = [1..3, 3..5];
+        let masks = indexed_product_masks(&context, 64, &index, &spans).unwrap();
+        for (position, (span, mask)) in masks.iter().enumerate() {
+            assert_eq!(span, &spans[position]);
+            assert_eq!(
+                mask,
+                &context
+                    .apply(
+                        Op::Equal,
+                        &[
+                            index.clone(),
+                            context.bit_vector(position as u128, 64).unwrap()
+                        ]
+                    )
+                    .unwrap()
+            );
+        }
+        assert!(indexed_product_masks(&Context::default(), 64, &index, &spans).is_err());
+        assert!(indexed_product_masks(&context, 32, &index, &spans).is_err());
+        assert!(
+            indexed_product_masks(&context, 64, &index, &vec![0..0; MAX_CHOICE_NODES + 1]).is_err()
+        );
+        assert!(validate_indexed_spans(&[1..3, 2..4], 5, 2).is_err());
+        assert!(validate_indexed_spans(&[1..3, 3..6], 5, 2).is_err());
+        assert!(validate_indexed_spans(&[1..1, 2..2], 3, 0).is_ok());
     }
 }

@@ -732,6 +732,13 @@ jointly correlated inner updates. Existing successful byte stores and their quer
 remain unchanged. The rvalue and destination validity checks execute once. Missing bodies,
 permission failures and solver/resource errors cannot trigger this fallback. Reference/raw/static
 and call destinations gain no support.
+Owned tuple and ordinary-struct roots can also update an array reached through leading compiler
+field projections. This uses the same exact unsupported-boundary fallback after the old writer.
+The complete original root and replacement share one validation budget; original field types
+resolve disjoint logical target spans. One symbolic index controls all leaves in each selected
+subtree, and untouched sibling terms survive the complete nominal rebuild and same-owner commit.
+Existing successful field and byte writes retain their earlier paths and queries. This adds no
+symbolic second index, dereference, retained-reference, raw, static or call-destination writes.
 Assignment targets retain complete parent and replacement validation, including siblings and
 zero-leaf fields. Deferred input products with no observable scalar leaves can be reconstructed
 after exact original-type and descriptor validation. Nominal zero-sized structs

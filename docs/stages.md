@@ -4249,3 +4249,49 @@ verified, at `/tmp/miren-stage169-capabilities-20261010` and
 identical status, obligation details and query text across four profiles. Independent review
 approves final source, actual helper mutation and valid native evidence. No assumptions, input
 caps or resource-budget changes are introduced.
+
+
+## Stage 170: owned product fields containing symbolic array writes
+
+A direct owned tuple or certified ordinary struct can contain an array under compiler Field
+projections. The writer reuses the original-type product path/span plan and complete
+root reconstruction after the older writer reaches its precise unsupported index boundary.
+Original root and every field retain pure-type, complete current-source, bounds, input provenance
+and cumulative resource checks. The transaction uses the same actual owner; no new reader or
+reference capability is planned.
+
+Three new shared controls use actual three-root 64-element struct arrays, preserving selected
+and untouched record fields, a root sibling, an untouched row and a false-field claim. Missing
+actual replacement bodies retain their independent compiler-evidence requirement. Validation
+and immutable before/after outcomes remain pending.
+
+The dedicated 29-root matrix yields 14 PROVED, 5 REFUTED and 10 UNKNOWN in host/ARM O0/O2.
+Original selected and lazy read-before-write claims remain unchanged and prove; no distinct
+workaround source is needed. Literal byte stores already prove before this extension and all
+four completed obligations and query texts remain identical in each compiler profile afterward.
+
+A real by-value helper changes the selected index to index XOR 1. Unchanged caller claims refute
+in all four profiles with actual helper entry and the same failing query/model. Valid originals
+pass seven native tests at O0/O2; mutant guards exit 101. Eight reports, native outputs, commands,
+hashes and ten-second timeouts remain at `/tmp/miren-stage170-final-evidence`. Two dedicated
+compiler tests, nineteen related tests and the new root-span/index-context metadata control pass.
+
+Shared controls retain actual three-root 195-slot struct products. Before probes yield UNKNOWN
+for valid/false claims at the field-root array-write boundary, with missing actual body UNKNOWN
+separately. Frozen after-probes yield P/R/missing-body U in all four configurations with empty
+assumptions and verified source/analyzer hashes. Commands and reports remain at
+`/tmp/miren-stage170-shared-expanded-before` and
+`/tmp/miren-stage170-shared-expanded-after`. Full required validation remains pending.
+
+
+Final frozen validation passes all 695 Rust tests and 68 Python tests in the isolated workspace.
+All 634 tracked main files match that snapshot byte for byte. Fresh main debug/release builds,
+twenty-seven new/related integration tests, 68 Python tests and every remaining required check
+pass. The initial harness line-wrap formatting failure and exact correction remain preserved;
+corrected formatting and its two affected compiler tests pass. Both surveys retain 196 PROVED,
+172 REFUTED and 120 UNKNOWN, with source/input/release hashes verified, at
+`/tmp/miren-stage170-capabilities-20261010` and
+`/tmp/miren-stage170-merged-capabilities-20261010`. All 360 earlier completed roots preserve
+identical status, obligation details and query text across four profiles. Independent review
+approves final source, actual helper mutation and valid native evidence. No assumptions, input
+caps or resource-budget changes are introduced.

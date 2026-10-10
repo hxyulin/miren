@@ -1176,6 +1176,70 @@ pub fn known_owned_array_missing_body(
     }
 }
 
+#[derive(Clone, Copy)]
+pub struct OwnedArrayProduct {
+    pub rows: [ReservedRecord; 64],
+    pub ready: bool,
+}
+
+pub fn owned_product_array_write(
+    mut first: OwnedArrayProduct,
+    _second: OwnedArrayProduct,
+    _third: OwnedArrayProduct,
+    index: usize,
+    replacement: u16,
+) {
+    if index < first.rows.len() {
+        let before = first.rows[index];
+        let other = first.rows[63];
+        let ready = first.ready;
+        first.rows[index].left = replacement;
+        let selected = first.rows[index];
+        assert!(selected.left == replacement);
+        assert!(selected.right == before.right);
+        assert!(first.ready == ready);
+        if index != 63 {
+            let after = first.rows[63];
+            assert!(after.left == other.left);
+            assert!(after.right == other.right);
+        }
+    }
+}
+
+pub fn owned_product_array_wrong_claim(
+    mut first: OwnedArrayProduct,
+    _second: OwnedArrayProduct,
+    _third: OwnedArrayProduct,
+    index: usize,
+    replacement: u16,
+) {
+    if index < first.rows.len() {
+        first.rows[index].left = replacement;
+        let selected = first.rows[index];
+        assert!(selected.right == replacement);
+    }
+}
+
+#[cfg(not(test))]
+unsafe extern "Rust" {
+    fn opaque_product_array_replacement() -> u16;
+}
+
+#[cfg(not(test))]
+pub fn owned_product_array_missing_body(
+    mut first: OwnedArrayProduct,
+    _second: OwnedArrayProduct,
+    _third: OwnedArrayProduct,
+    index: usize,
+) {
+    if index < first.rows.len() {
+        let replacement = unsafe { opaque_product_array_replacement() };
+        first.rows[index].left = replacement;
+        let selected = first.rows[index];
+        assert!(selected.left == replacement);
+    }
+}
+
 #[cfg(test)]
 mod native {
     use super::*;
@@ -1207,6 +1271,10 @@ mod native {
         for inner in [0, 1, 2, usize::MAX] {
             known_owned_array_write([[3, 7]; 64], [[5, 11]; 64], [[13, 17]; 64],
                 inner, u16::MAX);
+        }
+        let product = OwnedArrayProduct { rows: records, ready: true };
+        for index in [0, 63, 64, usize::MAX] {
+            owned_product_array_write(product, product, product, index, u16::MAX);
         }
         safe_sized_alignment(SizedLayoutZero);
         deferred_zero_owned_write([DeferredZero; 2], 0);
@@ -1394,6 +1462,14 @@ mod native {
         let first = [ReservedRecord { left: 3, right: 7 }; 64];
         let second = [ReservedRecord { left: 5, right: 11 }; 64];
         registered_product_wrong_claim(first, second, first, 63);
+    }
+    #[test]
+    #[should_panic]
+    fn owned_product_array_wrong_claim_panics() {
+        let product = OwnedArrayProduct {
+            rows: [ReservedRecord { left: 3, right: 7 }; 64], ready: true,
+        };
+        owned_product_array_wrong_claim(product, product, product, 63, 19);
     }
     #[test]
     #[should_panic]

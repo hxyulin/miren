@@ -1654,10 +1654,14 @@ impl<'tcx> Engine<'tcx> {
                 }
                 if self.write_owned_array_element(body, state, *place, &value)? {
                     Ok(())
-                } else if self.known_owned_array_write_candidate(body, *place) {
+                } else if self.known_owned_array_write_candidate(body, *place)
+                    || self.owned_field_array_write_candidate(body, *place)
+                {
                     match self.write(state, *place, value.clone()) {
                         Err(error) if typed_array_choices::known_owned_write_frontier(&error) => {
-                            if self.write_known_owned_array_element(body, state, *place, &value)? {
+                            if self.write_known_owned_array_element(body, state, *place, &value)?
+                                || self.write_owned_field_array(body, state, *place, &value)?
+                            {
                                 Ok(())
                             } else {
                                 Err(error)

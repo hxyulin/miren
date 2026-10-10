@@ -11,8 +11,8 @@ execution at O0 and O2, positive/refuted/unknown controls, a source mutation tha
 structured UNKNOWN reporting, and passing repository checks. Completion establishes a repeatable
 baseline. It does not establish full Rust support or a completed memory-model refactor.
 
-The manifest contains 119 cases across 41 families. Each build configuration expects 48 PROVED,
-42 REFUTED and 29 UNKNOWN results. Stage 133 originally had 23 cases with 10 PROVED, 9 REFUTED
+The manifest contains 122 cases across 42 families. Each build configuration expects 49 PROVED,
+43 REFUTED and 30 UNKNOWN results. Stage 133 originally had 23 cases with 10 PROVED, 9 REFUTED
 and 4 UNKNOWN; stage 134 closed its retained-prefix projection gap. Stage 136 adds raw-pointer
 metadata P/R controls and a safe core reference-array grant that remains UNKNOWN without a
 temporal permission certificate. Stage 137 adds tuple-array P/R and unsupported symbolic-write
@@ -86,6 +86,11 @@ controls. The earlier writer runs first; only its precise unsupported index boun
 existing typed transaction. Already supported byte writes retain identical completed queries.
 Original full parent types, complete candidates, bounds, context and owner checks precede commit.
 Frozen surveys and all required validation pass.
+Stage 170 adds owned tuple/ordinary-struct array-field write P/R and missing replacement body U
+controls. The shared typed product plan validates the complete original enclosing root, compiler
+field identities, disjoint logical spans, candidates and replacement before one same-owner commit.
+Already supported byte paths retain identical completed queries. Frozen surveys and all required
+validation pass.
 These additions change the denominator, not a coverage percentage.
 Covered examples exercise arithmetic, enum payloads, array indexing, reference effects, concrete
 generics, closures, iterator callbacks, finite loops, destructors, fresh future polling and raw

@@ -1531,3 +1531,17 @@ unsupported body, permission, solver and resource failures never trigger a succe
 Full original parent and candidate types, bounds, context and complete transaction checks retain
 the existing budgets and same owner. Typed references, raw paths and call destinations acquire
 no writer. Frozen host/ARM O0/O2 surveys and all required validation pass.
+
+
+Stage 170 extends certified owned writes to compiler Field paths within complete pure tuples and
+ordinary structs containing arrays. The existing original-type span plan and conditional product
+rebuild operate on the full current root after the precise old-writer refusal. Root siblings,
+untouched row fields, nominal metadata and Float bits remain intact; cumulative preparation and
+replacement limits precede the same-owner commit. Existing successful writes retain their writer,
+and earlier Array-root loops remain unchanged. Reads, references, raw and call destinations gain
+no new rule. Four completed pre-existing byte-store queries remain identical in every profile.
+
+The dedicated 29-root matrix yields 14 PROVED, 5 REFUTED and 10 UNKNOWN per configuration.
+Actual index mutation refutes in all profiles and fails valid native execution. Shared root
+products retain their actual 195-slot input descriptors and produce P/R/missing-body U with empty
+assumptions. Frozen host/ARM O0/O2 surveys and all required validation pass.
