@@ -344,7 +344,13 @@ fn evaluate(
         {
             match evaluate(context, &expr.receiver, bindings, pointer_bits, None)?.materialize()? {
                 Value::MutableU16 {
-                    role: symbolic::MutableU16Role::Ghost { length, data },
+                    role:
+                        symbolic::MutableU16Role::Ghost {
+                            element,
+                            length,
+                            data,
+                            ..
+                        },
                     ..
                 } => {
                     let (term, bits, signed) = length.integer()?;
@@ -354,7 +360,18 @@ fn evaluate(
                         || data.sort()
                             != &symbolic::Sort::Array(
                                 Box::new(symbolic::Sort::BitVec(pointer_bits)),
-                                Box::new(symbolic::Sort::BitVec(16)),
+                                Box::new(match element {
+                                    symbolic::ScalarSliceElement::Integer { bits, .. }
+                                        if matches!(bits, 8 | 16 | 32 | 64 | 128) =>
+                                    {
+                                        symbolic::Sort::BitVec(bits)
+                                    }
+                                    _ => {
+                                        return Err(
+                                            "mutable integer ghost requires integer codec".into()
+                                        );
+                                    }
+                                }),
                             )
                         || !data.belongs_to(context)
                     {

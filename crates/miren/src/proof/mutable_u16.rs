@@ -1,9 +1,18 @@
-//! Direct incoming mutable u16 roots. Metadata and ghosts have no data-write authority.
+//! Direct incoming mutable integer roots. Metadata and ghosts have no data-write authority.
 use super::*;
 use symbolic::MutableU16Role;
 
 #[derive(Clone, Debug)]
+pub(super) struct IntegerCertificate<'tcx> {
+    original: Ty<'tcx>,
+    element: symbolic::ScalarSliceElement,
+    bytes: u64,
+    alignment: u64,
+}
+
+#[derive(Clone, Debug)]
 pub(super) struct Backing {
+    pub(super) certificate: usize,
     pub(super) allocation: usize,
     pub(super) length: Value,
     pub(super) data: Term,
@@ -15,13 +24,56 @@ impl<'tcx> Engine<'tcx> {
     pub(super) fn mutable_u16_type(&self, original: Ty<'tcx>) -> bool {
         matches!(original.kind(), ty::Ref(_, inner, mutability)
             if mutability.is_mut() && matches!(inner.kind(), ty::Slice(element)
-                if *element == self.tcx.types.u16))
+                if self.mutable_integer_element(*element)))
     }
 
-    fn mutable_u16_shared_type(&self, original: Ty<'tcx>) -> bool {
-        matches!(original.kind(), ty::Ref(_, inner, mutability)
-            if !mutability.is_mut() && matches!(inner.kind(), ty::Slice(element)
-                if *element == self.tcx.types.u16))
+    fn mutable_integer_element(&self, original: Ty<'tcx>) -> bool {
+        matches!(original.kind(), ty::Int(_) | ty::Uint(_)) && original != self.tcx.types.u8
+    }
+
+    fn mutable_integer_certificate(&self, id: usize) -> Result<&IntegerCertificate<'tcx>, String> {
+        let certificate = self
+            .mutable_integer_types
+            .get(id)
+            .ok_or("mutable integer element certificate was not issued")?;
+        if !self.mutable_integer_element(certificate.original) {
+            return Err("mutable integer certificate has an unsupported original type".into());
+        }
+        let layout = self.static_layout(certificate.original)?;
+        if self.scalar_slice_element(certificate.original)? != Some(certificate.element)
+            || layout.size.bytes() != certificate.bytes
+            || layout.align.abi.bytes() != certificate.alignment
+        {
+            return Err("mutable integer certificate differs from original compiler layout".into());
+        }
+        Ok(certificate)
+    }
+
+    pub(super) fn mutable_integer_pending_message(
+        &self,
+        certificate: usize,
+    ) -> Result<&'static str, String> {
+        Ok(
+            if self.mutable_integer_certificate(certificate)?.original == self.tcx.types.u16 {
+                "mutable u16 staging needs a pending child"
+            } else {
+                "mutable integer staging needs a pending child"
+            },
+        )
+    }
+
+    pub(super) fn mutable_u16_matches(
+        &self,
+        original: Ty<'tcx>,
+        id: usize,
+        memory: &Memory,
+        mutable: bool,
+    ) -> Result<bool, String> {
+        let backing = self.mutable_u16_backing(id, memory)?;
+        let certificate = self.mutable_integer_certificate(backing.certificate)?;
+        Ok(matches!(original.kind(), ty::Ref(_, inner, mutability)
+            if mutability.is_mut() == mutable && matches!(inner.kind(), ty::Slice(element)
+                if *element == certificate.original)))
     }
 
     fn mutable_u16_error(&self, detail: &str) -> String {
@@ -30,6 +82,7 @@ impl<'tcx> Engine<'tcx> {
 
     pub(super) fn mutable_u16_input(
         &mut self,
+        original: Ty<'tcx>,
         memory: &mut Memory,
         conditions: &mut Vec<Term>,
     ) -> Result<Value, String> {
@@ -41,26 +94,52 @@ impl<'tcx> Engine<'tcx> {
                 "mutable u16 root exceeds existing storage budget".into(),
             ));
         }
-        let layout = self.static_layout(self.tcx.types.u16)?;
-        if layout.size.bytes() != 2 {
-            return Err("mutable u16 root requires exact two-byte compiler layout".into());
+        if !self.mutable_integer_element(original) {
+            return Err("mutable integer input needs exact admitted primitive".into());
         }
+        let element = self
+            .scalar_slice_element(original)?
+            .ok_or("mutable integer codec is unavailable")?;
+        let layout = self.static_layout(original)?;
+        let certificate = if let Some(id) = self
+            .mutable_integer_types
+            .iter()
+            .position(|certificate| certificate.original == original)
+        {
+            id
+        } else {
+            if self.mutable_integer_types.len() >= MAX_INPUT_VALUES {
+                return Err(self.categorized_error(
+                    UnknownCategory::ResourceLimit,
+                    "mutable integer certificates exceed existing budget".into(),
+                ));
+            }
+            let id = self.mutable_integer_types.len();
+            self.mutable_integer_types.push(IntegerCertificate {
+                original,
+                element,
+                bytes: layout.size.bytes(),
+                alignment: layout.align.abi.bytes(),
+            });
+            id
+        };
         self.input_values += 2;
         let bits = u32::from(self.tcx.sess.target.pointer_width);
         let length = self.fresh(Sort::BitVec(bits));
-        let max = ((1_u128 << (bits - 1)) - 1) / 2;
+        let max = ((1_u128 << (bits - 1)) - 1) / u128::from(layout.size.bytes());
         conditions.push(self.terms.apply(
             Op::BvUnsignedLe,
             &[length.clone(), self.terms.bit_vector(max, bits)?],
         )?);
         let data = self.fresh(Sort::Array(
             Box::new(Sort::BitVec(bits)),
-            Box::new(Sort::BitVec(16)),
+            Box::new(super::scalar_slices::scalar_slice_sort(element)?),
         ));
         let allocation = memory.len();
         memory.push(Some(Value::Unit));
         let id = memory.mutable_u16.len();
         std::rc::Rc::make_mut(&mut memory.mutable_u16).push(Backing {
+            certificate,
             allocation,
             length: Value::Int {
                 expression: length,
@@ -90,18 +169,28 @@ impl<'tcx> Engine<'tcx> {
         if !matches!(memory.get(backing.allocation), Some(Some(Value::Unit))) {
             return Err(self.mutable_u16_error("mutable u16 root backing is unavailable"));
         }
-        self.mutable_u16_terms(&backing.length, &backing.data)?;
+        self.mutable_u16_terms(backing.certificate, &backing.length, &backing.data)?;
         Ok(backing)
     }
 
-    fn mutable_u16_terms(&self, length: &Value, data: &Term) -> Result<(), String> {
+    fn mutable_u16_terms(
+        &self,
+        certificate: usize,
+        length: &Value,
+        data: &Term,
+    ) -> Result<(), String> {
+        let element = self.mutable_integer_certificate(certificate)?.element;
         let bits = u32::from(self.tcx.sess.target.pointer_width);
         let (term, width, signed) = length.integer()?;
         if width != bits
             || signed
             || term.sort() != &Sort::BitVec(bits)
             || !term.belongs_to(&self.terms)
-            || data.sort() != &Sort::Array(Box::new(Sort::BitVec(bits)), Box::new(Sort::BitVec(16)))
+            || data.sort()
+                != &Sort::Array(
+                    Box::new(Sort::BitVec(bits)),
+                    Box::new(super::scalar_slices::scalar_slice_sort(element)?),
+                )
             || !data.belongs_to(&self.terms)
         {
             return Err("mutable u16 backing has a different width, sort or context".into());
@@ -125,8 +214,16 @@ impl<'tcx> Engine<'tcx> {
                 self.mutable_u16_role_live(*id, role, memory)?;
                 Ok(self.mutable_u16_backing(*id, memory)?.length.clone())
             }
-            MutableU16Role::Ghost { length, data } => {
-                self.mutable_u16_terms(length, data)?;
+            MutableU16Role::Ghost {
+                certificate,
+                element,
+                length,
+                data,
+            } => {
+                self.mutable_u16_terms(*certificate, length, data)?;
+                if self.mutable_integer_certificate(*certificate)?.element != *element {
+                    return Err("mutable integer ghost codec differs from its certificate".into());
+                }
                 Ok((**length).clone())
             }
         }
@@ -147,6 +244,10 @@ impl<'tcx> Engine<'tcx> {
                 Ok(Value::MutableU16 {
                     id: *id,
                     role: MutableU16Role::Ghost {
+                        certificate: backing.certificate,
+                        element: self
+                            .mutable_integer_certificate(backing.certificate)?
+                            .element,
                         length: Box::new(backing.length.clone()),
                         data: backing.data.clone(),
                     },
@@ -157,8 +258,16 @@ impl<'tcx> Engine<'tcx> {
                 self.mutable_u16_backing(*id, memory)?;
                 Ok(value.clone())
             }
-            MutableU16Role::Ghost { length, data } => {
-                self.mutable_u16_terms(length, data)?;
+            MutableU16Role::Ghost {
+                certificate,
+                element,
+                length,
+                data,
+            } => {
+                self.mutable_u16_terms(*certificate, length, data)?;
+                if self.mutable_integer_certificate(*certificate)?.element != *element {
+                    return Err("mutable integer ghost codec differs from its certificate".into());
+                }
                 Ok(value.clone())
             }
         }
@@ -191,22 +300,26 @@ impl<'tcx> Engine<'tcx> {
             return Err(self.mutable_u16_error("mutable u16 root needs direct element observation"));
         };
         let body = body.ok_or("mutable u16 data observation needs original compiler Body")?;
-        if !self.mutable_u16_type(body.local_decls[place.local].ty)
+        if !self.mutable_u16_matches(body.local_decls[place.local].ty, id, &state.memory, true)?
             || body.local_decls[*index].ty != self.tcx.types.usize
-            || place.ty(&body.local_decls, self.tcx).ty != self.tcx.types.u16
+            || place.ty(&body.local_decls, self.tcx).ty
+                != self
+                    .mutable_integer_certificate(backing.certificate)?
+                    .original
         {
             return Err("mutable u16 element differs from original compiler type".into());
         }
         let index = self.local(state, index.as_usize())?;
         self.mutable_u16_index(&index, &backing.length, &state.conditions)?;
-        Ok(Some(Value::Int {
-            expression: self.terms.apply(
+        Ok(Some(super::scalar_slices::decode_scalar_element(
+            &self.terms,
+            self.mutable_integer_certificate(backing.certificate)?
+                .element,
+            self.terms.apply(
                 Op::Select,
                 &[backing.data.clone(), index.integer()?.0.clone()],
             )?,
-            bits: 16,
-            signed: false,
-        }))
+        )?))
     }
 
     fn mutable_u16_index(
@@ -268,9 +381,13 @@ impl<'tcx> Engine<'tcx> {
         else {
             return Err(self.mutable_u16_error("mutable u16 store requires direct whole element"));
         };
-        if !self.mutable_u16_type(body.local_decls[place.local].ty)
+        let backing = self.mutable_u16_backing(id, &state.memory)?;
+        if !self.mutable_u16_matches(body.local_decls[place.local].ty, id, &state.memory, true)?
             || body.local_decls[*index].ty != self.tcx.types.usize
-            || place.ty(&body.local_decls, self.tcx).ty != self.tcx.types.u16
+            || place.ty(&body.local_decls, self.tcx).ty
+                != self
+                    .mutable_integer_certificate(backing.certificate)?
+                    .original
         {
             return Err("mutable u16 store differs from original compiler type".into());
         }
@@ -278,9 +395,24 @@ impl<'tcx> Engine<'tcx> {
         let index = self.local(state, index.as_usize())?;
         self.mutable_u16_index(&index, &backing.length, &state.conditions)?;
         let (term, bits, signed) = replacement.integer()?;
-        if bits != 16 || signed || term.sort() != &Sort::BitVec(16) || !term.belongs_to(&self.terms)
+        let certificate = self.mutable_integer_certificate(backing.certificate)?;
+        let symbolic::ScalarSliceElement::Integer {
+            bits: expected_bits,
+            signed: expected_signed,
+        } = certificate.element
+        else {
+            return Err("mutable integer replacement certificate has a different kind".into());
+        };
+        if bits != expected_bits
+            || signed != expected_signed
+            || term.sort() != &Sort::BitVec(expected_bits)
+            || !term.belongs_to(&self.terms)
         {
-            return Err("mutable u16 replacement requires unsigned BV16 in current context".into());
+            return Err(if certificate.original == self.tcx.types.u16 {
+                "mutable u16 replacement requires unsigned BV16 in current context".into()
+            } else {
+                "mutable integer replacement differs from issued width, sign or context".into()
+            });
         }
         let data = self.terms.apply(
             Op::Store,
@@ -309,7 +441,12 @@ impl<'tcx> Engine<'tcx> {
         };
         if !matches!(role, MutableU16Role::Root | MutableU16Role::Child { .. })
             || place.projection.as_ref() != [ProjectionElem::Deref]
-            || !self.mutable_u16_type(body.local_decls[place.local].ty)
+            || !self.mutable_u16_matches(
+                body.local_decls[place.local].ty,
+                id,
+                &state.memory,
+                true,
+            )?
         {
             return Err(self.mutable_u16_error("mutable u16 metadata needs original direct root"));
         }
@@ -369,7 +506,10 @@ impl<'tcx> Engine<'tcx> {
                 ty::RawPtr(inner, mutability) if !mutability.is_mut() => *inner,
                 _ => return Err("mutable u16 metadata destination has a different type".into()),
             };
-            if !matches!(inner.kind(), ty::Slice(element) if *element == self.tcx.types.u16) {
+            if !matches!(inner.kind(), ty::Slice(element)
+                if *element == self.mutable_integer_certificate(
+                    self.mutable_u16_backing(*id, &state.memory)?.certificate)?.original)
+            {
                 return Err("mutable u16 metadata destination needs original u16 slice".into());
             }
             self.mutable_u16_backing(*id, &state.memory)?;
@@ -408,7 +548,12 @@ impl<'tcx> Engine<'tcx> {
                             MutableU16Role::Metadata { .. } | MutableU16Role::ChildMetadata { .. }
                         )
                         || self.tcx.lang_items().get(LangItem::SliceLen) != Some(instance.def_id())
-                        || !self.mutable_u16_shared_type(body.local_decls[place.local].ty)
+                        || !self.mutable_u16_matches(
+                            body.local_decls[place.local].ty,
+                            id,
+                            &state.memory,
+                            false,
+                        )?
                     {
                         return Err(self.mutable_u16_error(
                             "mutable u16 roles require selected metadata-only operation",
@@ -447,10 +592,16 @@ impl<'tcx> Engine<'tcx> {
             || signature.inputs().len() != 1
             || !matches!(signature.inputs()[0].kind(), ty::Ref(_, inner, mutability)
                 if !mutability.is_mut() && matches!(inner.kind(), ty::Slice(element)
-                    if *element == self.tcx.types.u16))
+                    if self.mutable_integer_element(*element)))
         {
             return Err("mutable u16 SliceLen has a different original signature".into());
         }
+        let ty::Ref(_, signature_slice, _) = signature.inputs()[0].kind() else {
+            return Err("mutable integer SliceLen receiver differs".into());
+        };
+        let ty::Slice(signature_element) = signature_slice.kind() else {
+            return Err("mutable integer SliceLen element differs".into());
+        };
         let body = self.instantiated_body(instance)?;
         if body.arg_count != 1
             || body.local_decls.len() != 2
@@ -458,7 +609,7 @@ impl<'tcx> Engine<'tcx> {
             || body.local_decls[rustc_middle::mir::RETURN_PLACE].ty != self.tcx.types.usize
             || !matches!(body.local_decls[rustc_middle::mir::Local::from_usize(1)].ty.kind(),
                 ty::Ref(_, inner, mutability) if !mutability.is_mut()
-                    && matches!(inner.kind(), ty::Slice(element) if *element == self.tcx.types.u16))
+                    && matches!(inner.kind(), ty::Slice(element) if element == signature_element))
         {
             return Err("mutable u16 SliceLen body has a different original schema".into());
         }
@@ -674,6 +825,7 @@ mod tests {
                     resolved_contracts: BTreeMap::new(),
                     solver: std::cell::RefCell::new(Solver::with_limits(limits)),
                     mutable_u16_frames: Default::default(),
+                    mutable_integer_types: Vec::new(),
                     mutable_u16_staging: Default::default(),
                     coroutine_places: Default::default(),
                     owned_box_types: Vec::new(),
@@ -724,7 +876,7 @@ mod tests {
                 let mut memory = Memory::default();
                 let mut conditions = Vec::new();
                 let root = engine
-                    .mutable_u16_input(&mut memory, &mut conditions)
+                    .mutable_u16_input(tcx.types.u16, &mut memory, &mut conditions)
                     .unwrap();
                 let ghost = engine.mutable_u16_snapshot(&root, &memory).unwrap();
                 let Value::MutableU16 { id, .. } = root else {
@@ -902,6 +1054,191 @@ mod tests {
                     )
                     .unwrap();
                 assert!(engine.mutable_u16_backing(id, &wrong_backing).is_err());
+                for (original_name, wrong_name) in
+                    [("caller_i32", "caller_u32"), ("caller_usize", "caller_u64")]
+                {
+                    let find = |name: &str| {
+                        tcx.hir_body_owners()
+                            .find(|owner| tcx.item_name(owner.to_def_id()).as_str() == name)
+                            .unwrap()
+                            .to_def_id()
+                    };
+                    let own_instance = engine
+                        .resolve_function_item(find(original_name), tcx.mk_args(&[]))
+                        .unwrap();
+                    let wrong_instance = engine
+                        .resolve_function_item(find(wrong_name), tcx.mk_args(&[]))
+                        .unwrap();
+                    let own_body = engine.instantiated_body(own_instance).unwrap();
+                    let wrong_body = engine.instantiated_body(wrong_instance).unwrap();
+                    let local = rustc_middle::mir::Local::from_usize(1);
+                    let ty::Ref(_, slice, _) = own_body.local_decls[local].ty.kind() else {
+                        panic!("reference")
+                    };
+                    let ty::Slice(element) = slice.kind() else {
+                        panic!("slice")
+                    };
+                    let mut memory = Memory::default();
+                    let mut conditions = Vec::new();
+                    let root = engine
+                        .mutable_u16_input(*element, &mut memory, &mut conditions)
+                        .unwrap();
+                    assert!(
+                        engine
+                            .mutable_u16_matches(own_body.local_decls[local].ty, 0, &memory, true)
+                            .unwrap()
+                    );
+                    assert!(
+                        !engine
+                            .mutable_u16_matches(wrong_body.local_decls[local].ty, 0, &memory, true)
+                            .unwrap()
+                    );
+                    let certificate = memory.mutable_u16[0].certificate;
+                    let old_certificate = engine.mutable_integer_types[certificate].clone();
+                    engine.mutable_integer_types[certificate].bytes = 0;
+                    assert!(engine.mutable_u16_backing(0, &memory).is_err());
+                    engine.mutable_integer_types[certificate] = old_certificate.clone();
+                    engine.mutable_integer_types[certificate].alignment = 0;
+                    assert!(engine.mutable_u16_backing(0, &memory).is_err());
+                    engine.mutable_integer_types[certificate] = old_certificate;
+                    let mut state = State {
+                        locals: vec![None; wrong_body.local_decls.len()],
+                        addresses: vec![None; wrong_body.local_decls.len()],
+                        conditions,
+                        memory,
+                        missing_places: Default::default(),
+                    };
+                    state.locals[1] = Some(root);
+                    let bits = u32::from(tcx.sess.target.pointer_width);
+                    state.locals[2] = Some(symbolic::integer(&engine.terms, 0, bits, false));
+                    let ty::Ref(_, wrong_slice, _) = wrong_body.local_decls[local].ty.kind() else {
+                        panic!("reference")
+                    };
+                    let ty::Slice(wrong_element) = wrong_slice.kind() else {
+                        panic!("slice")
+                    };
+                    let (width, signed) = engine.integer_type(*wrong_element).unwrap();
+                    state.locals[3] = Some(symbolic::integer(&engine.terms, 17, width, signed));
+                    let (block, instance) = wrong_body
+                        .basic_blocks
+                        .iter_enumerated()
+                        .find_map(|(block, data)| {
+                            if let TerminatorKind::Call { func, .. } = &data.terminator().kind
+                                && let ty::FnDef(id, args) =
+                                    func.ty(&wrong_body.local_decls, tcx).kind()
+                                && tcx.item_name(*id).as_str().starts_with("child_")
+                            {
+                                Some((
+                                    block,
+                                    engine
+                                        .resolve_function_item(*id, args.skip_binder())
+                                        .unwrap(),
+                                ))
+                            } else {
+                                None
+                            }
+                        })
+                        .unwrap();
+                    let TerminatorKind::Call {
+                        args,
+                        destination,
+                        target,
+                        ..
+                    } = &wrong_body.basic_blocks[block].terminator().kind
+                    else {
+                        panic!("call")
+                    };
+                    let before = state.memory.mutable_u16[0].data.clone();
+                    assert!(
+                        engine
+                            .mutable_u16_child_call(
+                                &mut state,
+                                super::super::mutable_u16_children::ChildCall {
+                                    body: &wrong_body,
+                                    block,
+                                    instance,
+                                    args,
+                                    destination: *destination,
+                                    target: *target,
+                                    stack: &[],
+                                    site: (wrong_instance.def_id(), rustc_span::DUMMY_SP),
+                                }
+                            )
+                            .is_err()
+                    );
+                    assert_eq!(state.memory.mutable_u16[0].data, before);
+                    assert_eq!(
+                        state.memory.mutable_u16[0].phase,
+                        super::super::mutable_u16_children::Phase::Idle
+                    );
+                    let place = Place {
+                        local,
+                        projection: tcx.mk_place_elems(&[ProjectionElem::Deref]),
+                    };
+                    let destination = Place::from(rustc_middle::mir::Local::from_usize(4));
+                    let value = Rvalue::Ref(
+                        tcx.lifetimes.re_erased,
+                        BorrowKind::Mut {
+                            kind: rustc_middle::mir::MutBorrowKind::Default,
+                        },
+                        place,
+                    );
+                    let occurrence = StatementKind::Assign(Box::new((destination, value)));
+                    let StatementKind::Assign(assignment) = &occurrence else {
+                        panic!("assign")
+                    };
+                    assert!(
+                        engine
+                            .mutable_u16_stage(
+                                &wrong_body,
+                                &mut state,
+                                destination,
+                                &assignment.1,
+                                &occurrence
+                            )
+                            .is_err()
+                    );
+                    let len = engine
+                        .resolve_function_item(
+                            tcx.lang_items().get(LangItem::SliceLen).unwrap(),
+                            tcx.mk_args(&[(*wrong_element).into()]),
+                        )
+                        .unwrap();
+                    let metadata = Value::MutableU16 {
+                        id: 0,
+                        role: MutableU16Role::Metadata { generation: 0 },
+                    };
+                    assert!(
+                        engine
+                            .builtin(
+                                &wrong_body,
+                                len,
+                                std::slice::from_ref(&metadata),
+                                std::slice::from_ref(&metadata),
+                                &mut state,
+                                rustc_span::DUMMY_SP
+                            )
+                            .is_err()
+                    );
+                    let mut ghost = engine
+                        .mutable_u16_snapshot(state.locals[1].as_ref().unwrap(), &state.memory)
+                        .unwrap();
+                    let Value::MutableU16 {
+                        role: MutableU16Role::Ghost { element, .. },
+                        ..
+                    } = &mut ghost
+                    else {
+                        panic!("ghost")
+                    };
+                    *element = symbolic::ScalarSliceElement::Integer {
+                        bits: width,
+                        signed,
+                    };
+                    // i32/u32 share width; usize/u64 share codec. Original types still differ.
+                    if original_name == "caller_i32" {
+                        assert!(engine.mutable_u16_snapshot(&ghost, &state.memory).is_err());
+                    }
+                }
                 self.checked = true;
                 rustc_driver::Compilation::Stop
             }
@@ -915,10 +1252,56 @@ mod tests {
         std::fs::write(
             &source,
             r#"#![no_std]
-pub fn shared(values: &[u16]) -> usize { values.len() }
-pub fn scalar(word: u16) -> u16 { word ^ 0 }
+#[inline(never)]
+pub fn child_i32(values: &mut [i32], index: usize, word: i32) {
+    if index < values.len() {
+        values[index] = word;
+    }
+}
+#[inline(never)]
+pub fn child_u32(values: &mut [u32], index: usize, word: u32) {
+    if index < values.len() {
+        values[index] = word;
+    }
+}
+#[inline(never)]
+pub fn child_usize(values: &mut [usize], index: usize, word: usize) {
+    if index < values.len() {
+        values[index] = word;
+    }
+}
+#[inline(never)]
+pub fn child_u64(values: &mut [u64], index: usize, word: u64) {
+    if index < values.len() {
+        values[index] = word;
+    }
+}
+pub fn caller_i32(values: &mut [i32], index: usize, word: i32) {
+    child_i32(values, index, word);
+    let _ = values.len();
+}
+pub fn caller_u32(values: &mut [u32], index: usize, word: u32) {
+    child_u32(values, index, word);
+    let _ = values.len();
+}
+pub fn caller_usize(values: &mut [usize], index: usize, word: usize) {
+    child_usize(values, index, word);
+    let _ = values.len();
+}
+pub fn caller_u64(values: &mut [u64], index: usize, word: u64) {
+    child_u64(values, index, word);
+    let _ = values.len();
+}
+pub fn shared(values: &[u16]) -> usize {
+    values.len()
+}
+pub fn scalar(word: u16) -> u16 {
+    word ^ 0
+}
 pub fn probe(values: &mut [u16], index: usize, word: u16) {
-    if index < values.len() { values[index] = word; }
+    if index < values.len() {
+        values[index] = word;
+    }
 }
 "#,
         )

@@ -452,6 +452,7 @@ mod tests {
                     resolved_contracts: BTreeMap::new(),
                     solver: std::cell::RefCell::new(Solver::with_limits(limits)),
                     mutable_u16_frames: Default::default(),
+                    mutable_integer_types: Vec::new(),
                     mutable_u16_staging: Default::default(),
                     coroutine_places: Default::default(),
                     bodies: std::cell::RefCell::new(std::collections::HashMap::new()),

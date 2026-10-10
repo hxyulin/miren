@@ -969,6 +969,23 @@
       "expected": "unknown",
       "unknown_reason": "owned nominal Box payload requires Copy, Freeze and no drop glue",
       "unknown_category": "semantics"
+    },
+    {
+      "entry": "integer_slice_child_call",
+      "family": "mutable_integer_child",
+      "expected": "proved"
+    },
+    {
+      "entry": "integer_slice_child_wrong_claim",
+      "family": "mutable_integer_child",
+      "expected": "refuted"
+    },
+    {
+      "entry": "integer_slice_nested_unknown",
+      "family": "mutable_integer_child",
+      "expected": "unknown",
+      "unknown_reason": "integer_slice_nested bb0: mutable integer staging needs a pending child",
+      "unknown_category": "semantics"
     }
   ]
 }

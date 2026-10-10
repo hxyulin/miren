@@ -2325,3 +2325,51 @@ global pairs, 702 normalized proof objects match exactly. Two query-free 30-seco
 resource refusals differ only in their active call-stack context and are explicitly recorded.
 All 831 tracked files are byte-identical between main and the isolated workspace. Checks and
 ledgers retain their precise scopes under `/tmp/miren-stage190-*`.
+
+Stage 191 extends the one incoming mutable-slice and whole-child protocol to exact signed
+i8/i16/i32/i64/i128/isize and unsigned u16/u32/u64/u128/usize elements. Each backing carries an
+immutable issued original element type, scalar codec and compiler byte-size/alignment certificate.
+Reads, stores, selected child signatures, reborrow staging, SliceLen and PtrMetadata correlate
+that exact type; matching SMT widths cannot substitute i32/u32 or target usize/u64 identity.
+Detached Ghost observations retain frozen data, length and their issued certificate without
+live read, write or borrowing authority.
+
+Actual safe scalar descendants and complete core metadata bodies remain required. Existing
+source initialization, generation, ancestor Weak Body stack, normal-return ownership and combined
+512-storage/body-work budgets remain. u8 keeps its existing byte-model priority; Bool, Char,
+Float, nominal elements and competing, split, shared or escaping leases remain UNKNOWN. No input
+caps, new assumptions, hardware policies, firmware changes or increased limits are introduced.
+
+The 113-root dedicated matrix yields 66 PROVED, 22 REFUTED and 25 UNKNOWN in each host/ARM O0/O2
+profile. The identical sources under committed Stage 190 yield six PROVED, two REFUTED and
+105 UNKNOWN; existing u16 controls were already supported. Changing the actual noinline i32
+helper from word ^ 0 to word ^ 1 refutes the unchanged selected assertion with an actual helper
+body entry and query/model on the failing obligation. Safe native originals pass two tests;
+unchanged mutation guards exit 101 at O0/O2 with ten-second timeouts. Auxiliary evidence covers
+explicit mir-opt-level-zero staging, unwind refusal and genuine retained/omitted foreign helper
+MIR. Actual-parent captures are at `/tmp/miren-stage191-parent190-final-evidence`.
+
+Historical actual-189 sources, binary and captures retain their original scope. A narrow wording
+fix labels non-u16 Pending staging failures as mutable integer failures using the issued original
+type; all u16 details remain unchanged. Forty query-free detail changes versus the prior author
+binary are explicitly recorded, with no outcome, query, model or protocol change. Fresh fidelity
+preserves all 232 old entry/profile pairs and completed queries, and all 84 old u16 child proof
+objects are deeply identical. Compiler negatives exercise wrong original child/staging/metadata
+types, layout, width/sign, codec, context and detached Ghost controls.
+
+Global controls add an i32 child assertion, its wrong claim and a nested-child UNKNOWN frontier.
+The actual scalar-helper mutation refutes the original assertion and fails its native guard.
+Saved before/after evidence is at `/tmp/miren-stage191-global-before-evidence` and
+`/tmp/miren-stage191-parent190-global-after-evidence`.
+The manifest now has 179 cases in 61 families.
+
+Root validation passes 775 workspace Rust tests and 87 focused Rust tests, with 68 Python
+checks in each workspace. Formatting, Clippy, debug/release builds, deny, docs and manual hooks
+pass. The fresh main release matches 480 dedicated proof objects and 966 queries, plus 16 new
+global proof objects and 32 queries. Native executions explicitly retain their actual-parent
+author scope. All 528 previously completed global pairs preserve status, inputs, models, premises
+and obligation queries; append-only replay fingerprints are excluded from that historical
+comparison. Of 716 current global pairs, 715 normalized proof objects match exactly. One query-free
+30-second UNKNOWN resource refusal differs only in active call-stack context and is recorded.
+All 834 tracked files are byte-identical between main and the isolated workspace. Checks and
+ledgers retain their precise scopes under `/tmp/miren-stage191-*`.

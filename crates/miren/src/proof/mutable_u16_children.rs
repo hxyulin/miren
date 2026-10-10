@@ -144,7 +144,12 @@ impl<'tcx> Engine<'tcx> {
         };
         if !place.projection.is_empty()
             || !matches!(role, MutableU16Role::Root | MutableU16Role::Child { .. })
-            || !self.mutable_u16_type(body.local_decls[place.local].ty)
+            || !self.mutable_u16_matches(
+                body.local_decls[place.local].ty,
+                id,
+                &state.memory,
+                true,
+            )?
         {
             return Ok(None);
         }
@@ -166,7 +171,8 @@ impl<'tcx> Engine<'tcx> {
         self.check_local_initialization(state, local, &[])?;
         let backing = self.mutable_u16_backing(id, &state.memory)?;
         let Phase::Pending { certificate } = backing.phase else {
-            return Err(self.mutable_u16_child_error("mutable u16 staging needs a pending child"));
+            let detail = self.mutable_integer_pending_message(backing.certificate)?;
+            return Err(self.mutable_u16_child_error(detail));
         };
         let certificates = self.mutable_u16_staging.borrow();
         let certificate = certificates
@@ -215,8 +221,18 @@ impl<'tcx> Engine<'tcx> {
             return Ok(false);
         };
         if source.projection.as_ref() != [ProjectionElem::Deref]
-            || !self.mutable_u16_type(body.local_decls[source.local].ty)
-            || !self.mutable_u16_type(body.local_decls[destination.local].ty)
+            || !self.mutable_u16_matches(
+                body.local_decls[source.local].ty,
+                id,
+                &state.memory,
+                true,
+            )?
+            || !self.mutable_u16_matches(
+                body.local_decls[destination.local].ty,
+                id,
+                &state.memory,
+                true,
+            )?
             || !destination.projection.is_empty()
             || destination.local.as_usize() <= body.arg_count
             || state.addresses[destination.local.as_usize()].is_some()
@@ -391,8 +407,13 @@ impl<'tcx> Engine<'tcx> {
             || signature.abi() != rustc_abi::ExternAbi::Rust
             || signature.c_variadic()
             || signature.inputs().len() != args.len()
-            || !self.mutable_u16_type(signature.inputs()[position])
-            || !self.mutable_u16_type(body.local_decls[place.local].ty)
+            || !self.mutable_u16_matches(signature.inputs()[position], id, &state.memory, true)?
+            || !self.mutable_u16_matches(
+                body.local_decls[place.local].ty,
+                id,
+                &state.memory,
+                true,
+            )?
             || signature
                 .inputs()
                 .iter()
@@ -413,6 +434,13 @@ impl<'tcx> Engine<'tcx> {
         let selected = self.instantiated_body(instance)?;
         self.mutable_u16_body_budget(&selected)?;
         if selected.arg_count != args.len()
+            || selected.local_decls.len() <= position + 1
+            || !self.mutable_u16_matches(
+                selected.local_decls[rustc_middle::mir::Local::from_usize(position + 1)].ty,
+                id,
+                &state.memory,
+                true,
+            )?
             || selected
                 .args_iter()
                 .zip(signature.inputs())
@@ -938,6 +966,7 @@ mod tests {
         let mut memory = Memory::default();
         memory.push(Some(Value::Unit));
         std::rc::Rc::make_mut(&mut memory.mutable_u16).push(super::super::mutable_u16::Backing {
+            certificate: 0,
             allocation: 0,
             length: symbolic::integer(&terms, 129, 64, false),
             data: terms

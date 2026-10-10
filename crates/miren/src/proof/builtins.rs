@@ -109,10 +109,35 @@ impl<'tcx> Engine<'tcx> {
                 return Err("slice len receiver is not modeled".to_owned());
             };
             if matches!(receiver, Value::MutableU16 { .. }) {
+                let Value::MutableU16 { id, .. } = receiver else {
+                    return Err("mutable integer length receiver differs".into());
+                };
+                let signature = self
+                    .tcx
+                    .fn_sig(instance.def_id())
+                    .instantiate(self.tcx, instance.args)
+                    .skip_binder();
+                if signature.inputs().len() != 1
+                    || !self.mutable_u16_matches(
+                        signature.inputs()[0],
+                        *id,
+                        &state.memory,
+                        false,
+                    )?
+                {
+                    return Err("mutable integer length changes issued original element".into());
+                }
                 self.certify_mutable_u16_len(instance)?;
+                let unit_element = matches!(signature.inputs()[0].kind(),
+                    ty::Ref(_, inner, _) if matches!(inner.kind(), ty::Slice(element)
+                        if *element == self.tcx.types.u16));
                 self.record_model(
                     callee,
-                    "mutable u16 metadata-only length; actual body certified",
+                    if unit_element {
+                        "mutable u16 metadata-only length; actual body certified"
+                    } else {
+                        "mutable integer metadata-only length; actual body certified"
+                    },
                 );
                 return Ok(Some(self.mutable_u16_length(receiver, &state.memory)?));
             }

@@ -2527,3 +2527,51 @@ mod native_aligned_zero_box {
         aligned_zero_box();
     }
 }
+
+#[inline(never)]
+pub fn integer_slice_child_word(word: i32) -> i32 {
+    word ^ 0
+}
+
+#[inline(never)]
+pub fn integer_slice_child(values: &mut [i32], index: usize, word: i32) {
+    values[index] = integer_slice_child_word(word);
+}
+
+pub fn integer_slice_child_call(values: &mut [i32], index: usize, word: i32) {
+    if index < values.len() {
+        integer_slice_child(values, index, word);
+        assert!(values[index] == word);
+    }
+}
+
+pub fn integer_slice_child_wrong_claim(values: &mut [i32], index: usize, word: i32) {
+    if index < values.len() {
+        integer_slice_child(values, index, word);
+        assert!(values[index] != word);
+    }
+}
+
+#[inline(never)]
+pub fn integer_slice_nested(values: &mut [i32], index: usize, word: i32) {
+    integer_slice_child(values, index, word);
+}
+
+pub fn integer_slice_nested_unknown(values: &mut [i32], index: usize, word: i32) {
+    if index < values.len() {
+        integer_slice_nested(values, index, word);
+        assert!(values[index] == word);
+    }
+}
+
+#[cfg(test)]
+mod native_integer_slice_child {
+    use super::*;
+
+    #[test]
+    fn signed_scalar_body_preserves_word() {
+        let mut values = [0_i32; 129];
+        integer_slice_child_call(&mut values, 128, i32::MIN);
+        assert_eq!(values[128], i32::MIN);
+    }
+}

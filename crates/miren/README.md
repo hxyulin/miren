@@ -1024,3 +1024,16 @@ rounding, power-of-two alignment, nonnull zero-branch sentinel and typed drop ar
 The complete selected zero-size Global branch needs no allocator-success premise. Logical
 region ownership remains separate from numeric dangling addresses; no raw, mutable or shared
 field access is added. Original payload/shape budgets, lifetimes and Unit inline lowering remain.
+
+The same single-root and whole-child protocol also admits original plain signed integer
+slices i8/i16/i32/i64/i128/isize and unsigned u32/u64/u128/usize, alongside u16. Each backing
+is issued with its exact original compiler element type, width, signedness and ABI layout.
+Reads, replacements, staging, selected child signatures and metadata receivers must match
+that certificate; equal SMT sorts do not equate i32 with u32 or usize with a fixed-width type.
+Detached ghosts retain their immutable codec and frozen data without executable authority.
+Current stores preserve exact integer values without truncation, sign conversion or casts.
+Reference extents use the actual element byte size and target usize. Existing u16 formulas
+and the shared storage/frame budgets remain unchanged. The private internal carrier retains
+its historical u16 name; that name adds no rights. u8 keeps its existing byte-model priority;
+Bool, Char, Float, refined aliases and additional spatial/temporal lease features remain
+outside this integer extension.

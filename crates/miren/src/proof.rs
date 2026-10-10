@@ -184,6 +184,7 @@ struct Engine<'tcx> {
     resolved_contracts: BTreeMap<String, DefId>,
     solver: std::cell::RefCell<Solver>,
     mutable_u16_frames: std::cell::RefCell<Vec<std::rc::Weak<Body<'tcx>>>>,
+    mutable_integer_types: Vec<mutable_u16::IntegerCertificate<'tcx>>,
     mutable_u16_staging: std::cell::RefCell<Vec<mutable_u16_children::Staging<'tcx>>>,
     coroutine_places:
         std::cell::RefCell<Vec<(std::rc::Weak<Body<'tcx>>, coroutines::OriginalPlace<'tcx>)>>,
@@ -259,6 +260,7 @@ pub fn verify(
         resolved_contracts: BTreeMap::new(),
         solver: std::cell::RefCell::new(Solver::with_limits(limits)),
         mutable_u16_frames: Default::default(),
+        mutable_integer_types: Vec::new(),
         mutable_u16_staging: Default::default(),
         coroutine_places: Default::default(),
         bodies: std::cell::RefCell::new(std::collections::HashMap::new()),
@@ -404,7 +406,14 @@ impl<'tcx> Engine<'tcx> {
                     return Err("memory allocation budget reached".to_owned());
                 }
                 if mutable_u16_root {
-                    arguments.push(self.mutable_u16_input(&mut memory, &mut conditions)?);
+                    let ty::Slice(original_element) = element.kind() else {
+                        return Err("mutable integer root needs original slice".into());
+                    };
+                    arguments.push(self.mutable_u16_input(
+                        *original_element,
+                        &mut memory,
+                        &mut conditions,
+                    )?);
                     continue;
                 }
                 self.building_mutable_input = true;
@@ -526,8 +535,21 @@ impl<'tcx> Engine<'tcx> {
 
     fn input_binding(&mut self, name: &str, value: &Value) -> Result<(), String> {
         let description = match value {
-            Value::MutableU16 { id, .. } => {
-                format!("single incoming mutable u16 root {id}; full typed extent")
+            Value::MutableU16 { id, role } => {
+                if matches!(
+                    role,
+                    symbolic::MutableU16Role::Ghost {
+                        element: symbolic::ScalarSliceElement::Integer {
+                            bits: 16,
+                            signed: false
+                        },
+                        ..
+                    }
+                ) {
+                    format!("single incoming mutable u16 root {id}; full typed extent")
+                } else {
+                    format!("single incoming mutable integer root {id}; full typed extent")
+                }
             }
             Value::OwnedRegion { .. } | Value::OwnedSnapshot(_) => {
                 return Err("owned regions require their private typed protocol".into());

@@ -276,6 +276,7 @@ mod tests {
                     owned_box_types: Vec::new(),
                     next_owned_region: 0,
                     owned_box_constructors: Vec::new(),
+                    mutable_integer_types: Vec::new(),
                     mutable_u16_staging: std::cell::RefCell::new(Vec::new()),
                     mutable_u16_frames: std::cell::RefCell::new(Vec::new()),
                     bodies: std::cell::RefCell::new(std::collections::HashMap::new()),

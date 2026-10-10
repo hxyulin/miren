@@ -53,10 +53,21 @@ pub enum OwnedRegionKind {
 #[derive(Clone, Debug)]
 pub enum MutableU16Role {
     Root,
-    Metadata { generation: u64 },
-    Child { generation: u64 },
-    ChildMetadata { generation: u64 },
-    Ghost { length: Box<Value>, data: Term },
+    Metadata {
+        generation: u64,
+    },
+    Child {
+        generation: u64,
+    },
+    ChildMetadata {
+        generation: u64,
+    },
+    Ghost {
+        certificate: usize,
+        element: ScalarSliceElement,
+        length: Box<Value>,
+        data: Term,
+    },
 }
 
 #[derive(Clone, Debug)]
