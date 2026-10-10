@@ -4344,3 +4344,33 @@ identical status, obligation details and query text across four profiles. Indepe
 approves final source, actual getter mutation, valid native evidence and 48 entry/profile
 comparisons of old paths. Initial obsolete model-label failures remain preserved. No assumptions,
 input caps or resource-budget changes are introduced.
+
+
+## Stage 173: concrete assignment storage boundary
+
+Assignment evaluation and storage dispatch were interleaved in the statement walker. A concrete
+`store_assignment_value` method now owns the existing destination validators and writer selection.
+The statement evaluates its rvalue once before calling this method. Validation order, original
+writer precedence, exact unsupported-index fallback and same-owner transactions remain unchanged.
+All eight function-result stores retain their prior policy during this representation refactor.
+
+The initial frozen Stage 171 comparison passes lint and twelve related compiler tests. Its survey
+retains 200 PROVED, 176 REFUTED and 124 UNKNOWN. All 376 completed parent roots retain identical
+status, obligation details and query text across host/ARM O0/O2. Independent review checks the
+extracted statement body and unchanged call branches. Evidence remains at
+`/tmp/miren-stage173-preparent-checks` and
+`/tmp/miren-stage173-preparent-existing-query-comparison.json`.
+Final required validation is recorded below. This stage is independent of the separate
+composite comparison implementation.
+
+
+Final frozen validation passes all 698 Rust tests and 68 Python tests in the isolated workspace.
+All 636 tracked main files match that snapshot byte for byte. Fresh main debug/release builds,
+twelve related integration tests, 68 Python tests and every remaining required check pass. Both
+surveys retain 200 PROVED, 176 REFUTED and 124 UNKNOWN with source/input/release hashes verified at
+`/tmp/miren-stage173-capabilities-20261010` and
+`/tmp/miren-stage173-merged-capabilities-20261010`. All 376 completed parent roots retain identical
+status, obligation details and query text. All 500 main/isolate selected results, queries, models
+and premises match. Independent review approves the exact extraction and unchanged call stores.
+No assumptions, input caps or resource-budget changes are introduced. Stage 173 follows Stage 171;
+composite comparison Stage 172 remains an independent implementation.

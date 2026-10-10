@@ -1634,44 +1634,7 @@ impl<'tcx> Engine<'tcx> {
             StatementKind::Assign(assignment) => {
                 let (place, value) = assignment.as_ref();
                 let value = self.rvalue(id, body, state, value)?;
-                self.validate_maybe_uninit_value(
-                    place.ty(&body.local_decls, self.tcx).ty,
-                    &value,
-                    &state.conditions,
-                )?;
-                self.validate_readonly_slice_value(
-                    place.ty(&body.local_decls, self.tcx).ty,
-                    &value,
-                    &state.memory,
-                    &state.conditions,
-                )?;
-                if self.restricted_scalar_target(place.ty(&body.local_decls, self.tcx).ty) {
-                    self.prove_scalar_target(
-                        place.ty(&body.local_decls, self.tcx).ty,
-                        &value,
-                        &state.conditions,
-                    )?;
-                }
-                if self.write_owned_array_element(body, state, *place, &value)? {
-                    Ok(())
-                } else if self.known_owned_array_write_candidate(body, *place)
-                    || self.owned_field_array_write_candidate(body, *place)
-                {
-                    match self.write(state, *place, value.clone()) {
-                        Err(error) if typed_array_choices::known_owned_write_frontier(&error) => {
-                            if self.write_known_owned_array_element(body, state, *place, &value)?
-                                || self.write_owned_field_array(body, state, *place, &value)?
-                            {
-                                Ok(())
-                            } else {
-                                Err(error)
-                            }
-                        }
-                        result => result,
-                    }
-                } else {
-                    self.write(state, *place, value)
-                }
+                self.store_assignment_value(body, state, *place, value)
             }
             StatementKind::SetDiscriminant {
                 place,
@@ -1690,6 +1653,53 @@ impl<'tcx> Engine<'tcx> {
             | StatementKind::PlaceMention(_)
             | StatementKind::BackwardIncompatibleDropHint { .. } => Ok(()),
             other => Err(format!("unsupported statement {other:?}")),
+        }
+    }
+
+    fn store_assignment_value(
+        &mut self,
+        body: &Body<'tcx>,
+        state: &mut State,
+        place: Place<'tcx>,
+        value: Value,
+    ) -> Result<(), String> {
+        self.validate_maybe_uninit_value(
+            place.ty(&body.local_decls, self.tcx).ty,
+            &value,
+            &state.conditions,
+        )?;
+        self.validate_readonly_slice_value(
+            place.ty(&body.local_decls, self.tcx).ty,
+            &value,
+            &state.memory,
+            &state.conditions,
+        )?;
+        if self.restricted_scalar_target(place.ty(&body.local_decls, self.tcx).ty) {
+            self.prove_scalar_target(
+                place.ty(&body.local_decls, self.tcx).ty,
+                &value,
+                &state.conditions,
+            )?;
+        }
+        if self.write_owned_array_element(body, state, place, &value)? {
+            Ok(())
+        } else if self.known_owned_array_write_candidate(body, place)
+            || self.owned_field_array_write_candidate(body, place)
+        {
+            match self.write(state, place, value.clone()) {
+                Err(error) if typed_array_choices::known_owned_write_frontier(&error) => {
+                    if self.write_known_owned_array_element(body, state, place, &value)?
+                        || self.write_owned_field_array(body, state, place, &value)?
+                    {
+                        Ok(())
+                    } else {
+                        Err(error)
+                    }
+                }
+                result => result,
+            }
+        } else {
+            self.write(state, place, value)
         }
     }
 
