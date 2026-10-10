@@ -887,8 +887,23 @@
     {
       "entry": "nominal_float_array_unknown",
       "family": "nominal_array_predicates",
+      "expected": "proved"
+    },
+    {
+      "entry": "nominal_primitive_array_predicates",
+      "family": "nominal_primitive_array_predicates",
+      "expected": "proved"
+    },
+    {
+      "entry": "nominal_primitive_array_wrong_claim",
+      "family": "nominal_primitive_array_predicates",
+      "expected": "refuted"
+    },
+    {
+      "entry": "nominal_reference_array_unknown",
+      "family": "nominal_primitive_array_predicates",
       "expected": "unknown",
-      "unknown_reason": "nominal comparison array requires exact integer children",
+      "unknown_reason": "only read-only byte slices and byte arrays are modeled",
       "unknown_category": "semantics"
     }
   ]

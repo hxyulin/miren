@@ -154,10 +154,6 @@ fn verify(
                 )
             } else {
                 match *name {
-                    "floating" | "bool_arrays" | "char_arrays" => (
-                        UnknownCategory::Semantics,
-                        "nominal comparison array requires exact integer children",
-                    ),
                     "vacant_ref" | "vacant_core" | "vacant_pat" | "mutable_root" => (
                         UnknownCategory::Semantics,
                         "only read-only byte slices and byte arrays are modeled",
@@ -199,6 +195,9 @@ fn verify(
                     | "different_views"
                     | "wrong_views"
                     | "float_sibling_self"
+                    | "floating"
+                    | "bool_arrays"
+                    | "char_arrays"
                     | "external_empty"
                     | "external_mismatch"
             ) {
@@ -290,9 +289,9 @@ fn integer_array_child_comparers_and_missing_external_bodies_are_certified() {
         ("wrong_claim", ProofStatus::Refuted),
         ("wrong_views", ProofStatus::Refuted),
         ("float_sibling_self", ProofStatus::Refuted),
-        ("floating", ProofStatus::Unknown),
-        ("bool_arrays", ProofStatus::Unknown),
-        ("char_arrays", ProofStatus::Unknown),
+        ("floating", ProofStatus::Proved),
+        ("bool_arrays", ProofStatus::Proved),
+        ("char_arrays", ProofStatus::Proved),
         ("vacant_ref", ProofStatus::Unknown),
         ("vacant_core", ProofStatus::Unknown),
         ("vacant_pat", ProofStatus::Unknown),

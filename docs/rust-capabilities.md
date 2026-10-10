@@ -11,8 +11,8 @@ execution at O0 and O2, positive/refuted/unknown controls, a source mutation tha
 structured UNKNOWN reporting, and passing repository checks. Completion establishes a repeatable
 baseline. It does not establish full Rust support or a completed memory-model refactor.
 
-The manifest contains 161 cases across 55 families. Each build configuration expects 63 PROVED,
-56 REFUTED and 42 UNKNOWN results. Stage 133 originally had 23 cases with 10 PROVED, 9 REFUTED
+The manifest contains 164 cases across 56 families. Each build configuration expects 65 PROVED,
+57 REFUTED and 42 UNKNOWN results. Stage 133 originally had 23 cases with 10 PROVED, 9 REFUTED
 and 4 UNKNOWN; stage 134 closed its retained-prefix projection gap. Stage 136 adds raw-pointer
 metadata P/R controls and a safe core reference-array grant that remains UNKNOWN without a
 temporal permission certificate. Stage 137 adds tuple-array P/R and unsupported symbolic-write
@@ -823,3 +823,46 @@ release captures are at `/tmp/miren-stage186-global-final-evidence`. Dedicated h
 preserves 172 unchanged outcome pairs and all 216 previous queries, including the four prefixes
 on advanced roots. Parent adoption preserves original fixtures and the archived evidence scope.
 No assumptions or resource budget changes are introduced.
+
+
+Stage 187 extends nominal whole-array child comparisons to exact Bool, Char, f32 and f64 leaves.
+Original child validation beneath zero lengths, typed logical paths, layout, Copy/Freeze/noDrop,
+expanded-node budgets and actual selected core body/effect/totality certificates remain required.
+Float equality stays numeric: NaN is nonreflexive and opposite signed zeros compare equal. Float
+bitwise comparison remains excluded. Char values retain decoded Unicode validity requirements.
+No nominal MIR Index, Cast, loop, raw transport or new permission is admitted.
+
+The dedicated 27-root matrix yields seventeen PROVED, four REFUTED and six UNKNOWN per host/ARM
+O0/O2 profile. Unrestricted f32/f64 self-equality claims refute; signed-zero and non-NaN membership
+controls prove. Genuine omitted external comparer bodies remain MissingCompilerEvidence before
+empty/mismatch shortcuts. An actual Bool-leaf helper mutation refutes the unchanged claim with
+body entry and query/model; a malformed comparer remains UNKNOWN. Native originals pass five
+tests and the mutant exits 101 at O0/O2 with ten-second limits. Current captures are
+`/tmp/miren-stage187-final-evidence`; exact-source before captures under committed Stage 186
+are `/tmp/miren-stage187-before-final-source`.
+
+Historical fidelity preserves 324 unchanged outcome/detail pairs, including 248 completed roots
+(160 query-bearing and 88 query-free), and all 364 completed queries. Three unchanged older
+primitive-array functions advance to PROVED. The old global Float-array function also becomes
+PROVED: it returns the numeric comparison result, without asserting universal reflexivity.
+Harness upkeep changes only those expectations and pins their actual full-domain equality model;
+original fixtures stay unchanged. Global controls, actual-helper mutation and native guard are at
+`/tmp/miren-stage187-global-after-evidence`. Unsupported reference children beneath zero lengths
+remain UNKNOWN. The combined manifest has 164 cases in 56 families.
+
+Scratch native evidence uses finite length129. A linear maximum-length zero-sized equality probe
+timed out; its source claim remains unchanged. The initial timeout handler did not save its output
+streams, and no native maximum-length success is claimed. Preparation records retain that limit
+at `/tmp/miren-stage187-prep`. No assumptions, input caps, firmware rewrites or resource budget
+increases are introduced.
+
+Final isolated validation passes 755 Rust tests and 68 Python tests; fresh-main focused validation
+passes 54 Rust tests and 68 Python tests. Formatting, lint, debug/release builds, dependency denial,
+documentation and manual hooks pass in both. All 816 tracked files match byte for byte. Both
+surveys yield 260 PROVED, 228 REFUTED and 168 UNKNOWN across four profiles. All 476 previously
+completed roots retain identical outcomes, obligation details, queries, models and premises;
+all 656 main/isolate results match with no diagnostic context differences. Fresh main release
+captures at `/tmp/miren-stage187-main-release-final-evidence` match 128 complete original/mutant
+proof objects and 248 queries after explicit source/replay path mappings. Global release captures
+at `/tmp/miren-stage187-global-final-evidence` match 20 proof objects and 80 queries. Native records
+retain their original execution scope. Source, input and release hashes are verified.

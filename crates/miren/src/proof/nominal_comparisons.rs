@@ -306,8 +306,8 @@ impl<'tcx> Engine<'tcx> {
             return Ok(());
         }
         if let ty::Array(child, count) = original.kind() {
-            if !integer_array_child(*child, depth + 1) {
-                return Err("nominal comparison array requires exact integer children".into());
+            if !primitive_array_child(*child, depth + 1) {
+                return Err("nominal comparison array requires exact primitive children".into());
             }
             let count = count
                 .try_to_target_usize(self.tcx)
@@ -355,13 +355,14 @@ impl<'tcx> Engine<'tcx> {
     }
 }
 
-fn integer_array_child(original: Ty<'_>, depth: usize) -> bool {
+fn primitive_array_child(original: Ty<'_>, depth: usize) -> bool {
     if depth >= 16 {
         return false;
     }
     match original.kind() {
-        ty::Int(_) | ty::Uint(_) => true,
-        ty::Array(child, _) => integer_array_child(*child, depth + 1),
+        ty::Bool | ty::Char | ty::Int(_) | ty::Uint(_) => true,
+        ty::Float(ty::FloatTy::F32 | ty::FloatTy::F64) => true,
+        ty::Array(child, _) => primitive_array_child(*child, depth + 1),
         _ => false,
     }
 }
@@ -755,6 +756,20 @@ mod tests {
                         replay_inputs: None,
                     },
                 };
+                for original in [
+                    tcx.types.bool,
+                    tcx.types.char,
+                    tcx.types.f32,
+                    tcx.types.f64,
+                    tcx.types.i16,
+                    tcx.types.u16,
+                ] {
+                    assert!(primitive_array_child(original, 0));
+                    assert!(!primitive_array_child(original, 16));
+                }
+                for original in [tcx.types.f16, tcx.types.f128, tcx.types.str_] {
+                    assert!(!primitive_array_child(original, 0));
+                }
                 let eq = tcx
                     .get_diagnostic_item(rustc_span::Symbol::intern("cmp_partialeq_eq"))
                     .unwrap();
@@ -766,7 +781,9 @@ mod tests {
                     ("nested", true),
                     ("integer_arrays", true),
                     ("vacant_array", true),
-                    ("noninteger_array", false),
+                    ("primitive_arrays", true),
+                    ("vacant_primitives", true),
+                    ("nonprimitive_array", false),
                     ("wrong_array", false),
                     ("zero", true),
                     ("wrong", false),
@@ -834,6 +851,35 @@ mod tests {
                                 )
                                 .is_err()
                         );
+                    }
+                    if name == "primitive_arrays" || name == "vacant_primitives" {
+                        let mut leaves = Vec::new();
+                        let mut nodes = 0;
+                        engine
+                            .nominal_comparison_leaves(
+                                original,
+                                &mut Vec::new(),
+                                &mut leaves,
+                                0,
+                                &mut nodes,
+                                true,
+                            )
+                            .unwrap();
+                        if name == "primitive_arrays" {
+                            assert_eq!(nodes, 17);
+                            assert_eq!(leaves.len(), 10);
+                            assert_eq!(
+                                leaves[4],
+                                vec![LeafStep::Field(1), LeafStep::ArrayElement(0)]
+                            );
+                            assert_eq!(
+                                leaves[9],
+                                vec![LeafStep::Field(3), LeafStep::ArrayElement(1)]
+                            );
+                        } else {
+                            assert_eq!(nodes, 7);
+                            assert!(leaves.is_empty());
+                        }
                     }
                     if name == "record" {
                         let fields = engine.nominal_comparison_fields(original).unwrap().unwrap();
@@ -945,7 +991,13 @@ mod tests {
 #[derive(Clone, Copy, PartialEq)] pub struct Zero;
 #[derive(Clone, Copy, PartialEq)] pub struct IntegerArrays { arrays: [[i16; 2]; 2], flag: bool }
 #[derive(Clone, Copy, PartialEq)] pub struct VacantArray { arrays: [[u16; 0]; 2] }
-#[derive(Clone, Copy, PartialEq)] pub struct NonintegerArray { array: [f32; 0] }
+#[derive(Clone, Copy, PartialEq)] pub struct PrimitiveArrays {
+    flags: [[bool; 2]; 2], characters: [char; 2], singles: [f32; 2], doubles: [f64; 2]
+}
+#[derive(Clone, Copy, PartialEq)] pub struct VacantPrimitives {
+    flags: [bool; 0], characters: [char; 0], floats: [f64; 0]
+}
+#[derive(Clone, Copy, PartialEq)] pub struct NonprimitiveArray { array: [Option<u16>; 0] }
 #[derive(Clone, Copy)] pub struct WrongArray { left: [u16; 2], right: [u16; 2] }
 impl PartialEq for WrongArray {
     fn eq(&self, other: &Self) -> bool { self.left == other.left && self.right == other.left }
@@ -960,7 +1012,8 @@ impl PartialEq for Missing { fn eq(&self, other: &Self) -> bool { self.left == o
 #[derive(Clone, Copy)] pub struct PanicEq;
 impl PartialEq for PanicEq { fn eq(&self, _: &Self) -> bool { panic!("effect") } }
 pub fn integer_arrays(_: IntegerArrays) {} pub fn vacant_array(_: VacantArray) {}
-pub fn noninteger_array(_: NonintegerArray) {} pub fn wrong_array(_: WrongArray) {}
+pub fn primitive_arrays(_: PrimitiveArrays) {} pub fn vacant_primitives(_: VacantPrimitives) {}
+pub fn nonprimitive_array(_: NonprimitiveArray) {} pub fn wrong_array(_: WrongArray) {}
 pub fn record(_: Record) {} pub fn nested(_: Nested) {} pub fn zero(_: Zero) {}
 pub fn wrong(_: Wrong) {} pub fn missing(_: Missing) {} pub fn panic_eq(_: PanicEq) {}
 "#,

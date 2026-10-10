@@ -2285,3 +2285,71 @@ mod native_nominal_array_predicates {
         nominal_array_wrong_claim(&[value; 129], 128);
     }
 }
+
+#[derive(Clone, Copy, PartialEq)]
+pub struct ComparedPrimitiveArrays {
+    flags: [bool; 2],
+    characters: [char; 2],
+    numbers: [f32; 2],
+}
+
+#[inline(never)]
+fn primitive_array_selected(
+    values: &[ComparedPrimitiveArrays],
+    index: usize,
+) -> ComparedPrimitiveArrays {
+    let mut selected = values[index];
+    selected.flags[0] ^= false;
+    selected
+}
+
+pub fn nominal_primitive_array_predicates(values: &[ComparedPrimitiveArrays], index: usize) {
+    if index < values.len()
+        && !values[index].numbers[0].is_nan()
+        && !values[index].numbers[1].is_nan()
+    {
+        assert!(values.contains(&primitive_array_selected(values, index)));
+    }
+}
+
+pub fn nominal_primitive_array_wrong_claim(values: &[ComparedPrimitiveArrays], index: usize) {
+    if index < values.len()
+        && !values[index].numbers[0].is_nan()
+        && !values[index].numbers[1].is_nan()
+    {
+        assert!(!values.contains(&primitive_array_selected(values, index)));
+    }
+}
+
+#[derive(Clone, Copy, PartialEq)]
+pub struct ComparedReferenceArray<'a> {
+    references: [&'a u16; 0],
+}
+
+pub fn nominal_reference_array_unknown(values: &[ComparedReferenceArray<'_>]) -> bool {
+    values == values
+}
+
+#[cfg(test)]
+mod native_primitive_array_predicates {
+    use super::*;
+
+    fn values() -> [ComparedPrimitiveArrays; 129] {
+        [ComparedPrimitiveArrays {
+            flags: [true, false],
+            characters: ['A', '\u{10FFFF}'],
+            numbers: [0.0, -0.0],
+        }; 129]
+    }
+
+    #[test]
+    fn selected_primitive_body_preserves_member() {
+        nominal_primitive_array_predicates(&values(), 128);
+    }
+
+    #[test]
+    #[should_panic]
+    fn false_primitive_claim_panics() {
+        nominal_primitive_array_wrong_claim(&values(), 128);
+    }
+}

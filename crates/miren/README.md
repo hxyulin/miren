@@ -911,7 +911,7 @@ counters. Certificates are rechecked against the selected instantiated MIR witho
 The slice source and comparator certificate are checked before empty or unequal-length shortcuts.
 Float fields retain numeric NaN and signed-zero semantics; Char observations retain their existing
 Unicode validation. Struct carriers must match exact nominal identity, field order and primitive
-width, signedness, sort and context. Noninteger array-field comparers, aggregate-to-integer casts
+width, signedness, sort and context. Ineligible array-field comparers, aggregate-to-integer casts
 and effects outside the certificate grammar remain UNKNOWN. Actual invoked
 missing helpers remain UNKNOWN; their diagnostic does not stand in for a missing comparator body.
 Existing finite custom-comparison calls still execute their actual bodies. The certificate supplies
@@ -952,7 +952,16 @@ array-element paths. Whole-array child calls must pass their actual selected cor
 certificate before supplying a conjunction or excluding cleanup. Every occurrence is charged
 against the existing expanded type budget, including vacant arrays and their original children.
 Nested signed/unsigned integer arrays retain the existing count128, depth16 and node512 bounds.
-Nominal MIR indexing, casts, loops and raw transports remain unsupported; Float, Bool and Char
-array children are outside this extension. Scalar Float and Char siblings keep numeric equality
-and decoded observation semantics. Missing bodies and unsupported original N0 children remain
-unknown before empty or zero-field shortcuts.
+Nominal MIR indexing, casts, loops and raw transports remain unsupported. The initial integer-
+array increment excluded Float, Bool and Char array children. Scalar Float and Char siblings keep
+numeric equality and decoded observation semantics. Missing bodies and unsupported original N0
+children remain unknown before empty or zero-field shortcuts.
+
+Nominal whole-array child comparers also admit exact Bool, Char, f32 and f64 leaves through
+recursive fixed arrays. The complete selected core body, original type, layout and effect
+certificate remains mandatory before any conjunction or empty shortcut. Numeric Float equality
+preserves NaN inequality and signed-zero equality; Float arrays do not acquire bitwise comparison
+eligibility. Char leaves reuse validated decoded Unicode observations. Every original child,
+including a vacant array's child, retains the existing expanded type budgets. This adds no nominal
+MIR indexing, cast, raw transport or ownership permission. Genuine missing selected dependency
+MIR remains unknown even for empty, unequal-length and zero-leaf slices.
