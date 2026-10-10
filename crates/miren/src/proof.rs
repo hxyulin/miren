@@ -28,6 +28,13 @@ mod async_entries;
 mod atomic_intrinsics;
 mod atomic_rmw;
 mod builtins;
+mod byte_copy_origins;
+#[cfg(test)]
+mod byte_copy_probe;
+mod byte_copy_provenance;
+mod byte_copy_references;
+mod byte_copy_templates;
+mod byte_copy_views;
 mod call_destination_locations;
 mod call_destinations;
 mod call_metadata;
@@ -389,6 +396,7 @@ impl<'tcx> Engine<'tcx> {
                 "mutable u16 root requires one original borrow and owned primitive inputs".into(),
             ));
         }
+        let incoming_byte_copy_root = self.incoming_byte_copy_root(id, body);
         let immutable_input = self.immutable_root_input(body)?;
         let mut interior_root = false;
         for local in body.args_iter() {
@@ -422,6 +430,20 @@ impl<'tcx> Engine<'tcx> {
                 // Simultaneously usable safe mutable borrows have disjoint reachable storage.
                 // Reference-bearing pointees remain rejected during input construction.
                 let allocation = memory.len();
+                if incoming_byte_copy_root
+                    && let Value::Bytes { length, .. } = &value
+                    && matches!(element.kind(), ty::Slice(inner) if *inner == self.tcx.types.u8)
+                {
+                    memory
+                        .incoming_byte_roots
+                        .push(byte_copy_provenance::IncomingByteRoot {
+                            allocation,
+                            capacity: (**length).clone(),
+                        });
+                    // Horn storage does not encode this new provenance sidecar. Existing
+                    // induction stays available, but cannot enable the new finite-copy branch.
+                    memory.byte_copy_opaque |= self.induction;
+                }
                 memory.push(Some(value));
                 arguments.push(Value::Reference {
                     allocation,
@@ -1512,6 +1534,11 @@ impl<'tcx> Engine<'tcx> {
                         }
                         _ => return Err("unresolved indirect call".to_owned()),
                     };
+                    self.byte_copy_call_eligibility(
+                        instance,
+                        !matches!(callable_ty.kind(), ty::FnDef(..)),
+                        &mut state,
+                    );
                     let callee = instance.def_id();
                     if let Some(results) = self.mutable_u16_child_call(
                         &mut state,
@@ -1610,13 +1637,18 @@ impl<'tcx> Engine<'tcx> {
                         instance
                     };
                     let instance = self.resolve_trait_object_call(instance, &mut values, &state)?;
+                    self.byte_copy_call_eligibility(instance, false, &mut state);
                     let callee = instance.def_id();
-                    if let Some(results) = self.trusted_call(
+                    if let Some(mut results) = self.trusted_call(
                         instance,
                         &values,
                         &state,
                         (id, terminator.source_info.span),
                     )? {
+                        state.memory.byte_copy_opaque = true;
+                        for result in &mut results {
+                            result.memory.byte_copy_opaque = true;
+                        }
                         let target = target.ok_or("trusted call has no return edge")?;
                         for result in results {
                             let mut continuation =
@@ -1774,6 +1806,43 @@ impl<'tcx> Engine<'tcx> {
                             )?;
                             queue.push_back((target, continuation, retry_path.clone()));
                         }
+                        continue;
+                    }
+                    if !configured && self.finite_byte_copy_candidate(instance, &values, &state) {
+                        // These are the actual operands evaluated above in MIR order for this
+                        // exact block. A direct selected copy Item cannot take either adapter
+                        // path that rewrites the argument vector. Source snapshots are read
+                        // from the same vector/current Memory; no supplied replacement value
+                        // or remembered operand can enter this dispatch.
+                        let ty::FnDef(original, generic) = callable_ty.kind() else {
+                            return Err(
+                                "finite byte copy requires original direct call operands".into()
+                            );
+                        };
+                        let original =
+                            self.resolve_function_item(*original, generic.skip_binder())?;
+                        if original != instance || values.len() != 2 || modeled_values.len() != 2 {
+                            return Err(
+                                "finite byte copy original call/operands were adapted".into()
+                            );
+                        }
+                        let target = target.ok_or("finite byte copy has no normal return edge")?;
+                        let value = self.finite_byte_copy(
+                            id,
+                            body,
+                            block,
+                            &values[0],
+                            &modeled_values[1],
+                            &mut state,
+                        )?;
+                        self.store_call_result(
+                            body,
+                            &mut state,
+                            *destination,
+                            destination_indices.as_ref(),
+                            value,
+                        )?;
+                        queue.push_back((target, state, retry_path.clone()));
                         continue;
                     }
                     if !configured
@@ -2439,6 +2508,41 @@ impl<'tcx> Engine<'tcx> {
         state: &mut State,
         rvalue: &Rvalue<'tcx>,
     ) -> Result<Value, String> {
+        let byte_metadata_only = matches!(rvalue,
+            Rvalue::RawPtr(rustc_middle::mir::RawPtrKind::FakeForPtrMetadata, place)
+                if matches!(place.ty(&body.local_decls, self.tcx).ty.kind(),
+                    ty::Slice(element) if *element == self.tcx.types.u8));
+        if !byte_metadata_only
+            && matches!(
+                rvalue,
+                Rvalue::RawPtr(..)
+                    | Rvalue::Cast(
+                        CastKind::Transmute
+                            | CastKind::BoxDerefTransmute
+                            | CastKind::PointerWithExposedProvenance
+                            | CastKind::PointerExposeProvenance
+                            | CastKind::PtrToPtr,
+                        ..
+                    )
+            )
+        {
+            state.memory.byte_copy_opaque = true;
+        }
+        if let Rvalue::Cast(CastKind::PointerCoercion(kind, _), operand, target) = rvalue {
+            let original = operand.ty(&body.local_decls, self.tcx);
+            let safe_byte_unsize = *kind == rustc_middle::ty::adjustment::PointerCoercion::Unsize
+                && match (original.kind(), target.kind()) {
+                    (ty::Ref(_, from, a), ty::Ref(_, to, b)) if a == b => {
+                        matches!((from.kind(), to.kind()),
+                            (ty::Array(element, _), ty::Slice(other))
+                                if *element == self.tcx.types.u8 && *other == self.tcx.types.u8)
+                    }
+                    _ => false,
+                };
+            if !safe_byte_unsize {
+                state.memory.byte_copy_opaque = true;
+            }
+        }
         match rvalue {
             Rvalue::Use(operand, retag) => {
                 let narrowed = if let Operand::Copy(place) = operand

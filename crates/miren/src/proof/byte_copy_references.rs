@@ -1,0 +1,55 @@
+//! Full selected byte-copy family bodies. Each byte is compared before admission.
+use super::byte_copy_templates::Family;
+
+pub(super) const REFERENCES: &[(&str, Family, &str)] = &[
+    (
+        "DefId(core::slice::{impl#0}::copy_from_slice)",
+        Family::Copy,
+        include_str!("byte_copy_reference/copy-1.mir"),
+    ),
+    (
+        "DefId(core::slice::copy_from_slice_impl)",
+        Family::Implementation,
+        include_str!("byte_copy_reference/implementation-1.mir"),
+    ),
+    (
+        "DefId(core::ptr::copy_nonoverlapping::precondition_check)",
+        Family::Precondition,
+        include_str!("byte_copy_reference/precondition-1.mir"),
+    ),
+    (
+        "DefId(core::ub_checks::maybe_is_nonoverlapping::runtime)",
+        Family::Nonoverlap,
+        include_str!("byte_copy_reference/nonoverlap-1.mir"),
+    ),
+    (
+        "DefId(core::ptr::const_ptr::{impl#0}::is_aligned_to)",
+        Family::Alignment,
+        include_str!("byte_copy_reference/alignment-1.mir"),
+    ),
+    (
+        "DefId(core::slice::{impl#0}::copy_from_slice)",
+        Family::Copy,
+        include_str!("byte_copy_reference/copy-2.mir"),
+    ),
+    (
+        "DefId(core::slice::copy_from_slice_impl)",
+        Family::Implementation,
+        include_str!("byte_copy_reference/implementation-2.mir"),
+    ),
+    (
+        "DefId(core::ptr::copy_nonoverlapping::precondition_check)",
+        Family::Precondition,
+        include_str!("byte_copy_reference/precondition-2.mir"),
+    ),
+    (
+        "DefId(core::ub_checks::maybe_is_nonoverlapping::runtime)",
+        Family::Nonoverlap,
+        include_str!("byte_copy_reference/nonoverlap-2.mir"),
+    ),
+    (
+        "DefId(core::ptr::const_ptr::{impl#0}::is_aligned_to)",
+        Family::Alignment,
+        include_str!("byte_copy_reference/alignment-2.mir"),
+    ),
+];

@@ -1,0 +1,119 @@
+args=4 spread=None
+local _0 Mut bool user=None
+local _1 Not *const () user=None
+local _2 Not *const () user=None
+local _3 Not usize user=None
+local _4 Not usize user=None
+local _5 Not usize user=None
+local _6 Not usize user=None
+local _7 Mut ! user=None
+local _8 Not usize user=None
+local _9 Mut core::option::Option<usize> user=None
+local _10 Not usize user=None
+local _11 Not u64 user=None
+local _12 Not bool user=None
+local _13 Mut (u64, bool) user=None
+local _14 Mut u64 user=None
+local _15 Mut u64 user=None
+local _16 Mut usize user=None
+local _17 Not () user=None
+local _18 Mut i32 user=None
+local _19 Mut i32 user=None
+local _20 Mut i32 user=None
+local _21 Mut bool user=None
+block bb0 cleanup=false
+StorageLive(_5)
+assign local=_5 path=[]
+cast Transmute target=usize
+copy _1/[]
+StorageLive(_6)
+assign local=_6 path=[]
+cast Transmute target=usize
+copy _2/[]
+StorageLive(_9)
+StorageLive(_12)
+StorageLive(_16)
+StorageLive(_13)
+StorageLive(_14)
+assign local=_14 path=[]
+cast IntToInt target=u64
+copy _3/[]
+StorageLive(_15)
+assign local=_15 path=[]
+cast IntToInt target=u64
+copy _4/[]
+assign local=_13 path=[]
+binary MulWithOverflow
+move _14/[]
+move _15/[]
+StorageDead(_15)
+StorageDead(_14)
+StorageLive(_11)
+assign local=_11 path=[]
+use Yes
+copy _13/[Field(0, u64)]
+assign local=_12 path=[]
+use Yes
+copy _13/[Field(1, bool)]
+StorageDead(_13)
+assign local=_16 path=[]
+cast IntToInt target=usize
+copy _11/[]
+StorageDead(_11)
+switch SwitchTargets { values: [Pu128(0)], targets: [bb3, bb1] }
+copy _12/[]
+block bb1 cleanup=false
+call core::intrinsics::cold_path destination=_17/[] target=Some(bb2) unwind=Unreachable source=N
+  | ormal
+const-value ZeroSized FnDef(DefId(core::intrinsics::cold_path), Binder { value: [], bound_vars:
+  > U+0020
+  | [] })
+block bb2 cleanup=false
+StorageDead(_16)
+StorageDead(_12)
+StorageDead(_9)
+call core::panicking::panic_nounwind destination=_7/[] target=None unwind=Unreachable source=Nor
+  | mal
+const-value ZeroSized FnDef(DefId(core::panicking::panic_nounwind), Binder { value: [], bound_va
+  | rs: [] })
+const-string "is_nonoverlapping: `size_of::<T>() * count` overflows a usize" &'{erased} str
+block bb3 cleanup=false
+assign local=_9 path=[]
+aggregate Adt(DefId(core::option::Option), 1, [usize], None, None)
+copy _16/[]
+StorageDead(_16)
+StorageDead(_12)
+StorageLive(_8)
+assign local=_8 path=[]
+use Yes
+copy _9/[Downcast(Some("Some"), 1), Field(0, usize)]
+StorageDead(_9)
+StorageLive(_21)
+assign local=_21 path=[]
+binary Lt
+copy _5/[]
+copy _6/[]
+switch SwitchTargets { values: [Pu128(0)], targets: [bb5, bb4] }
+move _21/[]
+block bb4 cleanup=false
+assign local=_10 path=[]
+binary Sub
+copy _6/[]
+copy _5/[]
+goto -> bb6
+block bb5 cleanup=false
+assign local=_10 path=[]
+binary Sub
+copy _5/[]
+copy _6/[]
+goto -> bb6
+block bb6 cleanup=false
+StorageDead(_21)
+assign local=_0 path=[]
+binary Ge
+move _10/[]
+copy _8/[]
+StorageDead(_8)
+StorageDead(_6)
+StorageDead(_5)
+return

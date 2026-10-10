@@ -1,0 +1,86 @@
+args=2 spread=None
+local _0 Mut () user=None
+local _1 Not &'{erased} mut [T/#0] user=None
+local _2 Not &'{erased} [T/#0] user=None
+local _3 Mut bool user=None
+local _4 Mut usize user=None
+local _5 Mut usize user=None
+local _6 Not ! user=None
+local _7 Mut *const T/#0 user=None
+local _8 Mut *mut T/#0 user=None
+local _9 Mut *const [T/#0] user=None
+local _10 Mut *mut [T/#0] user=None
+local _11 Not () user=None
+local _12 Mut *const () user=None
+local _13 Mut *mut () user=None
+block bb0 cleanup=false
+StorageLive(_3)
+assign local=_4 path=[]
+unary PtrMetadata
+copy _1/[]
+assign local=_5 path=[]
+unary PtrMetadata
+copy _2/[]
+assign local=_3 path=[]
+binary Ne
+copy _4/[]
+copy _5/[]
+switch SwitchTargets { values: [Pu128(0)], targets: [bb2, bb1] }
+move _3/[]
+block bb1 cleanup=false
+call core::slice::copy_from_slice_impl::len_mismatch_fail destination=_6/[] target=None unwind=C
+  | ontinue source=Normal
+const-value ZeroSized FnDef(DefId(core::slice::copy_from_slice_impl::len_mismatch_fail), Binder
+  > U+0020
+  | { value: [], bound_vars: [] })
+move _4/[]
+move _5/[]
+block bb2 cleanup=false
+StorageDead(_3)
+StorageLive(_7)
+assign local=_9 path=[]
+raw Const local=_2 path=[Deref]
+assign local=_7 path=[]
+cast PtrToPtr target=*const T/#0
+copy _9/[]
+StorageLive(_8)
+assign local=_10 path=[]
+raw Mut local=_1 path=[Deref]
+assign local=_8 path=[]
+cast PtrToPtr target=*mut T/#0
+copy _10/[]
+switch SwitchTargets { values: [Pu128(0)], targets: [bb5, bb3] }
+runtime-checks UbChecks
+block bb3 cleanup=false
+StorageLive(_12)
+assign local=_12 path=[]
+cast PtrToPtr target=*const ()
+copy _9/[]
+StorageLive(_13)
+assign local=_13 path=[]
+cast PtrToPtr target=*mut ()
+copy _10/[]
+call core::ptr::copy_nonoverlapping::precondition_check destination=_11/[] target=Some(bb4) unwi
+  | nd=Unreachable source=Normal
+const-value ZeroSized FnDef(DefId(core::ptr::copy_nonoverlapping::precondition_check), Binder {
+  > U+0020
+  | value: [], bound_vars: [] })
+move _12/[]
+move _13/[]
+const-unevaluated UnevaluatedConst { def: DefId(core::mem::SizedTypeProperties::SIZE), args: [T/
+  | #0], promoted: None } usize
+const-unevaluated UnevaluatedConst { def: DefId(core::mem::SizedTypeProperties::ALIGN), args: [T
+  | /#0], promoted: None } usize
+copy _4/[]
+block bb4 cleanup=false
+StorageDead(_13)
+StorageDead(_12)
+goto -> bb5
+block bb5 cleanup=false
+copy-nonoverlapping
+copy _7/[]
+copy _8/[]
+copy _4/[]
+StorageDead(_8)
+StorageDead(_7)
+return

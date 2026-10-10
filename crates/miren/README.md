@@ -1051,3 +1051,17 @@ must prove Unicode scalar validity under the existing path conditions before the
 invalid replacements are refused rather than repaired or assumed valid. Actual scalar child bodies
 may receive and return certified Char values. Detached Char ghosts expose only their exact length.
 Integer and Bool formulas, source lifetimes, private leases and storage budgets remain unchanged.
+
+A bounded byte-view copy also accepts a promoted immutable byte constant of at most 128 bytes
+into a guarded prefix of one original incoming writable `&mut [u8]`. The original arbitrary
+length and current BV8 array remain in the same allocation; sequential SMT Stores replace only
+the selected cells. Complete selected core copy, intrinsic and precondition bodies are matched
+against pinned MIR, with exact operand forwarding, byte layout and guarded failure edges.
+Original constant provenance and current source bytes must agree. A branch-local incoming-origin
+record and monotone exposure refusal preserve the valid writable Rust region premise; raw,
+unsafe, indirect, trusted and unsupported transport cannot restore this eligibility. Compiler
+metadata-only byte length observations return no address capability. The update validates current
+liveness, initialization, write permission and every nested prefix before one whole-root commit.
+Old fixed-capacity byte paths keep their existing priority and formulas. Shifted ranges, dynamic
+or returned sources, zero-length constants without initialized compiler bytes, and optimized
+foreign bodies with already inlined raw copy transport remain UNKNOWN in this extension.

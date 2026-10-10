@@ -1,0 +1,13 @@
+args=2 spread=None
+local _0 Mut () user=None
+local _1 Not &'{erased} mut [T/#0] user=None
+local _2 Not &'{erased} [T/#0] user=None
+block bb0 cleanup=false
+call core::slice::copy_from_slice_impl::<T> destination=_0/[] target=Some(bb1) unwind=Unreachabl
+  | e source=Normal
+const-value ZeroSized FnDef(DefId(core::slice::copy_from_slice_impl), Binder { value: [T/#0], bo
+  | und_vars: [] })
+move _1/[]
+move _2/[]
+block bb1 cleanup=false
+return

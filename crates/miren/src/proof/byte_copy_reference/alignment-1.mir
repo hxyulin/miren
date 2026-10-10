@@ -1,0 +1,122 @@
+args=2 spread=None
+local _0 Mut bool user=None
+local _1 Not *const T/#0 user=None
+local _2 Not usize user=None
+local _3 Mut bool user=None
+local _4 Not ! user=None
+local _5 Mut core::fmt::Arguments<'{erased}> user=None
+local _6 Mut usize user=None
+local _7 Mut usize user=None
+local _8 Mut usize user=None
+local _9 Mut u32 user=None
+local _10 Mut *const () user=None
+local _11 Mut &'{erased} str user=None
+local _12 Mut core::ptr::NonNull<u8> user=None
+local _13 Mut *const u8 user=None
+local _14 Mut core::ptr::NonNull<core::fmt::rt::Argument<'{erased}>> user=None
+local _15 Mut usize user=None
+local _16 Mut usize user=None
+local _17 Mut usize user=None
+local _18 Mut *const str user=None
+local _19 Not &'{erased} [u8] user=None
+block bb0 cleanup=false
+StorageLive(_3)
+StorageLive(_9)
+call core::intrinsics::ctpop::<usize> destination=_9/[] target=Some(bb3) unwind=Unreachable sour
+  | ce=Normal
+const-value ZeroSized FnDef(DefId(core::intrinsics::ctpop), Binder { value: [usize], bound_vars:
+  |  [] })
+copy _2/[]
+block bb1 cleanup=false
+StorageDead(_3)
+StorageLive(_6)
+StorageLive(_7)
+StorageLive(_10)
+assign local=_10 path=[]
+cast PtrToPtr target=*const ()
+copy _1/[]
+assign local=_7 path=[]
+cast Transmute target=usize
+copy _10/[]
+StorageDead(_10)
+StorageLive(_8)
+assign local=_8 path=[]
+binary Sub
+copy _2/[]
+const-value Scalar(0x0000000000000001) usize
+assign local=_6 path=[]
+binary BitAnd
+move _7/[]
+move _8/[]
+StorageDead(_8)
+StorageDead(_7)
+assign local=_0 path=[]
+binary Eq
+move _6/[]
+const-value Scalar(0x0000000000000000) usize
+StorageDead(_6)
+return
+block bb2 cleanup=false
+StorageLive(_5)
+StorageLive(_11)
+assign local=_11 path=[]
+use Yes
+const-string "is_aligned_to: align is not a power-of-two" &'{erased} str
+StorageLive(_12)
+StorageLive(_13)
+StorageLive(_18)
+assign local=_18 path=[]
+raw Const local=_11 path=[Deref]
+assign local=_13 path=[]
+cast PtrToPtr target=*const u8
+copy _18/[]
+StorageDead(_18)
+assign local=_12 path=[]
+cast Transmute target=core::ptr::NonNull<u8>
+copy _13/[]
+StorageDead(_13)
+StorageLive(_14)
+StorageLive(_15)
+StorageLive(_16)
+StorageLive(_17)
+StorageLive(_19)
+assign local=_19 path=[]
+cast Transmute target=&'{erased} [u8]
+const-string "is_aligned_to: align is not a power-of-two" &'{erased} str
+assign local=_17 path=[]
+unary PtrMetadata
+copy _19/[]
+StorageDead(_19)
+assign local=_16 path=[]
+binary Shl
+move _17/[]
+const-value Scalar(0x00000001) i32
+StorageDead(_17)
+assign local=_15 path=[]
+binary BitOr
+move _16/[]
+const-value Scalar(0x0000000000000001) usize
+StorageDead(_16)
+assign local=_14 path=[]
+cast Transmute target=core::ptr::NonNull<core::fmt::rt::Argument<'{erased}>>
+move _15/[]
+StorageDead(_15)
+assign local=_5 path=[]
+aggregate Adt(DefId(core::fmt::Arguments), 0, ['{erased}], None, None)
+move _12/[]
+move _14/[]
+StorageDead(_14)
+StorageDead(_12)
+StorageDead(_11)
+call core::panicking::panic_fmt destination=_4/[] target=None unwind=Continue source=Normal
+const-value ZeroSized FnDef(DefId(core::panicking::panic_fmt), Binder { value: [], bound_vars: [
+  | ] })
+move _5/[]
+block bb3 cleanup=false
+assign local=_3 path=[]
+binary Eq
+move _9/[]
+const-value Scalar(0x00000001) u32
+StorageDead(_9)
+switch SwitchTargets { values: [Pu128(0)], targets: [bb2, bb1] }
+move _3/[]

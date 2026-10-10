@@ -39,32 +39,68 @@ pub(super) fn owned_definition_key(id: DefId) -> String {
     normalize_owned_template(&format!("{id:?}"), true)
 }
 
+#[derive(Debug)]
+pub(super) struct TemplateError {
+    pub(super) category: UnknownCategory,
+    pub(super) reason: String,
+}
+impl TemplateError {
+    fn resource(reason: &str) -> Self {
+        Self {
+            category: UnknownCategory::ResourceLimit,
+            reason: reason.into(),
+        }
+    }
+}
+impl From<&str> for TemplateError {
+    fn from(reason: &str) -> Self {
+        Self {
+            category: UnknownCategory::Semantics,
+            reason: reason.into(),
+        }
+    }
+}
+impl From<String> for TemplateError {
+    fn from(reason: String) -> Self {
+        Self {
+            category: UnknownCategory::Semantics,
+            reason,
+        }
+    }
+}
+
 const TEMPLATE_NODES: usize = 512;
 const TEMPLATE_DEPTH: usize = 16;
 const TEMPLATE_OPERAND_WORK: usize = TEMPLATE_NODES * 8;
 const TEMPLATE_BYTES: usize = TEMPLATE_NODES * 128;
 
-fn template_work(body: &Body<'_>) -> Result<(), String> {
+fn template_work(body: &Body<'_>) -> Result<(), TemplateError> {
     let mut work = 0usize;
     for block in body.basic_blocks.iter() {
         work = work
             .saturating_add(block.statements.len())
             .saturating_add(1);
         if work > TEMPLATE_NODES {
-            return Err("comparison template exceeds its operation budget".into());
+            return Err(TemplateError::resource(
+                "comparison template exceeds its operation budget",
+            ));
         }
         for statement in &block.statements {
             if let StatementKind::Assign(assignment) = &statement.kind
                 && let Rvalue::Aggregate(_, operands) = &assignment.1
                 && operands.len() > TEMPLATE_OPERAND_WORK
             {
-                return Err("comparison template exceeds its operand budget".into());
+                return Err(TemplateError::resource(
+                    "comparison template exceeds its operand budget",
+                ));
             }
         }
         if let TerminatorKind::Call { args, .. } = &block.terminator().kind
             && args.len() > TEMPLATE_OPERAND_WORK
         {
-            return Err("comparison template exceeds its operand budget".into());
+            return Err(TemplateError::resource(
+                "comparison template exceeds its operand budget",
+            ));
         }
     }
     Ok(())
@@ -86,11 +122,31 @@ pub(super) fn encode_template_with_alloc<'tcx>(
     core: rustc_span::def_id::CrateNum,
     alloc: Option<rustc_span::def_id::CrateNum>,
 ) -> Result<String, String> {
-    if body.coroutine.is_some()
-        || body.tainted_by_errors.is_some()
-        || body.basic_blocks.len() > 128
-        || body.local_decls.len() > TEMPLATE_NODES
-    {
+    encode_template_domain(tcx, body, core, alloc, false).map_err(|error| error.reason)
+}
+
+/// Byte-copy certificates encode the exact copy operands without admitting runtime pointers.
+pub(super) fn encode_byte_copy_template<'tcx>(
+    tcx: TyCtxt<'tcx>,
+    body: &Body<'tcx>,
+    core: rustc_span::def_id::CrateNum,
+) -> Result<String, TemplateError> {
+    encode_template_domain(tcx, body, core, None, true)
+}
+
+fn encode_template_domain<'tcx>(
+    tcx: TyCtxt<'tcx>,
+    body: &Body<'tcx>,
+    core: rustc_span::def_id::CrateNum,
+    alloc: Option<rustc_span::def_id::CrateNum>,
+    byte_copy: bool,
+) -> Result<String, TemplateError> {
+    if body.basic_blocks.len() > 128 || body.local_decls.len() > TEMPLATE_NODES {
+        return Err(TemplateError::resource(
+            "comparison template exceeds its supported body domain",
+        ));
+    }
+    if body.coroutine.is_some() || body.tainted_by_errors.is_some() {
         return Err("comparison template exceeds its supported body domain".into());
     }
     template_work(body)?;
@@ -113,7 +169,9 @@ pub(super) fn encode_template_with_alloc<'tcx>(
         for statement in &data.statements {
             work += 1;
             if work > TEMPLATE_NODES {
-                return Err("comparison template exceeds its operation budget".into());
+                return Err(TemplateError::resource(
+                    "comparison template exceeds its operation budget",
+                ));
             }
             match &statement.kind {
                 StatementKind::Assign(assignment) => {
@@ -171,6 +229,17 @@ pub(super) fn encode_template_with_alloc<'tcx>(
                 StatementKind::StorageLive(_)
                 | StatementKind::StorageDead(_)
                 | StatementKind::Nop => lines.push(format!("{:?}", statement.kind)),
+                StatementKind::Intrinsic(intrinsic) if byte_copy => match intrinsic.as_ref() {
+                    rustc_middle::mir::NonDivergingIntrinsic::CopyNonOverlapping(copy) => {
+                        lines.push("copy-nonoverlapping".into());
+                        lines.push(encode_operand(tcx, &copy.src, false)?);
+                        lines.push(encode_operand(tcx, &copy.dst, false)?);
+                        lines.push(encode_operand(tcx, &copy.count, false)?);
+                    }
+                    rustc_middle::mir::NonDivergingIntrinsic::Assume(_) => {
+                        return Err("byte copy template has an unsupported assume".into());
+                    }
+                },
                 StatementKind::Intrinsic(intrinsic) if alloc.is_some() => {
                     match intrinsic.as_ref() {
                         rustc_middle::mir::NonDivergingIntrinsic::Assume(operand) => {
@@ -196,7 +265,9 @@ pub(super) fn encode_template_with_alloc<'tcx>(
         }
         work += 1;
         if work > TEMPLATE_NODES {
-            return Err("comparison template exceeds its operation budget".into());
+            return Err(TemplateError::resource(
+                "comparison template exceeds its operation budget",
+            ));
         }
         match &data.terminator().kind {
             TerminatorKind::Call {
@@ -256,14 +327,18 @@ pub(super) fn encode_template_with_alloc<'tcx>(
         bytes.checked_add(line.len())?.checked_add(1)
     });
     if bytes.is_none_or(|bytes| bytes > TEMPLATE_BYTES) {
-        return Err("comparison template exceeds its encoded byte budget".into());
+        return Err(TemplateError::resource(
+            "comparison template exceeds its encoded byte budget",
+        ));
     }
     let encoded = wrap_template(&normalize_owned_template(
         &lines.join("\n"),
         alloc.is_some(),
     ))?;
     if encoded.len() > TEMPLATE_BYTES {
-        return Err("comparison template exceeds its encoded byte budget".into());
+        return Err(TemplateError::resource(
+            "comparison template exceeds its encoded byte budget",
+        ));
     }
     Ok(encoded)
 }
@@ -272,7 +347,7 @@ fn encode_operand<'tcx>(
     tcx: TyCtxt<'tcx>,
     operand: &Operand<'tcx>,
     alloc: bool,
-) -> Result<String, String> {
+) -> Result<String, TemplateError> {
     Ok(match operand {
         Operand::Copy(place) => format!("copy {:?}/{:?}", place.local, place.projection),
         Operand::Move(place) => format!("move {:?}/{:?}", place.local, place.projection),
@@ -287,9 +362,13 @@ fn encode_operand<'tcx>(
                 rustc_middle::mir::ConstValue::Slice { alloc_id, meta },
                 ty,
             ) => {
+                if meta > TEMPLATE_NODES as u64 {
+                    return Err(TemplateError::resource(
+                        "comparison template has unsupported constant slice",
+                    ));
+                }
                 if !matches!(ty.kind(), ty::Ref(_, element, mutability)
                     if !mutability.is_mut() && matches!(element.kind(), ty::Str))
-                    || meta > TEMPLATE_NODES as u64
                 {
                     return Err("comparison template has unsupported constant slice".into());
                 }
@@ -340,14 +419,16 @@ fn encode_owned_constant<'tcx>(
     id: rustc_middle::mir::interpret::AllocId,
     offset: rustc_abi::Size,
     original: Ty<'tcx>,
-) -> Result<String, String> {
+) -> Result<String, TemplateError> {
     use rustc_abi::Size;
     use rustc_middle::mir::interpret::{GlobalAlloc, alloc_range};
     let layout = tcx
         .layout_of(ty::TypingEnv::fully_monomorphized().as_query_input(original))
         .map_err(|_| "owned template constant has unavailable original layout")?;
     if !layout.is_sized() || layout.size.bytes() > TEMPLATE_NODES as u64 {
-        return Err("owned template constant exceeds the original sized byte budget".into());
+        return Err(TemplateError::resource(
+            "owned template constant exceeds the original sized byte budget",
+        ));
     }
     let Some(GlobalAlloc::Memory(allocation)) = tcx.try_get_global_alloc(id) else {
         return Err("owned template constant lacks actual compiler memory".into());
@@ -391,7 +472,7 @@ fn encode_owned_constant<'tcx>(
     ))
 }
 
-fn wrap_template(text: &str) -> Result<String, String> {
+fn wrap_template(text: &str) -> Result<String, TemplateError> {
     if text
         .lines()
         .any(|line| line.starts_with("  |") || line.starts_with("  >"))
@@ -482,7 +563,7 @@ fn validate_template_core<'tcx>(
     body: &Body<'tcx>,
     core: rustc_span::def_id::CrateNum,
     alloc: Option<rustc_span::def_id::CrateNum>,
-) -> Result<(), String> {
+) -> Result<(), TemplateError> {
     use rustc_middle::mir::visit::Visitor;
     let mut checker = CoreTemplateVisitor {
         types: CoreTemplateTypes {
@@ -490,11 +571,17 @@ fn validate_template_core<'tcx>(
             alloc,
             count: 0,
             depth: 0,
+            exhausted: false,
         },
         valid: true,
         work: 0,
     };
     checker.visit_body(body);
+    if checker.types.exhausted {
+        return Err(TemplateError::resource(
+            "comparison template has uncertified embedded compiler identities",
+        ));
+    }
     if !checker.valid {
         return Err("comparison template has uncertified embedded compiler identities".into());
     }
@@ -506,6 +593,7 @@ struct CoreTemplateTypes {
     alloc: Option<rustc_span::def_id::CrateNum>,
     count: usize,
     depth: usize,
+    exhausted: bool,
 }
 
 impl CoreTemplateTypes {
@@ -520,6 +608,7 @@ impl<'tcx> ty::TypeVisitor<TyCtxt<'tcx>> for CoreTemplateTypes {
     fn visit_ty(&mut self, original: Ty<'tcx>) -> Self::Result {
         use ty::TypeSuperVisitable;
         if self.count >= TEMPLATE_NODES || self.depth >= TEMPLATE_DEPTH {
+            self.exhausted = true;
             return std::ops::ControlFlow::Break(());
         }
         self.count += 1;
@@ -565,6 +654,7 @@ impl<'tcx> ty::TypeVisitor<TyCtxt<'tcx>> for CoreTemplateTypes {
     fn visit_const(&mut self, constant: ty::Const<'tcx>) -> Self::Result {
         use ty::TypeSuperVisitable;
         if self.count >= TEMPLATE_NODES || self.depth >= TEMPLATE_DEPTH {
+            self.exhausted = true;
             return std::ops::ControlFlow::Break(());
         }
         self.count += 1;
@@ -643,6 +733,7 @@ impl<'tcx> rustc_middle::mir::visit::Visitor<'tcx> for CoreTemplateVisitor {
         location: rustc_middle::mir::Location,
     ) {
         self.work = self.work.saturating_add(1 + place.projection.len());
+        self.types.exhausted |= self.work > TEMPLATE_OPERAND_WORK;
         self.valid &= self.work <= TEMPLATE_OPERAND_WORK;
         if self.valid {
             self.super_place(place, context, location);
@@ -651,6 +742,7 @@ impl<'tcx> rustc_middle::mir::visit::Visitor<'tcx> for CoreTemplateVisitor {
 
     fn visit_operand(&mut self, operand: &Operand<'tcx>, location: rustc_middle::mir::Location) {
         self.work = self.work.saturating_add(1);
+        self.types.exhausted |= self.work > TEMPLATE_OPERAND_WORK;
         self.valid &= self.work <= TEMPLATE_OPERAND_WORK;
         if self.valid {
             self.super_operand(operand, location);

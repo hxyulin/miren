@@ -1,0 +1,223 @@
+args=5 spread=None
+local _0 Mut () user=None
+local _1 Not *const () user=None
+local _2 Not *mut () user=None
+local _3 Not usize user=None
+local _4 Not usize user=None
+local _5 Not usize user=None
+local _6 Mut bool user=None
+local _7 Not bool user=None
+local _8 Mut bool user=None
+local _9 Mut bool user=None
+local _10 Mut bool user=None
+local _11 Mut *const () user=None
+local _12 Not &'{erased} str user=None
+local _13 Not ! user=None
+local _14 Mut core::fmt::Arguments<'{erased}> user=None
+local _15 Mut bool user=None
+local _16 Mut bool user=None
+local _17 Mut usize user=None
+local _18 Mut bool user=None
+local _19 Mut bool user=None
+local _20 Mut usize user=None
+local _21 Mut core::ptr::NonNull<u8> user=None
+local _22 Mut *const u8 user=None
+local _23 Mut core::ptr::NonNull<core::fmt::rt::Argument<'{erased}>> user=None
+local _24 Mut usize user=None
+local _25 Mut usize user=None
+local _26 Mut usize user=None
+local _27 Mut *const str user=None
+local _28 Not &'{erased} [u8] user=None
+block bb0 cleanup=false
+StorageLive(_6)
+switch SwitchTargets { values: [Pu128(0)], targets: [bb1, bb2] }
+copy _5/[]
+block bb1 cleanup=false
+assign local=_7 path=[]
+use Yes
+const-value Scalar(0x01) bool
+goto -> bb3
+block bb2 cleanup=false
+assign local=_7 path=[]
+binary Eq
+copy _3/[]
+const-value Scalar(0x0000000000000000) usize
+goto -> bb3
+block bb3 cleanup=false
+StorageLive(_8)
+StorageLive(_9)
+assign local=_9 path=[]
+use Yes
+copy _7/[]
+StorageLive(_15)
+call core::ptr::const_ptr::<impl *const ()>::is_aligned_to destination=_15/[] target=Some(bb15)
+  > U+0020
+  | unwind=Terminate(Abi) source=Normal
+const-value ZeroSized FnDef(DefId(core::ptr::const_ptr::{impl#0}::is_aligned_to), Binder { value
+  | : [()], bound_vars: [] })
+copy _1/[]
+copy _4/[]
+block bb4 cleanup=false
+StorageDead(_9)
+StorageLive(_10)
+assign local=_11 path=[]
+cast PtrToPtr target=*const ()
+copy _2/[]
+StorageLive(_18)
+call core::ptr::const_ptr::<impl *const ()>::is_aligned_to destination=_18/[] target=Some(bb20)
+  > U+0020
+  | unwind=Terminate(Abi) source=Normal
+const-value ZeroSized FnDef(DefId(core::ptr::const_ptr::{impl#0}::is_aligned_to), Binder { value
+  | : [()], bound_vars: [] })
+copy _11/[]
+move _4/[]
+block bb5 cleanup=false
+call core::ub_checks::maybe_is_nonoverlapping::runtime destination=_6/[] target=Some(bb21) unwin
+  | d=Terminate(Abi) source=Misc
+const-value ZeroSized FnDef(DefId(core::ub_checks::maybe_is_nonoverlapping::runtime), Binder { v
+  | alue: [], bound_vars: [] })
+move _1/[]
+move _11/[]
+move _3/[]
+move _5/[]
+block bb6 cleanup=false
+goto -> bb8
+block bb7 cleanup=false
+StorageDead(_9)
+goto -> bb8
+block bb8 cleanup=false
+StorageDead(_10)
+StorageDead(_8)
+goto -> bb9
+block bb9 cleanup=false
+assign local=_12 path=[]
+use Yes
+const-string "unsafe precondition(s) violated: ptr::copy_nonoverlapping requires that both point
+  | er arguments are aligned and non-null and the specified memory ranges do not overlap\n\nThis ind
+  | icates a bug in the program. This Undefined Behavior check is optional, and cannot be relied on
+  > U+0020
+  | for safety." &'{erased} str
+StorageLive(_14)
+StorageLive(_21)
+StorageLive(_22)
+StorageLive(_27)
+assign local=_27 path=[]
+raw Const local=_12 path=[Deref]
+assign local=_22 path=[]
+cast PtrToPtr target=*const u8
+copy _27/[]
+StorageDead(_27)
+assign local=_21 path=[]
+cast Transmute target=core::ptr::NonNull<u8>
+copy _22/[]
+StorageDead(_22)
+StorageLive(_23)
+StorageLive(_24)
+StorageLive(_25)
+StorageLive(_26)
+StorageLive(_28)
+assign local=_28 path=[]
+cast Transmute target=&'{erased} [u8]
+const-string "unsafe precondition(s) violated: ptr::copy_nonoverlapping requires that both point
+  | er arguments are aligned and non-null and the specified memory ranges do not overlap\n\nThis ind
+  | icates a bug in the program. This Undefined Behavior check is optional, and cannot be relied on
+  > U+0020
+  | for safety." &'{erased} str
+assign local=_26 path=[]
+unary PtrMetadata
+copy _28/[]
+StorageDead(_28)
+assign local=_25 path=[]
+binary Shl
+move _26/[]
+const-value Scalar(0x00000001) i32
+StorageDead(_26)
+assign local=_24 path=[]
+binary BitOr
+move _25/[]
+const-value Scalar(0x0000000000000001) usize
+StorageDead(_25)
+assign local=_23 path=[]
+cast Transmute target=core::ptr::NonNull<core::fmt::rt::Argument<'{erased}>>
+move _24/[]
+StorageDead(_24)
+assign local=_14 path=[]
+aggregate Adt(DefId(core::fmt::Arguments), 0, ['{erased}], None, None)
+move _21/[]
+move _23/[]
+StorageDead(_23)
+StorageDead(_21)
+call core::panicking::panic_nounwind_fmt destination=_13/[] target=None unwind=Unreachable sourc
+  | e=Normal
+const-value ZeroSized FnDef(DefId(core::panicking::panic_nounwind_fmt), Binder { value: [], boun
+  | d_vars: [] })
+move _14/[]
+const-value Scalar(0x00) bool
+block bb10 cleanup=false
+StorageDead(_6)
+return
+block bb11 cleanup=false
+switch SwitchTargets { values: [Pu128(0)], targets: [bb14, bb13] }
+copy _9/[]
+block bb12 cleanup=false
+StorageDead(_15)
+goto -> bb7
+block bb13 cleanup=false
+StorageDead(_15)
+goto -> bb4
+block bb14 cleanup=false
+StorageLive(_16)
+StorageLive(_17)
+assign local=_17 path=[]
+cast Transmute target=usize
+copy _1/[]
+assign local=_16 path=[]
+binary Eq
+move _17/[]
+const-value Scalar(0x0000000000000000) usize
+StorageDead(_17)
+assign local=_8 path=[]
+unary Not
+move _16/[]
+StorageDead(_16)
+StorageDead(_15)
+switch SwitchTargets { values: [Pu128(0)], targets: [bb7, bb4] }
+move _8/[]
+block bb15 cleanup=false
+switch SwitchTargets { values: [Pu128(0)], targets: [bb12, bb11] }
+move _15/[]
+block bb16 cleanup=false
+switch SwitchTargets { values: [Pu128(0)], targets: [bb19, bb18] }
+copy _7/[]
+block bb17 cleanup=false
+StorageDead(_18)
+goto -> bb6
+block bb18 cleanup=false
+StorageDead(_18)
+goto -> bb5
+block bb19 cleanup=false
+StorageLive(_19)
+StorageLive(_20)
+assign local=_20 path=[]
+cast Transmute target=usize
+copy _2/[]
+assign local=_19 path=[]
+binary Eq
+move _20/[]
+const-value Scalar(0x0000000000000000) usize
+StorageDead(_20)
+assign local=_10 path=[]
+unary Not
+move _19/[]
+StorageDead(_19)
+StorageDead(_18)
+switch SwitchTargets { values: [Pu128(0)], targets: [bb6, bb5] }
+move _10/[]
+block bb20 cleanup=false
+switch SwitchTargets { values: [Pu128(0)], targets: [bb17, bb16] }
+move _18/[]
+block bb21 cleanup=false
+StorageDead(_10)
+StorageDead(_8)
+switch SwitchTargets { values: [Pu128(0)], targets: [bb9, bb10] }
+move _6/[]

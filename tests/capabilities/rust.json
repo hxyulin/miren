@@ -1020,6 +1020,23 @@
       "expected": "unknown",
       "unknown_reason": "char_slice_nested bb0: mutable char staging needs a pending child",
       "unknown_category": "semantics"
+    },
+    {
+      "entry": "fixed_byte_prefix_copy",
+      "family": "fixed_byte_prefix_copy",
+      "expected": "proved"
+    },
+    {
+      "entry": "fixed_byte_prefix_wrong_claim",
+      "family": "fixed_byte_prefix_copy",
+      "expected": "refuted"
+    },
+    {
+      "entry": "fixed_byte_prefix_dynamic_unknown",
+      "family": "fixed_byte_prefix_copy",
+      "expected": "unknown",
+      "unknown_reason": "byte copy source has uncertified transport or effects",
+      "unknown_category": "semantics"
     }
   ]
 }

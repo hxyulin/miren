@@ -2474,3 +2474,59 @@ Of 740 current global pairs, 739 normalized proof objects match exactly. One que
 UNKNOWN resource refusal differs only in active call-stack context and is recorded. All 840
 tracked files are byte-identical between main and the isolated workspace. Checks and ledgers
 retain their precise scopes under `/tmp/miren-stage194-*`.
+
+Stage 193 adds a certified constant byte copy into a bounded prefix of one incoming mutable
+byte slice whose overall length remains symbolic. The logical array and allocation are retained;
+sequential Stores replace only the selected cells after current liveness, initialization, writable
+permission, source provenance and nested-prefix bounds are checked. A single commit applies the
+validated update. The existing fixed-capacity byte path retains its priority and formulas.
+
+The replacement must be an authenticated compiler-promoted immutable byte constant of at most
+128 bytes. The limit bounds replacement analysis; it does not restrict the incoming slice length.
+Complete selected core copy and precondition bodies, actual intrinsic operands, byte layout and
+normal-return edges are checked. Source bytes and their original reaching definition must agree.
+Executed raw, unsafe, opaque, indirect or trusted transport monotonically revokes the new incoming
+origin eligibility. Metadata-only compiler length observations grant no address authority.
+Missing bodies, returned or dynamic sources, shifted ranges, competing incoming references and
+unsupported raw transport remain UNKNOWN. No allocator or hardware premise is added.
+
+The dedicated 21-root matrix yields nine PROVED, four REFUTED and eight UNKNOWN per host/ARM
+O0/O2 profile. The identical final source under committed Stage 194 yields one PROVED, two
+REFUTED and eighteen UNKNOWN. A 128-byte payload proves; a 129-byte payload reports the resource
+frontier before additional evaluation of the source constant. Ordinary call operands are
+evaluated first. Existing arbitrary-length byte operations retain their old path. Actual helper
+data mutation refutes the unchanged claim with a query and model on the same obligation. Safe
+native originals and mutation guards retain separate compiler-only proof scopes.
+
+A foreign helper compiled at O0 with retained MIR proves under caller O0/O2. Compiling the
+retained helper at O2 exposes unsupported raw-pointer transport and remains UNKNOWN. Omitting
+the O0 selected helper body yields missing-compiler-evidence UNKNOWN under caller O0/O2. These
+actual twelve dependency reports preserve the unchanged source and compiler flags; the optimized
+refusal is not relabeled as a successful body check.
+
+Global controls add a correct constant prefix, wrong claim and helper-produced source UNKNOWN.
+Changing the actual copied payload from [17, 19] to [17, 23] refutes the original assertion and
+fails the unchanged native guard at O0/O2. Safe native arrays have 129 elements and check the
+untouched tail. The manifest has 188 cases in 64 families. Scoped global evidence is retained at
+`/tmp/miren-stage193-parent194-global-before-evidence` and
+`/tmp/miren-stage193-parent194-global-after-evidence`.
+Root validation passes 789 workspace Rust tests and 102 focused Rust tests, with 68 Python
+checks in each workspace. Formatting, Clippy, debug/release builds, deny, docs and manual hooks
+pass. Both surveys report 300 PROVED, 260 REFUTED and 192 UNKNOWN outcomes across four profiles.
+The fresh repaired main release matches 100 dedicated proof objects and 260 queries, plus 16
+global proof objects and 60 queries. Safe native captures explicitly retain their actual-parent
+author scope. All 552 completed global pairs preserve status, inputs, models, premises and
+obligation queries; append-only replay fingerprints are excluded from the historical comparison.
+All 752 current normalized global proof objects match exactly, including query-free resource
+refusals. All 860 tracked files match byte-for-byte across main and the isolated workspace. The
+initial custom-solver replay and its counterexample-model differences are preserved separately;
+a corrected automatic-solver-mode replay matches whole proof objects without model
+normalization. The original failed full run remains separate from corrected validation.
+Corrected checks and ledgers are retained under `/tmp/miren-stage193-repaired-*`.
+
+Initial full validation exposed an unnamed core closure in the new copy candidate detector.
+The detector now checks Item and named Fn/AssocFn definition kinds before querying item_name;
+ordinary closure execution is unchanged. The original failed full run and earlier freezes remain
+preserved separately. The unchanged closure regression suite passes all three tests, and fresh
+repaired captures match 88 prior feature proof objects with 244 queries and 140 old proof objects
+with 356 queries exactly. Corrected full validation passes all required checks.

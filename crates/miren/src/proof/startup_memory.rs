@@ -30,6 +30,8 @@ pub(super) struct OwnedRegion {
 
 #[derive(Clone, Default)]
 pub(super) struct Memory {
+    pub(super) incoming_byte_roots: Vec<super::byte_copy_provenance::IncomingByteRoot>,
+    pub(super) byte_copy_opaque: bool,
     pub(super) mutable_u16: Rc<Vec<super::mutable_u16::Backing>>,
     allocations: Rc<Vec<Option<Value>>>,
     pub(super) owned_regions: Rc<Vec<OwnedRegion>>,

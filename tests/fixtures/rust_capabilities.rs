@@ -2673,3 +2673,43 @@ mod native_char_slice_child {
         }
     }
 }
+
+
+pub fn fixed_byte_prefix_copy(values: &mut [u8]) {
+    if values.len() >= 2 {
+        values[..2].copy_from_slice(&[17, 19]);
+        assert!(values[0] == 17 && values[1] == 19);
+    }
+}
+
+pub fn fixed_byte_prefix_wrong_claim(values: &mut [u8]) {
+    if values.len() >= 2 {
+        values[..2].copy_from_slice(&[17, 19]);
+        assert!(values[0] == 17 && values[1] == 17);
+    }
+}
+
+#[inline(never)]
+pub fn fixed_byte_prefix_source() -> [u8; 2] {
+    [17, 19]
+}
+
+pub fn fixed_byte_prefix_dynamic_unknown(values: &mut [u8]) {
+    if values.len() >= 2 {
+        let source = fixed_byte_prefix_source();
+        values[..2].copy_from_slice(&source);
+        assert!(values[0] == 17 && values[1] == 19);
+    }
+}
+
+#[cfg(test)]
+mod native_fixed_byte_prefix {
+    #[test]
+    fn copied_constant_payload_preserves_prefix_and_tail() {
+        let mut values = [0xa5; 129];
+        super::fixed_byte_prefix_copy(&mut values);
+        assert_eq!(&values[..2], &[17, 19]);
+        assert!(values[2..].iter().all(|value| *value == 0xa5));
+        super::fixed_byte_prefix_copy(&mut []);
+    }
+}
