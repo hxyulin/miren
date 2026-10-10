@@ -701,8 +701,14 @@ Owned byte-array elements keep their exact u8/count certificate. Writes to exist
 allocations validate live writable storage and commit to that same allocation. These updates
 preserve the existing 512-node/depth-16 budgets, Char validity and Float bit certificates.
 Reference/raw/static destinations and projections after the symbolic index retain their existing
-unsupported frontiers. Deferred lazy input candidates still require a separate bounded typed
-materialization step. Constant and uniquely determined stores keep their prior behavior.
+unsupported frontiers. Deferred input products with no observable scalar leaves can be
+reconstructed after exact original-type and descriptor validation. Nominal zero-sized structs
+retain their names and fields; tuple/array children retain their exact shapes. Descriptor kinds,
+counts, ordered field identities, slot/height metadata, seeds and checked ranges are validated
+before expansion. Expanded occurrences share the existing candidate budget. This reconstruction
+emits no symbols and adds no assumptions. Deferred scalar-containing inputs remain unsupported
+without a source reservation certificate. Constant and uniquely determined stores keep their
+prior behavior.
 
 Actual MIR Copy/Move reads can select a finite ordinary-struct array at a symbolic checked index.
 The original compiler array-prefix type certifies every candidate's exact nominal fields and

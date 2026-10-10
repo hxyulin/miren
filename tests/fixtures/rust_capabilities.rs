@@ -708,6 +708,48 @@ pub fn owned_array_whole_missing_body(index: usize, value: u32) {
     }
 }
 
+#[derive(Clone, Copy)]
+pub struct DeferredZero<const TAG: usize>;
+
+impl<const TAG: usize> DeferredZero<TAG> {
+    #[inline(never)]
+    fn marker(&self) -> usize {
+        TAG
+    }
+}
+
+pub fn deferred_zero_owned_write(mut values: [DeferredZero<7>; 2], index: usize) {
+    if index < values.len() {
+        values[index] = DeferredZero;
+        let copied = values[index];
+        assert!(copied.marker() == 7);
+    }
+}
+
+pub fn deferred_zero_owned_wrong_claim(mut values: [DeferredZero<7>; 2], index: usize) {
+    if index < values.len() {
+        values[index] = DeferredZero;
+        let copied = values[index];
+        assert!(copied.marker() == 8);
+    }
+}
+
+#[cfg(not(test))]
+unsafe extern "Rust" {
+    fn opaque_deferred_zero_marker(value: usize) -> usize;
+}
+
+#[cfg(not(test))]
+pub fn deferred_zero_owned_missing_body(mut values: [DeferredZero<7>; 2], index: usize) -> usize {
+    if index < values.len() {
+        values[index] = DeferredZero;
+        let copied = values[index];
+        unsafe { opaque_deferred_zero_marker(copied.marker()) }
+    } else {
+        0
+    }
+}
+
 #[cfg(test)]
 mod native {
     use super::*;
@@ -716,6 +758,9 @@ mod native {
     #[test]
     fn positives() {
         integers(199);
+        deferred_zero_owned_write([DeferredZero; 2], 0);
+        deferred_zero_owned_write([DeferredZero; 2], 1);
+        deferred_zero_owned_write([DeferredZero; 2], usize::MAX);
         owned_array_whole_write(0, 0);
         owned_array_whole_write(1, u32::MAX);
         owned_array_whole_write(usize::MAX, 7);
@@ -880,5 +925,10 @@ mod native {
     #[should_panic]
     fn owned_array_whole_wrong_claim_panics() {
         owned_array_whole_wrong_claim(1, u32::MAX);
+    }
+    #[test]
+    #[should_panic]
+    fn deferred_zero_owned_wrong_claim_panics() {
+        deferred_zero_owned_wrong_claim([DeferredZero; 2], 1);
     }
 }

@@ -5,7 +5,7 @@ use storage_locations::StorageLocation;
 use symbolic::ScalarSliceElement;
 
 #[derive(Clone, Debug)]
-enum OwnedChoiceShape {
+pub(super) enum OwnedChoiceShape {
     Primitive(ScalarSliceElement),
     Tuple(Vec<OwnedChoiceShape>),
     Array(Vec<OwnedChoiceShape>),
@@ -16,8 +16,8 @@ enum OwnedChoiceShape {
     ByteArray(usize),
 }
 
-const MAX_CHOICE_NODES: usize = 512;
-const MAX_CHOICE_DEPTH: usize = 16;
+pub(super) const MAX_CHOICE_NODES: usize = 512;
+pub(super) const MAX_CHOICE_DEPTH: usize = 16;
 
 impl<'tcx> Engine<'tcx> {
     pub(super) fn typed_owned_array_choice(
@@ -51,7 +51,16 @@ impl<'tcx> Engine<'tcx> {
         let mut nodes = 0;
         for value in elements {
             let mut leaves = Vec::new();
-            flatten(&self.terms, bits, &shape, value, 0, &mut nodes, &mut leaves)?;
+            let value = self.prepare_closed_product(*element, &shape, value, nodes)?;
+            flatten(
+                &self.terms,
+                bits,
+                &shape,
+                &value,
+                0,
+                &mut nodes,
+                &mut leaves,
+            )?;
             for (position, (kind, leaf)) in leaves.into_iter().enumerate() {
                 if kind == ScalarSliceElement::Char {
                     self.prove_char_value(&leaf, conditions)?;
@@ -146,12 +155,19 @@ impl<'tcx> Engine<'tcx> {
         )?;
         let mut nodes = 0;
         let replacement = self
-            .product_leaves(bits, &shape, replacement, &state.conditions, &mut nodes)
+            .product_leaves(
+                *element,
+                bits,
+                &shape,
+                replacement,
+                &state.conditions,
+                &mut nodes,
+            )
             .map_err(|error| format!("owned array write replacement: {error}"))?;
         let mut updated = Vec::new();
         for (position, value) in elements.iter().enumerate() {
             let old = self
-                .product_leaves(bits, &shape, value, &state.conditions, &mut nodes)
+                .product_leaves(*element, bits, &shape, value, &state.conditions, &mut nodes)
                 .map_err(|error| format!("owned array write candidate {position}: {error}"))?;
             let condition = self.terms.apply(
                 Op::Equal,
@@ -177,6 +193,7 @@ impl<'tcx> Engine<'tcx> {
 
     fn product_leaves(
         &self,
+        original: Ty<'tcx>,
         bits: u32,
         shape: &OwnedChoiceShape,
         value: &Value,
@@ -184,7 +201,8 @@ impl<'tcx> Engine<'tcx> {
         nodes: &mut usize,
     ) -> Result<Vec<Value>, String> {
         let mut leaves = Vec::new();
-        flatten(&self.terms, bits, shape, value, 0, nodes, &mut leaves)?;
+        let value = self.prepare_closed_product(original, shape, value, *nodes)?;
+        flatten(&self.terms, bits, shape, &value, 0, nodes, &mut leaves)?;
         leaves
             .into_iter()
             .map(|(kind, value)| {
@@ -515,7 +533,7 @@ fn conditional_product(
     Ok(result)
 }
 
-fn rebuild(
+pub(super) fn rebuild(
     context: &Context,
     pointer_bits: u32,
     shape: &OwnedChoiceShape,

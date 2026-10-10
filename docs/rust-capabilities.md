@@ -11,8 +11,8 @@ execution at O0 and O2, positive/refuted/unknown controls, a source mutation tha
 structured UNKNOWN reporting, and passing repository checks. Completion establishes a repeatable
 baseline. It does not establish full Rust support or a completed memory-model refactor.
 
-The manifest contains 91 cases across 32 families. Each build configuration expects 38 PROVED,
-33 REFUTED and 20 UNKNOWN results. Stage 133 originally had 23 cases with 10 PROVED, 9 REFUTED
+The manifest contains 94 cases across 33 families. Each build configuration expects 39 PROVED,
+34 REFUTED and 21 UNKNOWN results. Stage 133 originally had 23 cases with 10 PROVED, 9 REFUTED
 and 4 UNKNOWN; stage 134 closed its retained-prefix projection gap. Stage 136 adds raw-pointer
 metadata P/R controls and a safe core reference-array grant that remains UNKNOWN without a
 temporal permission certificate. Stage 137 adds tuple-array P/R and unsupported symbolic-write
@@ -138,6 +138,15 @@ retain the same live allocation and write checks. Constant and uniquely determin
 their earlier paths. Nested post-Index stores, reference destinations and deferred lazy nominal
 input candidates retain separate UNKNOWN frontiers. The unchanged tuple symbolic write now
 proves; shared P/R/missing-actual-replacement-body controls record the additional family.
+
+Stage 161 supports closed deferred input products with no observable primitive data in the
+compiler-typed owned read/write protocols. Complete original compiler types and descriptor
+metadata are checked, including unused N=0 children. Expanded occurrences consume the existing
+candidate budget before reconstruction. Nominal fields remain exact and no symbols are generated.
+Ordinary scalar-containing deferred inputs require future source reservation evidence and stay
+outside this admission. The unchanged nominal-zero write now proves. Owned align_of_val on a
+nested copied product still has a separate intrinsic frontier; successful reconstruction does
+not supply that API model. Actual custom methods, Clone and equality retain their bodies/effects.
 
 ## UNKNOWN categories
 

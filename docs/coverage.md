@@ -1390,3 +1390,18 @@ native O0/O2 execution; original native tests pass. The unchanged nominal zero-s
 remains UNKNOWN because its old candidate is a deferred lazy input, while its replacement retains
 nominal identity. The unchanged tuple whole-write source now proves. The shared 91-case/32-family
 baseline expects 152 PROVED, 132 REFUTED and 80 UNKNOWN across four configurations.
+
+
+Stage 161 reconstructs closed zero-observable-leaf deferred owned input products under the exact
+original compiler type certificate. Complete descriptor shape, fields, N=0 children, slot/height
+arithmetic, seed context and expanded costs are checked before rebuilding nominal values. The
+private typed reader and writer share this preparation; generic input observation is unchanged.
+No primitive symbols, alias rights, lifetime facts or assumptions are created.
+
+The 19-root host/ARM O0/O2 matrix yields 7 PROVED, 4 REFUTED and 8 UNKNOWN per build. Nominal,
+nested, aligned and const-generic copy/write routes, actual marker/Clone/equality bodies and
+read-only MAX metadata are checked. Actual marker mutation refutes and fails valid native
+O0/O2 execution. The unchanged nominal-zero source now proves; an unchanged nested owned
+alignment claim retains its separate intrinsic UNKNOWN. Ordinary scalar-containing deferred
+products require an engine-issued source reservation certificate before broader expansion.
+The shared 94-case/33-family baseline expects 156 PROVED, 136 REFUTED and 84 UNKNOWN across builds.

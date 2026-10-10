@@ -86,10 +86,6 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
                     UnknownCategory::Semantics,
                     "array write index is not uniquely determined",
                 ),
-                "nominal_zero" => (
-                    UnknownCategory::Unclassified,
-                    "typed struct choice value differs from exact compiler shape",
-                ),
                 "oversized" => (
                     UnknownCategory::ResourceLimit,
                     "composite slice type array exceeds the 128-element shape budget",
@@ -153,7 +149,7 @@ fn whole_owned_array_writes_preserve_selected_products_and_untouched_siblings() 
         ("float_char", ProofStatus::Proved),
         ("sequential", ProofStatus::Proved),
         ("allocated_source", ProofStatus::Proved),
-        ("nominal_zero", ProofStatus::Unknown),
+        ("nominal_zero", ProofStatus::Proved),
         ("unit_product", ProofStatus::Proved),
         ("constant_reference", ProofStatus::Proved),
         ("wrong_field", ProofStatus::Refuted),

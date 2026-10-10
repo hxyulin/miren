@@ -30,6 +30,7 @@ mod atomic_rmw;
 mod builtins;
 mod call_metadata;
 mod characters;
+mod closed_product_inputs;
 mod closure_captures;
 mod composite_slices;
 mod constants;

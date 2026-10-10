@@ -3750,3 +3750,60 @@ All 272 earlier completed P/R roots retain identical obligation statuses, detail
 across four configurations. Actual by-value helper mutation and native execution ledgers remain
 at `/tmp/miren-stage160-final-evidence`. Independent review approves the original-type write
 certificate and unchanged-source expectation maintenance; no conditional assumptions are added.
+
+
+## Stage 161: bounded closed deferred product inputs
+
+A private preparation module serves compiler-typed owned array reads and whole-element writes.
+It admits only already certified pure products with no observable primitive data. The actual
+original Ty remains available at every descriptor descendant, including the unused element of
+N=0 arrays; expanded shape names or normalized input-builder fields do not replace that evidence.
+Copy/Freeze/no-drop, original restricted fields, ordinary struct admission, ABI and type budgets
+remain the first certificate.
+
+Descriptor preflight checks exact kind, names and ordered fields, counts and original children,
+canonical slot modes, recomputed height, seed Boolean context and checked offset arithmetic.
+Expanded occurrence cost, including repeated shared descriptor nodes, is charged against the
+existing cumulative 512-node/depth-16 budget before allocating or rebuilding. Concrete malformed
+aggregates are refused before copying oversized carriers. Exact nominal products are reconstructed
+without emitting symbols, replacing structs with Unit or altering generic ValueInput observers.
+Existing read/write priority, bounds, live backing and transactional commit remain intact.
+
+General scalar-containing deferred expansion is deliberately separate: current Engine metadata
+has no source reservation ledger to certify symbol-offset provenance. Matching seed context and
+numerical bounds cannot establish that certificate. The closed subset needs no primitive symbol
+ranges and introduces no input assumption, ownership effect or raw permission.
+
+The dedicated 19-root matrix yields 7 PROVED, 4 REFUTED and 8 UNKNOWN per host/ARM O0/O2 build.
+Nominal, nested, aligned and const-generic copies/writes, pure zero-byte tuple products, actual
+marker/Clone/equality bodies and safe constant-work MAX slice controls are checked. A real marker
+method is changed from TAG to TAG+1; unchanged claims refute in all four profiles with the same
+obligation query/model and actual method entry. Six original native tests pass at O0/O2 while
+valid mutation guards fail. Durable commands, reports, source/binary hashes, full outputs and
+timeouts remain at `/tmp/miren-stage161-final-evidence`.
+
+The original Stage 160 nominal_zero source now proves in all four profiles; only its harness
+expectation and obsolete UNKNOWN arm change. The original nested alignment claim stays UNKNOWN
+at its separate owned align_of_val intrinsic frontier; a distinct nested_copy verifies the same
+reconstruction without rewriting that claim. Drop, original restricted/ref/raw/core N=0 children,
+retained writes, dead backing and resource controls retain their actual producer frontiers.
+Two descriptor metadata units, seventeen related integration tests and four final focused tests
+pass, as do build/lint/fmt. Independent source and focused-evidence review approves the closed
+reconstruction certificate.
+
+Three shared const-generic owned-zero P/R/missing actual method-result body U controls yield
+94 cases across 33 families, expecting 39 PROVED, 34 REFUTED and 21 UNKNOWN per configuration.
+The two shared baseline integration tests pass.
+
+
+Full isolated validation passes 665 Rust tests and 68 Python tests, formatting, cargo lint,
+release builds, cargo deny, documentation build and manual hooks. Main's complete 614 tracked
+files match the validated snapshot byte for byte. Fresh debug/release builds, seventeen new/related
+integration tests, 68 Python tests and the remaining required checks also pass in main. Frozen
+isolated and merged surveys retain 156 PROVED, 136 REFUTED and 84 UNKNOWN at
+`/tmp/miren-stage161-capabilities-20261010` and
+`/tmp/miren-stage161-merged-capabilities-20261010`, with current source/input/release hashes verified.
+All 284 earlier completed P/R roots retain identical obligation statuses, details and query text
+across four configurations. The actual marker mutation and native execution ledgers remain at
+`/tmp/miren-stage161-final-evidence`. Independent review approves the bounded symbol-free
+reconstruction and unchanged-source expectation maintenance; no conditional assumptions are added.
