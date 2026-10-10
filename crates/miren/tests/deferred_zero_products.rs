@@ -91,7 +91,6 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
                 "analyzer_only::dead_empty" => {
                     (UnknownCategory::Unclassified, "dead or uninitialized")
                 }
-                "nested" => (UnknownCategory::Unclassified, "::intrinsics::align_of_val"),
                 "drop_zero" => (
                     UnknownCategory::Unclassified,
                     "core::ptr::drop_glue bb2: static views require sized layouts",
@@ -164,7 +163,7 @@ fn deferred_zero_products_preserve_exact_nominal_types_and_actual_method_effects
     let entries = [
         ("marker_claim", ProofStatus::Proved),
         ("whole_write", ProofStatus::Proved),
-        ("nested", ProofStatus::Unknown),
+        ("nested", ProofStatus::Proved),
         ("unit_name", ProofStatus::Proved),
         ("nested_copy", ProofStatus::Proved),
         ("zero_tuple", ProofStatus::Proved),

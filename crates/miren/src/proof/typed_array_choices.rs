@@ -82,6 +82,30 @@ impl<'tcx> Engine<'tcx> {
         }
         Ok(Some(result))
     }
+    pub(super) fn validate_owned_product(
+        &self,
+        original: Ty<'tcx>,
+        value: &Value,
+        conditions: &[Term],
+    ) -> Result<(), String> {
+        let shape = self.owned_product_shape(original)?.ok_or_else(|| {
+            self.categorized_error(
+                UnknownCategory::Semantics,
+                "sized alignment requires an exact primitive or pure owned product".into(),
+            )
+        })?;
+        let mut nodes = 0;
+        self.product_leaves(
+            original,
+            u32::from(self.tcx.sess.target.pointer_width),
+            &shape,
+            value,
+            conditions,
+            &mut nodes,
+        )?;
+        Ok(())
+    }
+
     fn owned_product_shape(&self, original: Ty<'tcx>) -> Result<Option<OwnedChoiceShape>, String> {
         if let Some(kind) = self.scalar_slice_element(original)? {
             return Ok(Some(OwnedChoiceShape::Primitive(kind)));

@@ -513,6 +513,23 @@
       "expected": "unknown",
       "unknown_reason": "no compiler-exported Rust definition matches the foreign symbol",
       "unknown_category": "missing_compiler_evidence"
+    },
+    {
+      "entry": "safe_sized_alignment",
+      "family": "safe_sized_alignment",
+      "expected": "proved"
+    },
+    {
+      "entry": "safe_sized_alignment_wrong_claim",
+      "family": "safe_sized_alignment",
+      "expected": "refuted"
+    },
+    {
+      "entry": "safe_sized_alignment_missing_body",
+      "family": "safe_sized_alignment",
+      "expected": "unknown",
+      "unknown_reason": "no compiler-exported Rust definition matches the foreign symbol",
+      "unknown_category": "missing_compiler_evidence"
     }
   ]
 }

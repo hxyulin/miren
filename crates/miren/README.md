@@ -670,7 +670,14 @@ type, extent and the selected API body remain certified before size results. The
 `align_of_val` API also returns the compiler element ABI alignment for certified readonly scalar
 and composite slices, including empty and zero-sized views, after the same type, extent, source
 lifetime and selected-body checks. Raw dynamic layout APIs, deprecated aliases and trait-object
-metadata receive no new support. Readonly shared iteration retains the same compiler type, source
+metadata receive no new support. The exact safe core `align_of_val` API additionally supports
+sized primitive and certified pure owned products, including nominal aligned zero-sized structs.
+It validates the original shared receiver graph, live projections, exact original pointee and
+complete typed carrier before requiring the selected API body and returning compiler ABI
+alignment. Closed deferred zero-observable products retain their nominal metadata; deferred scalar
+inputs require their separate source certificate. This gives no raw/static decoding or padding
+access rights. Existing sized `size_of_val` and raw sized size behavior remains unchanged.
+Readonly shared iteration retains the same compiler type, source
 graph and original caller allocation.
 
 Ordinary local and dependency struct slice elements retain the exact original compiler type and

@@ -142,9 +142,14 @@ impl<'tcx> Engine<'tcx> {
         {
             return Ok(Some(value));
         }
-        if let Some(value) =
-            self.layout_intrinsic(instance, signature, values, state, (caller, span))?
-        {
+        if let Some(value) = self.layout_intrinsic(
+            instance,
+            signature,
+            values,
+            raw_values,
+            state,
+            (caller, span),
+        )? {
             return Ok(Some(value));
         }
         self.check_fence_ordering(instance, signature, values, state, (caller, span))?;

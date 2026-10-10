@@ -1405,3 +1405,21 @@ O0/O2 execution. The unchanged nominal-zero source now proves; an unchanged nest
 alignment claim retains its separate intrinsic UNKNOWN. Ordinary scalar-containing deferred
 products require an engine-issued source reservation certificate before broader expansion.
 The shared 94-case/33-family baseline expects 156 PROVED, 136 REFUTED and 84 UNKNOWN across builds.
+
+
+Stage 162 adds exact safe sized `core::mem::align_of_val` for primitive and certified pure product
+receivers. The actual compiler-resolved public core API, safe shared Rust signature, original
+receiver graph and live projection, original type/product metadata and selected body are checked
+before returning target ABI alignment. Closed nominal zero-byte inputs retain their exact type
+and explicit alignment. Static/raw/mutable handles and unsupported original products remain
+conservative; no payload dereference permission follows from layout metadata. Dynamic slice
+alignment and existing safe/raw sized size queries retain their separate behavior.
+
+The dedicated 20-root host/ARM O0/O2 matrix yields 10 PROVED, 4 REFUTED and 6 UNKNOWN per build.
+Primitive, padded, aligned, generic, copied, incoming shared and caller-backed returned-field
+receivers are checked. The original deferred_zero_products nested source now proves across all
+four profiles; only its harness expectation changes. Real generic helper result+1 mutations
+refute, and valid native original tests pass while mutation guards fail at O0/O2. Raw alignment,
+invalid/dead reference formation, opaque traits and unsupported wrappers retain their actual
+frontiers. The shared 97-case/34-family baseline expects 160 PROVED, 140 REFUTED and 88 UNKNOWN
+across four configurations; no fleet coverage claim follows from that inventory.

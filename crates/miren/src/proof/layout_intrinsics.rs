@@ -34,12 +34,16 @@ impl<'tcx> Engine<'tcx> {
         instance: ty::Instance<'tcx>,
         signature: ty::FnSig<'tcx>,
         values: &[Value],
+        raw_values: &[Value],
         state: &mut State,
         location: (DefId, Span),
     ) -> Result<Option<Value>, String> {
         let callee = instance.def_id();
         if self.is_core_align_of_val(callee) {
             let ty = instance.args.type_at(0);
+            if ty.is_sized(self.tcx, ty::TypingEnv::fully_monomorphized()) {
+                return self.sized_reference_alignment(instance, signature, ty, raw_values, state);
+            }
             let ty::Slice(element) = ty.kind() else {
                 return Ok(None);
             };
@@ -238,6 +242,68 @@ impl<'tcx> Engine<'tcx> {
             "compiler-sized value or slice length times compiler element size",
         );
         Ok(Some(size))
+    }
+
+    fn sized_reference_alignment(
+        &mut self,
+        instance: ty::Instance<'tcx>,
+        signature: ty::FnSig<'tcx>,
+        original: Ty<'tcx>,
+        raw_values: &[Value],
+        state: &State,
+    ) -> Result<Option<Value>, String> {
+        if signature.safety() != rustc_hir::Safety::Safe
+            || signature.abi() != rustc_abi::ExternAbi::Rust
+            || signature.c_variadic()
+            || signature.output() != self.tcx.types.usize
+            || !matches!(signature.inputs(), [input]
+                if matches!(input.kind(), ty::Ref(_, pointee, mutability)
+                    if *pointee == original && !mutability.is_mut()))
+        {
+            return Err("sized alignment requires the exact safe shared-reference API".into());
+        }
+        let [receiver] = raw_values else {
+            return Err("sized alignment requires one original shared receiver".into());
+        };
+        self.validate_tracked_value(receiver, state)?;
+        let projected;
+        let value = match receiver {
+            Value::Reference { mutable: false, .. } => {
+                projected = self.reference_value(receiver, &state.memory, &state.conditions)?;
+                &projected
+            }
+            Value::Reference { mutable: true, .. }
+            | Value::StaticView { .. }
+            | Value::StaticSlice { .. }
+            | Value::TrackedPointer { .. }
+            | Value::RawPointer { .. }
+            | Value::RawSlice { .. } => {
+                return Err(self.categorized_error(
+                    UnknownCategory::Semantics,
+                    "sized alignment requires a certified ordinary shared receiver".into(),
+                ));
+            }
+            // Incoming immutable snapshots retain their existing value-domain certificate.
+            // The exact original pointee and complete carrier are validated below.
+            value => value,
+        };
+        self.validate_owned_product(original, value, &state.conditions)?;
+        self.instantiated_body(instance)?;
+        let bits = u32::from(self.tcx.sess.target.pointer_width);
+        let alignment = self.static_layout(original)?.align.abi.bytes();
+        if !alignment.is_power_of_two() || u128::from(alignment) > (u128::MAX >> (128 - bits)) {
+            return Err("sized alignment does not fit target usize".into());
+        }
+        self.record_model(
+            instance.def_id(),
+            "safe sized alignment; exact pure receiver and compiler ABI alignment",
+        );
+        Ok(Some(symbolic::integer(
+            &self.terms,
+            u128::from(alignment),
+            bits,
+            false,
+        )))
     }
 
     pub(super) fn byte_array_scalar_transmute(

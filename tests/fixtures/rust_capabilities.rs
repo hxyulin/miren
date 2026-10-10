@@ -750,6 +750,34 @@ pub fn deferred_zero_owned_missing_body(mut values: [DeferredZero<7>; 2], index:
     }
 }
 
+#[repr(align(64))]
+#[derive(Clone, Copy)]
+pub struct SizedLayoutZero;
+
+#[inline(never)]
+fn sized_layout_alignment(value: &SizedLayoutZero) -> usize {
+    core::mem::align_of_val(value)
+}
+
+pub fn safe_sized_alignment(value: SizedLayoutZero) {
+    assert!(sized_layout_alignment(&value) == 64);
+    assert!(core::mem::size_of_val(&value) == 0);
+}
+
+pub fn safe_sized_alignment_wrong_claim(value: SizedLayoutZero) {
+    assert!(sized_layout_alignment(&value) == 0);
+}
+
+#[cfg(not(test))]
+unsafe extern "Rust" {
+    fn opaque_sized_alignment(alignment: usize) -> usize;
+}
+
+#[cfg(not(test))]
+pub fn safe_sized_alignment_missing_body(value: SizedLayoutZero) -> usize {
+    unsafe { opaque_sized_alignment(sized_layout_alignment(&value)) }
+}
+
 #[cfg(test)]
 mod native {
     use super::*;
@@ -758,6 +786,7 @@ mod native {
     #[test]
     fn positives() {
         integers(199);
+        safe_sized_alignment(SizedLayoutZero);
         deferred_zero_owned_write([DeferredZero; 2], 0);
         deferred_zero_owned_write([DeferredZero; 2], 1);
         deferred_zero_owned_write([DeferredZero; 2], usize::MAX);
@@ -931,4 +960,10 @@ mod native {
     fn deferred_zero_owned_wrong_claim_panics() {
         deferred_zero_owned_wrong_claim([DeferredZero; 2], 1);
     }
+    #[test]
+    #[should_panic]
+    fn safe_sized_alignment_wrong_claim_panics() {
+        safe_sized_alignment_wrong_claim(SizedLayoutZero);
+    }
+
 }

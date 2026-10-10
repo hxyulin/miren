@@ -3574,7 +3574,8 @@ files match the validated snapshot byte for byte. Fresh debug/release builds, ei
 integration tests, the owned-repeat compatibility test, 68 Python tests and the remaining checks
 also pass in main. Frozen isolated and merged surveys each record 136 PROVED, 124 REFUTED and
 80 UNKNOWN at `/tmp/miren-stage157-capabilities-20261010` and
-`/tmp/miren-stage157-merged-capabilities-20261010`, with current source/input/release hashes verified.
+`/tmp/miren-stage157-merged-capabilities-20261010`, with current source/input/release hashes
+verified.
 All 252 earlier completed P/R roots retain identical obligation statuses, details and queries
 across four configurations. Independent source review approves the exact owned type certificate.
 
@@ -3626,7 +3627,8 @@ files match the validated snapshot byte for byte. Fresh debug/release builds, te
 integration tests, 68 Python tests and the remaining required checks also pass in main. Frozen
 isolated and merged surveys each record 144 PROVED, 128 REFUTED and 80 UNKNOWN at
 `/tmp/miren-stage158-capabilities-20261010` and
-`/tmp/miren-stage158-merged-capabilities-20261010`, with current source/input/release hashes verified.
+`/tmp/miren-stage158-merged-capabilities-20261010`, with current source/input/release hashes
+verified.
 All 260 earlier completed P/R roots retain identical obligation statuses, details and query text
 across four configurations. Independent review approves exact byte metadata and owned-copy effects.
 
@@ -3681,7 +3683,8 @@ files match the validated snapshot byte for byte. Fresh debug/release builds, th
 integration tests, 68 Python tests and the remaining required checks also pass in main. Frozen
 isolated and merged core-only surveys retain 144 PROVED, 128 REFUTED and 80 UNKNOWN at
 `/tmp/miren-stage159-capabilities-20261010` and
-`/tmp/miren-stage159-merged-capabilities-20261010`, with current source/input/release hashes verified.
+`/tmp/miren-stage159-merged-capabilities-20261010`, with current source/input/release hashes
+verified.
 All 272 earlier completed P/R roots retain identical obligation statuses, details and query text
 across four configurations. The separate actual dependency rlib matrix and native mutation ledgers
 remain at `/tmp/miren-stage159-final-evidence`. Independent review approves the exact external
@@ -3745,7 +3748,8 @@ files match the validated snapshot byte for byte. Fresh debug/release builds, ni
 integration tests, three additional storage compatibility tests, 68 Python tests and the remaining
 required checks also pass in main. Frozen isolated and merged surveys retain 152 PROVED,
 132 REFUTED and 80 UNKNOWN at `/tmp/miren-stage160-capabilities-20261010` and
-`/tmp/miren-stage160-merged-capabilities-20261010`, with current source/input/release hashes verified.
+`/tmp/miren-stage160-merged-capabilities-20261010`, with current source/input/release hashes
+verified.
 All 272 earlier completed P/R roots retain identical obligation statuses, details and query text
 across four configurations. Actual by-value helper mutation and native execution ledgers remain
 at `/tmp/miren-stage160-final-evidence`. Independent review approves the original-type write
@@ -3802,8 +3806,62 @@ files match the validated snapshot byte for byte. Fresh debug/release builds, se
 integration tests, 68 Python tests and the remaining required checks also pass in main. Frozen
 isolated and merged surveys retain 156 PROVED, 136 REFUTED and 84 UNKNOWN at
 `/tmp/miren-stage161-capabilities-20261010` and
-`/tmp/miren-stage161-merged-capabilities-20261010`, with current source/input/release hashes verified.
+`/tmp/miren-stage161-merged-capabilities-20261010`, with current source/input/release hashes
+verified.
 All 284 earlier completed P/R roots retain identical obligation statuses, details and query text
 across four configurations. The actual marker mutation and native execution ledgers remain at
 `/tmp/miren-stage161-final-evidence`. Independent review approves the bounded symbol-free
 reconstruction and unchanged-source expectation maintenance; no conditional assumptions are added.
+
+
+## Stage 162: exact safe sized alignment for certified Rust values
+
+The exact public core::mem::align_of_val identity gains a sized branch before its raw intrinsic
+wrapper executes. Its original monomorphic safe shared Rust signature and target-usize result
+remain explicit. Original receiver graph checks and live retained projections precede the exact
+primitive or pure owned product certificate. A small shared validation helper reuses original
+field types, Copy/Freeze/no-drop and ordinary struct admission, bounded closed-zero preparation,
+scalar context/sort and Char validity, without introducing a selection or write effect.
+
+The actual selected safe API body must be available before returning compiler ABI alignment,
+including nominal zero-byte values and explicit repr alignment. Missing bodies and source errors
+propagate. Static views, raw/mutable receiver handles and unsupported product carriers acquire
+no new path; unsupported raw alignment is an implementation frontier rather than proof that a
+sized raw metadata query is invalid Rust. Existing dynamic slice alignment and safe/raw sized
+size-query code remain unchanged. No new raw permission, hardware model or assumption is added.
+
+
+The dedicated 20-root matrix yields 10 PROVED, 4 REFUTED and 6 UNKNOWN per host/ARM O0/O2 build.
+Primitive, padded, explicit-alignment, generic, copied, incoming shared and caller-backed returned
+field receivers are covered. Same-name local helpers execute actual bodies. The legacy sized raw
+size control stays PROVED, while raw alignment and deprecated aliases retain their unmodeled
+intrinsic frontier. Invalid/dead reference construction, trait roots and unsupported wrappers
+remain UNKNOWN on their actual producer categories rather than an invented metadata access rule.
+
+A real generic noinline metadata helper is changed to add one to its measured alignment.
+Unchanged claims refute in all four builds with actual helper entry and same-obligation query/model.
+Six original native tests pass at O0/O2 and valid 129-element mutation guards fail. Complete
+commands, source/binary hashes, reports, outputs and timeouts are retained at
+`/tmp/miren-stage162-final-evidence`. The unchanged earlier nested alignment source independently
+proves in all four profiles before its harness expectation and obsolete UNKNOWN arm are maintained.
+No application claim is rewritten. Three existing metadata units, fifteen related integration
+tests and four focused new/earlier tests pass, with build/lint/fmt passing as well.
+
+Three shared safe-sized alignment P/R/missing actual invoked body U controls yield 97 cases across
+34 families, expecting 40 PROVED, 35 REFUTED and 22 UNKNOWN per configuration.
+The two shared baseline integration tests pass. Independent source and evidence review approves
+the exact safe API and receiver certificate.
+
+
+Full isolated validation passes 667 Rust tests and 68 Python tests, formatting, cargo lint,
+release builds, cargo deny, documentation build and manual hooks. Main's complete 616 tracked
+files match the validated snapshot byte for byte. Fresh debug/release builds, nineteen new/related
+integration tests, 68 Python tests and the remaining required checks also pass in main. Frozen
+isolated and merged surveys retain 160 PROVED, 140 REFUTED and 88 UNKNOWN at
+`/tmp/miren-stage162-capabilities-20261010` and
+`/tmp/miren-stage162-merged-capabilities-20261010`, with current source/input/release hashes
+verified. All 292 earlier completed P/R roots retain identical obligation statuses, details and
+query text across four configurations. The actual generic helper mutation and native execution
+ledgers remain at `/tmp/miren-stage162-final-evidence`. Independent review approves the exact
+safe API/source/type certificates and unchanged-source expectation maintenance; no conditional
+assumptions are added.

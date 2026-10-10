@@ -11,8 +11,8 @@ execution at O0 and O2, positive/refuted/unknown controls, a source mutation tha
 structured UNKNOWN reporting, and passing repository checks. Completion establishes a repeatable
 baseline. It does not establish full Rust support or a completed memory-model refactor.
 
-The manifest contains 94 cases across 33 families. Each build configuration expects 39 PROVED,
-34 REFUTED and 21 UNKNOWN results. Stage 133 originally had 23 cases with 10 PROVED, 9 REFUTED
+The manifest contains 97 cases across 34 families. Each build configuration expects 40 PROVED,
+35 REFUTED and 22 UNKNOWN results. Stage 133 originally had 23 cases with 10 PROVED, 9 REFUTED
 and 4 UNKNOWN; stage 134 closed its retained-prefix projection gap. Stage 136 adds raw-pointer
 metadata P/R controls and a safe core reference-array grant that remains UNKNOWN without a
 temporal permission certificate. Stage 137 adds tuple-array P/R and unsupported symbolic-write
@@ -55,6 +55,9 @@ Stage 155 adds local ordinary struct slice read P/R and deferred membership U co
 field identities/types and exact compiler layout validity are certified before arbitrary inputs.
 Stage 156 adds nominal local zero-size struct cursor P/R and missing invoked body U controls.
 Zero-byte struct nodes retain exact Adt identity and certify every original child before success.
+Stage 162 adds exact safe sized alignment P/R and missing invoked body U controls. Original
+primitive or pure product receivers retain their existing type and live-source certificates;
+the selected safe core API body precedes compiler ABI alignment metadata.
 These additions change the denominator, not a coverage percentage.
 Covered examples exercise arithmetic, enum payloads, array indexing, reference effects, concrete
 generics, closures, iterator callbacks, finite loops, destructors, fresh future polling and raw
@@ -64,7 +67,8 @@ array behind the existing single immutable caller-root certificate. Their length
 actual target byte extent; it has no 128-element input cap. Exact pure tuple and fixed-array
 primitive elements likewise admit arbitrary runtime lengths. Their expanded type shapes retain
 node/depth limits and a 128-element array shape budget, independently of the slice length.
-Ordinary local and dependency structs with exact original pure fields also use this domain. Copy, Freeze,
+Ordinary local and dependency structs with exact original pure fields also use this domain. Copy,
+Freeze,
 no-drop, compiler scalar validity and original field identities are checked at every struct node.
 Zero-byte struct nodes require an empty actual primitive inventory and retain nominal values.
 Packed/vector layouts, core and compiler-special ADTs and identity-bearing fields remain
@@ -251,3 +255,13 @@ complete file sets and contents. Manual formatting hooks exclude these upstream 
 identity. Change the source version and provenance manifest together when intentionally upgrading.
 Vendoring these fixtures does not replace the normal Cargo cache for miren's own dependencies or
 all optional upstream features. The core-only capability suite has no third-party dependency.
+
+
+Stage 162 extends safe `core::mem::align_of_val` to sized primitive and certified pure product
+receivers. The original shared receiver graph and retained projection are checked before exact
+original type, bounded product metadata and the selected safe API body. Copied nominal zero-byte
+products keep their alignment even though they have no primitive leaves. The result is compiler
+ABI alignment, including explicit alignment, rather than a leaf count or payload size.
+Static views, raw/mutable receiver handles, opaque and unsupported product carriers acquire no
+new alignment path. Existing dynamic slice alignment and safe/raw sized size-query semantics
+remain separate; a sized raw metadata query does not establish pointee access or validity.
