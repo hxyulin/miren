@@ -3341,6 +3341,7 @@ The shared manifest adds zero-size cursor P/R and missing invoked body U control
 25 families, expecting 29 PROVED, 26 REFUTED and 15 UNKNOWN per configuration. Its two baseline
 integration tests pass. Independent source and focused-evidence review approves the narrow stage.
 
+
 Final isolated and merged validation each passes 638 Rust tests and 68 Python tests, formatting,
 cargo lint, release builds, cargo deny, documentation build and manual hooks. Frozen evidence at
 `/tmp/miren-stage152-capabilities-20261010` and
@@ -3349,3 +3350,42 @@ cargo lint, release builds, cargo deny, documentation build and manual hooks. Fr
 completed P/R roots retain byte-identical obligation statuses, details and query text across all
 four configurations. Independent review approves the exact zero-byte/no-leaf certificate and
 retained source/bounds protocol.
+
+
+## Stage 153: safe dynamic byte size for read-only composite slices
+
+The exact safe core size_of_val API now observes certified composite slice length through the
+common read-only descriptor helper. Original compiler slice element identity, registry metadata,
+allocation extent and retained source lifetime remain checked. The selected ordinary core body
+must be available before empty or zero-byte success. The API signature is safe, fixed Rust with
+its exact reference input and target-usize result. Actual compiler element size includes padding;
+nonzero extent certificates establish that the target-usize product cannot wrap, and zero stride
+returns zero throughout the full target-usize length domain.
+
+Direct raw size APIs, RawSlice unwrapping, alignment APIs and arbitrary DSTs gain no support.
+Existing primitive and finite size observations keep their previous behavior. A user function
+with a matching name executes its actual body. No raw access, alias permission, input assumption,
+shape budget or comparator policy changes.
+
+The dedicated 22-root compiler matrix yields 7 PROVED, 4 REFUTED and 11 UNKNOWN per host/ARM O0/O2
+build. It checks padded tuples, nested arrays, derived views, valid extent, zero-byte MAX lengths,
+actual helper entry and same-obligation refutation query/model evidence. Actual helper size+1
+mutation refutes all profiles and fails valid native 129-element tests; original native tests
+include safe full-MAX zero-sized arrays. Lookalike wrong helper bodies refute. Dead empty/zero-byte
+backing, missing bodies, invalid element shapes and raw/alignment sources retain their actual
+categories and causes; raw controls stop at their earlier sized-pointee cast frontier. The unchanged
+Stage 152 size_of_val source now proves. Four focused and six related tests pass. Independent
+source and focused-evidence review approves the narrow extension.
+
+The shared manifest adds composite byte-size P/R and missing invoked body U controls: 73 cases
+across 26 families, expecting 30 PROVED, 27 REFUTED and 16 UNKNOWN per configuration.
+Its two shared baseline integration tests pass.
+
+Final isolated and merged validation each passes 640 Rust tests and 68 Python tests, formatting,
+cargo lint, release builds, cargo deny, documentation build and manual hooks. Frozen evidence at
+`/tmp/miren-stage153-capabilities-20261010` and
+`/tmp/miren-stage153-merged-capabilities-20261010` each records 120 PROVED, 108 REFUTED and
+64 UNKNOWN with unchanged frozen inputs/binaries and no collection errors. The 220 previously
+completed P/R roots retain byte-identical obligation statuses, details and query text across all
+four configurations. Independent review approves the exact safe API, retained body and compiler
+stride certificate without new raw permissions.

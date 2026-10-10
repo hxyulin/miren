@@ -381,6 +381,23 @@
       "expected": "unknown",
       "unknown_reason": "no compiler-exported Rust definition matches the foreign symbol",
       "unknown_category": "missing_compiler_evidence"
+    },
+    {
+      "entry": "composite_slice_byte_size",
+      "family": "composite_slice_byte_size",
+      "expected": "proved"
+    },
+    {
+      "entry": "composite_slice_byte_size_wrong_claim",
+      "family": "composite_slice_byte_size",
+      "expected": "refuted"
+    },
+    {
+      "entry": "composite_slice_byte_size_missing_body",
+      "family": "composite_slice_byte_size",
+      "expected": "unknown",
+      "unknown_reason": "no compiler-exported Rust definition matches the foreign symbol",
+      "unknown_category": "missing_compiler_evidence"
     }
   ]
 }

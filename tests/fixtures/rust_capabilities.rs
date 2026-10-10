@@ -517,6 +517,27 @@ pub fn zero_sized_slice_missing_body(values: &[[u32; 0]]) -> usize {
     unsafe { opaque_zero_sized_slice_length(values.len()) }
 }
 
+pub fn composite_slice_byte_size(values: &[(u8, u32)]) {
+    assert!(core::mem::size_of_val(values) == values.len() * core::mem::size_of::<(u8, u32)>());
+}
+
+pub fn composite_slice_byte_size_wrong_claim(values: &[(u8, u32)]) {
+    if !values.is_empty() {
+        let leaf_sizes = core::mem::size_of::<u8>() + core::mem::size_of::<u32>();
+        assert!(core::mem::size_of_val(values) == values.len() * leaf_sizes);
+    }
+}
+
+#[cfg(not(test))]
+unsafe extern "Rust" {
+    fn opaque_composite_slice_size(size: usize) -> usize;
+}
+
+#[cfg(not(test))]
+pub fn composite_slice_byte_size_missing_body(values: &[(u8, u32)]) -> usize {
+    unsafe { opaque_composite_slice_size(core::mem::size_of_val(values)) }
+}
+
 #[cfg(test)]
 mod native {
     use super::*;
@@ -525,6 +546,8 @@ mod native {
     #[test]
     fn positives() {
         integers(199);
+        composite_slice_byte_size(&[]);
+        composite_slice_byte_size(&[(3, 7); 129]);
         zero_sized_slice_cursor(&[], usize::MAX);
         zero_sized_slice_cursor(&[(); 129], 128);
         zero_sized_slice_cursor(&[(); 129], usize::MAX);
@@ -636,5 +659,10 @@ mod native {
     #[should_panic]
     fn zero_sized_slice_wrong_claim_panics() {
         zero_sized_slice_wrong_claim(&[(); 129]);
+    }
+    #[test]
+    #[should_panic]
+    fn composite_slice_byte_size_wrong_claim_panics() {
+        composite_slice_byte_size_wrong_claim(&[(3, 7); 129]);
     }
 }

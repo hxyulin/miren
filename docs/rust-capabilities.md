@@ -11,8 +11,8 @@ execution at O0 and O2, positive/refuted/unknown controls, a source mutation tha
 structured UNKNOWN reporting, and passing repository checks. Completion establishes a repeatable
 baseline. It does not establish full Rust support or a completed memory-model refactor.
 
-The manifest contains 70 cases across 25 families. Each build configuration expects 29 PROVED,
-26 REFUTED and 15 UNKNOWN results. Stage 133 originally had 23 cases with 10 PROVED, 9 REFUTED
+The manifest contains 73 cases across 26 families. Each build configuration expects 30 PROVED,
+27 REFUTED and 16 UNKNOWN results. Stage 133 originally had 23 cases with 10 PROVED, 9 REFUTED
 and 4 UNKNOWN; stage 134 closed its retained-prefix projection gap. Stage 136 adds raw-pointer
 metadata P/R controls and a safe core reference-array grant that remains UNKNOWN without a
 temporal permission certificate. Stage 137 adds tuple-array P/R and unsupported symbolic-write
@@ -47,6 +47,8 @@ nth P/R and missing invoked body U controls. Exact core Iter element types, reta
 sources and ordered live cursor bounds remain checked before metadata and element operations.
 Stage 152 adds pure zero-sized slice cursor P/R and missing invoked body U controls. Exact
 zero-byte shapes retain the full target-usize length domain with existing source and bounds checks.
+Stage 153 adds safe composite size_of_val P/R and missing invoked body U controls. Exact
+compiler element size includes padding; source/type/extent and selected ordinary body are checked.
 These additions change the denominator, not a coverage percentage.
 Covered examples exercise arithmetic, enum payloads, array indexing, reference effects, concrete
 generics, closures, iterator callbacks, finite loops, destructors, fresh future polling and raw
@@ -58,6 +60,8 @@ primitive elements likewise admit arbitrary runtime lengths. Their expanded type
 node/depth limits and a 128-element array shape budget, independently of the slice length.
 Pure zero-sized tuple/array elements are supported with an empty primitive inventory and full
 target-usize length metadata. Original inner types are certified even beneath zero-length arrays.
+Safe size_of_val uses their certified compiler stride and validated length, including zero stride.
+Raw size APIs and safe/raw alignment APIs retain their separate boundaries.
 Refined and identity-bearing element shapes remain unsupported. Whole composite
 membership and equality require separate consumer models. Shared composite iteration uses the
 same checked cursor protocol as primitive slices. Checked symbolic selection between

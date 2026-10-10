@@ -662,8 +662,12 @@ tuple/array elements retain the full target-usize length domain and reconstruct 
 values; original element types are certified even beneath empty arrays. Their source lifetime and
 iterator bounds remain checked. Refined or identity-bearing leaves, mutable/competing roots and raw
 access remain unsupported. Logical field storage gives no padding-byte or physical representation
-rights. Whole composite membership and equality remain explicit semantic `UNKNOWN` boundaries.
-Readonly shared iteration retains the same compiler type, source graph and original caller
+rights. Whole composite membership and equality remain explicit semantic `UNKNOWN` boundaries. The
+exact safe core `size_of_val` API uses retained composite length and the compiler's complete
+element size, including padding. Pure zero-sized elements have byte size zero at every valid
+target-usize length. Source lifetime, original element type, extent and the selected API body
+remain certified before size results; raw dynamic-size APIs and dynamic alignment receive no new
+support. Readonly shared iteration retains the same compiler type, source graph and original caller
 allocation.
 
 Concrete synchronous closures can carry supported read-only scalar slices and initialized pure

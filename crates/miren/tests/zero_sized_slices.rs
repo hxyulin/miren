@@ -85,7 +85,10 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
         if matches!(*expected, ProofStatus::Proved | ProofStatus::Refuted)
             && !matches!(
                 *name,
-                "bounds_at_end" | "falsely_isize_bounded" | "maximum_length_reachable"
+                "bounds_at_end"
+                    | "falsely_isize_bounded"
+                    | "maximum_length_reachable"
+                    | "unsupported_size_of_val"
             )
         {
             assert!(proof.models.iter().any(|model| {
@@ -98,10 +101,6 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
                 | "empty_drop" | "empty_refined" => (
                     UnknownCategory::Semantics,
                     "only read-only byte slices and byte arrays are modeled",
-                ),
-                "unsupported_size_of_val" => (
-                    UnknownCategory::Unclassified,
-                    "dynamic slice size requires retained length metadata",
                 ),
                 "oversized_shape" => (
                     UnknownCategory::ResourceLimit,
@@ -209,7 +208,7 @@ fn zero_sized_slices_preserve_full_lengths_and_sources() {
         ("falsely_isize_bounded", ProofStatus::Refuted),
         ("bounds_at_end", ProofStatus::Refuted),
         ("wrong_remaining", ProofStatus::Refuted),
-        ("unsupported_size_of_val", ProofStatus::Unknown),
+        ("unsupported_size_of_val", ProofStatus::Proved),
         ("mutable_root", ProofStatus::Unknown),
         ("competing_roots", ProofStatus::Unknown),
         ("empty_reference", ProofStatus::Unknown),

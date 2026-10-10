@@ -1286,3 +1286,18 @@ prove without source changes. Unsupported original leaves, mutable/competing roo
 missing bodies and dead backing retain their actual UNKNOWN frontiers. Whole-composite comparison
 and size_of_val remain separate boundaries. The shared 70-case/25-family baseline expects
 116 PROVED, 104 REFUTED and 60 UNKNOWN across all four configurations.
+
+
+Stage 153 supports the exact safe core size_of_val API for certified read-only composite slices.
+Its selected ordinary body, exact original element type, source lifetime and extent are checked
+before computing length times actual compiler stride, including tuple padding. Extent validation
+prevents product overflow for nonzero stride; pure zero-byte elements return zero even at MAX
+length. No raw descriptor is unwrapped or granted reference validity.
+
+The 22-root host/ARM O0/O2 matrix yields 7 PROVED, 4 REFUTED and 11 UNKNOWN per build. Padded stride,
+nested arrays, views, MAX zero-size arrays and actual helper calls pass. Actual size+1 helper
+mutation refutes and fails native 129-element tests; unrelated lookalike bodies also refute.
+The unchanged earlier size query now proves. Dead backing, missing bodies and unsupported types
+retain their actual UNKNOWNs. Raw size and safe alignment controls reach their earlier sized-pointee
+cast frontier; this stage supplies no raw or alignment model. The shared 73-case/26-family
+baseline expects 120 PROVED, 108 REFUTED and 64 UNKNOWN across the four configurations.

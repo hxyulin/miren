@@ -120,6 +120,22 @@ impl<'tcx> Engine<'tcx> {
                 return Err("dynamic size requires a sized type or modeled slice metadata".into());
             };
             let length = match value.materialize()? {
+                storage @ Value::CompositeSlice { .. } if reference_api => {
+                    if signature.safety() != rustc_hir::Safety::Safe
+                        || signature.abi() != rustc_abi::ExternAbi::Rust
+                        || signature.c_variadic()
+                    {
+                        return Err("composite dynamic size requires a safe fixed Rust API".into());
+                    }
+                    self.validate_readonly_slice_value(
+                        ty,
+                        &storage,
+                        &state.memory,
+                        &state.conditions,
+                    )?;
+                    self.instantiated_body(instance)?;
+                    self.readonly_slice_length(&storage, &state.conditions)?
+                }
                 storage @ Value::ScalarSlice { .. } => {
                     self.validate_readonly_slice_value(
                         ty,
