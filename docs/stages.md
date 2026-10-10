@@ -4201,3 +4201,51 @@ four configurations. Independent review approves final source, actual getter mut
 64-element native evidence. Eager and typed dangling-reference returns now retain Semantics
 UNKNOWN, while supported comparisons advance without source changes. No assumptions, input caps
 or resource-budget changes are introduced.
+
+
+## Stage 169: known outer indices with symbolic nested owned writes
+
+The previous owned writer deliberately keeps compiler-constant and solver-unique outer stores
+on their older path. A symbolic inner index can still reach an unsupported projected-write
+boundary. The proposed extension reuses the certified indexed product plan after that precise
+old-writer refusal, preserving already supported byte writes and their queries. Full original
+parent types, current owner, bounds, effects and transaction checks remain required.
+
+Three new shared controls retain actual three-root 64-element arrays and unchanged selected-cell,
+untouched-cell and wrong-cell claims. Before/after outcomes and validation remain pending.
+
+Before probes return UNKNOWN for the valid and false claims at the projected-write boundary,
+while the missing replacement body retains its compiler-evidence frontier, across all four
+configurations. Commands, source/analyzer hashes and original reports remain at
+`/tmp/miren-stage169-shared-expanded-before`. No assumptions are introduced.
+
+Initial shared after-probes yield PROVED for selected and untouched-cell claims, REFUTED for the
+wrong-cell claim, and missing-actual-body UNKNOWN in every host/ARM O0/O2 build with empty
+assumptions. Commands, hashes and reports remain at
+`/tmp/miren-stage169-shared-expanded-after`; final immutable capture remains pending. A separate
+byte-store control proves before this extension and requires identical completed queries after it.
+
+The dedicated 27-root matrix yields 14 PROVED, 5 REFUTED and 8 UNKNOWN across host/ARM O0/O2.
+The unchanged original known_outer claim independently proves in all four configurations before
+harness-only expectation upkeep. New and maintained focused compiler tests pass; exact byte-store
+query compatibility and final immutable mutation/native evidence remain pending.
+
+Final immutable reports retain the 27-root 14/5/8 matrix across all four builds. A real by-value
+helper changes the selected inner index to inner XOR 1; unchanged claims refute in every build
+with actual helper entry and the same failing query/model. Valid originals pass seven native
+tests at O0/O2; mutant guards exit 101. Complete commands, hashes, reports, outputs and
+ten-second native timeouts remain at `/tmp/miren-stage169-final-evidence`. All seven completed
+byte-store obligations and query texts remain identical in each profile to the immutable stage168
+analyzer on the same final fixture source. No new byte-write support is claimed. Four focused
+compiler tests, twenty-one related tests and four metadata controls pass. Full validation pending.
+
+
+Final frozen validation passes 692 Rust tests and 68 Python tests in the isolated workspace.
+All 632 tracked main files match that snapshot byte for byte. Fresh main debug/release builds,
+twenty-five new/related integration tests, 68 Python tests and every remaining required check pass.
+Both surveys retain 192 PROVED, 168 REFUTED and 116 UNKNOWN, with source/input/release hashes
+verified, at `/tmp/miren-stage169-capabilities-20261010` and
+`/tmp/miren-stage169-merged-capabilities-20261010`. All 352 earlier completed roots preserve
+identical status, obligation details and query text across four profiles. Independent review
+approves final source, actual helper mutation and valid native evidence. No assumptions, input
+caps or resource-budget changes are introduced.

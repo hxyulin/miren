@@ -11,8 +11,8 @@ execution at O0 and O2, positive/refuted/unknown controls, a source mutation tha
 structured UNKNOWN reporting, and passing repository checks. Completion establishes a repeatable
 baseline. It does not establish full Rust support or a completed memory-model refactor.
 
-The manifest contains 116 cases across 40 families. Each build configuration expects 47 PROVED,
-41 REFUTED and 28 UNKNOWN results. Stage 133 originally had 23 cases with 10 PROVED, 9 REFUTED
+The manifest contains 119 cases across 41 families. Each build configuration expects 48 PROVED,
+42 REFUTED and 29 UNKNOWN results. Stage 133 originally had 23 cases with 10 PROVED, 9 REFUTED
 and 4 UNKNOWN; stage 134 closed its retained-prefix projection gap. Stage 136 adds raw-pointer
 metadata P/R controls and a safe core reference-array grant that remains UNKNOWN without a
 temporal permission certificate. Stage 137 adds tuple-array P/R and unsupported symbolic-write
@@ -81,6 +81,11 @@ A projection-carried compiler type certificate preserves the actual owner and va
 storage during later reference reads. Compiler-reference return checks reject eager and typed
 frame-owned escapes before snapshot conversion. Seven older unchanged claims independently
 advance to PROVED. Frozen surveys and all required validation pass.
+Stage 169 adds known outer and symbolic nested owned-write P/R and missing replacement body U
+controls. The earlier writer runs first; only its precise unsupported index boundary admits the
+existing typed transaction. Already supported byte writes retain identical completed queries.
+Original full parent types, complete candidates, bounds, context and owner checks precede commit.
+Frozen surveys and all required validation pass.
 These additions change the denominator, not a coverage percentage.
 Covered examples exercise arithmetic, enum payloads, array indexing, reference effects, concrete
 generics, closures, iterator callbacks, finite loops, destructors, fresh future polling and raw

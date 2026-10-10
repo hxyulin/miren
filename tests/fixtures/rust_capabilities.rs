@@ -1124,6 +1124,58 @@ pub fn retained_owned_array_missing_body(
     }
 }
 
+pub fn known_owned_array_write(
+    mut first: [[u16; 2]; 64],
+    _second: [[u16; 2]; 64],
+    _third: [[u16; 2]; 64],
+    inner: usize,
+    replacement: u16,
+) {
+    if inner < 2 {
+        let before = first[0];
+        let other = first[63];
+        first[0][inner] = replacement;
+        let selected = first[0];
+        assert!(selected[inner] == replacement);
+        assert!(selected[inner ^ 1] == before[inner ^ 1]);
+        assert!(first[63] == other);
+    }
+}
+
+pub fn known_owned_array_wrong_claim(
+    mut first: [[u16; 2]; 64],
+    _second: [[u16; 2]; 64],
+    _third: [[u16; 2]; 64],
+    inner: usize,
+    replacement: u16,
+) {
+    if inner < 2 {
+        first[0][inner] = replacement;
+        let selected = first[0];
+        assert!(selected[inner ^ 1] == replacement);
+    }
+}
+
+#[cfg(not(test))]
+unsafe extern "Rust" {
+    fn opaque_known_array_replacement() -> u16;
+}
+
+#[cfg(not(test))]
+pub fn known_owned_array_missing_body(
+    mut first: [[u16; 2]; 64],
+    _second: [[u16; 2]; 64],
+    _third: [[u16; 2]; 64],
+    inner: usize,
+) {
+    if inner < 2 {
+        let replacement = unsafe { opaque_known_array_replacement() };
+        first[0][inner] = replacement;
+        let selected = first[0];
+        assert!(selected[inner] == replacement);
+    }
+}
+
 #[cfg(test)]
 mod native {
     use super::*;
@@ -1151,6 +1203,10 @@ mod native {
         }
         for index in [0, 63, 64, usize::MAX] {
             retained_owned_array_read([[3, 7]; 64], [[5, 11]; 64], [[13, 17]; 64], index);
+        }
+        for inner in [0, 1, 2, usize::MAX] {
+            known_owned_array_write([[3, 7]; 64], [[5, 11]; 64], [[13, 17]; 64],
+                inner, u16::MAX);
         }
         safe_sized_alignment(SizedLayoutZero);
         deferred_zero_owned_write([DeferredZero; 2], 0);
@@ -1338,6 +1394,11 @@ mod native {
         let first = [ReservedRecord { left: 3, right: 7 }; 64];
         let second = [ReservedRecord { left: 5, right: 11 }; 64];
         registered_product_wrong_claim(first, second, first, 63);
+    }
+    #[test]
+    #[should_panic]
+    fn known_owned_array_wrong_claim_panics() {
+        known_owned_array_wrong_claim([[3, 7]; 64], [[5, 11]; 64], [[13, 17]; 64], 1, 19);
     }
     #[test]
     #[should_panic]

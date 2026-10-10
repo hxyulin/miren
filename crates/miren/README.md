@@ -724,7 +724,14 @@ leaf terms and Float bit certificates survive the complete nominal rebuild. Both
 exact homogeneous child types are certified before the same owned-storage transaction. A second
 symbolic nested index, reference/raw/static destinations, dereferences, downcasts and call
 destinations retain their existing unsupported frontiers. Known outer-index stores retain their
-existing paths, including any unsupported nested operations.
+existing paths. After the old writer returns an exact unsupported nonunique-index frontier,
+a known literal or path-entailed outer index can use the same certified symbolic-inner update.
+This fallback validates the complete original parent and every candidate before committing to the
+same owner allocation. Untouched rows retain their exact values; only the proven outer row receives
+jointly correlated inner updates. Existing successful byte stores and their queries run first and
+remain unchanged. The rvalue and destination validity checks execute once. Missing bodies,
+permission failures and solver/resource errors cannot trigger this fallback. Reference/raw/static
+and call destinations gain no support.
 Assignment targets retain complete parent and replacement validation, including siblings and
 zero-leaf fields. Deferred input products with no observable scalar leaves can be reconstructed
 after exact original-type and descriptor validation. Nominal zero-sized structs

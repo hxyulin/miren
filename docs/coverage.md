@@ -1522,3 +1522,12 @@ A custom MIR test exposed an older eager-array return boundary that converted a 
 reference into an owned snapshot. Compiler-correlated returned-reference graph validation now
 precedes that conversion; owned-value representation remains separate. Dedicated eager and issued
 projection escape controls retain their original claims and require UNKNOWN.
+
+
+Stage 169 admits a constant or condition-entailed owned outer array index followed by one symbolic
+nested index after the older writer reaches its precise unsupported boundary. Original Rvalue
+effects and destination checks occur once. Successful byte stores keep their existing path;
+unsupported body, permission, solver and resource failures never trigger a successful fallback.
+Full original parent and candidate types, bounds, context and complete transaction checks retain
+the existing budgets and same owner. Typed references, raw paths and call destinations acquire
+no writer. Frozen host/ARM O0/O2 surveys and all required validation pass.

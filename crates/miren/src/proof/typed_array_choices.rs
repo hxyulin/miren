@@ -30,6 +30,12 @@ enum ProductWritePlan<'tcx> {
     },
 }
 
+#[derive(Clone, Copy)]
+enum OwnedWriteMode {
+    Nonunique,
+    Known,
+}
+
 struct ProductUpdate<'a> {
     span: std::ops::Range<usize>,
     leaves: &'a [Value],
@@ -37,6 +43,14 @@ struct ProductUpdate<'a> {
 
 pub(super) const MAX_CHOICE_NODES: usize = 512;
 pub(super) const MAX_CHOICE_DEPTH: usize = 16;
+
+pub(super) fn known_owned_write_frontier(error: &str) -> bool {
+    matches!(
+        error,
+        "non-scalar array index is not uniquely determined on this path"
+            | "array write index is not uniquely determined"
+    )
+}
 
 impl<'tcx> Engine<'tcx> {
     pub(super) fn typed_owned_array_choice(
@@ -147,10 +161,84 @@ impl<'tcx> Engine<'tcx> {
         place: Place<'tcx>,
         replacement: &Value,
     ) -> Result<bool, String> {
-        let Some((ProjectionElem::Index(index_local), fields)) = place.projection.split_first()
-        else {
+        self.write_owned_array_element_mode(
+            body,
+            state,
+            place,
+            replacement,
+            OwnedWriteMode::Nonunique,
+        )
+    }
+
+    pub(super) fn known_owned_array_write_candidate(
+        &self,
+        body: &Body<'tcx>,
+        place: Place<'tcx>,
+    ) -> bool {
+        matches!(body.local_decls[place.local].ty.kind(), ty::Array(..))
+            && matches!(
+                place.projection.first(),
+                Some(
+                    ProjectionElem::Index(_)
+                        | ProjectionElem::ConstantIndex {
+                            from_end: false,
+                            ..
+                        }
+                )
+            )
+            && place.projection.iter().skip(1).all(|part| {
+                matches!(
+                    part,
+                    ProjectionElem::Field(..)
+                        | ProjectionElem::Index(_)
+                        | ProjectionElem::ConstantIndex {
+                            from_end: false,
+                            ..
+                        }
+                )
+            })
+            && place
+                .projection
+                .iter()
+                .skip(1)
+                .any(|part| matches!(part, ProjectionElem::Index(_)))
+    }
+
+    pub(super) fn write_known_owned_array_element(
+        &self,
+        body: &Body<'tcx>,
+        state: &mut State,
+        place: Place<'tcx>,
+        replacement: &Value,
+    ) -> Result<bool, String> {
+        self.write_owned_array_element_mode(body, state, place, replacement, OwnedWriteMode::Known)
+    }
+
+    fn write_owned_array_element_mode(
+        &self,
+        body: &Body<'tcx>,
+        state: &mut State,
+        place: Place<'tcx>,
+        replacement: &Value,
+        mode: OwnedWriteMode,
+    ) -> Result<bool, String> {
+        let Some((outer, fields)) = place.projection.split_first() else {
             return Ok(false);
         };
+        if !matches!(outer, ProjectionElem::Index(_))
+            && !matches!(
+                (mode, outer),
+                (
+                    OwnedWriteMode::Known,
+                    ProjectionElem::ConstantIndex {
+                        from_end: false,
+                        ..
+                    }
+                )
+            )
+        {
+            return Ok(false);
+        }
         if fields.iter().any(|field| {
             !matches!(
                 field,
@@ -174,13 +262,47 @@ impl<'tcx> Engine<'tcx> {
         } else {
             self.local(state, local)?
         };
+        let storage = match mode {
+            OwnedWriteMode::Nonunique => storage,
+            OwnedWriteMode::Known => {
+                let Some(parent_shape) = self.owned_product_shape(original)? else {
+                    return Ok(false);
+                };
+                self.prepare_typed_product(original, &parent_shape, &storage, 0)?
+            }
+        };
         let Value::Elements(elements) = storage.materialize()? else {
             return Ok(false);
         };
         if count.try_to_target_usize(self.tcx) != Some(elements.len() as u64) {
             return Err("owned array write inventory differs from compiler length".into());
         }
-        let index = self.local(state, index_local.as_usize())?;
+        let index = match outer {
+            ProjectionElem::Index(index_local) => {
+                if matches!(mode, OwnedWriteMode::Known)
+                    && body.local_decls[*index_local].ty != self.tcx.types.usize
+                {
+                    return Err("known owned outer index requires compiler usize".into());
+                }
+                self.local(state, index_local.as_usize())?
+            }
+            ProjectionElem::ConstantIndex {
+                offset,
+                min_length,
+                from_end: false,
+            } => {
+                let position = usize::try_from(*offset)
+                    .map_err(|_| "known owned constant index exceeds host capacity")?;
+                checked_fixed_index(elements.len() as u64, position, Some(*min_length))?;
+                symbolic::integer(
+                    &self.terms,
+                    u128::from(*offset),
+                    u32::from(self.tcx.sess.target.pointer_width),
+                    false,
+                )
+            }
+            _ => return Ok(false),
+        };
         let (term, bits, signed) = index.integer()?;
         if signed
             || bits != u32::from(self.tcx.sess.target.pointer_width)
@@ -189,18 +311,36 @@ impl<'tcx> Engine<'tcx> {
         {
             return Err("owned array write requires exact target usize".into());
         }
-        // Keep all old known-index stores, including identity-bearing elements, unchanged.
-        if symbolic::constant(&term).is_some() {
+        // The existing nonunique writer still leaves known stores to the old writer.
+        let constant = symbolic::constant(&term);
+        let mut known = constant.is_some();
+        let mut known_position = match constant {
+            Some(symbolic::Constant::BitVec { value, .. }) => usize::try_from(value)
+                .ok()
+                .filter(|position| *position < elements.len()),
+            _ => None,
+        };
+        if known && matches!(mode, OwnedWriteMode::Nonunique) {
             return Ok(false);
         }
-        for position in 0..elements.len() {
-            let equal = self.terms.apply(
-                Op::Equal,
-                &[term.clone(), self.terms.bit_vector(position as u128, bits)?],
-            )?;
-            if !self.feasible(&[state.conditions.clone(), vec![symbolic::not(&equal)]].concat())? {
-                return Ok(false);
+        if !known {
+            for position in 0..elements.len() {
+                let equal = self.terms.apply(
+                    Op::Equal,
+                    &[term.clone(), self.terms.bit_vector(position as u128, bits)?],
+                )?;
+                if !self
+                    .feasible(&[state.conditions.clone(), vec![symbolic::not(&equal)]].concat())?
+                {
+                    known = true;
+                    known_position = Some(position);
+                    break;
+                }
             }
+        }
+        match (mode, known) {
+            (OwnedWriteMode::Nonunique, true) | (OwnedWriteMode::Known, false) => return Ok(false),
+            (OwnedWriteMode::Nonunique, false) | (OwnedWriteMode::Known, true) => {}
         }
         let Some(shape) = self.owned_product_shape(*element)? else {
             return Ok(false);
@@ -209,6 +349,11 @@ impl<'tcx> Engine<'tcx> {
         else {
             return Ok(false);
         };
+        if matches!(mode, OwnedWriteMode::Known)
+            && !matches!(plan, ProductWritePlan::Indexed { .. })
+        {
+            return Ok(false);
+        }
         self.memory_bounds(
             &index,
             &symbolic::integer(&self.terms, elements.len() as u128, bits, false),
@@ -245,10 +390,12 @@ impl<'tcx> Engine<'tcx> {
             let old = self
                 .product_leaves(*element, bits, &shape, value, &state.conditions, &mut nodes)
                 .map_err(|error| format!("owned array write candidate {position}: {error}"))?;
-            let condition = self.terms.apply(
-                Op::Equal,
-                &[term.clone(), self.terms.bit_vector(position as u128, bits)?],
-            )?;
+            let Some(condition) =
+                owned_row_condition(&self.terms, &term, bits, position, known_position, mode)?
+            else {
+                updated.push(value.clone());
+                continue;
+            };
             updated.push(match &plan {
                 ProductWritePlan::Indexed { index, targets } => {
                     let masks = targets
@@ -1042,6 +1189,31 @@ fn conditional_indexed_product(
         return Err("owned indexed write omitted leaves".into());
     }
     Ok(result)
+}
+
+fn owned_row_condition(
+    context: &Context,
+    index: &Term,
+    bits: u32,
+    position: usize,
+    known: Option<usize>,
+    mode: OwnedWriteMode,
+) -> Result<Option<Term>, String> {
+    if index.sort() != &Sort::BitVec(bits) || !index.belongs_to(context) {
+        return Err("owned row mask requires exact index width and context".into());
+    }
+    match mode {
+        OwnedWriteMode::Nonunique => context
+            .apply(
+                Op::Equal,
+                &[index.clone(), context.bit_vector(position as u128, bits)?],
+            )
+            .map(Some),
+        OwnedWriteMode::Known => {
+            let selected = known.ok_or("known owned array index has no bounded target")?;
+            Ok((position == selected).then(|| context.boolean(true)))
+        }
+    }
 }
 
 fn fixed_index_value(
@@ -2078,6 +2250,81 @@ mod tests {
                 0,
                 &mut exhausted,
                 &mut Vec::new()
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn known_write_fallback_matches_only_the_exact_unsupported_boundaries() {
+        assert!(known_owned_write_frontier(
+            "array write index is not uniquely determined"
+        ));
+        assert!(known_owned_write_frontier(
+            "non-scalar array index is not uniquely determined on this path"
+        ));
+        for error in [
+            "array write index is not uniquely determined on this path",
+            "write through shared storage is unsupported",
+            "solver could not discharge an obligation",
+            "missing compiler-exported body",
+            "reference points to dead or uninitialized storage",
+            "wrapped: array write index is not uniquely determined",
+        ] {
+            assert!(!known_owned_write_frontier(error));
+        }
+    }
+
+    #[test]
+    fn known_row_masks_preserve_unrelated_rows_and_prior_nonunique_terms() {
+        let context = Context::default();
+        let index = context.symbol(0, Sort::BitVec(64)).unwrap();
+        let old = context
+            .apply(
+                Op::Equal,
+                &[index.clone(), context.bit_vector(1, 64).unwrap()],
+            )
+            .unwrap();
+        assert_eq!(
+            owned_row_condition(&context, &index, 64, 1, None, OwnedWriteMode::Nonunique)
+                .unwrap()
+                .unwrap(),
+            old
+        );
+        assert_eq!(
+            owned_row_condition(&context, &index, 64, 1, Some(1), OwnedWriteMode::Known)
+                .unwrap()
+                .unwrap(),
+            context.boolean(true)
+        );
+        assert!(
+            owned_row_condition(&context, &index, 64, 0, Some(1), OwnedWriteMode::Known)
+                .unwrap()
+                .is_none()
+        );
+        assert!(owned_row_condition(&context, &index, 64, 1, None, OwnedWriteMode::Known).is_err());
+        assert!(
+            owned_row_condition(&context, &index, 32, 1, Some(1), OwnedWriteMode::Known).is_err()
+        );
+        assert!(
+            owned_row_condition(
+                &Context::default(),
+                &index,
+                64,
+                1,
+                Some(1),
+                OwnedWriteMode::Known
+            )
+            .is_err()
+        );
+        assert!(
+            owned_row_condition(
+                &Context::default(),
+                &index,
+                64,
+                1,
+                None,
+                OwnedWriteMode::Nonunique
             )
             .is_err()
         );

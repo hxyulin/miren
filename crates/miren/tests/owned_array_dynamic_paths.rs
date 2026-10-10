@@ -90,7 +90,7 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
         }
         if *expected == ProofStatus::Unknown {
             let (category, reason) = match *name {
-                "dynamic_twice" | "retained" | "known_outer" => (
+                "dynamic_twice" | "retained" => (
                     UnknownCategory::Semantics,
                     "array write index is not uniquely determined",
                 ),
@@ -188,7 +188,7 @@ fn one_dynamic_inner_index_preserves_owned_sibling_spans() {
         ("bounds_inner", ProofStatus::Refuted),
         ("dynamic_twice", ProofStatus::Unknown),
         ("retained", ProofStatus::Unknown),
-        ("known_outer", ProofStatus::Unknown),
+        ("known_outer", ProofStatus::Proved),
         ("reference_zero", ProofStatus::Unknown),
         ("refined_zero", ProofStatus::Unknown),
         ("oversized", ProofStatus::Unknown),
