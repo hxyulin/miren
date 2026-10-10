@@ -88,7 +88,6 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
         if *expected == ProofStatus::Unknown {
             let (category, reason) = match *name {
                 "retained_borrow"
-                | "ambiguous_store"
                 | "reference_sibling"
                 | "raw_sibling"
                 | "refined_sibling"
@@ -177,7 +176,7 @@ fn typed_byte_choices_preserve_original_lengths_fields_and_owned_copies() {
         ("independent_rows", ProofStatus::Refuted),
         ("bounds", ProofStatus::Refuted),
         ("retained_borrow", ProofStatus::Unknown),
-        ("ambiguous_store", ProofStatus::Unknown),
+        ("ambiguous_store", ProofStatus::Proved),
         ("reference_sibling", ProofStatus::Unknown),
         ("raw_sibling", ProofStatus::Unknown),
         ("refined_sibling", ProofStatus::Unknown),

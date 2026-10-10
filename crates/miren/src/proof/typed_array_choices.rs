@@ -16,9 +16,9 @@ pub(super) enum OwnedChoiceShape {
     ByteArray(usize),
 }
 
-struct ProductFieldTarget<'a, 'tcx> {
+struct ProductPathTarget<'tcx> {
     original: Ty<'tcx>,
-    shape: &'a OwnedChoiceShape,
+    shape: OwnedChoiceShape,
     span: std::ops::Range<usize>,
 }
 
@@ -140,10 +140,14 @@ impl<'tcx> Engine<'tcx> {
         else {
             return Ok(false);
         };
-        if fields
-            .iter()
-            .any(|field| !matches!(field, ProjectionElem::Field(..)))
-        {
+        if fields.iter().any(|field| {
+            !matches!(
+                field,
+                ProjectionElem::Field(..)
+                    | ProjectionElem::Index(..)
+                    | ProjectionElem::ConstantIndex { .. }
+            )
+        }) {
             return Ok(false);
         }
         let original = body.local_decls[place.local].ty;
@@ -190,7 +194,10 @@ impl<'tcx> Engine<'tcx> {
         let Some(shape) = self.owned_product_shape(*element)? else {
             return Ok(false);
         };
-        let target = self.owned_product_field_target(*element, &shape, fields)?;
+        let Some(target) = self.owned_product_path_target(body, state, *element, &shape, fields)?
+        else {
+            return Ok(false);
+        };
         self.memory_bounds(
             &index,
             &symbolic::integer(&self.terms, elements.len() as u128, bits, false),
@@ -201,7 +208,7 @@ impl<'tcx> Engine<'tcx> {
             .product_leaves(
                 target.original,
                 bits,
-                target.shape,
+                &target.shape,
                 replacement,
                 &state.conditions,
                 &mut nodes,
@@ -241,67 +248,139 @@ impl<'tcx> Engine<'tcx> {
         Ok(true)
     }
 
-    fn owned_product_field_target<'a>(
+    fn owned_product_path_target(
         &self,
+        body: &Body<'tcx>,
+        state: &State,
         mut original: Ty<'tcx>,
-        mut shape: &'a OwnedChoiceShape,
-        fields: &[rustc_middle::mir::PlaceElem<'tcx>],
-    ) -> Result<ProductFieldTarget<'a, 'tcx>, String> {
+        shape: &OwnedChoiceShape,
+        projections: &[rustc_middle::mir::PlaceElem<'tcx>],
+    ) -> Result<Option<ProductPathTarget<'tcx>>, String> {
+        let mut shape = shape.clone();
         let mut start = 0_usize;
-        for field in fields {
-            let ProjectionElem::Field(index, recorded) = field else {
-                return Err("owned product target requires compiler Field projections".into());
-            };
-            let index = index.as_usize();
-            let child_ty = match (original.kind(), shape) {
-                (ty::Tuple(types), OwnedChoiceShape::Tuple(children))
-                    if types.len() == children.len() =>
-                {
-                    let ty = types
-                        .get(index)
-                        .ok_or("owned tuple field index is invalid")?;
-                    *ty
-                }
-                (ty::Adt(def, args), OwnedChoiceShape::Struct { name, fields })
-                    if self.plain_composite_struct(*def)
-                        && self.tcx.def_path_str(def.did()) == *name
-                        && def.non_enum_variant().fields.len() == fields.len() =>
-                {
-                    let declared = &def.non_enum_variant().fields;
-                    let field = declared
-                        .get(rustc_abi::FieldIdx::from_usize(index))
-                        .ok_or("owned struct field index is invalid")?;
-                    for (field, (name, _)) in declared.iter().zip(fields) {
-                        if field.name.as_str() != name {
-                            return Err("owned struct field identity mismatch".into());
+        for projection in projections {
+            let (child_ty, child, offset) = match projection {
+                ProjectionElem::Field(index, recorded) => {
+                    let index = index.as_usize();
+                    let child_ty = match (original.kind(), &shape) {
+                        (ty::Tuple(types), OwnedChoiceShape::Tuple(children))
+                            if types.len() == children.len() =>
+                        {
+                            let ty = types
+                                .get(index)
+                                .ok_or("owned tuple field index is invalid")?;
+                            *ty
                         }
+                        (ty::Adt(def, args), OwnedChoiceShape::Struct { name, fields })
+                            if self.plain_composite_struct(*def)
+                                && self.tcx.def_path_str(def.did()) == *name
+                                && def.non_enum_variant().fields.len() == fields.len() =>
+                        {
+                            let declared = &def.non_enum_variant().fields;
+                            let field = declared
+                                .get(rustc_abi::FieldIdx::from_usize(index))
+                                .ok_or("owned struct field index is invalid")?;
+                            for (field, (name, _)) in declared.iter().zip(fields) {
+                                if field.name.as_str() != name {
+                                    return Err("owned struct field identity mismatch".into());
+                                }
+                            }
+                            field.ty(self.tcx, args).skip_norm_wip()
+                        }
+                        _ => {
+                            return Err(
+                                "owned field target differs from exact compiler product shape"
+                                    .into(),
+                            );
+                        }
+                    };
+                    if child_ty != *recorded {
+                        return Err(
+                            "owned field target differs from original compiler field type".into(),
+                        );
                     }
-                    field.ty(self.tcx, args).skip_norm_wip()
+
+                    let (child, offset) = product_field(&shape, index)?;
+                    (child_ty, child.clone(), offset)
                 }
-                _ => {
-                    return Err(
-                        "owned field target differs from exact compiler product shape".into(),
-                    );
+                ProjectionElem::Index(local) => {
+                    if body.local_decls[*local].ty != self.tcx.types.usize {
+                        return Err("owned nested array index requires compiler usize".into());
+                    }
+                    let value = self.local(state, local.as_usize())?;
+                    let Some(index) = fixed_index_value(
+                        &self.terms,
+                        &value,
+                        u32::from(self.tcx.sess.target.pointer_width),
+                    )?
+                    else {
+                        return Ok(None);
+                    };
+                    self.owned_product_array_target(original, &shape, index, None)?
                 }
+                ProjectionElem::ConstantIndex {
+                    offset,
+                    min_length,
+                    from_end,
+                } => {
+                    if *from_end {
+                        return Ok(None);
+                    }
+                    let index = usize::try_from(*offset)
+                        .map_err(|_| "owned nested array index exceeds host capacity")?;
+                    self.owned_product_array_target(original, &shape, index, Some(*min_length))?
+                }
+                _ => return Ok(None),
             };
-            if child_ty != *recorded {
-                return Err("owned field target differs from original compiler field type".into());
-            }
-            let (child, offset) = product_field(shape, index)?;
             start = start
                 .checked_add(offset)
-                .ok_or("owned field leaf offset overflow")?;
+                .ok_or("owned product leaf offset overflow")?;
             shape = child;
             original = child_ty;
         }
         let end = start
-            .checked_add(product_leaf_count(shape)?)
-            .ok_or("owned field leaf extent overflow")?;
-        Ok(ProductFieldTarget {
+            .checked_add(product_leaf_count(&shape)?)
+            .ok_or("owned product leaf extent overflow")?;
+        Ok(Some(ProductPathTarget {
             original,
             shape,
             span: start..end,
-        })
+        }))
+    }
+
+    fn owned_product_array_target(
+        &self,
+        original: Ty<'tcx>,
+        shape: &OwnedChoiceShape,
+        index: usize,
+        min_length: Option<u64>,
+    ) -> Result<(Ty<'tcx>, OwnedChoiceShape, usize), String> {
+        let ty::Array(inner, count) = original.kind() else {
+            return Err("owned nested index requires original fixed array type".into());
+        };
+        let count = count
+            .try_to_target_usize(self.tcx)
+            .ok_or("owned nested array requires exact compiler length")?;
+        checked_fixed_index(count, index, min_length)?;
+        match shape {
+            OwnedChoiceShape::Array(children) if children.len() as u64 == count => {
+                let (child, offset) = product_array_child(children, index)?;
+                Ok((*inner, child.clone(), offset))
+            }
+            OwnedChoiceShape::ByteArray(length)
+                if *inner == self.tcx.types.u8 && *length as u64 == count =>
+            {
+                Ok((
+                    *inner,
+                    OwnedChoiceShape::Primitive(ScalarSliceElement::Integer {
+                        bits: 8,
+                        signed: false,
+                    }),
+                    index,
+                ))
+            }
+            _ => Err("owned nested array differs from exact compiler product shape".into()),
+        }
     }
 
     fn product_leaves(
@@ -680,6 +759,50 @@ fn conditional_product_field(
     Ok(result)
 }
 
+fn fixed_index_value(
+    context: &Context,
+    value: &Value,
+    pointer_bits: u32,
+) -> Result<Option<usize>, String> {
+    let (term, bits, signed) = value.integer()?;
+    if signed
+        || bits != pointer_bits
+        || term.sort() != &Sort::BitVec(bits)
+        || !term.belongs_to(context)
+    {
+        return Err("owned nested array index requires exact target usize".into());
+    }
+    let Some(symbolic::Constant::BitVec { value, .. }) = symbolic::constant(&term) else {
+        return Ok(None);
+    };
+    usize::try_from(value)
+        .map(Some)
+        .map_err(|_| "owned nested array index exceeds host capacity".into())
+}
+
+fn product_array_child(
+    children: &[OwnedChoiceShape],
+    index: usize,
+) -> Result<(&OwnedChoiceShape, usize), String> {
+    let child = children
+        .get(index)
+        .ok_or("owned nested array index is invalid")?;
+    let offset = children[..index].iter().try_fold(0_usize, |sum, child| {
+        sum.checked_add(product_leaf_count(child)?)
+            .ok_or_else(|| "owned product leaf offset overflow".to_owned())
+    })?;
+    Ok((child, offset))
+}
+
+fn checked_fixed_index(count: u64, index: usize, min_length: Option<u64>) -> Result<(), String> {
+    if min_length.is_some_and(|minimum| minimum > count)
+        || u64::try_from(index).map_or(true, |index| index >= count)
+    {
+        return Err("owned nested array index or minimum length is invalid".into());
+    }
+    Ok(())
+}
+
 fn product_field(
     shape: &OwnedChoiceShape,
     index: usize,
@@ -831,6 +954,65 @@ pub(super) fn rebuild(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn fixed_array_paths_validate_literal_metadata_bounds_and_logical_spans() {
+        let context = Context::default();
+        assert_eq!(
+            fixed_index_value(&context, &symbolic::integer(&context, 1, 64, false), 64).unwrap(),
+            Some(1)
+        );
+        let symbolic_index = Value::Int {
+            expression: context.symbol(42, Sort::BitVec(64)).unwrap(),
+            bits: 64,
+            signed: false,
+        };
+        assert!(
+            fixed_index_value(&context, &symbolic_index, 64)
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            fixed_index_value(&context, &symbolic::integer(&context, 0, 64, true), 64).is_err()
+        );
+        assert!(
+            fixed_index_value(&context, &symbolic::integer(&context, 0, 32, false), 64).is_err()
+        );
+        let foreign = Context::default();
+        assert!(
+            fixed_index_value(&context, &symbolic::integer(&foreign, 0, 64, false), 64).is_err()
+        );
+        let forged = Value::Int {
+            expression: context.boolean(false),
+            bits: 64,
+            signed: false,
+        };
+        assert!(fixed_index_value(&context, &forged, 64).is_err());
+        // Actual optimized MIR uses [0 of 1] for the original [u16; 2].
+        assert!(checked_fixed_index(2, 0, Some(1)).is_ok());
+        assert!(checked_fixed_index(2, 1, Some(2)).is_ok());
+        assert!(checked_fixed_index(2, 0, Some(3)).is_err());
+        assert!(checked_fixed_index(2, 2, Some(1)).is_err());
+        assert!(checked_fixed_index(0, 0, Some(0)).is_err());
+        let integer = OwnedChoiceShape::Primitive(ScalarSliceElement::Integer {
+            bits: 16,
+            signed: false,
+        });
+        let empty = OwnedChoiceShape::Struct {
+            name: "Zero".into(),
+            fields: vec![],
+        };
+        let row = OwnedChoiceShape::Tuple(vec![integer.clone(), empty, integer.clone()]);
+        let rows = vec![row.clone(), row];
+        let (child, offset) = product_array_child(&rows, 1).unwrap();
+        assert_eq!(offset, 2);
+        let (zero, inner) = product_field(child, 1).unwrap();
+        assert_eq!(inner, 1);
+        assert_eq!(product_leaf_count(zero).unwrap(), 0);
+        assert!(product_array_child(&rows, 2).is_err());
+        assert!(product_array_child(&[], 0).is_err());
+        assert!(product_array_child(&[OwnedChoiceShape::ByteArray(513), integer], 1).is_err());
+    }
 
     #[test]
     fn field_updates_preserve_untouched_terms_float_bits_zero_identity_and_checked_spans() {

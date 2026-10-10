@@ -3979,3 +3979,57 @@ All 308 earlier completed P/R roots retain identical obligation results, details
 across four configurations. The two shared baseline tests pass. Actual source mutation and native
 execution evidence remains at `/tmp/miren-stage164-final-evidence`; independent review approves
 final source and evidence. No assumptions, input caps or resource-budget changes are introduced.
+
+
+## Stage 165: fixed nested indices in owned array write paths
+
+The next extension follows compiler Field projections and constant fixed-array indices after an
+initial symbolic owned-array Index. The complete original product certificate and checked logical
+span remain mandatory; a nested array index requires its original element type and count.
+Literal local indices must have the exact target usize type and context. Optimized ConstantIndex
+metadata is checked against actual array length and offset bounds, including the pinned compiler's
+shorter minimum-length encoding. End-relative and dynamic nested indices remain outside this rule.
+
+Replacement and all complete old candidates retain bounded typed preparation, issued scalar input
+reservations, zero-product validation and scalar representation checks. Existing rvalue effects,
+bounds, destination validators, source liveness and same-owner commit remain required. The extension
+reuses the conditional span update; it adds no assumptions, input caps or larger resource budgets.
+
+Four shared fixed-index controls use actual three-array roots with 64 two-word elements per root.
+Before implementation all four host/ARM O0/O2 configurations return UNKNOWN. Write-first and false
+claims stop at the nonunique write frontier, the read-before-write source stops at the earlier lazy
+nested-array reader, and the missing actual replacement body stops at its compiler-evidence
+frontier. Commands, source/analyzer hashes and reports are retained at
+`/tmp/miren-stage165-shared-expanded-before`. The write-first control independently proves after
+implementation, while the false claim refutes and both separate UNKNOWN sources retain their
+frontiers. The original read-before-write source is preserved; no reader rule is added here.
+Frozen after-evidence at `/tmp/miren-stage165-shared-expanded-after` retains those exact outcomes
+across all four compiler profiles, with empty assumptions and verified source/analyzer hashes.
+Four shared controls yield 107 cases across 37 families, expecting 43 PROVED, 38 REFUTED and
+26 UNKNOWN per configuration. Full required validation remains pending.
+
+The dedicated 25-root matrix yields 13 PROVED, 4 REFUTED and 8 UNKNOWN per host/ARM O0/O2 build.
+Fixed inner indices, alternating Field/Index paths, multiple constant levels, complete subtrees,
+sequential updates, allocated owners, byte children, Float/Char and zero-leaf effects are covered.
+The original lazy read-before-write source retains its earlier reader frontier; a separate
+write-first lazy source proves. Dynamic nested indices, retained/raw/restricted values, missing
+actual bodies and existing resource limits remain UNKNOWN at their recorded frontiers.
+
+Four unchanged earlier sources prove independently in all four compiler profiles: pure array
+symbolic_mutation, owned array deeper_store, field-write second_index and byte-array ambiguous_store.
+Only their harness expectations and obsolete UNKNOWN arms are maintained; source claims stay
+unchanged. Initial expectation failures remain in the related logs. Five product metadata tests,
+ten new/earlier focused compiler tests and 21 related integration tests pass. Final fmt, lint and
+fresh debug build pass. A real noinline assignment helper changes inner index 0 to 1; final
+mutation/native evidence is retained separately, with full required validation pending.
+
+Final validation passes all 677 Rust tests in the isolated frozen workspace and 68 Python tests.
+All 623 tracked main files match the validated snapshot byte for byte. Fresh main debug/release
+builds, nineteen new/related integration tests, 68 Python tests and all remaining required checks
+also pass. Frozen isolated and main surveys retain 172 PROVED, 152 REFUTED and 104 UNKNOWN at
+`/tmp/miren-stage165-capabilities-20261010` and
+`/tmp/miren-stage165-merged-capabilities-20261010`, with source/input/release hashes verified.
+All 316 earlier completed P/R roots retain identical obligation results, details and query text
+across four configurations. Actual inner-index assignment mutation and valid two-element native
+controls remain at `/tmp/miren-stage165-final-evidence`; independent review approves final source
+and evidence. No assumptions, input caps or resource-budget changes are introduced.

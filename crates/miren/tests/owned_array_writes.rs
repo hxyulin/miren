@@ -82,7 +82,7 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
                     UnknownCategory::Unclassified,
                     "non-scalar array index is not uniquely determined on this path",
                 ),
-                "reference_store" | "retained_store" | "deeper_store" => (
+                "reference_store" | "retained_store" => (
                     UnknownCategory::Semantics,
                     "array write index is not uniquely determined",
                 ),
@@ -159,7 +159,7 @@ fn whole_owned_array_writes_preserve_selected_products_and_untouched_siblings() 
         ("reference_store", ProofStatus::Unknown),
         ("raw_store", ProofStatus::Unknown),
         ("retained_store", ProofStatus::Unknown),
-        ("deeper_store", ProofStatus::Unknown),
+        ("deeper_store", ProofStatus::Proved),
         ("oversized", ProofStatus::Unknown),
     ];
     for target in [None, Some("thumbv7em-none-eabihf")] {

@@ -92,10 +92,6 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
                     UnknownCategory::Unclassified,
                     "static views require sized layouts",
                 ),
-                "symbolic_mutation" => (
-                    UnknownCategory::Semantics,
-                    "array write index is not uniquely determined",
-                ),
                 other => panic!("missing expected frontier for {other}"),
             };
             assert!(
@@ -175,7 +171,7 @@ fn pure_nested_array_choices_preserve_correlations_and_existing_rights() {
         ("ambiguous_adt", ProofStatus::Proved),
         ("ambiguous_drop", ProofStatus::Unknown),
         ("byte_array_choices", ProofStatus::Proved),
-        ("symbolic_mutation", ProofStatus::Unknown),
+        ("symbolic_mutation", ProofStatus::Proved),
     ];
     for target in [None, Some("thumbv7em-none-eabihf")] {
         for optimized in [false, true] {

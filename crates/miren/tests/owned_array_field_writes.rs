@@ -90,7 +90,7 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
         }
         if *expected == ProofStatus::Unknown {
             let (category, reason) = match *name {
-                "second_index" | "retained" | "reference_zero" | "refined_zero" => (
+                "retained" | "reference_zero" | "refined_zero" => (
                     UnknownCategory::Unclassified,
                     "non-scalar array index is not uniquely determined on this path",
                 ),
@@ -188,7 +188,7 @@ fn owned_field_writes_preserve_siblings_and_original_storage() {
         ("wrong_other", ProofStatus::Refuted),
         ("bounds", ProofStatus::Refuted),
         ("zero_body_panic", ProofStatus::Refuted),
-        ("second_index", ProofStatus::Unknown),
+        ("second_index", ProofStatus::Proved),
         ("deferred_reader", ProofStatus::Proved),
         ("deferred_field_rhs", ProofStatus::Proved),
         ("drop_field", ProofStatus::Unknown),

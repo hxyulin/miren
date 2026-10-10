@@ -1458,3 +1458,19 @@ Second Index and retained/raw/identity/restricted/resource cases keep their sepa
 A real helper assignment changes left to right; unchanged claims refute and valid original
 2-element native inputs pass while mutants fail at O0/O2. The shared 103-case/36-family baseline
 expects 168 PROVED, 148 REFUTED and 96 UNKNOWN across four configurations.
+
+
+Stage 165 extends the certified owned-array destination path with constant nested fixed-array
+indices between original Field projections. Actual target-usize literal locals and optimized
+ConstantIndex metadata retain original element types, actual bounds and checked logical spans.
+The complete original product and all candidate values remain validated before one same-owner
+commit. Dynamic nested indices and end-relative projections have no new rule. The shared controls
+use actual three-root 64-element arrays. A distinct write-first claim proves, its false claim
+refutes, a missing actual replacement body remains UNKNOWN, and the unchanged read-before-write
+source remains UNKNOWN at the earlier lazy pure-array reader. No reader rule is introduced.
+Before/after evidence is retained; final frozen outcomes and required validation remain pending.
+
+The dedicated 25-root host/ARM O0/O2 matrix yields 13 PROVED, 4 REFUTED and 8 UNKNOWN per build.
+Four earlier unchanged constant-index sources now prove across all four profiles before harness
+maintenance. The shared 107-case/37-family baseline expects 172 PROVED, 152 REFUTED and 104 UNKNOWN
+across four configurations. Required full validation remains pending.
