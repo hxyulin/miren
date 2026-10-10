@@ -31,6 +31,13 @@ impl<'tcx> Engine<'tcx> {
         incoming: Option<usize>,
         visited: &mut Vec<usize>,
     ) -> Result<(), String> {
+        if let Value::Reference { projection, .. } = value {
+            for part in projection {
+                if let symbolic::MemoryProjection::TypedIndex { index, .. } = part {
+                    Self::validate_reference_graph(index, state, incoming, visited)?;
+                }
+            }
+        }
         match value {
             Value::ScalarSlice { length, .. } | Value::CompositeSlice { length, .. } => {
                 Self::validate_reference_graph(length, state, incoming, visited)
@@ -250,5 +257,45 @@ mod tests {
             Some(Value::Tuple(vec![reference(0, false)])),
         ]);
         Engine::validate_reference_graph(&borrowed, &state, Some(2), &mut Vec::new()).unwrap();
+    }
+
+    #[test]
+    fn typed_indices_retain_owner_lifetime_and_reject_hidden_index_borrows() {
+        let context = Context::default();
+        let projected = Value::Reference {
+            allocation: 0,
+            projection: vec![symbolic::MemoryProjection::TypedIndex {
+                index: Box::new(symbolic::integer(&context, 1, 64, false)),
+                certificate: 0,
+            }],
+            mutable: false,
+        };
+        let live = state(vec![Some(Value::Unit)]);
+        Engine::validate_reference_graph(&projected, &live, Some(1), &mut Vec::new()).unwrap();
+        let dead = state(vec![None]);
+        assert!(
+            Engine::validate_reference_graph(&projected, &dead, None, &mut Vec::new())
+                .unwrap_err()
+                .contains("dead or uninitialized")
+        );
+        assert!(
+            Engine::validate_reference_graph(&projected, &live, Some(0), &mut Vec::new())
+                .unwrap_err()
+                .contains("frame-owned")
+        );
+        let malformed = Value::Reference {
+            allocation: 0,
+            projection: vec![symbolic::MemoryProjection::TypedIndex {
+                index: Box::new(reference(1, false)),
+                certificate: 0,
+            }],
+            mutable: false,
+        };
+        let dead_index = state(vec![Some(Value::Unit), None]);
+        assert!(
+            Engine::validate_reference_graph(&malformed, &dead_index, None, &mut Vec::new())
+                .unwrap_err()
+                .contains("dead or uninitialized")
+        );
     }
 }

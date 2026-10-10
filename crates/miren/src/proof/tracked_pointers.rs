@@ -92,6 +92,9 @@ impl<'tcx> Engine<'tcx> {
         let projection = projection
             .iter()
             .map(|projection| match projection {
+                MemoryProjection::TypedIndex { .. } => {
+                    Err("typed owned shared projections have no raw address model".into())
+                }
                 MemoryProjection::Field(index) => Ok(AddressProjection::Field(*index)),
                 MemoryProjection::Variant(index) => Ok(AddressProjection::Variant(*index)),
                 MemoryProjection::Index(index) => Ok(AddressProjection::Index(index.integer()?.0)),

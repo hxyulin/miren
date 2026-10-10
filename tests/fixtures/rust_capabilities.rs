@@ -1071,6 +1071,59 @@ pub fn owned_array_dynamic_missing_body(
     }
 }
 
+#[inline(never)]
+pub fn retained_array_first(value: &[u16; 2]) -> u16 {
+    value[0]
+}
+
+pub fn retained_owned_array_read(
+    first: [[u16; 2]; 64],
+    _second: [[u16; 2]; 64],
+    _third: [[u16; 2]; 64],
+    index: usize,
+) {
+    if index < first.len() {
+        let copied = first[index];
+        let selected = &first[index];
+        let alias = selected;
+        assert!(retained_array_first(alias) == copied[0]);
+        assert!(selected[1] == copied[1]);
+    }
+}
+
+pub fn retained_owned_array_wrong_claim(
+    first: [[u16; 2]; 64],
+    _second: [[u16; 2]; 64],
+    _third: [[u16; 2]; 64],
+    index: usize,
+) {
+    if index < first.len() {
+        let copied = first[index];
+        let selected = &first[index];
+        assert!(retained_array_first(selected) == copied[1]);
+    }
+}
+
+#[cfg(not(test))]
+unsafe extern "Rust" {
+    fn opaque_retained_array_getter(value: &[u16; 2]) -> u16;
+}
+
+#[cfg(not(test))]
+pub fn retained_owned_array_missing_body(
+    first: [[u16; 2]; 64],
+    _second: [[u16; 2]; 64],
+    _third: [[u16; 2]; 64],
+    index: usize,
+) -> u16 {
+    if index < first.len() {
+        let selected = &first[index];
+        unsafe { opaque_retained_array_getter(selected) }
+    } else {
+        0
+    }
+}
+
 #[cfg(test)]
 mod native {
     use super::*;
@@ -1095,6 +1148,9 @@ mod native {
                 owned_array_dynamic_write([[3, 7]; 64], [[5, 11]; 64], [[13, 17]; 64],
                     outer, inner, u16::MAX);
             }
+        }
+        for index in [0, 63, 64, usize::MAX] {
+            retained_owned_array_read([[3, 7]; 64], [[5, 11]; 64], [[13, 17]; 64], index);
         }
         safe_sized_alignment(SizedLayoutZero);
         deferred_zero_owned_write([DeferredZero; 2], 0);
@@ -1282,6 +1338,11 @@ mod native {
         let first = [ReservedRecord { left: 3, right: 7 }; 64];
         let second = [ReservedRecord { left: 5, right: 11 }; 64];
         registered_product_wrong_claim(first, second, first, 63);
+    }
+    #[test]
+    #[should_panic]
+    fn retained_owned_array_wrong_claim_panics() {
+        retained_owned_array_wrong_claim([[3, 7]; 64], [[5, 11]; 64], [[13, 17]; 64], 63);
     }
     #[test]
     #[should_panic]

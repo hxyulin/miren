@@ -84,7 +84,7 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
         }
         if *expected == ProofStatus::Unknown {
             let (category, reason) = match *name {
-                "reference_zero" | "refined_zero" | "core_zero" | "retained_borrow" => (
+                "reference_zero" | "refined_zero" | "core_zero" => (
                     UnknownCategory::Unclassified,
                     "non-scalar array index is not uniquely determined on this path",
                 ),
@@ -178,7 +178,7 @@ fn deferred_zero_products_preserve_exact_nominal_types_and_actual_method_effects
         ("core_zero", ProofStatus::Unknown),
         ("drop_zero", ProofStatus::Unknown),
         ("oversized", ProofStatus::Unknown),
-        ("retained_borrow", ProofStatus::Unknown),
+        ("retained_borrow", ProofStatus::Proved),
         ("analyzer_only::dead_empty", ProofStatus::Unknown),
     ];
     for target in [None, Some("thumbv7em-none-eabihf")] {

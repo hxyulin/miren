@@ -85,8 +85,7 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
         }
         if *expected == ProofStatus::Unknown {
             let (category, reason) = match *name {
-                "nominal_zero"
-                | "ambiguous_reference"
+                "ambiguous_reference"
                 | "raw_record"
                 | "refined_zero_array"
                 | "analyzer_only::untyped_retained" => (
@@ -191,7 +190,7 @@ fn typed_array_selection_preserves_nominal_fields_and_correlations() {
         ("incoming_composite", ProofStatus::Proved),
         ("owned_copy_mutation", ProofStatus::Proved),
         ("float_char_choices", ProofStatus::Proved),
-        ("nominal_zero", ProofStatus::Unknown),
+        ("nominal_zero", ProofStatus::Proved),
         ("owned_nominal_zero", ProofStatus::Proved),
         ("mutation_claim", ProofStatus::Proved),
         ("singleton_reference", ProofStatus::Proved),

@@ -1503,3 +1503,22 @@ per build. The original earlier dynamic_inner source proves in all four profiles
 maintenance. The shared 113-case/39-family baseline expects 184 PROVED, 160 REFUTED and 108 UNKNOWN
 across all configurations. Real inner-index XOR 1 mutation refutes unchanged claims in all four
 profiles and fails valid two-by-two native controls. Full required validation remains pending.
+
+
+Stage 168 retains original compiler array evidence with shared owned indexed projections. Actual
+MIR issues a bounded type certificate; later reads keep the real owner and revalidate complete
+current backing, bounds, scalar context and registered input or closed-zero preparation. New
+projection writes, raw address identity and induction remain unsupported. Exact callee and
+PartialEq bodies execute normally; type certificates do not summarize comparisons or add rights.
+
+The unchanged earlier long lazy-array read/write and comparison claims independently prove in
+all four compiler configurations before their harness expectations are updated. Three new shared
+controls yield PROVED, REFUTED and missing-actual-body UNKNOWN in host/ARM O0/O2, with no
+assumptions. Frozen before/after commands, hashes and reports remain at
+`/tmp/miren-stage168-shared-expanded-before` and
+`/tmp/miren-stage168-shared-expanded-after`. Final full validation remains pending.
+
+A custom MIR test exposed an older eager-array return boundary that converted a frame-owned
+reference into an owned snapshot. Compiler-correlated returned-reference graph validation now
+precedes that conversion; owned-value representation remains separate. Dedicated eager and issued
+projection escape controls retain their original claims and require UNKNOWN.

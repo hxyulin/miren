@@ -93,6 +93,9 @@ impl<'tcx> Engine<'tcx> {
                 projection: projection
                     .iter()
                     .map(|part| match part {
+                        MemoryProjection::TypedIndex { .. } => {
+                            Err("typed owned projections are unsupported in induction".into())
+                        }
                         MemoryProjection::Field(_) | MemoryProjection::Variant(_) => {
                             Ok(part.clone())
                         }
@@ -624,6 +627,9 @@ pub(super) fn same_shape(expected: Option<&Value>, actual: Option<&Value>) -> Re
 
 pub(super) fn static_projection(value: Value, part: &MemoryProjection) -> Result<Value, String> {
     match (part, value) {
+        (MemoryProjection::TypedIndex { .. }, _) => {
+            Err("typed owned projections are unsupported in induction".into())
+        }
         (MemoryProjection::Field(index), Value::Tuple(fields)) => fields
             .get(*index)
             .cloned()
@@ -701,6 +707,9 @@ impl<'tcx> Visitor<'tcx> for UsedLocals {
 
 fn projection_shape(a: &MemoryProjection, b: &MemoryProjection) -> Result<(), String> {
     match (a, b) {
+        (MemoryProjection::TypedIndex { .. }, _) => {
+            Err("typed owned projections are unsupported in induction".into())
+        }
         (MemoryProjection::Field(a), MemoryProjection::Field(b))
         | (MemoryProjection::Variant(a), MemoryProjection::Variant(b))
             if a == b =>

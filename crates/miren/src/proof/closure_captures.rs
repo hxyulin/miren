@@ -236,6 +236,16 @@ impl<'tcx> Engine<'tcx> {
                 }
             }
             (ty::Ref(_, pointee, _), value @ Value::Reference { allocation, .. }) => {
+                // A compiler reference result must preserve its allocation, even when the
+                // legacy owned-value return adapter could snapshot the referent.
+                Self::validate_reference_graph(value, state, Some(incoming), &mut Vec::new())
+                    .map_err(|error| {
+                        if error == "reference to frame-owned storage cannot escape its frame" {
+                            self.categorized_error(UnknownCategory::Semantics, error)
+                        } else {
+                            error
+                        }
+                    })?;
                 // Existing finite views may have symbolic lengths. Discover closure-bearing
                 // returns without materializing a definitely pure retained slice allocation.
                 // Both compiler type and raw storage must exclude captures; type alone cannot

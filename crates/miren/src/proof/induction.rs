@@ -1053,6 +1053,9 @@ fn flatten_value(value: &Value, result: &mut Vec<Term>) -> Result<(), String> {
         Value::Reference { projection, .. } => {
             for part in projection {
                 match part {
+                    symbolic::MemoryProjection::TypedIndex { .. } => {
+                        return Err("typed owned projections are unsupported in induction".into());
+                    }
                     symbolic::MemoryProjection::Field(_)
                     | symbolic::MemoryProjection::Variant(_) => {}
                     symbolic::MemoryProjection::Index(index) => flatten_value(index, result)?,

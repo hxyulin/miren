@@ -94,7 +94,7 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
                     UnknownCategory::Semantics,
                     "array write index is not uniquely determined",
                 ),
-                "lazy_roots" | "reference_zero" | "refined_zero" => (
+                "reference_zero" | "refined_zero" => (
                     UnknownCategory::Unclassified,
                     "non-scalar array index is not uniquely determined on this path",
                 ),
@@ -178,7 +178,7 @@ fn fixed_inner_paths_preserve_siblings_and_original_storage() {
         ("subtree", ProofStatus::Proved),
         ("sequential", ProofStatus::Proved),
         ("allocated_owner", ProofStatus::Proved),
-        ("lazy_roots", ProofStatus::Unknown),
+        ("lazy_roots", ProofStatus::Proved),
         ("lazy_writer_first", ProofStatus::Proved),
         ("float_char", ProofStatus::Proved),
         ("bytes", ProofStatus::Proved),

@@ -8,6 +8,9 @@ impl<'tcx> Engine<'tcx> {
         part: &MemoryProjection,
     ) -> Result<Value, String> {
         match part {
+            symbolic::MemoryProjection::TypedIndex { .. } => {
+                Err("typed owned projections are unsupported in induction".into())
+            }
             MemoryProjection::Field(_) | MemoryProjection::Variant(_) => {
                 storage::static_projection(value, part)
             }
@@ -299,6 +302,9 @@ impl<'tcx> Engine<'tcx> {
             .ok_or("inductive reference storage missing")?;
         for part in projection {
             let safe = match part {
+                symbolic::MemoryProjection::TypedIndex { .. } => {
+                    return Err("typed owned projections are unsupported in induction".into());
+                }
                 MemoryProjection::Variant(index) => {
                     if let Value::Enum {
                         discriminant,

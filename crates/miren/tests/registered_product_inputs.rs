@@ -121,7 +121,7 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
         }
         if *expected == ProofStatus::Unknown {
             let (category, reason) = match *name {
-                "retained_borrow" | "reference_zero" | "refined_zero" | "core_zero" => (
+                "reference_zero" | "refined_zero" | "core_zero" => (
                     UnknownCategory::Unclassified,
                     "non-scalar array index is not uniquely determined on this path",
                 ),
@@ -210,7 +210,7 @@ fn registered_product_inputs_preserves_exact_abi_and_source_lifetimes() {
         ("occurrences_are_equal", ProofStatus::Refuted),
         ("fields_are_equal", ProofStatus::Refuted),
         ("bounds", ProofStatus::Refuted),
-        ("retained_borrow", ProofStatus::Unknown),
+        ("retained_borrow", ProofStatus::Proved),
         ("reference_zero", ProofStatus::Unknown),
         ("refined_zero", ProofStatus::Unknown),
         ("core_zero", ProofStatus::Unknown),

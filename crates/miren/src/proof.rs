@@ -58,6 +58,7 @@ mod mutable_slice_ranges;
 mod nonzero_options;
 mod opaque_function_inputs;
 mod owned_iterators;
+mod owned_shared_projections;
 mod pointer_atomic_cas;
 mod pointer_atomic_shapes;
 mod pointer_atomics;
@@ -142,6 +143,7 @@ struct Engine<'tcx> {
     input_depth: usize,
     input_values: usize,
     input_reservations: Vec<input_reservations::IssuedInput<'tcx>>,
+    owned_array_projection_types: Vec<Ty<'tcx>>,
     input_shapes: std::collections::HashMap<Ty<'tcx>, std::rc::Rc<symbolic::input::InputShape>>,
     zero_sized_inputs:
         std::collections::HashMap<Ty<'tcx>, std::rc::Rc<symbolic::input::InputShape>>,
@@ -210,6 +212,7 @@ pub fn verify(
         input_depth: 0,
         input_values: 0,
         input_reservations: Vec::new(),
+        owned_array_projection_types: Vec::new(),
         input_shapes: std::collections::HashMap::new(),
         zero_sized_inputs: std::collections::HashMap::new(),
         zero_sized_input_nodes: 0,
@@ -2032,7 +2035,18 @@ impl<'tcx> Engine<'tcx> {
                 if let Some(value) = self.borrow_shared_snapshot(body, state, *place)? {
                     return Ok(value);
                 }
-                self.borrow(state, *place, false)
+                match self.borrow(state, *place, false) {
+                    Ok(value) => Ok(value),
+                    Err(error)
+                        if error
+                            == "non-scalar array index is not uniquely determined on this path" =>
+                    {
+                        Ok(self
+                            .borrow_typed_owned_array(body, state, *place)?
+                            .ok_or(error)?)
+                    }
+                    Err(error) => Err(error),
+                }
             }
             Rvalue::Ref(_, BorrowKind::Mut { .. }, place) => self.borrow(state, *place, true),
             Rvalue::RawPtr(

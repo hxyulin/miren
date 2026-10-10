@@ -355,3 +355,24 @@ from the current path. Supported predicates are nonnull thin pointers and existi
 range/or patterns. A certified static raw address has nonzero allocation provenance; a numeric or
 tracked address must satisfy the symbolic condition. An unproved or unsupported pattern remains
 UNKNOWN. This validation does not add runtime checks or exact static payload histories.
+
+
+## Retained compiler types for owned array projections
+
+A shared projection into a certified owned array can retain its original compiler array type
+through an Engine-issued certificate. The certificate travels with the indexed projection,
+while the reference retains the same owner allocation. Every observation reads current backing
+and checks its liveness, original complete product shape, exact target-usize index and bounds.
+Issued lazy input metadata or closed zero-product preparation remains necessary where applicable.
+The type certificate supplies no initialization, lifetime or access permission.
+
+Actual shared owned-array MIR issues these certificates only after the existing generic, constant
+and uniquely selected borrow paths decline. Mutable borrows, raw addresses, static storage and
+writes through the new projections have no added consumer. Certificate numbers do not describe
+physical address identity. Induction refuses unsupported projection consumers explicitly.
+
+Compiler return types distinguish returned references from the existing owned-value snapshot
+representation. A returned reference must pass the owner graph's frame-escape check before any
+return snapshot conversion, including references nested in compiler-correlated product carriers.
+This also rejects the older eager-array case where converting a frame-owned shared reference to
+an owned snapshot could hide a dangling return. Caller-owned live references keep their owner.

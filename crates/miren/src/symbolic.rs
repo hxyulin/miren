@@ -18,6 +18,10 @@ pub enum MemoryProjection {
     Field(usize),
     Variant(usize),
     Index(Box<Value>),
+    TypedIndex {
+        index: Box<Value>,
+        certificate: usize,
+    },
     Slice {
         offset: Box<Value>,
         length: Box<Value>,

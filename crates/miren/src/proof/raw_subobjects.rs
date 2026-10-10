@@ -368,6 +368,9 @@ fn address_projection(projections: &[MemoryProjection]) -> Result<Vec<AddressPro
     projections
         .iter()
         .map(|projection| match projection {
+            MemoryProjection::TypedIndex { .. } => {
+                Err("typed owned shared projections have no raw address model".into())
+            }
             MemoryProjection::Field(index) => Ok(AddressProjection::Field(*index)),
             MemoryProjection::Variant(index) => Ok(AddressProjection::Variant(*index)),
             MemoryProjection::Index(index) => Ok(AddressProjection::Index(index.integer()?.0)),
@@ -376,4 +379,25 @@ fn address_projection(projections: &[MemoryProjection]) -> Result<Vec<AddressPro
             }
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn compiler_projection_certificate_never_becomes_address_identity() {
+        let context = Context::default();
+        for certificate in [0, 1, usize::MAX] {
+            let path = [MemoryProjection::TypedIndex {
+                index: Box::new(symbolic::integer(&context, 1, 64, false)),
+                certificate,
+            }];
+            assert_eq!(
+                address_projection(&path).err().as_deref(),
+                Some("typed owned shared projections have no raw address model")
+            );
+        }
+        assert!(address_projection(&[MemoryProjection::Field(0)]).is_ok());
+    }
 }

@@ -758,6 +758,17 @@ Every byte counts toward the existing candidate budget. Selected arrays rebuild 
 byte values, while incoming composite observations and generic byte-slice selection remain
 unchanged. Untyped views cannot supply this original compiler array certificate.
 
+Shared borrows of direct owned arrays can retain compiler-certified symbolic index projections.
+The actual MIR array-prefix type supplies an immutable type certificate; the reference retains the
+same owner allocation and index, rather than a detached value snapshot. Each later read validates
+live current storage, the complete original pure array, all candidate metadata and the index bounds.
+Scalar-bearing deferred products retain their issued reservation requirements. Copying the borrow
+preserves source identity and observes later owner updates. Ordinary calls and comparison bodies
+retain their existing execution and body-availability rules. These projections cannot grant mutable
+access or raw addresses, and frame-owned borrows cannot escape through returns or closure captures.
+Existing eager, constant and uniquely determined borrows keep their prior paths. Raw, static,
+reference-source and mutable destinations gain no new borrow support.
+
 Concrete synchronous closures can carry supported read-only scalar slices and initialized pure
 `MaybeUninit` values through their exact compiler capture types. Shared capture metadata checks
 validate the closure identity, kind, numbered fields and original capture types; each payload

@@ -11,8 +11,8 @@ execution at O0 and O2, positive/refuted/unknown controls, a source mutation tha
 structured UNKNOWN reporting, and passing repository checks. Completion establishes a repeatable
 baseline. It does not establish full Rust support or a completed memory-model refactor.
 
-The manifest contains 113 cases across 39 families. Each build configuration expects 46 PROVED,
-40 REFUTED and 27 UNKNOWN results. Stage 133 originally had 23 cases with 10 PROVED, 9 REFUTED
+The manifest contains 116 cases across 40 families. Each build configuration expects 47 PROVED,
+41 REFUTED and 28 UNKNOWN results. Stage 133 originally had 23 cases with 10 PROVED, 9 REFUTED
 and 4 UNKNOWN; stage 134 closed its retained-prefix projection gap. Stage 136 adds raw-pointer
 metadata P/R controls and a safe core reference-array grant that remains UNKNOWN without a
 temporal permission certificate. Stage 137 adds tuple-array P/R and unsupported symbolic-write
@@ -66,15 +66,21 @@ numbered Field projections resolve a certified child and logical leaf span; comp
 retain their existing bounds, source and typed preparation certificates.
 Stage 165 adds constant nested owned-array write P/R and missing rvalue body U controls.
 Original fixed-array element types, lengths and constant index metadata resolve the child span;
-dynamic nested indices remain outside this extension. The unchanged read-before-write control
-retains its separate lazy pure-array reader frontier; a distinct write-first source covers the
-supported issued-input write path. Final survey validation is pending.
+dynamic nested indices remain outside that stage's extension. Its initial read-before-write
+control reached a separate lazy reader frontier, closed by stage 166. A distinct write-first
+source covers the issued-input writer. The frozen stage 165 survey passes.
 Stage 166 adds registered pure tuple/array read P/R and missing invoked body U controls. Actual
 deferred candidates use the existing complete original-type and issued symbol certificates;
-the original read-before-write control is evaluated unchanged. Final outcomes remain pending.
+the original read-before-write control proves unchanged. Its longer borrowed-array comparison
+frontier is closed by stage 168. The frozen stage 166 survey passes.
 Stage 167 adds owned nested symbolic-index write P/R and missing replacement body U controls.
 One original fixed-array inner index selects certified disjoint spans with a joint outer/inner
 condition; complete typed candidates and existing bounds precede the same-owner update.
+Stage 168 adds retained shared owned-array projection P/R and missing getter body U controls.
+A projection-carried compiler type certificate preserves the actual owner and validates current
+storage during later reference reads. Compiler-reference return checks reject eager and typed
+frame-owned escapes before snapshot conversion. Seven older unchanged claims independently
+advance to PROVED. Frozen surveys and all required validation pass.
 These additions change the denominator, not a coverage percentage.
 Covered examples exercise arithmetic, enum payloads, array indexing, reference effects, concrete
 generics, closures, iterator callbacks, finite loops, destructors, fresh future polling and raw

@@ -94,7 +94,7 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
         }
         if *expected == ProofStatus::Unknown {
             let (category, reason) = match *name {
-                "retained_borrow" | "reference_zero" | "refined_zero" | "read_then_write" => (
+                "reference_zero" | "refined_zero" => (
                     UnknownCategory::Unclassified,
                     "non-scalar array index is not uniquely determined on this path",
                 ),
@@ -181,8 +181,8 @@ fn issued_pure_array_roots_preserve_reads_and_reservation_independence() {
         ("offsets_equal", ProofStatus::Refuted),
         ("fields_equal", ProofStatus::Refuted),
         ("bounds", ProofStatus::Refuted),
-        ("read_then_write", ProofStatus::Unknown),
-        ("retained_borrow", ProofStatus::Unknown),
+        ("read_then_write", ProofStatus::Proved),
+        ("retained_borrow", ProofStatus::Proved),
         ("over_cap", ProofStatus::Unknown),
         ("character_producer", ProofStatus::Unknown),
         ("reference_zero", ProofStatus::Unknown),

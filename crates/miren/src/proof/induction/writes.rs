@@ -39,6 +39,9 @@ impl<'tcx> Engine<'tcx> {
         conditions: &[Term],
     ) -> Result<(), String> {
         match path.split_first() {
+            Some((MemoryProjection::TypedIndex { .. }, _)) => {
+                Err("typed owned projections are unsupported in induction".into())
+            }
             Some((MemoryProjection::Field(index), rest)) => match storage {
                 Value::Adt { fields, .. } => {
                     self.loop_write_projection(&mut fields[*index].1, rest, value, conditions)

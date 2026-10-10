@@ -2,7 +2,7 @@ use super::storage_locations::{StorageLocation, validate_static_epoch};
 use super::*;
 use symbolic::MemoryProjection;
 
-const MAX_ALLOCATIONS: usize = 512;
+pub(super) const MAX_ALLOCATIONS: usize = 512;
 const MAX_BYTE_VIEW_WRITES: u128 = 128;
 const MAX_FINITE_VIEW_ELEMENTS: usize = 128;
 
@@ -255,6 +255,10 @@ impl<'tcx> Engine<'tcx> {
         projection: &MemoryProjection,
         conditions: &[Term],
     ) -> Result<Value, String> {
+        if let MemoryProjection::TypedIndex { index, certificate } = projection {
+            let original = self.owned_array_projection_type(*certificate)?;
+            return self.read_typed_owned_index(original, value, index, conditions);
+        }
         match (projection, value.materialize()?) {
             (MemoryProjection::Field(index), Value::Adt { fields, .. }) => fields
                 .get(*index)
@@ -877,7 +881,17 @@ impl<'tcx> Engine<'tcx> {
         }
         let (allocation, projection, writable) = self.memory_path(state, place)?;
         if mutable && !writable {
-            return Err("mutable borrow needs writable allocation storage".to_owned());
+            let error = "mutable borrow needs writable allocation storage".to_owned();
+            return Err(
+                if projection
+                    .iter()
+                    .any(|part| matches!(part, MemoryProjection::TypedIndex { .. }))
+                {
+                    self.categorized_error(UnknownCategory::Semantics, error)
+                } else {
+                    error
+                },
+            );
         }
         let allocation = if let Some(allocation) = allocation {
             allocation
@@ -949,6 +963,12 @@ impl<'tcx> Engine<'tcx> {
             *storage = value;
             return Ok(());
         };
+        if matches!(projection, MemoryProjection::TypedIndex { .. }) {
+            return Err(self.categorized_error(
+                UnknownCategory::Semantics,
+                "writes through typed owned shared projections are unsupported".into(),
+            ));
+        }
         if let MemoryProjection::Slice { offset, length } = projection {
             if let Some((
                 MemoryProjection::Slice {
@@ -1261,6 +1281,16 @@ impl<'tcx> Engine<'tcx> {
             } if allocation >= incoming => {
                 if mutable {
                     return Err("mutable local borrows cannot escape their frame".to_owned());
+                }
+                if let Value::Reference { projection, .. } = &value
+                    && projection
+                        .iter()
+                        .any(|part| matches!(part, MemoryProjection::TypedIndex { .. }))
+                {
+                    return Err(self.categorized_error(
+                        UnknownCategory::Semantics,
+                        "typed owned shared borrow cannot escape frame-owned storage".into(),
+                    ));
                 }
                 let referent = self.reference_value(&value, &state.memory, &state.conditions)?;
                 if referent.contains_local_atomic() {

@@ -4131,3 +4131,73 @@ All 336 earlier completed P/R roots retain identical obligation results, details
 across four configurations. Actual inner-index mutation and valid two-by-two native controls
 remain at `/tmp/miren-stage167-final-evidence`; independent review approves final source and
 complete evidence. No assumptions, input caps or resource-budget changes are introduced.
+
+
+## Stage 168: retained compiler type evidence for owned shared projections
+
+The remaining lazy-array comparison frontier occurs before any PartialEq body entry. An actual
+shared borrow calls the untyped place reader, and later retained reference traversal also lacks
+the original compiler array type. Making only borrow creation Body-aware is insufficient.
+
+The foundation carries a private compiler type certificate with a retained indexed
+projection. Actual shared owned-array MIR and its original prefix type issue the certificate;
+it supplies type evidence only. The real owner allocation, projection, capability, lifetime and
+frame graph remain authoritative. Current complete source/candidate types, bounds, scalar context
+and issued-scalar or closed-zero preparation must be checked on every later observation.
+Detached snapshots, allocation-number type maps, mutable/raw/static grants and certificate ids
+as address identity are excluded. Projection consumers require an exhaustive audit.
+
+Three shared caller/callee read, false field claim and missing actual getter body controls use
+three actual 64-element roots. Before implementation all four compiler profiles return UNKNOWN
+at the earlier projected-borrow frontier. Complete commands, hashes and reports remain at
+`/tmp/miren-stage168-shared-expanded-before`. Final outcomes and validation remain pending.
+
+Initial probes exposed an older eager-array escape bug: a returned reference to frame-owned
+storage could become an owned snapshot. Compiler-correlated return-reference graph validation
+now precedes dereference and pure-slice pruning, while owned-value snapshot conventions retain
+their separate representation. A distinct three-root custom MIR control exercises the new
+certificate path. Neither dangling source is endorsed as a successful proof. Final validation
+remains pending.
+
+The new shared controls yield PROVED, REFUTED and missing-actual-body UNKNOWN in every host/ARM
+O0/O2 build, with empty assumptions and verified source/analyzer hashes. Reports remain at
+`/tmp/miren-stage168-shared-expanded-after`. The unchanged stage165 lazy_roots and stage166
+read_then_write whole claims also independently prove in all four configurations before harness
+expectation upkeep; their original source and obligations are preserved. Three new shared cases
+yield 116 cases across 40 families, expecting 47 PROVED, 41 REFUTED and 28 UNKNOWN per
+configuration.
+
+Two further unchanged registered-product and pure-array retained_borrow controls independently
+prove in host/ARM O0/O2 before harness-only expectation upkeep. Initial obsolete UNKNOWN assertion
+failures and original source hashes remain with the before/after evidence.
+
+The dedicated 29-root matrix yields 13 PROVED, 4 REFUTED and 12 UNKNOWN per compiler
+configuration in the focused pass. It exercises exact callee and custom PartialEq body entry,
+copied handles, owner updates, caller-backed returns and both frame-escape paths. Static literal
+reads use their earlier initializer model; they do not demonstrate a new certificate grant.
+An actual shared-to-mutable reborrow reaches the existing writable-storage refusal, while the
+original transmute control keeps its earlier frontier. Three new metadata tests and eight
+reference-graph tests pass. Seven related suites yield nineteen passing tests; the new fixture
+and three maintained old suites yield eight. Final frozen validation remains pending.
+
+The first full workspace run exposed three more obsolete UNKNOWN assertions: unchanged
+deferred-zero retained_borrow, typed-byte retained_borrow and nominal_zero claims now prove.
+All 24 UNKNOWN roots in those three harnesses were probed in all four configurations; only those
+three advance, while the other 21 preserve their outcomes and frontiers. Original fixture sources
+remain unchanged. Twelve complete reports, commands and hashes remain at
+`/tmp/miren-stage168-full-gap-probes`; the initial full failure log remains at
+`/tmp/miren-stage168-checks/tests-initial-obsolete-expectations.log`. Harness-only upkeep precedes
+a corrected full-suite rerun. Engine and compiler fixture hashes remain frozen.
+
+Final corrected validation passes all 688 Rust tests in the isolated frozen workspace and
+68 Python tests. All 630 tracked main files match that snapshot byte for byte. Fresh main
+debug/release builds, twenty-seven new/related integration tests, 68 Python tests and all remaining
+required checks pass. Initial obsolete expectation failures remain preserved; the engine and
+fixture sources are unchanged by their upkeep. Both frozen surveys retain 188 PROVED, 164 REFUTED
+and 112 UNKNOWN at `/tmp/miren-stage168-capabilities-20261010` and
+`/tmp/miren-stage168-merged-capabilities-20261010`, with source/input/release hashes verified.
+All 344 earlier completed P/R roots retain identical obligations, details and query text across
+four configurations. Independent review approves final source, actual getter mutation and valid
+64-element native evidence. Eager and typed dangling-reference returns now retain Semantics
+UNKNOWN, while supported comparisons advance without source changes. No assumptions, input caps
+or resource-budget changes are introduced.
