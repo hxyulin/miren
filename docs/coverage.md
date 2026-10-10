@@ -1347,3 +1347,10 @@ MAX by-reference native count was stopped and is not claimed as completed. Three
 zero-struct sources now prove. Unsupported original children, missing bodies, dead backing,
 whole comparisons and ambiguous struct choices retain their actual UNKNOWNs. The shared
 82-case/29-family baseline expects 132 PROVED, 120 REFUTED and 76 UNKNOWN across builds.
+
+Compiler-typed finite local struct array copies support checked symbolic indices on actual MIR
+Copy/Move reads. The original array-prefix type certifies every complete candidate before a
+shared-index merge; nominal fields, Float storage bits and valid Char values retain their meaning.
+Constant, singleton and solver-unique identity-bearing selection retain their existing paths.
+Untyped retained reference projections and ambiguous stores remain unsupported; owned copies add
+no raw, alias, custom-method purity or constructor-invariant assumptions.

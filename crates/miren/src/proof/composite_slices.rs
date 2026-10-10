@@ -41,6 +41,15 @@ pub(super) struct CompositeType<'tcx> {
 }
 
 impl<'tcx> Engine<'tcx> {
+    pub(super) fn owned_struct_choice_shape(
+        &self,
+        ty: Ty<'tcx>,
+    ) -> Result<Option<CompositeShape>, String> {
+        Ok(self
+            .composite_slice_shape(ty)?
+            .map(|descriptor| descriptor.shape))
+    }
+
     pub(super) fn composite_slice_shape(
         &self,
         ty: Ty<'tcx>,

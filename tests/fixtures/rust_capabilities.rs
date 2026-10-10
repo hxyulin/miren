@@ -608,6 +608,37 @@ pub fn local_zero_struct_missing_body(values: &[NominalZero]) -> usize {
     unsafe { opaque_local_zero_struct_length(values.iter().count()) }
 }
 
+pub fn typed_struct_array_choice(index: usize) {
+    let values = [SliceSample { left: 3, right: 7 }, SliceSample { left: 11, right: 13 }];
+    if index < values.len() {
+        let selected = values[index];
+        assert!(selected.left == if index == 0 { 3 } else { 11 });
+        assert!(selected.right == if index == 0 { 7 } else { 13 });
+    }
+}
+
+pub fn typed_struct_array_wrong_claim(index: usize) {
+    let values = [SliceSample { left: 3, right: 7 }, SliceSample { left: 11, right: 13 }];
+    if index < values.len() {
+        assert!(values[index].left == 0);
+    }
+}
+
+#[cfg(not(test))]
+unsafe extern "Rust" {
+    fn opaque_typed_struct_field(value: u16) -> u16;
+}
+
+#[cfg(not(test))]
+pub fn typed_struct_array_missing_body(index: usize) -> u16 {
+    let values = [SliceSample { left: 3, right: 7 }, SliceSample { left: 11, right: 13 }];
+    if index < values.len() {
+        unsafe { opaque_typed_struct_field(values[index].left) }
+    } else {
+        0
+    }
+}
+
 #[cfg(test)]
 mod native {
     use super::*;
@@ -616,6 +647,9 @@ mod native {
     #[test]
     fn positives() {
         integers(199);
+        typed_struct_array_choice(0);
+        typed_struct_array_choice(1);
+        typed_struct_array_choice(usize::MAX);
         local_zero_struct_cursor(&[], usize::MAX);
         local_zero_struct_cursor(&[NominalZero; 129], 128);
         local_zero_struct_cursor(&[NominalZero; usize::MAX], usize::MAX - 1);
@@ -756,5 +790,10 @@ mod native {
     #[should_panic]
     fn local_zero_struct_wrong_claim_panics() {
         local_zero_struct_wrong_claim(&[NominalZero; usize::MAX]);
+    }
+    #[test]
+    #[should_panic]
+    fn typed_struct_array_wrong_claim_panics() {
+        typed_struct_array_wrong_claim(1);
     }
 }

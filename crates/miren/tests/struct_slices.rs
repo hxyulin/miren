@@ -107,10 +107,6 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
                     UnknownCategory::ResourceLimit,
                     "composite slice type array exceeds the 128-element shape budget",
                 ),
-                "ambiguous_nested_struct" => (
-                    UnknownCategory::Unclassified,
-                    "non-scalar array index is not uniquely determined on this path",
-                ),
                 "full_contains" => (
                     UnknownCategory::Semantics,
                     "whole composite slice membership is unsupported",
@@ -222,7 +218,7 @@ fn local_struct_slices_preserve_fields_layout_and_source_rights() {
         ("empty_zero_struct", ProofStatus::Proved),
         ("refined_zero_array", ProofStatus::Unknown),
         ("oversized_shape", ProofStatus::Unknown),
-        ("ambiguous_nested_struct", ProofStatus::Unknown),
+        ("ambiguous_nested_struct", ProofStatus::Refuted),
         ("enum_field", ProofStatus::Unknown),
         ("union_field", ProofStatus::Unknown),
         ("full_contains", ProofStatus::Unknown),

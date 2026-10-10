@@ -75,7 +75,7 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
         );
         assert!(proof.assumptions.is_empty());
         assert!(proof.trusted_calls.is_empty());
-        if matches!(*name, "references" | "structs") {
+        if *name == "references" {
             assert!(proof.obligations.iter().any(|o| {
                 o.detail
                     .contains("non-scalar array index is not uniquely determined on this path")
@@ -127,7 +127,7 @@ fn pure_tuple_selection_preserves_correlated_fields_and_rejects_identity_values(
         ("wrong_float_bits", ProofStatus::Refuted),
         ("bounds_failure", ProofStatus::Refuted),
         ("references", ProofStatus::Unknown),
-        ("structs", ProofStatus::Unknown),
+        ("structs", ProofStatus::Proved),
         ("drop_zst", ProofStatus::Unknown),
         ("symbolic_write", ProofStatus::Unknown),
     ];

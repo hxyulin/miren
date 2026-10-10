@@ -11,8 +11,8 @@ execution at O0 and O2, positive/refuted/unknown controls, a source mutation tha
 structured UNKNOWN reporting, and passing repository checks. Completion establishes a repeatable
 baseline. It does not establish full Rust support or a completed memory-model refactor.
 
-The manifest contains 82 cases across 29 families. Each build configuration expects 33 PROVED,
-30 REFUTED and 19 UNKNOWN results. Stage 133 originally had 23 cases with 10 PROVED, 9 REFUTED
+The manifest contains 85 cases across 30 families. Each build configuration expects 34 PROVED,
+31 REFUTED and 20 UNKNOWN results. Stage 133 originally had 23 cases with 10 PROVED, 9 REFUTED
 and 4 UNKNOWN; stage 134 closed its retained-prefix projection gap. Stage 136 adds raw-pointer
 metadata P/R controls and a safe core reference-array grant that remains UNKNOWN without a
 temporal permission certificate. Stage 137 adds tuple-array P/R and unsupported symbolic-write
@@ -104,6 +104,15 @@ analyzer binaries, records source revision and fixture/manifest hashes, retains 
 commands, and checks inputs again at completion. A successful run means expectations matched;
 UNKNOWN and REFUTED cases are deliberate controls. Counts describe cases, not language feature
 percentages. The existing larger integration suite remains necessary.
+
+Stage 157 adds compiler-typed finite local-struct array selection P/R and missing invoked body U
+controls. Only actual MIR Copy/Move reads supply the original array-prefix type certificate.
+Every candidate must match its complete original local struct schema, primitive metadata and
+context; Char fields require valid values under current conditions. All fields use the same
+symbolic index, and Float storage bits survive only with certificates from every alternative.
+Generic operation types come from compiler MIR, rather than names or matching scalar widths.
+Untyped retained reference projections and ambiguous writes remain separate frontiers. User
+methods still execute their actual bodies, and no constructor invariant constrains input fields.
 
 ## UNKNOWN categories
 

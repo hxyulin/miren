@@ -274,6 +274,16 @@ impl<'tcx> Engine<'tcx> {
         index: &Value,
         conditions: &[Term],
     ) -> Result<Value, String> {
+        self.fixed_element_with_type(elements, index, conditions, None)
+    }
+
+    pub(super) fn fixed_element_with_type(
+        &self,
+        elements: &[Value],
+        index: &Value,
+        conditions: &[Term],
+        original: Option<Ty<'tcx>>,
+    ) -> Result<Value, String> {
         let (expression, bits, signed) = index.integer()?;
         if signed || bits != u32::from(self.tcx.sess.target.pointer_width) {
             return Err("fixed array index type mismatch".to_owned());
@@ -331,6 +341,12 @@ impl<'tcx> Engine<'tcx> {
         outside.push(symbolic::not(&bound));
         if self.feasible(&outside)? {
             return Err("array read lacks a proven bounds check".to_owned());
+        }
+        if let Some(original) = original
+            && let Some(selected) =
+                self.typed_struct_array_choice(original, elements, index, conditions)?
+        {
+            return Ok(selected);
         }
         symbolic::select_element(&self.terms, elements, index).map_err(|_| {
             "non-scalar array index is not uniquely determined on this path".to_owned()

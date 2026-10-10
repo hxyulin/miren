@@ -3530,3 +3530,55 @@ Frozen isolated and merged evidence at `/tmp/miren-stage156-capabilities-2026101
 previously completed P/R roots retain identical obligation statuses, details and query text across
 four configurations. Independent review approves exact nominal zero-byte values and unchanged
 body, lifetime, original-type and extent certificates.
+
+
+## Stage 157: compiler-typed owned struct array selection
+
+Actual MIR Copy/Move operands share the ordinary place-read loop with an optional instantiated
+Body. At an explicit array Index, the original compiler prefix type supplies exact element type
+and inventory length. Earlier constant, primitive/pure aggregate and solver-unique selection,
+real bounds and solver errors retain their order. Untyped place/reference projection paths,
+borrows, stores and raw operations gain no selection certificate.
+
+The private owned certificate reuses complete original local pure struct shape checks without
+normalization or name-based generic inference. Every candidate validates complete nominal fields,
+variant/discriminant/Option metadata, arity, scalar sign/width/context, Float optional bit evidence
+and valid Char values. Shared candidate node/depth budgets remain bounded. All primitive columns
+select with the same index before exact nominal reconstruction, including zero-leaf structs.
+No constructor invariant, raw permission, conditional identity or method-effect summary follows.
+
+The dedicated 26-root matrix yields 11 PROVED, 3 REFUTED and 12 UNKNOWN per host/ARM O0/O2 build.
+Named, tuple-style, generic and nested structs, composite input rows, Float/Char correlations,
+nominal owned zero-byte copies and locally mutated owned values are covered. The actual helper
+left-to-right field mutation refutes every profile and fails valid native 129-element inputs;
+native originals pass with durable outputs and timeouts. Original borrowed zero-field access
+honestly remains UNKNOWN through an untyped projection, alongside raw/ref/Drop/byte-carrier,
+ambiguous stores, original restricted N=0 children, resource and missing body boundaries.
+
+Unchanged original Stage 155 ambiguous_nested_struct now REFUTES its false arbitrary-field claim.
+Unchanged original pure_array_choices ambiguous_adt now PROVES its owned-copy claim. The unchanged
+owned_repeats ambiguous function also proves on host/ARM O0/O2; its compiler harness expectation
+is maintained. The original tuple_array_choices structs copy also proves across all four
+profiles, with only its expected status and obsolete UNKNOWN assertion updated. Only harness
+expectations change. Six focused and thirteen related tests pass, as do metadata corruption units,
+build, lint and formatting. Independent source and focused-evidence review approves the scope.
+
+The shared manifest adds typed struct-array selection P/R and missing invoked body U controls:
+85 cases across 30 families, expecting 34 PROVED, 31 REFUTED and 20 UNKNOWN per configuration.
+Its two baseline integration tests pass.
+
+
+Full isolated validation passes 651 Rust tests and 68 Python tests, formatting, cargo lint,
+release builds, cargo deny, documentation build and manual hooks. Main's complete 604 tracked
+files match the validated snapshot byte for byte. Fresh debug/release builds, eight new/related
+integration tests, the owned-repeat compatibility test, 68 Python tests and the remaining checks
+also pass in main. Frozen isolated and merged surveys each record 136 PROVED, 124 REFUTED and
+80 UNKNOWN at `/tmp/miren-stage157-capabilities-20261010` and
+`/tmp/miren-stage157-merged-capabilities-20261010`, with current source/input/release hashes verified.
+All 252 earlier completed P/R roots retain identical obligation statuses, details and queries
+across four configurations. Independent source review approves the exact owned type certificate.
+
+Two earlier full attempts exposed obsolete expected-UNKNOWN harness entries for unchanged owned
+struct copies. Their failures remain at `/tmp/miren-stage157-old-expectation-checks` and
+`/tmp/miren-stage157-second-old-expectation-checks`. Actual four-profile probes and native mutation
+controls justify expectation-only maintenance; the final complete rerun passes.

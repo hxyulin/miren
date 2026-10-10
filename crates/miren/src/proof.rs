@@ -74,6 +74,7 @@ mod static_writes;
 mod storage_layout;
 mod storage_locations;
 mod trusted_storage;
+mod typed_array_choices;
 use startup::AtomicStorage;
 use startup_memory::Memory;
 mod raw_subobjects;
@@ -1667,9 +1668,34 @@ impl<'tcx> Engine<'tcx> {
     }
 
     fn place(&self, state: &State, place: Place<'tcx>) -> Result<Value, String> {
+        self.read_place(state, place, None)
+    }
+
+    fn read_place(
+        &self,
+        state: &State,
+        place: Place<'tcx>,
+        body: Option<&Body<'tcx>>,
+    ) -> Result<Value, String> {
         let mut value = self.local(state, place.local.as_usize())?;
-        for projection in place.projection {
-            value = self.place_projection(state, value, projection)?;
+        for (position, projection) in place.projection.iter().enumerate() {
+            if let (Some(body), ProjectionElem::Index(index)) = (body, projection)
+                && let Value::Elements(elements) = value.clone().materialize()?
+            {
+                let prefix = Place {
+                    local: place.local,
+                    projection: self.tcx.mk_place_elems(&place.projection[..position]),
+                };
+                let index = self.local(state, index.as_usize())?;
+                value = self.fixed_element_with_type(
+                    &elements,
+                    &index,
+                    &state.conditions,
+                    Some(prefix.ty(&body.local_decls, self.tcx).ty),
+                )?;
+            } else {
+                value = self.place_projection(state, value, projection)?;
+            }
         }
         self.finish_place(state, value)
     }
@@ -1862,7 +1888,7 @@ impl<'tcx> Engine<'tcx> {
     ) -> Result<Value, String> {
         match operand {
             Operand::Copy(place) | Operand::Move(place) => {
-                let value = self.place(state, *place)?;
+                let value = self.read_place(state, *place, Some(body))?;
                 self.validate_maybe_uninit_value(
                     place.ty(&body.local_decls, self.tcx).ty,
                     &value,

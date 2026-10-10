@@ -449,6 +449,23 @@
       "expected": "unknown",
       "unknown_reason": "no compiler-exported Rust definition matches the foreign symbol",
       "unknown_category": "missing_compiler_evidence"
+    },
+    {
+      "entry": "typed_struct_array_choice",
+      "family": "typed_struct_array_choice",
+      "expected": "proved"
+    },
+    {
+      "entry": "typed_struct_array_wrong_claim",
+      "family": "typed_struct_array_choice",
+      "expected": "refuted"
+    },
+    {
+      "entry": "typed_struct_array_missing_body",
+      "family": "typed_struct_array_choice",
+      "expected": "unknown",
+      "unknown_reason": "no compiler-exported Rust definition matches the foreign symbol",
+      "unknown_category": "missing_compiler_evidence"
     }
   ]
 }

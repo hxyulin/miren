@@ -2743,7 +2743,7 @@ fn owned_aggregate_repeats_preserve_independent_copies_and_keep_storage_limits_o
         ("bad_copy", ProofStatus::Refuted),
         ("too_many", ProofStatus::Unknown),
         ("too_large", ProofStatus::Proved),
-        ("ambiguous", ProofStatus::Unknown),
+        ("ambiguous", ProofStatus::Proved),
         ("references", ProofStatus::Unknown),
         ("interior", ProofStatus::Unknown),
     ];

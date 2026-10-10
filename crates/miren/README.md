@@ -686,6 +686,14 @@ reconstruct exact struct metadata with every field selected at the same index; o
 caller-backed field borrows add no raw, write or padding-byte rights. Custom methods, Clone and
 PartialEq receive no purity inference from Copy; whole composite comparison remains unsupported.
 
+Actual MIR Copy/Move reads can select a finite local-struct array at a symbolic checked index.
+The original compiler array-prefix type certifies every candidate's exact nominal fields and
+primitive metadata before a shared-index value merge. Float storage bits survive only when all
+alternatives carry them; Char leaves require validity under the current conditions. Existing
+constant, singleton and solver-unique handle reads retain their prior behavior. Untyped retained
+reference projection chains and ambiguous writes gain no support; this owned-value operation
+adds no reference, raw address, method-purity or constructor-invariant assumptions.
+
 Concrete synchronous closures can carry supported read-only scalar slices and initialized pure
 `MaybeUninit` values through their exact compiler capture types. Shared capture metadata checks
 validate the closure identity, kind, numbered fields and original capture types; each payload
