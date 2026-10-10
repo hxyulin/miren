@@ -651,26 +651,37 @@ and custom comparisons retain their existing comparison work bounds. Custom fini
 execute actual `PartialEq` bodies and retain their effects. Solver limits, unresolved results and
 budget exhaustion in iterative consumers remain explicit `UNKNOWN`.
 
-Single incoming immutable Rust borrows also support arbitrary-length slices of exact pure tuple and
-fixed-array primitive elements. A compiler type descriptor preserves each expanded primitive field
-occurrence in its own logical array; checked indexing reconstructs all fields with the same index.
-Nested Float fields retain storage bits and Char fields decode valid Unicode values. Reads, owned
-copies, caller-backed field borrows and checked range views retain the original allocation and
-projections. Runtime length has only the valid Rust allocation-size bound; type shapes retain the
-existing depth and node budgets and a 128-element fixed-array shape limit. Exact pure zero-sized
-tuple/array elements retain the full target-usize length domain and reconstruct only their unique
-values; original element types are certified even beneath empty arrays. Their source lifetime and
-iterator bounds remain checked. Refined or identity-bearing leaves, mutable/competing roots and raw
-access remain unsupported. Logical field storage gives no padding-byte or physical representation
-rights. Whole composite membership and equality remain explicit semantic `UNKNOWN` boundaries. The
-exact safe core `size_of_val` API uses retained composite length and the compiler's complete
-element size, including padding. Pure zero-sized elements have byte size zero at every valid
-target-usize length. Source lifetime, original element type, extent and the selected API body
-remain certified before size results. The exact safe core `align_of_val` API also returns the
-compiler element ABI alignment for certified readonly scalar and composite slices, including empty
-and zero-sized views, after the same type, extent, source lifetime and selected-body checks. Raw
-dynamic layout APIs, deprecated aliases and trait-object metadata receive no new support. Readonly
-shared iteration retains the same compiler type, source graph and original caller allocation.
+Single incoming immutable Rust borrows also support arbitrary-length slices of exact pure tuple,
+fixed-array and local plain-struct elements. A compiler type descriptor preserves each expanded
+primitive field occurrence in its own logical array; checked indexing reconstructs all fields with
+the same index. Nested Float fields retain storage bits and Char fields decode valid Unicode
+values. Reads, owned copies, caller-backed field borrows and checked range views retain the
+original allocation and projections. Runtime length has only the valid Rust allocation-size bound;
+type shapes retain the existing depth and node budgets and a 128-element fixed-array shape limit.
+Exact pure zero-sized tuple/array elements retain the full target-usize length domain and
+reconstruct only their unique values; original element types are certified even beneath empty
+arrays. Their source lifetime and iterator bounds remain checked. Refined or identity-bearing
+leaves, mutable/competing roots and raw access remain unsupported. Logical field storage gives no
+padding-byte or physical representation rights. Whole composite membership and equality remain
+explicit semantic `UNKNOWN` boundaries. The exact safe core `size_of_val` API uses retained
+composite length and the compiler's complete element size, including padding. Pure zero-sized
+elements have byte size zero at every valid target-usize length. Source lifetime, original element
+type, extent and the selected API body remain certified before size results. The exact safe core
+`align_of_val` API also returns the compiler element ABI alignment for certified readonly scalar
+and composite slices, including empty and zero-sized views, after the same type, extent, source
+lifetime and selected-body checks. Raw dynamic layout APIs, deprecated aliases and trait-object
+metadata receive no new support. Readonly shared iteration retains the same compiler type, source
+graph and original caller allocation.
+
+Local struct slice elements retain the exact original compiler type, complete declaration-ordered
+field identities and compiler layout. Every struct node must be nonzero-sized; unit, tuple and
+empty-array fields remain supported. Recursive field certification rejects restricted patterns
+before normalization, including beneath empty arrays. Packed/SIMD layouts, external or core ADTs,
+enums, unions, reference/raw fields, interior mutation and destructor-bearing types remain
+unsupported. Compiler scalar validity must match the actual typed fields and offsets. Observations
+reconstruct exact struct metadata with every field selected at the same index; owned copies and
+caller-backed field borrows add no raw, write or padding-byte rights. Custom methods, Clone and
+PartialEq receive no purity inference from Copy; whole composite comparison remains unsupported.
 
 Concrete synchronous closures can carry supported read-only scalar slices and initialized pure
 `MaybeUninit` values through their exact compiler capture types. Shared capture metadata checks

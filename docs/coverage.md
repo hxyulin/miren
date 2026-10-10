@@ -1315,3 +1315,19 @@ length. Actual helper alignment+1 mutation refutes and fails native 129-element 
 wrong bodies refute; missing bodies, dead backing, unsupported roots, raw calls and deprecated
 aliases retain recorded UNKNOWNs. The unchanged prior safe alignment fixture now proves. The
 shared 76-case/27-family baseline expects 124 PROVED, 112 REFUTED and 68 UNKNOWN across builds.
+
+
+Stage 155 supports arbitrary read-only slices of exact local ordinary nonzero structs whose
+original pure fields and compiler scalar layout validity are certified recursively. Logical fields
+retain exact nominal/declaration identities and independent per-occurrence primitive arrays at the
+same index. Physical offset checks share an unchanged neutral helper with trusted storage, without
+sharing its assumption or normalization domain. Actual stride includes padding. Constructor-only
+policies impose no restrictions on arbitrary valid Rust input values.
+
+The 36-root host/ARM O0/O2 matrix yields 10 PROVED, 5 REFUTED and 21 UNKNOWN per build. Fields,
+generics, nested structs, Float/Char, views, cursors, owned-copy mutation and layout pass. False
+field relations and constructor invariants refute; actual field-helper mutation refutes and fails
+native 129-element tests. Packed layouts, external ADTs, zero-size struct nodes, restricted or
+identity-bearing fields, raw access and retired sources retain their actual UNKNOWNs. Whole
+membership/equality and ambiguous nested array-of-struct choices remain separate boundaries.
+The shared 79-case/28-family baseline expects 128 PROVED, 116 REFUTED and 72 UNKNOWN across builds.

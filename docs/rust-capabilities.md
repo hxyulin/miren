@@ -11,8 +11,8 @@ execution at O0 and O2, positive/refuted/unknown controls, a source mutation tha
 structured UNKNOWN reporting, and passing repository checks. Completion establishes a repeatable
 baseline. It does not establish full Rust support or a completed memory-model refactor.
 
-The manifest contains 76 cases across 27 families. Each build configuration expects 31 PROVED,
-28 REFUTED and 17 UNKNOWN results. Stage 133 originally had 23 cases with 10 PROVED, 9 REFUTED
+The manifest contains 79 cases across 28 families. Each build configuration expects 32 PROVED,
+29 REFUTED and 18 UNKNOWN results. Stage 133 originally had 23 cases with 10 PROVED, 9 REFUTED
 and 4 UNKNOWN; stage 134 closed its retained-prefix projection gap. Stage 136 adds raw-pointer
 metadata P/R controls and a safe core reference-array grant that remains UNKNOWN without a
 temporal permission certificate. Stage 137 adds tuple-array P/R and unsupported symbolic-write
@@ -51,6 +51,8 @@ Stage 153 adds safe composite size_of_val P/R and missing invoked body U control
 compiler element size includes padding; source/type/extent and selected ordinary body are checked.
 Stage 154 adds safe dynamic slice alignment P/R and missing invoked body U controls. The exact
 core function is resolved through compiler module identity; live descriptors precede alignment.
+Stage 155 adds local ordinary struct slice read P/R and deferred membership U controls. Original
+field identities/types and exact compiler layout validity are certified before arbitrary inputs.
 These additions change the denominator, not a coverage percentage.
 Covered examples exercise arithmetic, enum payloads, array indexing, reference effects, concrete
 generics, closures, iterator callbacks, finite loops, destructors, fresh future polling and raw
@@ -60,6 +62,10 @@ array behind the existing single immutable caller-root certificate. Their length
 actual target byte extent; it has no 128-element input cap. Exact pure tuple and fixed-array
 primitive elements likewise admit arbitrary runtime lengths. Their expanded type shapes retain
 node/depth limits and a 128-element array shape budget, independently of the slice length.
+Local ordinary nonzero structs with exact original pure fields also use this domain. Copy, Freeze,
+no-drop, compiler scalar validity and original field identities are checked at every struct node.
+Packed/vector layouts, external ADTs, zero-sized struct nodes and identity-bearing fields remain
+unsupported; constructor policies do not constrain arbitrary valid input values.
 Pure zero-sized tuple/array elements are supported with an empty primitive inventory and full
 target-usize length metadata. Original inner types are certified even beneath zero-length arrays.
 Safe size_of_val uses their certified compiler stride and validated length, including zero stride.

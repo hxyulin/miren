@@ -20,6 +20,7 @@ const MAX_INPUT_VALUES: usize = 512;
 const RAW_ACCESS_PERMISSION_GAP: &str =
     "raw memory access requires a verified temporal permission certificate";
 
+mod aggregate_validity;
 mod aggregates;
 mod arm_interrupts;
 mod array_equality;

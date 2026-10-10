@@ -556,6 +556,30 @@ pub fn slice_dynamic_alignment_missing_body(values: &[[u32; 0]]) -> usize {
     unsafe { opaque_slice_dynamic_alignment(core::mem::align_of_val(values)) }
 }
 
+#[derive(Clone, Copy, PartialEq)]
+pub struct SliceSample {
+    pub left: u16,
+    pub right: u16,
+}
+
+pub fn local_struct_slice_read(values: &[SliceSample], index: usize) {
+    if index < values.len() {
+        let selected = values.iter().nth(index).unwrap();
+        assert!(selected.left == values[index].left);
+        assert!(selected.right == values[index].right);
+    }
+}
+
+pub fn local_struct_slice_wrong_claim(values: &[SliceSample]) {
+    if values.len() > 128 {
+        assert!(values[128].left == values[128].right);
+    }
+}
+
+pub fn local_struct_slice_membership(values: &[SliceSample], needle: SliceSample) -> bool {
+    values.contains(&needle)
+}
+
 #[cfg(test)]
 mod native {
     use super::*;
@@ -564,6 +588,8 @@ mod native {
     #[test]
     fn positives() {
         integers(199);
+        local_struct_slice_read(&[], usize::MAX);
+        local_struct_slice_read(&[SliceSample { left: 3, right: 7 }; 129], 128);
         slice_dynamic_alignment(&[]);
         slice_dynamic_alignment(&[(3, 7); 129]);
         composite_slice_byte_size(&[]);
@@ -689,5 +715,10 @@ mod native {
     #[should_panic]
     fn slice_dynamic_alignment_wrong_claim_panics() {
         slice_dynamic_alignment_wrong_claim(&[[0; 0]; 129]);
+    }
+    #[test]
+    #[should_panic]
+    fn local_struct_slice_wrong_claim_panics() {
+        local_struct_slice_wrong_claim(&[SliceSample { left: 3, right: 7 }; 129]);
     }
 }

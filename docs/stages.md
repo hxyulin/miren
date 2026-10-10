@@ -3421,6 +3421,7 @@ The shared manifest adds dynamic alignment P/R and missing invoked body U contro
 across 27 families, expecting 31 PROVED, 28 REFUTED and 17 UNKNOWN per configuration.
 Its two shared baseline integration tests pass.
 
+
 Final isolated and merged validation each passes 642 Rust tests and 68 Python tests, formatting,
 cargo lint, release builds, cargo deny, documentation build and manual hooks. Frozen evidence at
 `/tmp/miren-stage154-capabilities-20261010` and
@@ -3429,3 +3430,55 @@ cargo lint, release builds, cargo deny, documentation build and manual hooks. Fr
 completed P/R roots retain byte-identical obligation statuses, details and query text across all
 four configurations. Independent review approves the exact safe API identity and unchanged
 source/body/extent protocol without new raw permissions.
+
+
+## Stage 155: exact local struct read-only slice elements
+
+Composite descriptors now include ordinary local nonzero struct nodes with exact compiler nominal
+names and declaration-ordered field identities. Every original monomorphic field type is examined
+before normalization, including zero-length array probes. Copy/Freeze/no-drop and original pure
+field eligibility remain required, with existing depth/node/array budgets charged before metadata
+append. Packed/vector layouts, external ADTs, enums/unions, zero-sized struct nodes and identity
+or refined fields remain outside this domain. Private constructors add no input invariant.
+
+A neutral aggregate scalar-validity helper is extracted unchanged from trusted storage. Both
+consumers compare exact scalar/scalar-pair validity and physical offsets against actual fields;
+the trusted storage domain, normalizer, diagnostics and assumption policy retain their behavior.
+New struct admission shares only that concrete compiler layout evidence. Physical temporary fields
+are offset-sorted for this check; logical observations retain declaration order and exact named
+Adt metadata. Each primitive occurrence has independent storage and all fields observe the same
+checked index. Actual compiler stride includes padding and supplies the existing extent bound.
+
+Checked fields, owned copies, caller-backed field borrows, views, shared cursors and safe layout
+APIs reuse existing protocols. Whole-composite membership/equality and ambiguous symbolic choices
+between struct array elements remain unsupported. No reference, raw, padding-byte or identity
+permission follows from the logical descriptor.
+
+The dedicated 36-root matrix yields 10 PROVED, 5 REFUTED and 21 UNKNOWN per host/ARM O0/O2 build.
+Named/tuple/generic/nested structs, repeated-field correlation, Float bits, Char, views, returned
+fields, owned-copy mutation, cursors and layout observations pass. Independent-field and
+constructor-invariant claims refute. Actual helper field mutation refutes every profile and fails
+valid native 129-element tests with original assertions unchanged. Same-obligation query/models,
+actual helper entry and precise categorized UNKNOWN frontiers are retained. Existing non-Copy
+wrapper controls stay UNKNOWN. Four focused and eleven related tests pass, along with metadata
+units and warning-free build/lint/fmt. Independent source and focused-evidence review approves the
+exact type, layout and source certificates.
+
+The shared manifest adds local struct read P/R and whole membership U controls: 79 cases across
+28 families, expecting 32 PROVED, 29 REFUTED and 18 UNKNOWN per configuration. Both baseline
+integration tests pass.
+
+Final isolated and merged validation each passes 645 Rust tests and 68 Python tests, formatting,
+cargo lint, release builds, cargo deny, documentation build and manual hooks. Frozen evidence at
+`/tmp/miren-stage155-capabilities-20261010` and
+`/tmp/miren-stage155-merged-capabilities-20261010` each records 128 PROVED, 116 REFUTED and
+72 UNKNOWN with current source/input/release hashes verified and no collection errors. All 236
+previously completed P/R roots retain byte-identical obligation statuses, details and queries
+across four configurations. Independent review approves the original type, field validity and
+retained source certificate.
+
+The first merged attempt ran a stale analyzer after copied older source timestamps escaped
+Cargo freshness checks; its failures are preserved at
+`/tmp/miren-stage155-merged-stale-binary-checks`. A fresh explicit binary build restores the
+struct cases and the complete rerun passes. Later copied snapshots use fresh file timestamps and
+validation builds analyzer binaries explicitly before compiler integration tests.

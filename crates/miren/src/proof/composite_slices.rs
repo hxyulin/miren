@@ -1,5 +1,7 @@
 //! Typed incoming aggregate slice observations, without physical or mutable access rights.
 use super::*;
+use aggregate_validity::scalar_fields_match;
+use rustc_abi::BackendRepr;
 use scalar_slices::{decode_scalar_element, scalar_slice_sort};
 use symbolic::ScalarSliceElement;
 
@@ -24,6 +26,10 @@ pub(super) enum CompositeShape {
     Primitive(ScalarSliceElement),
     Tuple(Vec<CompositeShape>),
     Array(Vec<CompositeShape>),
+    Struct {
+        name: String,
+        fields: Vec<(String, CompositeShape)>,
+    },
 }
 
 #[derive(Clone, Debug)]
@@ -39,7 +45,7 @@ impl<'tcx> Engine<'tcx> {
         &self,
         ty: Ty<'tcx>,
     ) -> Result<Option<CompositeType<'tcx>>, String> {
-        if !matches!(ty.kind(), ty::Tuple(_) | ty::Array(..)) {
+        if !matches!(ty.kind(), ty::Tuple(_) | ty::Array(..) | ty::Adt(..)) {
             return Ok(None);
         }
         let mut nodes = 0;
@@ -47,6 +53,9 @@ impl<'tcx> Engine<'tcx> {
             return Ok(None);
         };
         let bytes = self.static_layout(ty)?.size.bytes();
+        if bytes == 0 && matches!(ty.kind(), ty::Adt(..)) {
+            return Ok(None);
+        }
         let mut leaves = Vec::new();
         shape.leaves(&mut leaves);
         if bytes == 0 && !leaves.is_empty() {
@@ -128,6 +137,46 @@ impl<'tcx> Engine<'tcx> {
                 }
                 Ok(Some(CompositeShape::Array(shapes)))
             }
+            ty::Adt(def, args) if def.did().is_local() && def.is_struct() => {
+                if layout.size.bytes() == 0
+                    || def.repr().pack.is_some()
+                    || matches!(
+                        layout.backend_repr,
+                        BackendRepr::SimdVector { .. } | BackendRepr::SimdScalableVector { .. }
+                    )
+                {
+                    return Ok(None);
+                }
+                let mut fields = Vec::new();
+                let mut physical_fields = Vec::new();
+                for (position, field) in def.non_enum_variant().fields.iter().enumerate() {
+                    // Keep original instantiated kinds: normalization must not erase Pat or
+                    // turn opaque wrappers into ordinary primitive fields, even beneath N=0.
+                    let field_ty = field.ty(self.tcx, args).skip_norm_wip();
+                    let Some(shape) = self.composite_shape_depth(field_ty, depth + 1, nodes)?
+                    else {
+                        return Ok(None);
+                    };
+                    let field_layout = self.static_layout(field_ty)?;
+                    if field_layout.size.bytes() != 0 {
+                        physical_fields.push((
+                            layout.fields.offset(position).bytes(),
+                            field_layout.backend_repr,
+                        ));
+                    }
+                    fields.push((field.name.as_str().to_owned(), shape));
+                }
+                physical_fields.sort_by_key(|(offset, _)| *offset);
+                if !scalar_fields_match(layout.backend_repr, &physical_fields) {
+                    return Err(
+                        "composite struct validity exceeds its original typed fields".into(),
+                    );
+                }
+                Ok(Some(CompositeShape::Struct {
+                    name: self.tcx.def_path_str(def.did()),
+                    fields,
+                }))
+            }
             _ => Ok(None),
         }
     }
@@ -147,7 +196,7 @@ impl<'tcx> Engine<'tcx> {
         let descriptor = self.composite_slice_shape(ty)?.ok_or_else(|| {
             self.categorized_error(
                 UnknownCategory::Semantics,
-                "composite slice requires a pure tuple or array element".into(),
+                "composite slice requires a pure tuple, array or local struct element".into(),
             )
         })?;
         let count = descriptor.leaves.len() + 1;
@@ -340,6 +389,11 @@ impl CompositeShape {
                     field.leaves(output);
                 }
             }
+            Self::Struct { fields, .. } => {
+                for (_, field) in fields {
+                    field.leaves(output);
+                }
+            }
         }
     }
 
@@ -351,6 +405,19 @@ impl CompositeShape {
         cursor: &mut usize,
     ) -> Result<Value, String> {
         match self {
+            Self::Struct { name, fields } => Ok(Value::Adt {
+                name: name.clone(),
+                variant: 0,
+                discriminant: 0,
+                is_option: false,
+                fields: fields
+                    .iter()
+                    .map(|(name, field)| {
+                        Ok((name.clone(), field.observe(context, leaves, index, cursor)?))
+                    })
+                    .collect::<Result<Vec<_>, String>>()?
+                    .into(),
+            }),
             Self::Primitive(leaf) => {
                 let data = leaves
                     .get(*cursor)
@@ -371,7 +438,7 @@ impl CompositeShape {
                     Self::Tuple(_) if values.is_empty() => Ok(Value::Unit),
                     Self::Tuple(_) => Ok(Value::Tuple(values)),
                     Self::Array(_) => Ok(Value::Elements(values.into())),
-                    Self::Primitive(_) => unreachable!(),
+                    Self::Primitive(_) | Self::Struct { .. } => unreachable!(),
                 }
             }
         }
@@ -381,6 +448,96 @@ impl CompositeShape {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn struct_observation_preserves_named_fields_and_independent_same_index_leaves() {
+        let context = Context::default();
+        let kind = ScalarSliceElement::Integer {
+            bits: 16,
+            signed: false,
+        };
+        let shape = CompositeShape::Struct {
+            name: "fixture::Pair".into(),
+            fields: vec![
+                ("left".into(), CompositeShape::Primitive(kind)),
+                ("right".into(), CompositeShape::Primitive(kind)),
+                ("marker".into(), CompositeShape::Tuple(vec![])),
+            ],
+        };
+        let mut kinds = Vec::new();
+        shape.leaves(&mut kinds);
+        assert_eq!(kinds, vec![kind; 2]);
+        let leaves = (0..2)
+            .map(|i| {
+                context
+                    .symbol(
+                        i,
+                        Sort::Array(Box::new(Sort::BitVec(64)), Box::new(Sort::BitVec(16))),
+                    )
+                    .unwrap()
+            })
+            .collect::<Vec<_>>();
+        let index = context.symbol(2, Sort::BitVec(64)).unwrap();
+        let mut cursor = 0;
+        let value = shape
+            .observe(&context, &leaves, &index, &mut cursor)
+            .unwrap();
+        let Value::Adt {
+            name,
+            variant,
+            discriminant,
+            is_option,
+            fields,
+        } = value
+        else {
+            panic!("struct observation must retain its ADT carrier");
+        };
+        assert_eq!(name, "fixture::Pair");
+        assert_eq!(variant, 0);
+        assert_eq!(discriminant, 0);
+        assert!(!is_option);
+        assert_eq!(
+            fields
+                .iter()
+                .map(|(name, _)| name.as_str())
+                .collect::<Vec<_>>(),
+            vec!["left", "right", "marker"]
+        );
+        assert!(matches!(&fields[2].1, Value::Unit));
+        assert_eq!(cursor, 2);
+        for i in 0..2 {
+            assert_eq!(
+                fields[i].1.integer().unwrap().0,
+                context
+                    .apply(Op::Select, &[leaves[i].clone(), index.clone()])
+                    .unwrap()
+            );
+        }
+        assert_ne!(
+            fields[0].1.integer().unwrap().0,
+            fields[1].1.integer().unwrap().0
+        );
+        let mut repeated_cursor = 0;
+        let repeated = shape
+            .observe(&context, &leaves, &index, &mut repeated_cursor)
+            .unwrap();
+        let Value::Adt {
+            fields: repeated_fields,
+            ..
+        } = repeated
+        else {
+            unreachable!();
+        };
+        assert_eq!(
+            fields[0].1.integer().unwrap().0,
+            repeated_fields[0].1.integer().unwrap().0
+        );
+        assert!(
+            shape
+                .observe(&context, &leaves[..1], &index, &mut 0)
+                .is_err()
+        );
+    }
 
     #[test]
     fn zero_sized_slice_extent_and_values_preserve_full_target_length() {

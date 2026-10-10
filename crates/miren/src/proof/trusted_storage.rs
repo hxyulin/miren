@@ -1,6 +1,7 @@
 //! Pure-owned boundary certification for an explicit ordinary-storage frame premise.
 use super::*;
-use rustc_abi::{BackendRepr, VariantIdx};
+use aggregate_validity::scalar_fields_match;
+use rustc_abi::VariantIdx;
 use rustc_middle::ty::TypeVisitableExt;
 
 impl<'tcx> Engine<'tcx> {
@@ -114,7 +115,7 @@ impl<'tcx> Engine<'tcx> {
             }
         }
         fields.sort_by_key(|(offset, _)| *offset);
-        let valid = trusted_owned_scalar_fields(layout.backend_repr, &fields);
+        let valid = scalar_fields_match(layout.backend_repr, &fields);
         if !valid {
             return Err(
                 "owned scalar wrapper has unsupported validity beyond its typed fields".into(),
@@ -372,40 +373,10 @@ impl<'tcx> Engine<'tcx> {
     }
 }
 
-fn trusted_owned_scalar_fields(representation: BackendRepr, fields: &[(u64, BackendRepr)]) -> bool {
-    match representation {
-        BackendRepr::Scalar(scalar) => matches!(fields,
-                [(0, BackendRepr::Scalar(field))] if *field == scalar),
-        BackendRepr::ScalarPair {
-            a: first,
-            b: second,
-            b_offset,
-        } => match fields {
-            [
-                (
-                    0,
-                    BackendRepr::ScalarPair {
-                        a,
-                        b,
-                        b_offset: offset,
-                    },
-                ),
-            ] => *a == first && *b == second && *offset == b_offset,
-            [
-                (0, BackendRepr::Scalar(a)),
-                (offset, BackendRepr::Scalar(b)),
-            ] => *a == first && *b == second && *offset == b_offset.bytes(),
-            _ => false,
-        },
-        BackendRepr::SimdVector { .. } | BackendRepr::SimdScalableVector { .. } => false,
-        BackendRepr::Memory { .. } => true,
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rustc_abi::{Integer, Primitive, Scalar, Size, WrappingRange};
+    use rustc_abi::{BackendRepr, Integer, Primitive, Scalar, Size, WrappingRange};
     fn scalar(start: u128, end: u128) -> BackendRepr {
         BackendRepr::Scalar(Scalar::Initialized {
             value: Primitive::Int(Integer::I32, false),
@@ -416,9 +387,9 @@ mod tests {
     fn scalar_wrapper_fields_cannot_lose_range_restrictions_or_offsets() {
         let full = scalar(0, u128::from(u32::MAX));
         let restricted = scalar(1, u128::from(u32::MAX));
-        assert!(trusted_owned_scalar_fields(full, &[(0, full)]));
-        assert!(!trusted_owned_scalar_fields(restricted, &[(0, full)]));
-        assert!(!trusted_owned_scalar_fields(full, &[(4, full)]));
+        assert!(scalar_fields_match(full, &[(0, full)]));
+        assert!(!scalar_fields_match(restricted, &[(0, full)]));
+        assert!(!scalar_fields_match(full, &[(4, full)]));
         let BackendRepr::Scalar(first) = full else {
             unreachable!()
         };
@@ -430,14 +401,14 @@ mod tests {
             b: first,
             b_offset: Size::from_bytes(4),
         };
-        assert!(trusted_owned_scalar_fields(pair, &[(0, full), (4, full)]));
-        assert!(!trusted_owned_scalar_fields(pair, &[(0, full), (8, full)]));
+        assert!(scalar_fields_match(pair, &[(0, full), (4, full)]));
+        assert!(!scalar_fields_match(pair, &[(0, full), (8, full)]));
         let restricted_pair = BackendRepr::ScalarPair {
             a: first,
             b: second,
             b_offset: Size::from_bytes(4),
         };
-        assert!(!trusted_owned_scalar_fields(
+        assert!(!scalar_fields_match(
             restricted_pair,
             &[(0, full), (4, full)]
         ));
