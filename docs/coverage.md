@@ -2714,3 +2714,50 @@ retain 914 of 916 full proof objects exactly and all 1,580 emitted queries: 1,43
 roots and 144 partial queries from UNKNOWN roots. Two named query-free fold timeout contexts
 retain exact residual proof fields; their raw prefixes and call chains are preserved in
 `/tmp/miren-stage200-root-global-evidence`. This stage adds no assumptions or hardware model.
+
+## Stage 201: original integer function-table signatures
+
+Known owned function tables now admit safe Rust `fn(T) -> T` for all twelve original integer types.
+The certificate retains original compiler Ty, width and sign; raw Int/Uint is checked before the
+integer encoder. Pointer-sized and fixed-width types cannot substitute merely because they share
+machine sorts. Bool, Char, Float, Pat, NonZero, references, other signatures and ABI/arity changes
+remain
+outside this domain. Original table/index/current storage authentication, once-only operands,
+actual feasible body execution, returned memory and sixteen-element/shared work budgets remain.
+
+Actual compiler-TCX checks cover all twelve types in host/ARM O0/O2, including same-sort original
+argument, destination and copied-field substitutions, target signature mismatches, consumed inputs,
+wrong width/sign/context and genuine NonZero Pat refusal. The existing test Engine factory and
+integration verification/native helpers are shared without weakening result or mutation checks.
+
+The generated sixty-root matrix yields 24 PROVED, 24 REFUTED and 12 UNKNOWN per profile. Checked
+overflow retains solver counterexamples; explicit wrapping operations prove. Helper and table-order
+mutations refute all twelve unchanged selected claims in all four profiles. Separate native tests
+observe every type at minimum/maximum and small boundaries: originals pass and both mutations fail
+for all twelve tests at O0/O2, within ten-second limits. Generic and associated target bodies also
+produce P/R results. The compact permanent sixty-nine-root fixture adds those targets and explicit
+signature refusals, yielding 25 PROVED, 25 REFUTED and 19 UNKNOWN per profile.
+
+Eight genuine retained/omitted dependency archives yield 144 PROVED and 48 missing-body UNKNOWN
+root/profile outcomes. Retained helpers execute their actual bodies. Feasible omitted helpers
+remain UNKNOWN; only solver-proved infeasible omitted branches are pruned. No synthetic body,
+allocation/reference grant, assumption, trusted call or runtime annotation assertion is added.
+
+The old u32 table fixture is unchanged and advances from UNKNOWN to PROVED in all four profiles.
+The other legacy table/function-pointer controls compare 100 FULL proof objects and 76 emitted
+queries exactly. Seven unsupported signature controls compare another 28 FULL objects and queries
+exactly. The original 197-case global replay retains all 1,468 emitted queries; one named query-free
+fold ResourceLimit context in the permanent replay differs only in its diagnostic chain.
+Every residual field matches. Raw reports and historical disabled/initial sources remain preserved.
+
+Three global controls bring the manifest to 200 cases across 68 families, with 79 PROVED,
+69 REFUTED and 52 UNKNOWN per profile. The new UNKNOWN records its actual reason and unclassified
+category; its original missing-metadata harness failures are preserved. The corrected validation
+passes all 809 Rust tests, 68 Python tests, formatting, Clippy, release builds, dependency checks
+and manual hooks. The immutable owner release compares 1,716 objects with debug: 1,715 FULL objects
+and all
+2,672 emitted queries match exactly. One query-free ARM O2 fold ResourceLimit differs only in
+its recorded execution context, with every residual field identical. Fresh release mutation
+checks again refute four compiler profiles and observe native original/mutant exits 0/101.
+Evidence is preserved in `/tmp/miren-stage201-corrected-core-freeze.json`,
+`/tmp/miren-stage201-release-fidelity` and `/tmp/miren-stage201-release-global-mutation`.

@@ -1088,6 +1088,23 @@
       "expected": "unknown",
       "unknown_reason": "function table cannot contain opaque or nested choices",
       "unknown_category": "semantics"
+    },
+    {
+      "entry": "integer_function_table",
+      "family": "integer_function_table",
+      "expected": "proved"
+    },
+    {
+      "entry": "integer_function_table_wrong",
+      "family": "integer_function_table",
+      "expected": "refuted"
+    },
+    {
+      "entry": "integer_function_table_signature_unknown",
+      "family": "integer_function_table",
+      "expected": "unknown",
+      "unknown_reason": "non-scalar array index is not uniquely determined on this path",
+      "unknown_category": "unclassified"
     }
   ]
 }

@@ -2847,3 +2847,43 @@ mod native_known_function_table {
         super::known_function_table(2, 129);
     }
 }
+
+#[inline(never)]
+pub fn integer_table_first(word: isize) -> isize { word }
+
+#[inline(never)]
+pub fn integer_table_second(word: isize) -> isize { word.wrapping_add(1) }
+
+pub fn integer_function_table(index: usize, word: isize) {
+    let table: [fn(isize) -> isize; 2] = [integer_table_first, integer_table_second];
+    if index < 2 {
+        assert!(table[index](word) == if index == 0 { word } else { word.wrapping_add(1) });
+    }
+}
+
+pub fn integer_function_table_wrong(index: usize, word: isize) {
+    let table: [fn(isize) -> isize; 2] = [integer_table_first, integer_table_second];
+    if index < 2 { assert!(table[index](word) == word); }
+}
+
+#[inline(never)]
+pub fn integer_table_converted_first(word: isize) -> usize { word as usize }
+
+#[inline(never)]
+pub fn integer_table_converted_second(word: isize) -> usize { word as usize ^ 1 }
+
+pub fn integer_function_table_signature_unknown(index: usize, word: isize) {
+    let table: [fn(isize) -> usize; 2] =
+        [integer_table_converted_first, integer_table_converted_second];
+    if index < 2 { assert!(table[index](word) == word as usize); }
+}
+
+#[cfg(test)]
+mod native_integer_function_table {
+    #[test]
+    fn original_target_body_matches_at_target_width_boundaries() {
+        for word in [isize::MIN, isize::MAX, 0, 1] {
+            for index in 0..3 { super::integer_function_table(index, word); }
+        }
+    }
+}

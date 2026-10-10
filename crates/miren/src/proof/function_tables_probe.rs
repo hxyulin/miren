@@ -112,80 +112,7 @@ pub fn copied(callback: fn(u16)->u16, record: (u16, bool)) -> u16 {
 }
 
 fn check_prepared_calls<'tcx>(tcx: TyCtxt<'tcx>) {
-    let config = miren::ContractConfig::default();
-    let limits = miren::AnalysisLimits::default();
-    let all_failures = false;
-    let induction = false;
-    let startup = false;
-    let isolated_startup = false;
-    let async_entry = false;
-    let mut engine = Engine {
-        tcx,
-        terms: Context::default(),
-        next_symbol: std::cell::Cell::new(0),
-        float_encodings: BTreeMap::new(),
-        float_pairs: float_pairs::Registry::default(),
-        abstraction_symbols: std::cell::RefCell::new(BTreeMap::new()),
-        static_views: std::cell::RefCell::new(Vec::new()),
-        static_origins: Default::default(),
-        static_epoch: None,
-        static_roots: None,
-        function_pointers: std::cell::RefCell::new(Vec::new()),
-        static_addresses: std::collections::HashMap::new(),
-        tracked_addresses: Vec::new(),
-        maybe_uninit_types: Vec::new(),
-        scalar_slice_types: Vec::new(),
-        composite_slice_types: Vec::new(),
-        steps: 0,
-        call_chain: Vec::new(),
-        failed_call_chain: None,
-        trait_objects: Vec::new(),
-        input_depth: 0,
-        input_values: 0,
-        input_reservations: Vec::new(),
-        owned_projection_certificates: Vec::new(),
-        input_shapes: std::collections::HashMap::new(),
-        zero_sized_inputs: std::collections::HashMap::new(),
-        zero_sized_input_nodes: 0,
-        prefer_lazy_inputs: false,
-        building_mutable_input: false,
-        unknown_causes: std::cell::RefCell::new(BTreeMap::new()),
-        started: std::time::Instant::now(),
-        config: config.clone(),
-        all_failures,
-        induction,
-        startup,
-        isolated_startup,
-        limits,
-        resolved_contracts: BTreeMap::new(),
-        solver: std::cell::RefCell::new(Solver::with_limits(limits)),
-        mutable_u16_frames: Default::default(),
-        mutable_integer_types: Vec::new(),
-        mutable_u16_staging: Default::default(),
-        coroutine_places: Default::default(),
-        owned_box_types: Vec::new(),
-        next_owned_region: 0,
-        owned_box_constructors: Vec::new(),
-        bodies: std::cell::RefCell::new(std::collections::HashMap::new()),
-        call_signatures: std::cell::RefCell::new(std::collections::HashMap::new()),
-        proof: Proof {
-            status: ProofStatus::Proved,
-            async_entry,
-            assumptions: Vec::new(),
-            entry_assumptions: Vec::new(),
-            inputs: BTreeMap::new(),
-            models: Vec::new(),
-            invariants: Vec::new(),
-            analyzed_bodies: Vec::new(),
-            body_entries: Vec::new(),
-            body_entries_truncated: false,
-            obligations: Vec::new(),
-            trusted_calls: Vec::new(),
-            matched_contracts: Vec::new(),
-            stopped_after_counterexample: false,
-            replay_inputs: None,
-        },
-    };
+    let mut engine = test_engine(tcx);
 
     let find = |name: &str| {
         tcx.mir_keys(())
@@ -879,4 +806,81 @@ fn check_prepared_calls<'tcx>(tcx: TyCtxt<'tcx>) {
     );
     assert_eq!(engine.function_pointers.borrow().len(), 510);
     assert!(before < 510);
+}
+
+pub(super) fn test_engine(tcx: TyCtxt<'_>) -> Engine<'_> {
+    let config = miren::ContractConfig::default();
+    let limits = miren::AnalysisLimits::default();
+    let all_failures = false;
+    let induction = false;
+    let startup = false;
+    let isolated_startup = false;
+    let async_entry = false;
+    Engine {
+        tcx,
+        terms: Context::default(),
+        next_symbol: std::cell::Cell::new(0),
+        float_encodings: BTreeMap::new(),
+        float_pairs: float_pairs::Registry::default(),
+        abstraction_symbols: std::cell::RefCell::new(BTreeMap::new()),
+        static_views: std::cell::RefCell::new(Vec::new()),
+        static_origins: Default::default(),
+        static_epoch: None,
+        static_roots: None,
+        function_pointers: std::cell::RefCell::new(Vec::new()),
+        static_addresses: std::collections::HashMap::new(),
+        tracked_addresses: Vec::new(),
+        maybe_uninit_types: Vec::new(),
+        scalar_slice_types: Vec::new(),
+        composite_slice_types: Vec::new(),
+        steps: 0,
+        call_chain: Vec::new(),
+        failed_call_chain: None,
+        trait_objects: Vec::new(),
+        input_depth: 0,
+        input_values: 0,
+        input_reservations: Vec::new(),
+        owned_projection_certificates: Vec::new(),
+        input_shapes: std::collections::HashMap::new(),
+        zero_sized_inputs: std::collections::HashMap::new(),
+        zero_sized_input_nodes: 0,
+        prefer_lazy_inputs: false,
+        building_mutable_input: false,
+        unknown_causes: std::cell::RefCell::new(BTreeMap::new()),
+        started: std::time::Instant::now(),
+        config: config.clone(),
+        all_failures,
+        induction,
+        startup,
+        isolated_startup,
+        limits,
+        resolved_contracts: BTreeMap::new(),
+        solver: std::cell::RefCell::new(Solver::with_limits(limits)),
+        mutable_u16_frames: Default::default(),
+        mutable_integer_types: Vec::new(),
+        mutable_u16_staging: Default::default(),
+        coroutine_places: Default::default(),
+        owned_box_types: Vec::new(),
+        next_owned_region: 0,
+        owned_box_constructors: Vec::new(),
+        bodies: std::cell::RefCell::new(std::collections::HashMap::new()),
+        call_signatures: std::cell::RefCell::new(std::collections::HashMap::new()),
+        proof: Proof {
+            status: ProofStatus::Proved,
+            async_entry,
+            assumptions: Vec::new(),
+            entry_assumptions: Vec::new(),
+            inputs: BTreeMap::new(),
+            models: Vec::new(),
+            invariants: Vec::new(),
+            analyzed_bodies: Vec::new(),
+            body_entries: Vec::new(),
+            body_entries_truncated: false,
+            obligations: Vec::new(),
+            trusted_calls: Vec::new(),
+            matched_contracts: Vec::new(),
+            stopped_after_counterexample: false,
+            replay_inputs: None,
+        },
+    }
 }

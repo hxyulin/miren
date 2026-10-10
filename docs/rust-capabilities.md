@@ -11,8 +11,8 @@ execution at O0 and O2, positive/refuted/unknown controls, a source mutation tha
 structured UNKNOWN reporting, and passing repository checks. Completion establishes a repeatable
 baseline. It does not establish full Rust support or a completed memory-model refactor.
 
-The manifest contains 197 cases across 67 families. Each build configuration expects 78 PROVED,
-68 REFUTED and 51 UNKNOWN results. Stage 133 originally had 23 cases with 10 PROVED, 9 REFUTED
+The manifest contains 200 cases across 68 families. Each build configuration expects 79 PROVED,
+69 REFUTED and 52 UNKNOWN results. Stage 133 originally had 23 cases with 10 PROVED, 9 REFUTED
 and 4 UNKNOWN; stage 134 closed its retained-prefix projection gap. Stage 136 adds raw-pointer
 metadata P/R controls and a safe core reference-array grant that remains UNKNOWN without a
 temporal permission certificate. Stage 137 adds tuple-array P/R and unsupported symbolic-write
@@ -1457,3 +1457,30 @@ retain 914 of 916 full proof objects exactly and all 1,580 emitted queries: 1,43
 roots and 144 partial queries from UNKNOWN roots. Two named query-free fold timeout contexts
 retain exact residual proof fields; their raw prefixes and call chains are preserved in
 `/tmp/miren-stage200-root-global-evidence`. This stage adds no assumptions or hardware model.
+
+## Stage 201: original integer function-table signatures
+
+Bounded owned tables now execute actual safe Rust `fn(T) -> T` targets for all twelve integer
+types. Original compiler types, widths and signs remain authenticated separately; equal machine
+sorts cannot substitute pointer-sized and fixed-width types. The original source, storage,
+initialization, index, target-body and once-only operand checks and work budgets remain intact.
+Other signature kinds, arities and ABIs remain outside this domain.
+
+The permanent typed fixture has 69 roots per profile: 25 PROVED, 25 REFUTED and 19 UNKNOWN.
+All-type helper and table-order mutations break the unchanged claims in compiler and native
+execution. Genuine retained helpers execute their bodies; feasible omitted helpers remain UNKNOWN,
+while solver-proved infeasible branches are pruned. All cases run at host/ARM O0/O2.
+
+Three append-only isize controls bring this actual Stage 200 parent to 200 cases across 68 families:
+79 PROVED, 69 REFUTED and 52 UNKNOWN per profile. The mismatched result signature remains UNKNOWN
+with its observed unclassified reason, without changing the producer classification. Old global
+queries and unchanged legacy proof objects are preserved, with only explicitly recorded query-free
+thirty-second fold diagnostic contexts. This stage adds no assumptions or trusted calls.
+
+Repository validation passes 809 Rust tests and 68 Python tests, formatting, Clippy, release builds,
+dependency checks and manual hooks. Initial metadata-only harness failures remain archived.
+The immutable owner release matches 1,715 of 1,716 FULL objects and all 2,672 queries against
+debug. The sole difference is a query-free ARM O2 fold execution-budget context; all residual
+fields match. Fresh release compiler mutations refute all four profiles and native originals
+pass while mutants fail. Frozen sources and raw evidence are retained in
+`/tmp/miren-stage201-corrected-core-freeze.json` and `/tmp/miren-stage201-release-fidelity`.

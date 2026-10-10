@@ -4,6 +4,14 @@ use super::function_pointers::Target;
 use super::*;
 
 const ENABLE_FUNCTION_TABLES: bool = true;
+const ENABLE_INTEGER_FUNCTION_TABLES: bool = true;
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+struct IntegerSignature<'tcx> {
+    original: Ty<'tcx>,
+    bits: u32,
+    signed: bool,
+}
 
 #[derive(Clone, PartialEq)]
 pub(super) struct Choice<'tcx> {
@@ -46,16 +54,35 @@ pub(super) struct TableSource<'a, 'tcx> {
 }
 
 impl<'tcx> Engine<'tcx> {
-    fn table_signature(&self, original: Ty<'tcx>) -> bool {
-        let ty::FnPtr(..) = original.kind() else {
-            return false;
+    fn integer_table_signature(&self, callable: Ty<'tcx>) -> Option<IntegerSignature<'tcx>> {
+        let ty::FnPtr(..) = callable.kind() else {
+            return None;
         };
-        let signature = original.fn_sig(self.tcx).skip_binder();
-        signature.safety() == rustc_hir::Safety::Safe
-            && signature.abi() == rustc_abi::ExternAbi::Rust
-            && !signature.c_variadic()
-            && signature.inputs() == [self.tcx.types.u16]
-            && signature.output() == self.tcx.types.u16
+        let signature = callable.fn_sig(self.tcx).skip_binder();
+        let [original] = signature.inputs() else {
+            return None;
+        };
+        if signature.safety() != rustc_hir::Safety::Safe
+            || signature.abi() != rustc_abi::ExternAbi::Rust
+            || signature.c_variadic()
+            || signature.output() != *original
+            || !matches!(original.kind(), ty::Int(_) | ty::Uint(_))
+        {
+            return None;
+        }
+        let (bits, signed) = self.integer_type(*original)?;
+        Some(IntegerSignature {
+            original: *original,
+            bits,
+            signed,
+        })
+    }
+
+    fn table_signature(&self, callable: Ty<'tcx>) -> bool {
+        self.integer_table_signature(callable)
+            .is_some_and(|signature| {
+                signature.original == self.tcx.types.u16 || ENABLE_INTEGER_FUNCTION_TABLES
+            })
     }
 
     pub(super) fn function_table_choice(
@@ -116,7 +143,7 @@ impl<'tcx> Engine<'tcx> {
         let ty::Array(element, count) = original.kind() else {
             return Ok(None);
         };
-        if !self.table_signature(*element) {
+        if self.integer_table_signature(*element).is_none() {
             return Ok(None);
         }
         if elements.is_empty()
@@ -185,7 +212,7 @@ impl<'tcx> Engine<'tcx> {
             ));
         };
         if signature != expected
-            || !self.table_signature(signature)
+            || self.integer_table_signature(signature).is_none()
             || !matches!(instance.def, ty::InstanceKind::Item(_))
             || !matches!(
                 self.tcx.def_kind(instance.def_id()),
@@ -263,17 +290,19 @@ impl<'tcx> Engine<'tcx> {
         let ty::Array(element, count) = choice.original.kind() else {
             return Err("function table choice lost its original array type".into());
         };
+        let Some(integer) = self.integer_table_signature(callable) else {
+            return Err("function table call requires an original integer signature".into());
+        };
         if callable != choice.signature
             || self.tcx.erase_and_anonymize_regions(*element) != callable
-            || !self.table_signature(callable)
             || count.try_to_target_usize(self.tcx) != Some(choice.targets.len() as u64)
             || choice.targets.is_empty()
             || choice.targets.len() > MAX_ARRAY_ELEMENTS
             || !choice.index.belongs_to(&self.terms)
             || choice.index.sort() != &Sort::BitVec(u32::from(self.tcx.sess.target.pointer_width))
             || call.args.len() != 1
-            || call.args[0].node.ty(&call.body.local_decls, self.tcx) != self.tcx.types.u16
-            || call.destination.ty(&call.body.local_decls, self.tcx).ty != self.tcx.types.u16
+            || call.args[0].node.ty(&call.body.local_decls, self.tcx) != integer.original
+            || call.destination.ty(&call.body.local_decls, self.tcx).ty != integer.original
             || call.target.is_none()
             || !state.memory.mutable_u16.is_empty()
             || !state.memory.owned_regions.is_empty()
@@ -326,9 +355,16 @@ impl<'tcx> Engine<'tcx> {
         let value =
             self.evaluate_operand(call.site.0, call.body, &mut consumed, &call.args[0].node)?;
         let (term, bits, signed) = value.integer()?;
-        if bits != 16 || signed || term.sort() != &Sort::BitVec(16) || !term.belongs_to(&self.terms)
+        if bits != integer.bits
+            || signed != integer.signed
+            || term.sort() != &Sort::BitVec(integer.bits)
+            || !term.belongs_to(&self.terms)
         {
-            return Err("function table argument differs from original u16".into());
+            return Err(if integer.original == self.tcx.types.u16 {
+                "function table argument differs from original u16".into()
+            } else {
+                "function table argument differs from original integer type".into()
+            });
         }
         self.validate_owned_call_arguments(std::slice::from_ref(&value), &consumed.memory)?;
         let mut returns = Vec::new();
@@ -372,3 +408,7 @@ impl<'tcx> Engine<'tcx> {
 #[cfg(test)]
 #[path = "function_tables_probe.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "integer_function_tables_probe.rs"]
+mod integer_tests;
