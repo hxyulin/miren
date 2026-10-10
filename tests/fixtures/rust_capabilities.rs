@@ -538,6 +538,24 @@ pub fn composite_slice_byte_size_missing_body(values: &[(u8, u32)]) -> usize {
     unsafe { opaque_composite_slice_size(core::mem::size_of_val(values)) }
 }
 
+pub fn slice_dynamic_alignment(values: &[(u8, u32)]) {
+    assert!(core::mem::align_of_val(values) == core::mem::align_of::<(u8, u32)>());
+}
+
+pub fn slice_dynamic_alignment_wrong_claim(values: &[[u32; 0]]) {
+    assert!(core::mem::align_of_val(values) == core::mem::size_of::<[u32; 0]>());
+}
+
+#[cfg(not(test))]
+unsafe extern "Rust" {
+    fn opaque_slice_dynamic_alignment(alignment: usize) -> usize;
+}
+
+#[cfg(not(test))]
+pub fn slice_dynamic_alignment_missing_body(values: &[[u32; 0]]) -> usize {
+    unsafe { opaque_slice_dynamic_alignment(core::mem::align_of_val(values)) }
+}
+
 #[cfg(test)]
 mod native {
     use super::*;
@@ -546,6 +564,8 @@ mod native {
     #[test]
     fn positives() {
         integers(199);
+        slice_dynamic_alignment(&[]);
+        slice_dynamic_alignment(&[(3, 7); 129]);
         composite_slice_byte_size(&[]);
         composite_slice_byte_size(&[(3, 7); 129]);
         zero_sized_slice_cursor(&[], usize::MAX);
@@ -664,5 +684,10 @@ mod native {
     #[should_panic]
     fn composite_slice_byte_size_wrong_claim_panics() {
         composite_slice_byte_size_wrong_claim(&[(3, 7); 129]);
+    }
+    #[test]
+    #[should_panic]
+    fn slice_dynamic_alignment_wrong_claim_panics() {
+        slice_dynamic_alignment_wrong_claim(&[[0; 0]; 129]);
     }
 }

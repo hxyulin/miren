@@ -1301,3 +1301,17 @@ The unchanged earlier size query now proves. Dead backing, missing bodies and un
 retain their actual UNKNOWNs. Raw size and safe alignment controls reach their earlier sized-pointee
 cast frontier; this stage supplies no raw or alignment model. The shared 73-case/26-family
 baseline expects 120 PROVED, 108 REFUTED and 64 UNKNOWN across the four configurations.
+
+
+Stage 154 models the exact safe core align_of_val function for certified read-only primitive and
+composite slices. Compiler module identity supplies the exact public function; its actual safe
+signature and retained body are required. Source lifetime, original element type and descriptor
+extent remain checked before returning compiler ABI alignment for empty or zero-byte storage.
+Alignment supplies no raw permissions or physical address theorem.
+
+The 21-root host/ARM O0/O2 matrix yields 8 PROVED, 3 REFUTED and 10 UNKNOWN per build, covering
+primitive Char/Float, padded tuples, views, nested arrays and aligned zero-sized arrays at MAX
+length. Actual helper alignment+1 mutation refutes and fails native 129-element tests. Lookalike
+wrong bodies refute; missing bodies, dead backing, unsupported roots, raw calls and deprecated
+aliases retain recorded UNKNOWNs. The unchanged prior safe alignment fixture now proves. The
+shared 76-case/27-family baseline expects 124 PROVED, 112 REFUTED and 68 UNKNOWN across builds.

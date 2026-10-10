@@ -398,6 +398,23 @@
       "expected": "unknown",
       "unknown_reason": "no compiler-exported Rust definition matches the foreign symbol",
       "unknown_category": "missing_compiler_evidence"
+    },
+    {
+      "entry": "slice_dynamic_alignment",
+      "family": "slice_dynamic_alignment",
+      "expected": "proved"
+    },
+    {
+      "entry": "slice_dynamic_alignment_wrong_claim",
+      "family": "slice_dynamic_alignment",
+      "expected": "refuted"
+    },
+    {
+      "entry": "slice_dynamic_alignment_missing_body",
+      "family": "slice_dynamic_alignment",
+      "expected": "unknown",
+      "unknown_reason": "no compiler-exported Rust definition matches the foreign symbol",
+      "unknown_category": "missing_compiler_evidence"
     }
   ]
 }

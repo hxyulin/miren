@@ -2,6 +2,33 @@ use super::*;
 use rustc_span::Symbol;
 
 impl<'tcx> Engine<'tcx> {
+    fn is_core_align_of_val(&self, callee: DefId) -> bool {
+        let Some(anchor) = self.tcx.get_diagnostic_item(Symbol::intern("mem_align_of")) else {
+            return false;
+        };
+        let module = self.tcx.parent(anchor);
+        if self.tcx.crate_name(anchor.krate) != Symbol::intern("core")
+            || callee.krate != anchor.krate
+            || self.tcx.parent(callee) != module
+            || self.tcx.item_name(callee) != Symbol::intern("align_of_val")
+            || self.tcx.def_kind(anchor) != DefKind::Fn
+            || self.tcx.def_kind(module) != DefKind::Mod
+        {
+            return false;
+        }
+        self.tcx.module_children(module).iter().any(|child| {
+            let Some(id) = child.res.opt_def_id() else {
+                return false;
+            };
+            id == callee
+                && child.ident.name == Symbol::intern("align_of_val")
+                && id.krate == anchor.krate
+                && self.tcx.parent(id) == module
+                && self.tcx.def_kind(id) == DefKind::Fn
+                && self.tcx.visibility(id).is_public()
+        })
+    }
+
     pub(super) fn layout_intrinsic(
         &mut self,
         instance: ty::Instance<'tcx>,
@@ -11,6 +38,50 @@ impl<'tcx> Engine<'tcx> {
         location: (DefId, Span),
     ) -> Result<Option<Value>, String> {
         let callee = instance.def_id();
+        if self.is_core_align_of_val(callee) {
+            let ty = instance.args.type_at(0);
+            let ty::Slice(element) = ty.kind() else {
+                return Ok(None);
+            };
+            let [value] = values else {
+                return Err("dynamic alignment requires one shared slice argument".into());
+            };
+            let storage = value.materialize()?;
+            if !matches!(
+                storage,
+                Value::ScalarSlice { .. } | Value::CompositeSlice { .. }
+            ) {
+                return Ok(None);
+            }
+            if signature.safety() != rustc_hir::Safety::Safe
+                || signature.abi() != rustc_abi::ExternAbi::Rust
+                || signature.c_variadic()
+                || signature.output() != self.tcx.types.usize
+                || !matches!(signature.inputs(), [input]
+                    if matches!(input.kind(), ty::Ref(_, pointee, mutability)
+                        if *pointee == ty && !mutability.is_mut()))
+            {
+                return Err("dynamic alignment requires the exact safe shared-slice API".into());
+            }
+            self.validate_readonly_slice_value(ty, &storage, &state.memory, &state.conditions)?;
+            self.readonly_slice_length(&storage, &state.conditions)?;
+            self.instantiated_body(instance)?;
+            let bits = u32::from(self.tcx.sess.target.pointer_width);
+            let alignment = self.static_layout(*element)?.align.abi.bytes();
+            if !alignment.is_power_of_two() || u128::from(alignment) > (u128::MAX >> (128 - bits)) {
+                return Err("dynamic slice alignment does not fit target usize".into());
+            }
+            self.record_model(
+                callee,
+                "readonly slice alignment; exact compiler element ABI alignment",
+            );
+            return Ok(Some(symbolic::integer(
+                &self.terms,
+                u128::from(alignment),
+                bits,
+                false,
+            )));
+        }
         if self
             .tcx
             .is_intrinsic(callee, Symbol::intern("assert_zero_valid"))

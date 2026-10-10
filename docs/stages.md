@@ -3381,6 +3381,7 @@ The shared manifest adds composite byte-size P/R and missing invoked body U cont
 across 26 families, expecting 30 PROVED, 27 REFUTED and 16 UNKNOWN per configuration.
 Its two shared baseline integration tests pass.
 
+
 Final isolated and merged validation each passes 640 Rust tests and 68 Python tests, formatting,
 cargo lint, release builds, cargo deny, documentation build and manual hooks. Frozen evidence at
 `/tmp/miren-stage153-capabilities-20261010` and
@@ -3389,3 +3390,42 @@ cargo lint, release builds, cargo deny, documentation build and manual hooks. Fr
 completed P/R roots retain byte-identical obligation statuses, details and query text across all
 four configurations. Independent review approves the exact safe API, retained body and compiler
 stride certificate without new raw permissions.
+
+
+## Stage 154: safe dynamic alignment for certified read-only slices
+
+The safe core align_of_val function is identified by its exact public function DefId beneath the
+actual core module containing the compiler mem_align_of anchor. Unrelated crates, parents and
+names are excluded before the exact child check. No nonexistent diagnostic item or user name
+supplies identity. The model requires the safe fixed Rust shared-reference signature, original
+slice element type, validated read-only primitive/composite descriptor and selected ordinary body.
+Source lifetime and valid extent precede the constant result, including empty and zero-byte cases.
+It returns actual compiler ABI alignment, checked as a representable nonzero power of two.
+
+Raw APIs, deprecated aliases, unrelated DSTs and finite/owned domains gain no new model. Existing
+byte-size observations retain their separate path. No pointer address, alias right, raw memory
+permission, input premise or budget changes.
+
+The dedicated 21-root compiler matrix yields 8 PROVED, 3 REFUTED and 10 UNKNOWN per host/ARM O0/O2
+build. Primitive Char/Float slices, padded tuples, nested arrays, derived views and aligned empty
+array elements pass. Valid native MAX zero-sized arrays retain their element alignment. Actual
+helper alignment+1 mutation refutes every profile and fails valid native 129-element tests;
+lookalike wrong helper bodies execute and refute. Same-obligation queries/models and actual helper
+entry/model attribution are retained. Dead empty/zero-byte backing, unsupported types, competing
+or mutable roots, missing bodies and raw/alias calls preserve their exact categories and frontiers.
+The original Stage 153 safe-alignment source advances from its earlier body-cast UNKNOWN to
+PROVED without a source change. Four focused and six related tests pass. Independent source and
+focused-evidence review approves the exact identity and descriptor protocol.
+
+The shared manifest adds dynamic alignment P/R and missing invoked body U controls: 76 cases
+across 27 families, expecting 31 PROVED, 28 REFUTED and 17 UNKNOWN per configuration.
+Its two shared baseline integration tests pass.
+
+Final isolated and merged validation each passes 642 Rust tests and 68 Python tests, formatting,
+cargo lint, release builds, cargo deny, documentation build and manual hooks. Frozen evidence at
+`/tmp/miren-stage154-capabilities-20261010` and
+`/tmp/miren-stage154-merged-capabilities-20261010` each records 124 PROVED, 112 REFUTED and
+68 UNKNOWN with unchanged frozen inputs/binaries and no collection errors. The 228 previously
+completed P/R roots retain byte-identical obligation statuses, details and query text across all
+four configurations. Independent review approves the exact safe API identity and unchanged
+source/body/extent protocol without new raw permissions.

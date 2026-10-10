@@ -666,9 +666,11 @@ rights. Whole composite membership and equality remain explicit semantic `UNKNOW
 exact safe core `size_of_val` API uses retained composite length and the compiler's complete
 element size, including padding. Pure zero-sized elements have byte size zero at every valid
 target-usize length. Source lifetime, original element type, extent and the selected API body
-remain certified before size results; raw dynamic-size APIs and dynamic alignment receive no new
-support. Readonly shared iteration retains the same compiler type, source graph and original caller
-allocation.
+remain certified before size results. The exact safe core `align_of_val` API also returns the
+compiler element ABI alignment for certified readonly scalar and composite slices, including empty
+and zero-sized views, after the same type, extent, source lifetime and selected-body checks. Raw
+dynamic layout APIs, deprecated aliases and trait-object metadata receive no new support. Readonly
+shared iteration retains the same compiler type, source graph and original caller allocation.
 
 Concrete synchronous closures can carry supported read-only scalar slices and initialized pure
 `MaybeUninit` values through their exact compiler capture types. Shared capture metadata checks

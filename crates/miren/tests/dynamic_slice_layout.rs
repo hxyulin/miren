@@ -83,10 +83,15 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
             ))));
         }
         if matches!(*expected, ProofStatus::Proved | ProofStatus::Refuted)
-            && *name != "lookalike_wrong_body"
+            && !matches!(*name, "lookalike_wrong_body" | "unsupported_alignment")
         {
             assert!(proof.models.iter().any(|model| {
                 model.contains("compiler-sized value or slice length times compiler element size")
+            }));
+        }
+        if *name == "unsupported_alignment" {
+            assert!(proof.models.iter().any(|model| {
+                model.contains("readonly slice alignment; exact compiler element ABI alignment")
             }));
         }
         if *expected == ProofStatus::Unknown {
@@ -96,10 +101,6 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
                     "only read-only byte slices and byte arrays are modeled",
                 ),
                 "trait_object" => (UnknownCategory::Semantics, "unsupported argument type dyn"),
-                "unsupported_alignment" => (
-                    UnknownCategory::Unclassified,
-                    "tracked raw addresses require a sized pointee",
-                ),
                 "analyzer_only::raw_size_api" => (
                     UnknownCategory::Unclassified,
                     "tracked raw addresses require a sized pointee",
@@ -190,7 +191,7 @@ fn dynamic_sizes_use_compiler_stride_and_live_sources() {
         ("wrong_product", ProofStatus::Refuted),
         ("wrong_zero", ProofStatus::Refuted),
         ("lookalike_wrong_body", ProofStatus::Refuted),
-        ("unsupported_alignment", ProofStatus::Unknown),
+        ("unsupported_alignment", ProofStatus::Proved),
         ("mutable_root", ProofStatus::Unknown),
         ("competing_roots", ProofStatus::Unknown),
         ("trait_object", ProofStatus::Unknown),
