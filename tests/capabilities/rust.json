@@ -986,6 +986,23 @@
       "expected": "unknown",
       "unknown_reason": "integer_slice_nested bb0: mutable integer staging needs a pending child",
       "unknown_category": "semantics"
+    },
+    {
+      "entry": "bool_slice_child_call",
+      "family": "mutable_bool_child",
+      "expected": "proved"
+    },
+    {
+      "entry": "bool_slice_child_wrong_claim",
+      "family": "mutable_bool_child",
+      "expected": "refuted"
+    },
+    {
+      "entry": "bool_slice_nested_unknown",
+      "family": "mutable_bool_child",
+      "expected": "unknown",
+      "unknown_reason": "bool_slice_nested bb0: mutable bool staging needs a pending child",
+      "unknown_category": "semantics"
     }
   ]
 }

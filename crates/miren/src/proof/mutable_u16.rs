@@ -1,4 +1,4 @@
-//! Direct incoming mutable integer roots. Metadata and ghosts have no data-write authority.
+//! Direct incoming mutable integer and Bool roots. Metadata and ghosts have no data-write authority.
 use super::*;
 use symbolic::MutableU16Role;
 
@@ -28,7 +28,8 @@ impl<'tcx> Engine<'tcx> {
     }
 
     fn mutable_integer_element(&self, original: Ty<'tcx>) -> bool {
-        matches!(original.kind(), ty::Int(_) | ty::Uint(_)) && original != self.tcx.types.u8
+        matches!(original.kind(), ty::Bool | ty::Int(_) | ty::Uint(_))
+            && original != self.tcx.types.u8
     }
 
     fn mutable_integer_certificate(&self, id: usize) -> Result<&IntegerCertificate<'tcx>, String> {
@@ -40,7 +41,9 @@ impl<'tcx> Engine<'tcx> {
             return Err("mutable integer certificate has an unsupported original type".into());
         }
         let layout = self.static_layout(certificate.original)?;
-        if self.scalar_slice_element(certificate.original)? != Some(certificate.element)
+        if (certificate.original == self.tcx.types.bool
+            && (layout.size.bytes() != 1 || layout.align.abi.bytes() != 1))
+            || self.scalar_slice_element(certificate.original)? != Some(certificate.element)
             || layout.size.bytes() != certificate.bytes
             || layout.align.abi.bytes() != certificate.alignment
         {
@@ -56,6 +59,9 @@ impl<'tcx> Engine<'tcx> {
         Ok(
             if self.mutable_integer_certificate(certificate)?.original == self.tcx.types.u16 {
                 "mutable u16 staging needs a pending child"
+            } else if self.mutable_integer_certificate(certificate)?.original == self.tcx.types.bool
+            {
+                "mutable bool staging needs a pending child"
             } else {
                 "mutable integer staging needs a pending child"
             },
@@ -394,8 +400,42 @@ impl<'tcx> Engine<'tcx> {
         let backing = self.mutable_u16_backing(id, &state.memory)?;
         let index = self.local(state, index.as_usize())?;
         self.mutable_u16_index(&index, &backing.length, &state.conditions)?;
-        let (term, bits, signed) = replacement.integer()?;
         let certificate = self.mutable_integer_certificate(backing.certificate)?;
+        let term = self.mutable_scalar_replacement(certificate, replacement)?;
+        let data = self.terms.apply(
+            Op::Store,
+            &[
+                backing.data.clone(),
+                index.integer()?.0.clone(),
+                term.clone(),
+            ],
+        )?;
+        std::rc::Rc::make_mut(&mut state.memory.mutable_u16)[id].data = data;
+        Ok(true)
+    }
+
+    fn mutable_scalar_replacement(
+        &self,
+        certificate: &IntegerCertificate<'tcx>,
+        replacement: &Value,
+    ) -> Result<Term, String> {
+        if certificate.element == symbolic::ScalarSliceElement::Bool {
+            let Value::Bool(term) = replacement else {
+                return Err(
+                    "mutable Bool replacement requires logical Bool in current context".into(),
+                );
+            };
+            if certificate.original != self.tcx.types.bool
+                || term.sort() != &Sort::Bool
+                || !term.belongs_to(&self.terms)
+            {
+                return Err(
+                    "mutable Bool replacement differs from issued type, sort or context".into(),
+                );
+            }
+            return Ok(term.clone());
+        }
+        let (term, bits, signed) = replacement.integer()?;
         let symbolic::ScalarSliceElement::Integer {
             bits: expected_bits,
             signed: expected_signed,
@@ -414,16 +454,7 @@ impl<'tcx> Engine<'tcx> {
                 "mutable integer replacement differs from issued width, sign or context".into()
             });
         }
-        let data = self.terms.apply(
-            Op::Store,
-            &[
-                backing.data.clone(),
-                index.integer()?.0.clone(),
-                term.clone(),
-            ],
-        )?;
-        std::rc::Rc::make_mut(&mut state.memory.mutable_u16)[id].data = data;
-        Ok(true)
+        Ok(term.clone())
     }
 
     pub(super) fn mutable_u16_metadata(
@@ -1239,6 +1270,123 @@ mod tests {
                         assert!(engine.mutable_u16_snapshot(&ghost, &state.memory).is_err());
                     }
                 }
+                let mut bool_memory = Memory::default();
+                let mut bool_conditions = Vec::new();
+                let bool_root = engine
+                    .mutable_u16_input(tcx.types.bool, &mut bool_memory, &mut bool_conditions)
+                    .unwrap();
+                let ghost = engine
+                    .mutable_u16_snapshot(&bool_root, &bool_memory)
+                    .unwrap();
+                let certificate = bool_memory.mutable_u16[0].certificate;
+                let issued = engine.mutable_integer_types[certificate].clone();
+                assert_eq!(issued.element, symbolic::ScalarSliceElement::Bool);
+                assert_eq!((issued.bytes, issued.alignment), (1, 1));
+                let good = Value::Bool(engine.terms.boolean(true));
+                assert!(engine.mutable_scalar_replacement(&issued, &good).is_ok());
+                for wrong in [
+                    symbolic::integer(&engine.terms, 1, 8, false),
+                    Value::Bool(foreign.boolean(true)),
+                    Value::Bool(engine.terms.bit_vector(1, 8).unwrap()),
+                ] {
+                    assert!(engine.mutable_scalar_replacement(&issued, &wrong).is_err());
+                }
+                for wrong_type in [tcx.types.u8, tcx.types.i8] {
+                    engine.mutable_integer_types[certificate].original = wrong_type;
+                    assert!(engine.mutable_u16_backing(0, &bool_memory).is_err());
+                    engine.mutable_integer_types[certificate] = issued.clone();
+                }
+                for (bytes, alignment) in [(0, 1), (1, 2)] {
+                    engine.mutable_integer_types[certificate].bytes = bytes;
+                    engine.mutable_integer_types[certificate].alignment = alignment;
+                    assert!(engine.mutable_u16_backing(0, &bool_memory).is_err());
+                    engine.mutable_integer_types[certificate] = issued.clone();
+                }
+                for context in [&engine.terms, &foreign] {
+                    let mut corrupt = bool_memory.clone();
+                    std::rc::Rc::make_mut(&mut corrupt.mutable_u16)[0].data = context
+                        .symbol(
+                            99,
+                            Sort::Array(Box::new(Sort::BitVec(bits)), Box::new(Sort::BitVec(8))),
+                        )
+                        .unwrap();
+                    assert!(engine.mutable_u16_backing(0, &corrupt).is_err());
+                }
+                let bool_definition = tcx
+                    .hir_body_owners()
+                    .find(|owner| tcx.item_name(owner.to_def_id()).as_str() == "bool_probe")
+                    .unwrap();
+                let bool_instance = engine
+                    .resolve_function_item(bool_definition.to_def_id(), tcx.mk_args(&[]))
+                    .unwrap();
+                let bool_body = engine.instantiated_body(bool_instance).unwrap();
+                std::rc::Rc::make_mut(&mut bool_memory.mutable_u16)[0].length =
+                    symbolic::integer(&engine.terms, 2, bits, false);
+                let mut bool_state = State {
+                    locals: vec![None; bool_body.local_decls.len()],
+                    addresses: vec![None; bool_body.local_decls.len()],
+                    conditions: bool_conditions,
+                    memory: bool_memory.clone(),
+                    missing_places: Default::default(),
+                };
+                bool_state.locals[1] = Some(bool_root.clone());
+                bool_state.locals[2] = Some(symbolic::integer(&engine.terms, 0, bits, false));
+                let bool_place = Place {
+                    local: rustc_middle::mir::Local::from_usize(1),
+                    projection: tcx.mk_place_elems(&[
+                        ProjectionElem::Deref,
+                        ProjectionElem::Index(rustc_middle::mir::Local::from_usize(2)),
+                    ]),
+                };
+                assert!(
+                    engine
+                        .mutable_u16_store(&bool_body, &mut bool_state, bool_place, &good)
+                        .unwrap()
+                );
+                assert!(matches!(
+                    engine
+                        .mutable_u16_read(Some(&bool_body), &bool_state, bool_place)
+                        .unwrap(),
+                    Some(Value::Bool(_))
+                ));
+                assert!(
+                    !engine
+                        .mutable_u16_matches(
+                            body.local_decls[rustc_middle::mir::Local::from_usize(1)].ty,
+                            0,
+                            &bool_state.memory,
+                            true
+                        )
+                        .unwrap()
+                );
+                bool_state.locals[1] = Some(ghost.clone());
+                assert!(
+                    engine
+                        .mutable_u16_read(Some(&bool_body), &bool_state, bool_place)
+                        .is_err()
+                );
+                let old_data = bool_memory.mutable_u16[0].data.clone();
+                std::rc::Rc::make_mut(&mut bool_memory.mutable_u16)[0].data = engine
+                    .terms
+                    .apply(
+                        Op::Store,
+                        &[
+                            old_data,
+                            engine.terms.bit_vector(0, bits).unwrap(),
+                            engine.terms.boolean(true),
+                        ],
+                    )
+                    .unwrap();
+                assert!(engine.mutable_u16_length(&ghost, &bool_memory).is_ok());
+                if let Value::MutableU16 {
+                    role: MutableU16Role::Ghost { data, .. },
+                    ..
+                } = ghost
+                {
+                    assert_ne!(data, bool_memory.mutable_u16[0].data);
+                } else {
+                    panic!("detached ghost");
+                }
                 self.checked = true;
                 rustc_driver::Compilation::Stop
             }
@@ -1298,6 +1446,9 @@ pub fn shared(values: &[u16]) -> usize {
 pub fn scalar(word: u16) -> u16 {
     word ^ 0
 }
+pub fn bool_probe(values: &mut [bool], index: usize, word: bool) {
+    if index < values.len() { values[index] = word; }
+}
 pub fn probe(values: &mut [u16], index: usize, word: u16) {
     if index < values.len() {
         values[index] = word;
@@ -1311,10 +1462,10 @@ pub fn probe(values: &mut [u16], index: usize, word: u16) {
             .output()
             .unwrap();
         assert!(sysroot.status.success());
-        for level in ["0", "2"] {
-            let mut check = Check { checked: false };
-            rustc_driver::run_compiler(
-                &[
+        for target in [None, Some("thumbv7em-none-eabihf")] {
+            for level in ["0", "2"] {
+                let mut check = Check { checked: false };
+                let mut arguments = vec![
                     "rustc".into(),
                     source.to_str().unwrap().into(),
                     "--crate-type=lib".into(),
@@ -1328,10 +1479,13 @@ pub fn probe(values: &mut [u16], index: usize, word: u16) {
                         .unwrap()
                         .trim()
                         .into(),
-                ],
-                &mut check,
-            );
-            assert!(check.checked);
+                ];
+                if let Some(target) = target {
+                    arguments.extend(["--target".into(), target.into()]);
+                }
+                rustc_driver::run_compiler(&arguments, &mut check);
+                assert!(check.checked);
+            }
         }
         std::fs::remove_dir_all(directory).unwrap();
     }

@@ -163,7 +163,7 @@ fn exact_integer_kinds_current_stores_and_child_calls_cover_four_profiles() {
         .map(|(name, status)| (name.as_str(), *status))
         .collect::<Vec<_>>();
     entries.extend([
-        ("bool_unknown", U),
+        ("bool_unknown", P),
         ("char_unknown", U),
         ("float_unknown", U),
     ]);

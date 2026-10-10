@@ -1037,3 +1037,10 @@ and the shared storage/frame budgets remain unchanged. The private internal carr
 its historical u16 name; that name adds no rights. u8 keeps its existing byte-model priority;
 Bool, Char, Float, refined aliases and additional spatial/temporal lease features remain
 outside this integer extension.
+
+Mutable Bool slices share the existing single-root primitive lease protocol. The original Bool
+compiler type and size-one/alignment-one layout issue a logical Bool-array certificate; typed
+reads and stores accept only same-context Bool values. Whole synchronous children retain their
+actual selected bodies and current backing, while detached entry ghosts retain frozen data.
+Integer codecs and completed queries remain unchanged. No byte coercion, validity assumption,
+shared alias, raw access, subslice loan or mutable return permission follows from this codec.

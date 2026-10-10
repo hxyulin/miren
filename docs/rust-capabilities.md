@@ -11,8 +11,8 @@ execution at O0 and O2, positive/refuted/unknown controls, a source mutation tha
 structured UNKNOWN reporting, and passing repository checks. Completion establishes a repeatable
 baseline. It does not establish full Rust support or a completed memory-model refactor.
 
-The manifest contains 179 cases across 61 families. Each build configuration expects 72 PROVED,
-62 REFUTED and 45 UNKNOWN results. Stage 133 originally had 23 cases with 10 PROVED, 9 REFUTED
+The manifest contains 182 cases across 62 families. Each build configuration expects 73 PROVED,
+63 REFUTED and 46 UNKNOWN results. Stage 133 originally had 23 cases with 10 PROVED, 9 REFUTED
 and 4 UNKNOWN; stage 134 closed its retained-prefix projection gap. Stage 136 adds raw-pointer
 metadata P/R controls and a safe core reference-array grant that remains UNKNOWN without a
 temporal permission certificate. Stage 137 adds tuple-array P/R and unsupported symbolic-write
@@ -1116,3 +1116,55 @@ comparison. Of 716 current global pairs, 715 normalized proof objects match exac
 30-second UNKNOWN resource refusal differs only in active call-stack context and is recorded.
 All 834 tracked files are byte-identical between main and the isolated workspace. Checks and
 ledgers retain their precise scopes under `/tmp/miren-stage191-*`.
+
+Stage 192 admits exact original Bool elements through the existing one mutable-root and
+whole-child protocol. The immutable type/layout certificate checks raw Bool and compiler
+size/alignment 1/1. Logical backing is Array(target usize, Bool); typed reads and stores preserve
+same-context Boolean values. BV8 carriers, integer 0/1 replacements, wrong original types,
+forged layouts and foreign contexts cannot supply Bool authority. No byte-validity assumption,
+coercion, input cap or new borrowing right is added.
+
+Detached Ghost retains its original frozen array, length and issued codec. Configured contract
+length observations support exact Bool backing; executable Ghost indexing remains UNKNOWN.
+Existing original-type, initialization, generation, parent suspension, selected child body,
+normal-return, ancestor stack and weighted storage rules remain. Integer/u16 queries and diagnostic
+wording retain their previous behavior. Only issued raw Bool Pending failures use the Boolean
+label. Other elements, competing/split/shared/escaping leases and raw transport remain outside
+this extension.
+
+The 21-root dedicated matrix yields nine PROVED, four REFUTED and eight UNKNOWN per host/ARM
+O0/O2 profile. Identical sources under committed Stage 191 yield one PROVED and twenty UNKNOWN:
+the historical u8_unknown write control already works through ordinary writable Reference/Bytes
+with arbitrary valid byte extent. It is no new Bool or byte capability. The original panic-format
+control remains UNKNOWN at its scalar-frame frontier; a separate child assertion refutes.
+
+Thirty-two fresh proof reports cover the ordinary matrix, actual data mutation, genuine
+retained/omitted foreign child bodies and configured Ghost length P/R/index U controls. Changing
+the actual replacement helper from !value to value refutes the unchanged claim with actual body
+entries and a query/model on the same obligation. Safe native originals pass three tests; the
+unchanged mutation guard exits 101 at O0/O2 with ten-second timeouts and valid 129-element arrays.
+Actual-parent evidence is `/tmp/miren-stage192-parent191-evidence`.
+
+Historical pending-191 sources, binary and captures retain their original scope. Fresh fidelity
+compares 868 prior root/profile pairs: 864 outcomes and obligations remain unchanged, all 568
+previously completed pairs and 1,236 queries match exactly, and four original bool_unknown controls
+advance to PROVED. No old query-free diagnostic changes occur. Narrow root harness upkeep changes
+only that expectation, leaving its original fixture intact.
+
+Global controls add a Bool child assertion, its wrong claim and a nested-child UNKNOWN frontier.
+Their actual helper mutation refutes the original claim and fails the native guard. An initial
+unshipped assert_eq draft reached unsupported temporary shared references; that source and failed
+capture remain immutable. The direct-assertion draft exercises supported typed reads with the same
+equality claims. Before/after evidence is at `/tmp/miren-stage192-global-before-evidence` and
+`/tmp/miren-stage192-parent191-global-after-evidence`. The manifest has 182 cases in 62 families.
+
+Root validation passes 780 workspace Rust tests and 91 focused Rust tests, with 68 Python
+checks in each workspace. Formatting, Clippy, debug/release builds, deny, docs and manual hooks
+pass. The fresh main release matches 108 dedicated proof objects and 158 queries, plus 16 new
+global proof objects and 32 queries. Native executions explicitly retain their actual-parent
+author scope. All 536 previously completed global pairs preserve status, inputs, models, premises
+and obligation queries; append-only replay fingerprints are excluded from that historical
+comparison. Of 728 current global pairs, 727 normalized proof objects match exactly. One query-free
+30-second UNKNOWN resource refusal differs only in active call-stack context and is recorded.
+All 837 tracked files are byte-identical between main and the isolated workspace. Checks and
+ledgers retain their precise scopes under `/tmp/miren-stage192-*`.

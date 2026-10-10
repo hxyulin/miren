@@ -2575,3 +2575,52 @@ mod native_integer_slice_child {
         assert_eq!(values[128], i32::MIN);
     }
 }
+
+
+#[inline(never)]
+pub fn bool_slice_child_value(value: bool) -> bool {
+    !value
+}
+
+#[inline(never)]
+pub fn bool_slice_child(values: &mut [bool], index: usize, value: bool) {
+    values[index] = bool_slice_child_value(value);
+}
+
+pub fn bool_slice_child_call(values: &mut [bool], index: usize, value: bool) {
+    if index < values.len() {
+        bool_slice_child(values, index, value);
+        assert!(values[index] == !value);
+    }
+}
+
+pub fn bool_slice_child_wrong_claim(values: &mut [bool], index: usize, value: bool) {
+    if index < values.len() {
+        bool_slice_child(values, index, value);
+        assert!(values[index] == value);
+    }
+}
+
+#[inline(never)]
+pub fn bool_slice_nested(values: &mut [bool], index: usize, value: bool) {
+    bool_slice_child(values, index, value);
+}
+
+pub fn bool_slice_nested_unknown(values: &mut [bool], index: usize, value: bool) {
+    if index < values.len() {
+        bool_slice_nested(values, index, value);
+        assert!(values[index] == !value);
+    }
+}
+
+#[cfg(test)]
+mod native_bool_slice_child {
+    #[test]
+    fn boolean_scalar_body_preserves_negation() {
+        for value in [false, true] {
+            let mut values = [value; 129];
+            super::bool_slice_child_call(&mut values, 128, value);
+            assert_eq!(values[128], !value);
+        }
+    }
+}
