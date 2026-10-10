@@ -327,7 +327,7 @@ impl<'tcx> Engine<'tcx> {
     fn mutable_u16_primitive(&self, original: Ty<'tcx>) -> bool {
         matches!(
             original.kind(),
-            ty::Bool | ty::Int(_) | ty::Uint(_) | ty::Float(_)
+            ty::Bool | ty::Char | ty::Int(_) | ty::Uint(_) | ty::Float(_)
         )
     }
 
@@ -517,6 +517,11 @@ impl<'tcx> Engine<'tcx> {
                 values.push(self.evaluate_operand(site.0, body, state, &arg.node)?);
             }
         }
+        for (original, value) in signature.inputs().iter().zip(&values) {
+            if *original == self.tcx.types.char {
+                self.prove_char_value(value, &state.conditions)?;
+            }
+        }
         let frame = self.mutable_u16_register_frame(&selected)?;
         if state.memory.storage_slots().saturating_add(1) > MAX_INPUT_VALUES {
             return Err(self.categorized_error(
@@ -541,6 +546,9 @@ impl<'tcx> Engine<'tcx> {
         // graph checks before publishing Return. No executable role is stored in caller memory:
         // aggregate, addressed and projected role stores are refused by the ordinary store gate.
         for result in &mut results {
+            if signature.output() == self.tcx.types.char {
+                self.prove_char_value(&result.value, &result.conditions)?;
+            }
             self.mutable_u16_role_live(id, &MutableU16Role::Child { generation }, &result.memory)?;
             if result.memory.mutable_u16[id].phase
                 != (Phase::Active {
@@ -724,6 +732,11 @@ impl<'tcx> Engine<'tcx> {
         for arg in args {
             values.push(self.evaluate_operand(site.0, body, state, &arg.node)?);
         }
+        for (original, value) in signature.inputs().iter().zip(&values) {
+            if *original == self.tcx.types.char {
+                self.prove_char_value(value, &state.conditions)?;
+            }
+        }
         std::rc::Rc::make_mut(&mut state.memory.mutable_u16)[*id].phase = Phase::Active {
             frames: next_frames.clone(),
         };
@@ -736,6 +749,9 @@ impl<'tcx> Engine<'tcx> {
             site,
         )?;
         for result in &mut results {
+            if signature.output() == self.tcx.types.char {
+                self.prove_char_value(&result.value, &result.conditions)?;
+            }
             let backing = self.mutable_u16_backing(*id, &result.memory)?;
             if backing.generation != *generation
                 || backing.phase

@@ -5444,3 +5444,52 @@ comparison. Of 728 current global pairs, 727 normalized proof objects match exac
 30-second UNKNOWN resource refusal differs only in active call-stack context and is recorded.
 All 837 tracked files are byte-identical between main and the isolated workspace. Checks and
 ledgers retain their precise scopes under `/tmp/miren-stage192-*`.
+
+Stage 194 admits exact original Char elements through the existing single mutable-root and
+whole-child protocol. The issued type/layout certificate checks raw Char and compiler layout 4/4.
+Logical backing is Array(target usize, BV32). Reads use the existing valid Unicode observation
+decoder; writes prove the actual replacement is a Unicode scalar before Store. Invalid surrogate
+or above-maximum replacements are refused without repairing data or adding validity premises.
+Wrong original u32/i32 types, layout, signedness, width, sort and foreign contexts are refused.
+Transactional negatives leave data, phase and generation unchanged.
+
+Scalar Char root companions reuse the existing compiler-typed Unicode input producer. Selected
+child/helper arguments and results retain exact type, validity, actual body and effect checks.
+Detached Ghost length supports the original issued Char codec; executable Ghost indexing remains
+UNKNOWN. Existing initialization, generation, parent suspension, normal return, alias policy and
+storage budgets remain. Float, shared element methods, raw transport, competing/escaping/split
+leases and nested mutable children receive no new rights.
+
+The dedicated 24-root matrix yields eleven PROVED, four REFUTED and nine UNKNOWN per host/ARM
+O0/O2 profile. Identical sources under committed Stage 192 yield one PROVED and twenty-three
+UNKNOWN. The existing write-only u8 control remains PROVED on its ordinary byte path. An original
+shared-element method remains UNKNOWN; a distinct copied-value method proves its actual body.
+Thirty-two fresh proof reports cover the matrix, real helper data mutation, retained/omitted
+foreign bodies and Ghost length P/R/index U controls. Changing the actual helper else branch from
+'A' to 'C' refutes the unchanged claim with actual body entries and a query/model on the same
+obligation. Safe native originals pass three tests; the mutation guard exits 101 at O0/O2 with
+ten-second timeouts and valid 129-element arrays. Actual-parent evidence is
+`/tmp/miren-stage194-parent192-evidence`.
+
+Historical pending-192 evidence retains its original scope. Controlled committed-192 adoption
+changes only parent documentation; all eight feature source paths remain unchanged. Fresh fidelity
+compares 952 old root/profile pairs: 944 retain exact statuses and obligations, four original
+integer-suite char_unknown controls advance to PROVED, and four Bool-suite char_unknown controls
+remain UNKNOWN with a precise metadata-only refusal detail. All 624 previously completed pairs
+and 1,356 queries match exactly. Narrow harness upkeep changes only those expectations, leaving
+original fixtures intact.
+
+Global controls add a Char child assertion, wrong claim and nested-child UNKNOWN frontier.
+Their actual helper mutation refutes the unchanged assertion and fails its native guard. Saved
+before/after evidence is at `/tmp/miren-stage194-global-before-evidence` and
+`/tmp/miren-stage194-parent192-global-after-evidence`. The manifest has 185 cases in 63 families.
+Root validation passes 785 workspace Rust tests and 95 focused Rust tests, with 68 Python
+checks in each workspace. Formatting, Clippy, debug/release builds, deny, docs and manual hooks
+pass. The fresh main release matches 120 dedicated proof objects and 264 queries, plus 16 new
+global proof objects and 56 queries. Native captures explicitly retain their actual-parent author
+scope. All 544 previously completed global pairs preserve status, inputs, models, premises and
+obligation queries; append-only replay fingerprints are excluded from that historical comparison.
+Of 740 current global pairs, 739 normalized proof objects match exactly. One query-free 30-second
+UNKNOWN resource refusal differs only in active call-stack context and is recorded. All 840
+tracked files are byte-identical between main and the isolated workspace. Checks and ledgers
+retain their precise scopes under `/tmp/miren-stage194-*`.

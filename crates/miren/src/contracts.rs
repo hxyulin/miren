@@ -362,6 +362,9 @@ fn evaluate(
                                 Box::new(symbolic::Sort::BitVec(pointer_bits)),
                                 Box::new(match element {
                                     symbolic::ScalarSliceElement::Bool => symbolic::Sort::Bool,
+                                    symbolic::ScalarSliceElement::Char => {
+                                        symbolic::Sort::BitVec(32)
+                                    }
                                     symbolic::ScalarSliceElement::Integer { bits, .. }
                                         if matches!(bits, 8 | 16 | 32 | 64 | 128) =>
                                     {
@@ -695,6 +698,65 @@ mod tests {
                         symbolic::Sort::Array(
                             Box::new(symbolic::Sort::BitVec(bits)),
                             Box::new(symbolic::Sort::Bool),
+                        ),
+                    )
+                    .unwrap(),
+            ] {
+                bindings.insert("values".into(), make(wrong, length.clone()));
+                assert!(predicate(&context, "values.len() == 5", &bindings, bits).is_err());
+            }
+            bindings.insert(
+                "values".into(),
+                make(data, symbolic::integer(&context, 5, 8, false)),
+            );
+            assert!(predicate(&context, "values.len() == 5", &bindings, bits).is_err());
+        }
+    }
+    #[test]
+    fn mutable_char_ghost_length_authenticates_codec_and_keeps_indexing_unsupported() {
+        use super::{BTreeMap, Value, predicate, symbolic};
+        for bits in [32, 64] {
+            let context = symbolic::Context::default();
+            let foreign = symbolic::Context::default();
+            let length = symbolic::integer(&context, 5, bits, false);
+            let data = context
+                .symbol(
+                    0,
+                    symbolic::Sort::Array(
+                        Box::new(symbolic::Sort::BitVec(bits)),
+                        Box::new(symbolic::Sort::BitVec(32)),
+                    ),
+                )
+                .unwrap();
+            let make = |data, length| Value::MutableU16 {
+                id: 0,
+                role: symbolic::MutableU16Role::Ghost {
+                    certificate: 0,
+                    element: symbolic::ScalarSliceElement::Char,
+                    length: Box::new(length),
+                    data,
+                },
+            };
+            let mut bindings = BTreeMap::new();
+            bindings.insert("values".into(), make(data.clone(), length.clone()));
+            assert!(predicate(&context, "values.len() == 5", &bindings, bits).is_ok());
+            assert!(predicate(&context, "values[0] == 65", &bindings, bits).is_err());
+            for wrong in [
+                context
+                    .symbol(
+                        1,
+                        symbolic::Sort::Array(
+                            Box::new(symbolic::Sort::BitVec(bits)),
+                            Box::new(symbolic::Sort::BitVec(8)),
+                        ),
+                    )
+                    .unwrap(),
+                foreign
+                    .symbol(
+                        0,
+                        symbolic::Sort::Array(
+                            Box::new(symbolic::Sort::BitVec(bits)),
+                            Box::new(symbolic::Sort::BitVec(32)),
                         ),
                     )
                     .unwrap(),

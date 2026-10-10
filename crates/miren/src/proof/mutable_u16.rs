@@ -1,4 +1,5 @@
-//! Direct incoming mutable integer and Bool roots. Metadata and ghosts have no data-write authority.
+//! Direct incoming mutable integer, Bool and Char roots.
+//! Metadata and ghosts have no data-write authority.
 use super::*;
 use symbolic::MutableU16Role;
 
@@ -28,8 +29,10 @@ impl<'tcx> Engine<'tcx> {
     }
 
     fn mutable_integer_element(&self, original: Ty<'tcx>) -> bool {
-        matches!(original.kind(), ty::Bool | ty::Int(_) | ty::Uint(_))
-            && original != self.tcx.types.u8
+        matches!(
+            original.kind(),
+            ty::Bool | ty::Char | ty::Int(_) | ty::Uint(_)
+        ) && original != self.tcx.types.u8
     }
 
     fn mutable_integer_certificate(&self, id: usize) -> Result<&IntegerCertificate<'tcx>, String> {
@@ -43,6 +46,8 @@ impl<'tcx> Engine<'tcx> {
         let layout = self.static_layout(certificate.original)?;
         if (certificate.original == self.tcx.types.bool
             && (layout.size.bytes() != 1 || layout.align.abi.bytes() != 1))
+            || (certificate.original == self.tcx.types.char
+                && (layout.size.bytes() != 4 || layout.align.abi.bytes() != 4))
             || self.scalar_slice_element(certificate.original)? != Some(certificate.element)
             || layout.size.bytes() != certificate.bytes
             || layout.align.abi.bytes() != certificate.alignment
@@ -62,6 +67,9 @@ impl<'tcx> Engine<'tcx> {
             } else if self.mutable_integer_certificate(certificate)?.original == self.tcx.types.bool
             {
                 "mutable bool staging needs a pending child"
+            } else if self.mutable_integer_certificate(certificate)?.original == self.tcx.types.char
+            {
+                "mutable char staging needs a pending child"
             } else {
                 "mutable integer staging needs a pending child"
             },
@@ -402,6 +410,9 @@ impl<'tcx> Engine<'tcx> {
         self.mutable_u16_index(&index, &backing.length, &state.conditions)?;
         let certificate = self.mutable_integer_certificate(backing.certificate)?;
         let term = self.mutable_scalar_replacement(certificate, replacement)?;
+        if certificate.original == self.tcx.types.char {
+            self.prove_char_value(replacement, &state.conditions)?;
+        }
         let data = self.terms.apply(
             Op::Store,
             &[
@@ -431,6 +442,20 @@ impl<'tcx> Engine<'tcx> {
             {
                 return Err(
                     "mutable Bool replacement differs from issued type, sort or context".into(),
+                );
+            }
+            return Ok(term.clone());
+        }
+        if certificate.element == symbolic::ScalarSliceElement::Char {
+            let (term, bits, signed) = replacement.integer()?;
+            if certificate.original != self.tcx.types.char
+                || bits != 32
+                || signed
+                || term.sort() != &Sort::BitVec(32)
+                || !term.belongs_to(&self.terms)
+            {
+                return Err(
+                    "mutable Char replacement differs from issued type, sort or context".into(),
                 );
             }
             return Ok(term.clone());
@@ -1387,6 +1412,138 @@ mod tests {
                 } else {
                     panic!("detached ghost");
                 }
+                let mut char_memory = Memory::default();
+                let mut char_conditions = Vec::new();
+                let char_root = engine
+                    .mutable_u16_input(tcx.types.char, &mut char_memory, &mut char_conditions)
+                    .unwrap();
+                let certificate = char_memory.mutable_u16[0].certificate;
+                let issued = engine.mutable_integer_types[certificate].clone();
+                assert_eq!(issued.element, symbolic::ScalarSliceElement::Char);
+                assert_eq!((issued.bytes, issued.alignment), (4, 4));
+                for wrong_type in [tcx.types.u32, tcx.types.i32] {
+                    engine.mutable_integer_types[certificate].original = wrong_type;
+                    assert!(engine.mutable_u16_backing(0, &char_memory).is_err());
+                    engine.mutable_integer_types[certificate] = issued.clone();
+                }
+                for (bytes, alignment) in [(1, 4), (4, 1)] {
+                    engine.mutable_integer_types[certificate].bytes = bytes;
+                    engine.mutable_integer_types[certificate].alignment = alignment;
+                    assert!(engine.mutable_u16_backing(0, &char_memory).is_err());
+                    engine.mutable_integer_types[certificate] = issued.clone();
+                }
+                for data in [
+                    engine
+                        .terms
+                        .symbol(
+                            90,
+                            Sort::Array(Box::new(Sort::BitVec(bits)), Box::new(Sort::Bool)),
+                        )
+                        .unwrap(),
+                    foreign
+                        .symbol(
+                            90,
+                            Sort::Array(Box::new(Sort::BitVec(bits)), Box::new(Sort::BitVec(32))),
+                        )
+                        .unwrap(),
+                ] {
+                    let mut wrong = char_memory.clone();
+                    std::rc::Rc::make_mut(&mut wrong.mutable_u16)[0].data = data;
+                    assert!(engine.mutable_u16_backing(0, &wrong).is_err());
+                }
+                let definition = tcx
+                    .hir_body_owners()
+                    .find(|owner| tcx.item_name(owner.to_def_id()).as_str() == "char_probe")
+                    .unwrap();
+                let instance = engine
+                    .resolve_function_item(definition.to_def_id(), tcx.mk_args(&[]))
+                    .unwrap();
+                let char_body = engine.instantiated_body(instance).unwrap();
+                std::rc::Rc::make_mut(&mut char_memory.mutable_u16)[0].length =
+                    symbolic::integer(&engine.terms, 2, bits, false);
+                let mut char_state = State {
+                    locals: vec![None; char_body.local_decls.len()],
+                    addresses: vec![None; char_body.local_decls.len()],
+                    conditions: char_conditions,
+                    memory: char_memory,
+                    missing_places: Default::default(),
+                };
+                char_state.locals[1] = Some(char_root);
+                char_state.locals[2] = Some(symbolic::integer(&engine.terms, 0, bits, false));
+                let char_place = Place {
+                    local: rustc_middle::mir::Local::from_usize(1),
+                    projection: tcx.mk_place_elems(&[
+                        ProjectionElem::Deref,
+                        ProjectionElem::Index(rustc_middle::mir::Local::from_usize(2)),
+                    ]),
+                };
+                let ghost = engine
+                    .mutable_u16_snapshot(
+                        char_state.locals[1].as_ref().unwrap(),
+                        &char_state.memory,
+                    )
+                    .unwrap();
+                for replacement in [
+                    symbolic::integer(&engine.terms, 0xd800, 32, false),
+                    symbolic::integer(&engine.terms, 0xdfff, 32, false),
+                    symbolic::integer(&engine.terms, 0x110000, 32, false),
+                    symbolic::integer(&engine.terms, 65, 32, true),
+                    symbolic::integer(&engine.terms, 65, 8, false),
+                    symbolic::integer(&foreign, 65, 32, false),
+                    Value::Int {
+                        expression: engine.terms.boolean(true),
+                        bits: 32,
+                        signed: false,
+                    },
+                    Value::Bool(engine.terms.boolean(true)),
+                ] {
+                    let before = char_state.memory.mutable_u16[0].clone();
+                    assert!(
+                        engine
+                            .mutable_u16_store(
+                                &char_body,
+                                &mut char_state,
+                                char_place,
+                                &replacement
+                            )
+                            .is_err()
+                    );
+                    let after = &char_state.memory.mutable_u16[0];
+                    assert_eq!(after.data, before.data);
+                    assert_eq!(after.generation, before.generation);
+                    assert_eq!(after.phase, before.phase);
+                }
+                for scalar in [0, 0xd7ff, 0xe000, 0xffff, 0x10000, 0x10ffff] {
+                    let replacement = symbolic::integer(&engine.terms, scalar, 32, false);
+                    assert!(
+                        engine
+                            .mutable_u16_store(
+                                &char_body,
+                                &mut char_state,
+                                char_place,
+                                &replacement
+                            )
+                            .unwrap()
+                    );
+                    let observed = engine
+                        .mutable_u16_read(Some(&char_body), &char_state, char_place)
+                        .unwrap()
+                        .unwrap();
+                    engine
+                        .prove_char_value(&observed, &char_state.conditions)
+                        .unwrap();
+                }
+                char_state.locals[1] = Some(ghost.clone());
+                assert!(
+                    engine
+                        .mutable_u16_read(Some(&char_body), &char_state, char_place)
+                        .is_err()
+                );
+                assert!(
+                    engine
+                        .mutable_u16_length(&ghost, &char_state.memory)
+                        .is_ok()
+                );
                 self.checked = true;
                 rustc_driver::Compilation::Stop
             }
@@ -1445,6 +1602,9 @@ pub fn shared(values: &[u16]) -> usize {
 }
 pub fn scalar(word: u16) -> u16 {
     word ^ 0
+}
+pub fn char_probe(values: &mut [char], index: usize, word: char) {
+    if index < values.len() { values[index] = word; }
 }
 pub fn bool_probe(values: &mut [bool], index: usize, word: bool) {
     if index < values.len() { values[index] = word; }

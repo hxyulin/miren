@@ -164,7 +164,7 @@ fn exact_integer_kinds_current_stores_and_child_calls_cover_four_profiles() {
         .collect::<Vec<_>>();
     entries.extend([
         ("bool_unknown", P),
-        ("char_unknown", U),
+        ("char_unknown", P),
         ("float_unknown", U),
     ]);
     for target in [None, Some("thumbv7em-none-eabihf")] {

@@ -2624,3 +2624,52 @@ mod native_bool_slice_child {
         }
     }
 }
+
+
+#[inline(never)]
+pub fn char_slice_child_value(value: char) -> char {
+    if value == 'A' { 'B' } else { 'A' }
+}
+
+#[inline(never)]
+pub fn char_slice_child(values: &mut [char], index: usize, value: char) {
+    values[index] = char_slice_child_value(value);
+}
+
+pub fn char_slice_child_call(values: &mut [char], index: usize, value: char) {
+    if index < values.len() {
+        char_slice_child(values, index, value);
+        assert!(values[index] == if value == 'A' { 'B' } else { 'A' });
+    }
+}
+
+pub fn char_slice_child_wrong_claim(values: &mut [char], index: usize, value: char) {
+    if index < values.len() {
+        char_slice_child(values, index, value);
+        assert!(values[index] == value);
+    }
+}
+
+#[inline(never)]
+pub fn char_slice_nested(values: &mut [char], index: usize, value: char) {
+    char_slice_child(values, index, value);
+}
+
+pub fn char_slice_nested_unknown(values: &mut [char], index: usize, value: char) {
+    if index < values.len() {
+        char_slice_nested(values, index, value);
+        assert!(values[index] == if value == 'A' { 'B' } else { 'A' });
+    }
+}
+
+#[cfg(test)]
+mod native_char_slice_child {
+    #[test]
+    fn character_scalar_body_preserves_replacement() {
+        for value in ['A', 'B', '\0', '\u{d7ff}', '\u{e000}', '\u{10ffff}'] {
+            let mut values = [value; 129];
+            super::char_slice_child_call(&mut values, 128, value);
+            assert_eq!(values[128], if value == 'A' { 'B' } else { 'A' });
+        }
+    }
+}

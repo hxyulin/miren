@@ -1044,3 +1044,10 @@ reads and stores accept only same-context Bool values. Whole synchronous childre
 actual selected bodies and current backing, while detached entry ghosts retain frozen data.
 Integer codecs and completed queries remain unchanged. No byte coercion, validity assumption,
 shared alias, raw access, subslice loan or mutable return permission follows from this codec.
+
+Mutable Char slice roots use an exact original `char` certificate and compiler size4/alignment4.
+Their logical BV32 array reads reuse the valid Unicode observation map. Every typed replacement
+must prove Unicode scalar validity under the existing path conditions before the unchanged Store;
+invalid replacements are refused rather than repaired or assumed valid. Actual scalar child bodies
+may receive and return certified Char values. Detached Char ghosts expose only their exact length.
+Integer and Bool formulas, source lifetimes, private leases and storage budgets remain unchanged.

@@ -380,7 +380,7 @@ impl<'tcx> Engine<'tcx> {
                     self.mutable_u16_type(original)
                         || matches!(
                             original.kind(),
-                            ty::Bool | ty::Int(_) | ty::Uint(_) | ty::Float(_)
+                            ty::Bool | ty::Char | ty::Int(_) | ty::Uint(_) | ty::Float(_)
                         )
                 }))
         {
