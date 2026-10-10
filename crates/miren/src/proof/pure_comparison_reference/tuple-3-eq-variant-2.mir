@@ -1,0 +1,84 @@
+args=2 spread=None
+local _0 Mut bool user=None
+local _1 Not &'{erased} (V/#0, U/#1, T/#2) user=None
+local _2 Not &'{erased} (V/#0, U/#1, T/#2) user=None
+local _3 Mut bool user=None
+local _4 Mut &'{erased} V/#0 user=None
+local _5 Mut &'{erased} V/#0 user=None
+local _6 Mut bool user=None
+local _7 Mut &'{erased} U/#1 user=None
+local _8 Mut &'{erased} U/#1 user=None
+local _9 Mut &'{erased} T/#2 user=None
+local _10 Mut &'{erased} T/#2 user=None
+block bb0 cleanup=false
+StorageLive(_3)
+StorageLive(_4)
+assign local=_4 path=[]
+ref '{erased} Shared local=_1 path=[Deref, Field(0, V/#0)]
+StorageLive(_5)
+assign local=_5 path=[]
+ref '{erased} Shared local=_2 path=[Deref, Field(0, V/#0)]
+call <V as core::cmp::PartialEq>::eq destination=_3/[] target=Some(bb1) unwind=Unreachable sourc
+  | e=OverloadedOperator
+const-value ZeroSized FnDef(DefId(core::cmp::PartialEq::eq), Binder { value: [V/#0, V/#0], bound
+  | _vars: [] })
+move _4/[]
+move _5/[]
+block bb1 cleanup=false
+switch SwitchTargets { values: [Pu128(0)], targets: [bb6, bb2] }
+move _3/[]
+block bb2 cleanup=false
+StorageDead(_5)
+StorageDead(_4)
+StorageLive(_6)
+StorageLive(_7)
+assign local=_7 path=[]
+ref '{erased} Shared local=_1 path=[Deref, Field(1, U/#1)]
+StorageLive(_8)
+assign local=_8 path=[]
+ref '{erased} Shared local=_2 path=[Deref, Field(1, U/#1)]
+call <U as core::cmp::PartialEq>::eq destination=_6/[] target=Some(bb3) unwind=Unreachable sourc
+  | e=OverloadedOperator
+const-value ZeroSized FnDef(DefId(core::cmp::PartialEq::eq), Binder { value: [U/#1, U/#1], bound
+  | _vars: [] })
+move _7/[]
+move _8/[]
+block bb3 cleanup=false
+switch SwitchTargets { values: [Pu128(0)], targets: [bb5, bb4] }
+move _6/[]
+block bb4 cleanup=false
+StorageDead(_8)
+StorageDead(_7)
+StorageLive(_9)
+assign local=_9 path=[]
+ref '{erased} Shared local=_1 path=[Deref, Field(2, T/#2)]
+StorageLive(_10)
+assign local=_10 path=[]
+ref '{erased} Shared local=_2 path=[Deref, Field(2, T/#2)]
+call <T as core::cmp::PartialEq>::eq destination=_0/[] target=Some(bb8) unwind=Unreachable sourc
+  | e=OverloadedOperator
+const-value ZeroSized FnDef(DefId(core::cmp::PartialEq::eq), Binder { value: [T/#2, T/#2], bound
+  | _vars: [] })
+move _9/[]
+move _10/[]
+block bb5 cleanup=false
+StorageDead(_8)
+StorageDead(_7)
+goto -> bb7
+block bb6 cleanup=false
+StorageDead(_5)
+StorageDead(_4)
+goto -> bb7
+block bb7 cleanup=false
+assign local=_0 path=[]
+use Yes
+const-value Scalar(0x00) bool
+goto -> bb9
+block bb8 cleanup=false
+StorageDead(_10)
+StorageDead(_9)
+goto -> bb9
+block bb9 cleanup=false
+StorageDead(_6)
+StorageDead(_3)
+return

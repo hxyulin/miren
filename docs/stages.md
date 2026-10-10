@@ -4480,3 +4480,75 @@ review approves original-location capture, current-owner validation, the twenty-
 actual dedicated/global mutation and native evidence. No assumptions, input caps or resource-
 budget changes are introduced. Stage 175 follows Stage 174; composite comparison Stage 172
 remains an independent implementation awaiting integration.
+
+
+## Stage 172: certified full-domain pure composite slice predicates
+
+This independently authored stage integrates after Stage 175. Exact original primitive, unit,
+tuple and fixed-array types define recursive numeric comparison. A common logical index observes
+all element occurrences; scoped existential membership and length-guarded universal equality keep
+arbitrary runtime slice length within the original target extent. Float NaN and signed-zero rules,
+Char decoding, complete N=0 children and live source/type/extent checks precede formula creation.
+Nominal custom effects and unsupported access paths receive no new summary or permission.
+
+The private semantic encoder matches complete actual pinned core MIR against 113 immutable
+reference variants and authenticates compiler identities before normalization. Selected concrete
+transitive helpers and closure transport require matching bodies; evaluated SIZE/IS_ZST/ALIGN
+constants agree with compiler layout. Target32/64 arithmetic counterexample queries certify exact
+caller-guarded cursor addition/subtraction before omitting their unreachable overflow panic edge.
+Other missing bodies remain UNKNOWN. Independent source review records the checked boundaries at
+`/tmp/miren-stage172-final-source-review.md`.
+
+The frozen thirty-two-root author matrix yields fourteen PROVED, six REFUTED and twelve UNKNOWN
+across host/ARM O0/O2. Actual selected needle leaf mutation refutes and fails native O0/O2 guards;
+eight valid native originals pass. Full reports, commands, hashes and ten-second timeouts remain
+at `/tmp/miren-stage172-final-evidence`. Fifty-six completed older queries retain identical
+status, kind, detail and query: forty-eight
+scalar/byte/custom fixture queries plus eight separate finite-custom-false queries. Evidence is at
+`/tmp/miren-stage172-query-fidelity`. One-byte composite membership and mixed descriptor/finite
+equality remain explicit UNKNOWN. Before results for the exact final sources remain preserved.
+
+Two unchanged original composite roots advance from UNKNOWN to PROVED in all four profiles.
+Initial obsolete UNKNOWN expectation failure remains at
+`/tmp/miren-stage172-old-composite-initial.log`
+before harness-only upkeep; sources and actual after reports remain at
+`/tmp/miren-stage172-old-composite-after`. The shared triplet yields P/R/missing-body U in the
+frozen author binary at `/tmp/miren-stage172-shared-expanded-after`. These author captures
+preceded combined parent integration, global mutation evidence and full required validation.
+
+
+The combined source preserves all Stage 175 assignment and eight call-result stores exactly;
+`proof.rs` adds only two module declarations. All 119 disjoint modules/reference assets match the
+reviewed author freeze. Integrated metadata tests and eight new/related compiler tests pass.
+Independent composition review is recorded at `/tmp/miren-stage172-integrated-source-review.md`.
+The final global recapture uses the post-test frozen binary and confirms P/R/missing-body U plus
+actual helper mutation across all four profiles at
+`/tmp/miren-stage172-integrated-global-final-evidence`. Original native evidence, prior captures
+and hashes remain separately recorded. These captures preceded final full validation.
+
+
+The initial manual hook trimmed ten reference files at physical wrap boundaries. That interrupted
+validation run and its original failures remain at `/tmp/miren-stage172-initial-checks`; it is not
+counted as a completed suite. The corrected encoder records each terminal whitespace code point
+with a reserved marker and rejects marker collisions. All 113 decoded references preserve the
+original complete semantic bytes; exactly ten assets change their physical encoding. Four metadata
+tests and eight compiler integration tests pass, and hooks leave every asset unchanged. The
+canonical correction supersedes the original physical-byte freeze for these eleven paths only.
+Evidence remains at `/tmp/miren-stage172-canonical-reference-proof.json` and
+`/tmp/miren-stage172-integrated-canonical-core-freeze.json`. The corrected binary recaptures all
+eight global after/mutation reports at `/tmp/miren-stage172-integrated-global-canonical-evidence`;
+unchanged native evidence retains its original source and execution scope.
+
+
+Final validation passes all 709 Rust tests and 68 Python tests. Formatting, lint, debug/release
+builds, cargo deny, documentation and manual hooks pass. All 760 tracked main files match the
+final snapshot byte for byte; fresh main builds, sixteen related integration tests, four metadata
+tests and 68 Python tests pass. Both frozen surveys yield 212 PROVED, 188 REFUTED and 136 UNKNOWN
+at `/tmp/miren-stage172-capabilities-20261010` and
+`/tmp/miren-stage172-merged-capabilities-20261010`. All 392 previously completed parent roots
+retain identical outcomes, obligation details and query text. All 536 main/isolate outcomes,
+queries, models, premises and diagnostic details match. Source, input and release hashes are
+verified. Independent source, composition and canonical correction reviews approve the final
+implementation; the correction review is `/tmp/miren-stage172-canonical-review.md`. The interrupted
+initial hook run remains excluded from these checks. No assumptions, input caps or resource-budget
+changes are introduced. This independently authored stage integrates after actual Stage 175.

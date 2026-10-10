@@ -1,0 +1,262 @@
+args=2 spread=None
+local _0 Mut bool user=None
+local _1 Not &'{erased} T/#0 user=None
+local _2 Not &'{erased} [T/#0] user=None
+local _3 Mut bool user=None
+local _4 Mut u8 user=None
+local _5 Mut &'{erased} [u8] user=None
+local _6 Mut *const u8 user=None
+local _7 Mut *const T/#0 user=None
+local _8 Mut usize user=None
+local _9 Mut &'{erased} core::option::Option<usize> user=None
+local _10 Not core::option::Option<usize> user=None
+local _11 Mut &'{erased} mut core::slice::Iter<'{erased}, T/#0> user=None
+local _12 Mut core::slice::Iter<'{erased}, T/#0> user=None
+local _13 Mut Closure(DefId(core::slice::cmp::{impl#18}::slice_contains::{closure#0}), [T/#0, i1
+  | 6, Binder { value: extern "RustCall" fn((&'{erased} T/#0,)) -> bool, bound_vars: [] }, (&'{erase
+  | d} T/#0,)]) user=None
+local _14 Not () user=None
+local _15 Mut bool user=None
+local _16 Mut *const u8 user=None
+local _17 Mut *const T/#0 user=None
+local _18 Mut *const u8 user=None
+local _19 Mut *const T/#0 user=None
+local _20 Not *const core::ptr::Unaligned<u8> user=None
+local _21 Not core::ptr::Unaligned<u8> user=None
+local _22 Mut *const [T/#0] user=None
+local _23 Not () user=None
+local _24 Mut *mut () user=None
+local _25 Not *const [u8] user=None
+local _26 Mut isize user=None
+local _27 Not usize user=None
+local _28 Not core::ptr::NonNull<T/#0> user=None
+local _29 Mut core::ptr::NonNull<[T/#0]> user=None
+local _30 Not *const T/#0 user=None
+local _31 Mut *mut T/#0 user=None
+local _32 Mut *mut T/#0 user=None
+local _33 Mut *const [T/#0] user=None
+local _34 Mut *mut T/#0 user=None
+local _35 Mut *mut [T/#0] user=None
+block bb0 cleanup=false
+StorageLive(_3)
+assign local=_3 path=[]
+binary Eq
+const-unevaluated UnevaluatedConst { def: DefId(core::mem::SizedTypeProperties::SIZE), args: [T/
+  | #0], promoted: None } usize
+const-value Scalar(0x00000001) usize
+switch SwitchTargets { values: [Pu128(0)], targets: [bb3, bb1] }
+move _3/[]
+block bb1 cleanup=false
+StorageLive(_18)
+switch SwitchTargets { values: [Pu128(0)], targets: [bb6, bb10] }
+runtime-checks UbChecks
+block bb2 cleanup=false
+StorageLive(_26)
+assign local=_26 path=[]
+discriminant(_10) local=_10 path=[]
+assign local=_0 path=[]
+binary Eq
+copy _26/[]
+const-value Scalar(0x00000001) isize
+StorageDead(_26)
+StorageDead(_10)
+goto -> bb5
+block bb3 cleanup=false
+StorageLive(_11)
+StorageLive(_12)
+StorageLive(_30)
+StorageLive(_27)
+assign local=_27 path=[]
+unary PtrMetadata
+copy _2/[]
+StorageLive(_28)
+StorageLive(_29)
+StorageLive(_33)
+assign local=_33 path=[]
+raw Const local=_2 path=[Deref]
+assign local=_29 path=[]
+cast Transmute target=core::ptr::NonNull<[T/#0]>
+copy _33/[]
+StorageDead(_33)
+StorageLive(_34)
+StorageLive(_35)
+assign local=_35 path=[]
+cast Transmute target=*mut [T/#0]
+copy _29/[]
+assign local=_34 path=[]
+cast PtrToPtr target=*mut T/#0
+copy _35/[]
+StorageDead(_35)
+assign local=_28 path=[]
+cast Transmute target=core::ptr::NonNull<T/#0>
+copy _34/[]
+StorageDead(_34)
+StorageDead(_29)
+switch SwitchTargets { values: [Pu128(0)], targets: [bb15, bb14] }
+const-unevaluated UnevaluatedConst { def: DefId(core::mem::SizedTypeProperties::IS_ZST), args: [
+  | T/#0], promoted: None } bool
+block bb4 cleanup=false
+StorageDead(_13)
+StorageDead(_12)
+StorageDead(_11)
+goto -> bb5
+block bb5 cleanup=false
+StorageDead(_3)
+return
+block bb6 cleanup=false
+StorageLive(_15)
+assign local=_15 path=[]
+binary Gt
+const-value Scalar(0x00000001) usize
+const-unevaluated UnevaluatedConst { def: DefId(core::mem::SizedTypeProperties::ALIGN), args: [T
+  | /#0], promoted: None } usize
+switch SwitchTargets { values: [Pu128(0)], targets: [bb8, bb7] }
+move _15/[]
+block bb7 cleanup=false
+StorageLive(_16)
+StorageLive(_17)
+assign local=_17 path=[]
+raw Const local=_1 path=[Deref]
+assign local=_16 path=[]
+cast PtrToPtr target=*const u8
+copy _17/[]
+StorageLive(_20)
+assign local=_20 path=[]
+cast PtrToPtr target=*const core::ptr::Unaligned<u8>
+copy _17/[]
+StorageLive(_21)
+assign local=_21 path=[]
+use Yes
+copy _20/[Deref]
+assign local=_4 path=[]
+cast Transmute target=u8
+copy _21/[]
+StorageDead(_21)
+StorageDead(_20)
+StorageDead(_17)
+StorageDead(_16)
+goto -> bb9
+block bb8 cleanup=false
+StorageLive(_19)
+assign local=_19 path=[]
+raw Const local=_1 path=[Deref]
+assign local=_18 path=[]
+cast PtrToPtr target=*const u8
+copy _19/[]
+assign local=_4 path=[]
+use Yes
+copy _18/[Deref]
+StorageDead(_19)
+goto -> bb9
+block bb9 cleanup=false
+StorageDead(_15)
+StorageDead(_18)
+StorageLive(_6)
+StorageLive(_7)
+assign local=_22 path=[]
+raw Const local=_2 path=[Deref]
+assign local=_7 path=[]
+cast PtrToPtr target=*const T/#0
+copy _22/[]
+assign local=_6 path=[]
+cast PtrToPtr target=*const u8
+copy _22/[]
+StorageDead(_7)
+StorageLive(_8)
+assign local=_8 path=[]
+unary PtrMetadata
+copy _2/[]
+switch SwitchTargets { values: [Pu128(0)], targets: [bb13, bb11] }
+runtime-checks UbChecks
+block bb10 cleanup=false
+call core::mem::transmute_copy::precondition_check destination=_14/[] target=Some(bb6) unwind=Un
+  | reachable source=Normal
+const-value ZeroSized FnDef(DefId(core::mem::transmute_copy::precondition_check), Binder { value
+  | : [], bound_vars: [] })
+const-unevaluated UnevaluatedConst { def: DefId(core::mem::SizedTypeProperties::SIZE), args: [T/
+  | #0], promoted: None } usize
+const-value Scalar(0x00000001) usize
+block bb11 cleanup=false
+StorageLive(_24)
+assign local=_24 path=[]
+cast PtrToPtr target=*mut ()
+copy _22/[]
+call core::slice::from_raw_parts::precondition_check destination=_23/[] target=Some(bb12) unwind
+  | =Unreachable source=Normal
+const-value ZeroSized FnDef(DefId(core::slice::raw::from_raw_parts::precondition_check), Binder
+  > U+0020
+  | { value: [], bound_vars: [] })
+move _24/[]
+const-value Scalar(0x00000001) usize
+const-value Scalar(0x00000001) usize
+copy _8/[]
+block bb12 cleanup=false
+StorageDead(_24)
+goto -> bb13
+block bb13 cleanup=false
+StorageLive(_25)
+assign local=_25 path=[]
+aggregate RawPtr([u8], Not)
+copy _6/[]
+copy _8/[]
+assign local=_5 path=[]
+ref '{erased} Shared local=_25 path=[Deref]
+StorageDead(_25)
+StorageDead(_8)
+StorageDead(_6)
+StorageLive(_10)
+call core::slice::memchr::memchr destination=_10/[] target=Some(bb2) unwind=Unreachable source=N
+  | ormal
+const-value ZeroSized FnDef(DefId(core::slice::memchr::memchr), Binder { value: [], bound_vars:
+  > U+0020
+  | [] })
+move _4/[]
+move _5/[]
+block bb14 cleanup=false
+assign local=_30 path=[]
+cast Transmute target=*const T/#0
+copy _27/[]
+goto -> bb16
+block bb15 cleanup=false
+StorageLive(_31)
+StorageLive(_32)
+assign local=_32 path=[]
+cast Transmute target=*mut T/#0
+copy _28/[]
+assign local=_31 path=[]
+binary Offset
+copy _32/[]
+copy _27/[]
+StorageDead(_32)
+assign local=_30 path=[]
+cast PtrToPtr target=*const T/#0
+copy _31/[]
+StorageDead(_31)
+goto -> bb16
+block bb16 cleanup=false
+assign local=_12 path=[]
+aggregate Adt(DefId(core::slice::iter::Iter), 0, ['{erased}, T/#0], Some(UserType(4)), None)
+copy _28/[]
+copy _30/[]
+const-value ZeroSized core::marker::PhantomData<&'{erased} T/#0>
+StorageDead(_28)
+StorageDead(_27)
+StorageDead(_30)
+assign local=_11 path=[]
+ref '{erased} Mut { kind: TwoPhaseBorrow } local=_12 path=[]
+StorageLive(_13)
+assign local=_13 path=[]
+aggregate Closure(DefId(core::slice::cmp::{impl#18}::slice_contains::{closure#0}), [T/#0, i16, B
+  | inder { value: extern "RustCall" fn((&'{erased} T/#0,)) -> bool, bound_vars: [] }, (&'{erased} T
+  | /#0,)])
+copy _1/[]
+call <core::slice::Iter<'_, T> as core::iter::Iterator>::any::<{closure@<T as core::slice::cmp::
+  | SliceContains>::slice_contains::{closure#0}}> destination=_0/[] target=Some(bb4) unwind=Unreacha
+  | ble source=Normal
+const-value ZeroSized FnDef(DefId(core::iter::traits::iterator::Iterator::any), Binder { value:
+  > U+0020
+  | [core::slice::Iter<'{erased}, T/#0>, Closure(DefId(core::slice::cmp::{impl#18}::slice_contains::
+  | {closure#0}), [T/#0, i16, Binder { value: extern "RustCall" fn((&'{erased} T/#0,)) -> bool, boun
+  | d_vars: [] }, (&'{erased} T/#0,)])], bound_vars: [] })
+move _11/[]
+move _13/[]

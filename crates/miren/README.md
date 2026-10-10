@@ -662,8 +662,15 @@ Exact pure zero-sized tuple/array elements retain the full target-usize length d
 reconstruct only their unique values; original element types are certified even beneath empty
 arrays. Their source lifetime and iterator bounds remain checked. Refined or identity-bearing
 leaves, mutable/competing roots and raw access remain unsupported. Logical field storage gives no
-padding-byte or physical representation rights. Whole composite membership and equality remain
-explicit semantic `UNKNOWN` boundaries. The exact safe core `size_of_val` API uses retained
+padding-byte or physical representation rights. Full-length membership and equality support exact
+pure tuple/array elements with primitive or unit leaves. Scoped predicates observe all fields at
+the same index and use numeric Float equality and decoded Char values. Admission checks complete
+pinned compiler MIR reference bodies, actual core identities and selected comparator, specialization
+and callback instances. Available reachable bodies remain required; unsigned cursor proofs exclude
+only the exact overflow panic edges. Source validity and extent checks precede binders, empty
+results and length mismatch. Nominal struct comparison, mixed composite/finite equality and
+one-byte bytewise membership transport remain semantic `UNKNOWN` boundaries. The exact safe core
+`size_of_val` API uses retained
 composite length and the compiler's complete element size, including padding. Pure zero-sized
 elements have byte size zero at every valid target-usize length. Source lifetime, original element
 type, extent and the selected API body remain certified before size results. The exact safe core
@@ -695,8 +702,8 @@ core or compiler-special dependency ADTs, enums, unions, reference/raw fields, i
 and destructor-bearing types remain unsupported. Compiler scalar validity must match the actual
 typed fields and offsets. Observations reconstruct exact struct metadata with every field selected
 at the same index; owned copies and caller-backed field borrows add no raw, write or padding-byte
-rights. Custom methods, Clone and
-PartialEq receive no purity inference from Copy; whole composite comparison remains unsupported.
+rights. Custom methods, Clone and PartialEq receive no purity inference from Copy; whole nominal
+struct slice comparison remains unsupported.
 
 Dependency structs use the same original-field, layout and type-budget certificates as local
 structs. The actual compiler core-crate identity and special ADT flags exclude builtin ownership,

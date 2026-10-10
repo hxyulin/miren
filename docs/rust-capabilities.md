@@ -11,8 +11,8 @@ execution at O0 and O2, positive/refuted/unknown controls, a source mutation tha
 structured UNKNOWN reporting, and passing repository checks. Completion establishes a repeatable
 baseline. It does not establish full Rust support or a completed memory-model refactor.
 
-The manifest contains 131 cases across 45 families. Each build configuration expects 52 PROVED,
-46 REFUTED and 33 UNKNOWN results. Stage 133 originally had 23 cases with 10 PROVED, 9 REFUTED
+The manifest contains 134 cases across 46 families. Each build configuration expects 53 PROVED,
+47 REFUTED and 34 UNKNOWN results. Stage 133 originally had 23 cases with 10 PROVED, 9 REFUTED
 and 4 UNKNOWN; stage 134 closed its retained-prefix projection gap. Stage 136 adds raw-pointer
 metadata P/R controls and a safe core reference-array grant that remains UNKNOWN without a
 temporal permission certificate. Stage 137 adds tuple-array P/R and unsupported symbolic-write
@@ -105,6 +105,10 @@ Stage 175 adds tracked mutable call-result location P/R and missing callee body 
 The original allocation and typed path are captured before the callee; changes to its reference
 handle cannot redirect the returned value. Current whole-owner and replacement validation precede
 one writable live-location commit. Unsupported reference forms retain their explicit frontiers.
+Stage 172 integrates full-domain pure tuple/fixed-array slice predicate P/R and missing body U
+controls after Stage 175. Original types, complete actual core bodies, selected transitive
+comparators and layout constants certify scoped numeric equality and membership. Runtime length
+has no new cap. Nominal custom comparisons and uncertified transport paths remain explicit UNKNOWN.
 These additions change the denominator, not a coverage percentage.
 Covered examples exercise arithmetic, enum payloads, array indexing, reference effects, concrete
 generics, closures, iterator callbacks, finite loops, destructors, fresh future polling and raw
@@ -334,3 +338,17 @@ allocation. Rvalue effects and destination validators still precede the hook. Fi
 no physical padding, alias or pointer access information. Retained-reference, raw, call destination
 and second-Index projections keep their separate frontiers; constants and solver-unique stores
 retain their prior writer.
+
+
+Final validation passes all 709 Rust tests and 68 Python tests. Formatting, lint, debug/release
+builds, cargo deny, documentation and manual hooks pass. All 760 tracked main files match the
+final snapshot byte for byte; fresh main builds, sixteen related integration tests, four metadata
+tests and 68 Python tests pass. Both frozen surveys yield 212 PROVED, 188 REFUTED and 136 UNKNOWN
+at `/tmp/miren-stage172-capabilities-20261010` and
+`/tmp/miren-stage172-merged-capabilities-20261010`. All 392 previously completed parent roots
+retain identical outcomes, obligation details and query text. All 536 main/isolate outcomes,
+queries, models, premises and diagnostic details match. Source, input and release hashes are
+verified. Independent source, composition and canonical correction reviews approve the final
+implementation; the correction review is `/tmp/miren-stage172-canonical-review.md`. The interrupted
+initial hook run remains excluded from these checks. No assumptions, input caps or resource-budget
+changes are introduced. This independently authored stage integrates after actual Stage 175.

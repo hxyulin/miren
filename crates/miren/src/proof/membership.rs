@@ -107,10 +107,42 @@ impl<'tcx> Engine<'tcx> {
         };
         let slice = slice.materialize()?;
         if matches!(slice, Value::CompositeSlice { .. }) {
-            return Err(self.categorized_error(
-                UnknownCategory::Semantics,
-                "whole composite slice membership is unsupported".into(),
-            ));
+            let Some(plan) = self.pure_comparison_shape(*element)? else {
+                return Err(self.categorized_error(
+                    UnknownCategory::Semantics,
+                    "whole composite slice membership is unsupported".into(),
+                ));
+            };
+            let length = self.composite_slice_length(&slice, &state.conditions)?;
+            self.validate_owned_product(*element, needle, &state.conditions)?;
+            let shape = self
+                .owned_product_shape(*element)?
+                .ok_or("composite membership needle has no exact compiler product")?;
+            let needle = self.prepare_typed_product(*element, &shape, needle, 0)?;
+            self.certify_pure_comparison(*element, instance)?;
+            let (length, bits, _) = length.integer()?;
+            let index = self.fresh(Sort::BitVec(bits));
+            let item = self.composite_slice_logical_item(&slice, *element, &index)?;
+            let equal = self.pure_comparison_equal(&plan, &item, &needle)?;
+            let inside = self
+                .terms
+                .apply(Op::BvUnsignedLt, &[index.clone(), length])?;
+            let predicate = self.terms.apply(Op::And, &[inside, equal])?;
+            let member = self
+                .terms
+                .quantify(miren::smt::Quantifier::Exists, &index, &predicate)?;
+            self.record_model(
+                callee,
+                concat!(
+                    "full-domain pure composite slice membership; ",
+                    "scoped existential structural numeric equality",
+                ),
+            );
+            return Ok(Some(vec![Return {
+                value: Value::Bool(member),
+                conditions: state.conditions.clone(),
+                memory: state.memory.clone(),
+            }]));
         }
         if matches!(slice, Value::ScalarSlice { .. }) {
             // Source and needle validity are established under the original free conditions.

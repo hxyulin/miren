@@ -1,0 +1,103 @@
+args=2 spread=None
+local _0 Mut () user=None
+local _1 Not usize user=None
+local _2 Not usize user=None
+local _3 Not &'{erased} str user=None
+local _4 Not ! user=None
+local _5 Mut core::fmt::Arguments<'{erased}> user=None
+local _6 Not bool user=None
+local _7 Mut (u32, bool) user=None
+local _8 Mut u32 user=None
+local _9 Mut u32 user=None
+local _10 Mut core::ptr::NonNull<u8> user=None
+local _11 Mut *const u8 user=None
+local _12 Mut core::ptr::NonNull<core::fmt::rt::Argument<'{erased}>> user=None
+local _13 Mut usize user=None
+local _14 Mut usize user=None
+local _15 Mut usize user=None
+local _16 Mut *const str user=None
+local _17 Not &'{erased} [u8] user=None
+block bb0 cleanup=false
+StorageLive(_7)
+StorageLive(_8)
+assign local=_8 path=[]
+cast IntToInt target=u32
+copy _1/[]
+StorageLive(_9)
+assign local=_9 path=[]
+cast IntToInt target=u32
+copy _2/[]
+assign local=_7 path=[]
+binary SubWithOverflow
+move _8/[]
+move _9/[]
+StorageDead(_9)
+StorageDead(_8)
+assign local=_6 path=[]
+use Yes
+copy _7/[Field(1, bool)]
+StorageDead(_7)
+switch SwitchTargets { values: [Pu128(0)], targets: [bb2, bb1] }
+copy _6/[]
+block bb1 cleanup=false
+assign local=_3 path=[]
+use Yes
+const-string "unsafe precondition(s) violated: usize::unchecked_sub cannot overflow\n\nThis indi
+  | cates a bug in the program. This Undefined Behavior check is optional, and cannot be relied on f
+  | or safety." &'{erased} str
+StorageLive(_5)
+StorageLive(_10)
+StorageLive(_11)
+StorageLive(_16)
+assign local=_16 path=[]
+raw Const local=_3 path=[Deref]
+assign local=_11 path=[]
+cast PtrToPtr target=*const u8
+copy _16/[]
+StorageDead(_16)
+assign local=_10 path=[]
+cast Transmute target=core::ptr::NonNull<u8>
+copy _11/[]
+StorageDead(_11)
+StorageLive(_12)
+StorageLive(_13)
+StorageLive(_14)
+StorageLive(_15)
+StorageLive(_17)
+assign local=_17 path=[]
+cast Transmute target=&'{erased} [u8]
+const-string "unsafe precondition(s) violated: usize::unchecked_sub cannot overflow\n\nThis indi
+  | cates a bug in the program. This Undefined Behavior check is optional, and cannot be relied on f
+  | or safety." &'{erased} str
+assign local=_15 path=[]
+unary PtrMetadata
+copy _17/[]
+StorageDead(_17)
+assign local=_14 path=[]
+binary Shl
+move _15/[]
+const-value Scalar(0x00000001) i32
+StorageDead(_15)
+assign local=_13 path=[]
+binary BitOr
+move _14/[]
+const-value Scalar(0x00000001) usize
+StorageDead(_14)
+assign local=_12 path=[]
+cast Transmute target=core::ptr::NonNull<core::fmt::rt::Argument<'{erased}>>
+move _13/[]
+StorageDead(_13)
+assign local=_5 path=[]
+aggregate Adt(DefId(core::fmt::Arguments), 0, ['{erased}], None, None)
+move _10/[]
+move _12/[]
+StorageDead(_12)
+StorageDead(_10)
+call core::panicking::panic_nounwind_fmt destination=_4/[] target=None unwind=Unreachable source
+  | =Normal
+const-value ZeroSized FnDef(DefId(core::panicking::panic_nounwind_fmt), Binder { value: [], boun
+  | d_vars: [] })
+move _5/[]
+const-value Scalar(0x00) bool
+block bb2 cleanup=false
+return

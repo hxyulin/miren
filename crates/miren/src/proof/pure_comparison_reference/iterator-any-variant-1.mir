@@ -1,0 +1,186 @@
+args=2 spread=None
+local _0 Mut bool user=None
+local _1 Not &'{erased} mut core::slice::Iter<'{erased}, T/#1> user=None
+local _2 Mut F/#2 user=None
+local _3 Mut core::option::Option<&'{erased} T/#1> user=None
+local _4 Not &'{erased} T/#1 user=None
+local _5 Mut bool user=None
+local _6 Mut &'{erased} mut F/#2 user=None
+local _7 Mut (&'{erased} T/#1,) user=None
+local _8 Not core::ptr::NonNull<T/#1> user=None
+local _9 Not *const T/#1 user=None
+local _10 Not usize user=None
+local _11 Mut usize user=None
+local _12 Mut bool user=None
+local _13 Mut &'{erased} core::ptr::NonNull<T/#1> user=None
+local _14 Mut &'{erased} core::ptr::NonNull<T/#1> user=None
+local _15 Not core::ptr::NonNull<T/#1> user=None
+local _16 Mut core::ptr::NonNull<T/#1> user=None
+local _17 Not &'{erased} T/#1 user=None
+local _18 Mut &'{erased} core::ptr::NonNull<T/#1> user=None
+local _19 Not () user=None
+local _20 Mut *mut T/#1 user=None
+local _21 Mut *mut T/#1 user=None
+local _22 Mut *mut T/#1 user=None
+local _23 Not *const T/#1 user=None
+block bb0 cleanup=false
+goto -> bb1
+block bb1 cleanup=false
+StorageLive(_3)
+StorageLive(_11)
+StorageLive(_20)
+StorageLive(_8)
+assign local=_8 path=[]
+use Yes
+copy _1/[Deref, Field(0, core::ptr::NonNull<T/#1>)]
+StorageLive(_9)
+assign local=_9 path=[]
+use Yes
+copy _1/[Deref, Field(1, *const T/#1)]
+switch SwitchTargets { values: [Pu128(0)], targets: [bb11, bb8] }
+const-unevaluated UnevaluatedConst { def: DefId(core::mem::SizedTypeProperties::IS_ZST), args: [
+  | T/#1], promoted: None } bool
+block bb2 cleanup=false
+switch SwitchTargets { values: [Pu128(0)], targets: [bb4, bb3] }
+move _5/[]
+block bb3 cleanup=false
+StorageDead(_7)
+StorageDead(_6)
+assign local=_0 path=[]
+use Yes
+const-value Scalar(0x01) bool
+StorageDead(_5)
+StorageDead(_4)
+StorageDead(_3)
+drop _2/[] target=bb5 unwind=Continue replace=false async=None
+block bb4 cleanup=false
+StorageDead(_7)
+StorageDead(_6)
+StorageDead(_5)
+StorageDead(_4)
+StorageDead(_3)
+goto -> bb1
+block bb5 cleanup=false
+return
+block bb6 cleanup=true
+drop _2/[] target=bb7 unwind=Terminate(InCleanup) replace=false async=None
+block bb7 cleanup=true
+resume
+block bb8 cleanup=false
+StorageLive(_10)
+assign local=_10 path=[]
+cast Transmute target=usize
+copy _9/[]
+switch SwitchTargets { values: [Pu128(0)], targets: [bb9, bb10] }
+copy _10/[]
+block bb9 cleanup=false
+StorageDead(_10)
+goto -> bb15
+block bb10 cleanup=false
+switch SwitchTargets { values: [Pu128(0)], targets: [bb17, bb16] }
+runtime-checks UbChecks
+block bb11 cleanup=false
+StorageLive(_12)
+StorageLive(_15)
+assign local=_15 path=[]
+cast Transmute target=core::ptr::NonNull<T/#1>
+copy _9/[]
+assign local=_20 path=[]
+cast Transmute target=*mut T/#1
+copy _8/[]
+StorageLive(_21)
+assign local=_21 path=[]
+cast Transmute target=*mut T/#1
+copy _15/[]
+assign local=_12 path=[]
+binary Eq
+copy _20/[]
+copy _21/[]
+StorageDead(_21)
+switch SwitchTargets { values: [Pu128(0)], targets: [bb13, bb12] }
+move _12/[]
+block bb12 cleanup=false
+StorageDead(_15)
+StorageDead(_12)
+goto -> bb15
+block bb13 cleanup=false
+StorageDead(_15)
+StorageDead(_12)
+StorageLive(_16)
+StorageLive(_22)
+assign local=_22 path=[]
+binary Offset
+copy _20/[]
+const-value Scalar(0x0000000000000001) usize
+assign local=_16 path=[]
+cast Transmute target=core::ptr::NonNull<T/#1>
+copy _22/[]
+StorageDead(_22)
+assign local=_1 path=[Deref, Field(0, core::ptr::NonNull<T/#1>)]
+use Yes
+move _16/[]
+StorageDead(_16)
+goto -> bb14
+block bb14 cleanup=false
+StorageLive(_17)
+StorageLive(_23)
+assign local=_23 path=[]
+cast Transmute target=*const T/#1
+copy _8/[]
+assign local=_17 path=[]
+ref '{erased} Shared local=_23 path=[Deref]
+StorageDead(_23)
+assign local=_3 path=[]
+aggregate Adt(DefId(core::option::Option), 1, [&'{erased} T/#1], None, None)
+copy _17/[]
+StorageDead(_17)
+StorageDead(_9)
+StorageDead(_8)
+StorageDead(_20)
+StorageDead(_11)
+StorageLive(_4)
+assign local=_4 path=[]
+use Yes
+copy _3/[Downcast(Some("Some"), 1), Field(0, &'{erased} T/#1)]
+StorageLive(_5)
+StorageLive(_6)
+assign local=_6 path=[]
+ref '{erased} Mut { kind: Default } local=_2 path=[]
+StorageLive(_7)
+assign local=_7 path=[]
+aggregate Tuple
+copy _4/[]
+call <F as core::ops::FnMut<(&T,)>>::call_mut destination=_5/[] target=Some(bb2) unwind=Cleanup(
+  | bb6) source=Normal
+const-value ZeroSized FnDef(DefId(core::ops::function::FnMut::call_mut), Binder { value: [F/#2,
+  > U+0020
+  | (&'{erased} T/#1,)], bound_vars: [] })
+move _6/[]
+move _7/[]
+block bb15 cleanup=false
+StorageDead(_9)
+StorageDead(_8)
+StorageDead(_20)
+StorageDead(_11)
+StorageDead(_3)
+assign local=_0 path=[]
+use Yes
+const-value Scalar(0x00) bool
+drop _2/[] target=bb5 unwind=Continue replace=false async=None
+block bb16 cleanup=false
+call core::num::<impl usize>::unchecked_sub::precondition_check destination=_19/[] target=Some(b
+  | b17) unwind=Unreachable source=Normal
+const-value ZeroSized FnDef(DefId(core::num::{impl#11}::unchecked_sub::precondition_check), Bind
+  | er { value: [], bound_vars: [] })
+copy _10/[]
+const-value Scalar(0x0000000000000001) usize
+block bb17 cleanup=false
+assign local=_11 path=[]
+binary SubUnchecked
+copy _10/[]
+const-value Scalar(0x0000000000000001) usize
+assign local=_1 path=[Deref, Field(1, *const T/#1)]
+cast Transmute target=*const T/#1
+copy _11/[]
+StorageDead(_10)
+goto -> bb14

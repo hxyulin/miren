@@ -349,6 +349,55 @@ impl<'tcx> Engine<'tcx> {
         Ok(value)
     }
 
+    /// Pure logical observation after free source/type/extent certification. The index may be
+    /// lexically bound, so this method performs no feasibility or memory-access query.
+    pub(super) fn composite_slice_logical_item(
+        &self,
+        source: &Value,
+        original: Ty<'tcx>,
+        index: &Term,
+    ) -> Result<Value, String> {
+        let Value::CompositeSlice { id, length, leaves } = source else {
+            return Err("logical composite observation requires a readonly descriptor".into());
+        };
+        let descriptor = self
+            .composite_slice_types
+            .get(*id)
+            .ok_or("logical composite observation has an invalid type certificate")?;
+        let bits = u32::from(self.tcx.sess.target.pointer_width);
+        let (length, width, signed) = length.integer()?;
+        if descriptor.ty != original
+            || width != bits
+            || signed
+            || length.sort() != &Sort::BitVec(bits)
+            || !length.belongs_to(&self.terms)
+            || index.sort() != &Sort::BitVec(bits)
+            || !index.belongs_to(&self.terms)
+            || leaves.len() != descriptor.leaves.len()
+        {
+            return Err("logical composite observation differs from its compiler metadata".into());
+        }
+        for (leaf, kind) in leaves.iter().zip(&descriptor.leaves) {
+            if !leaf.belongs_to(&self.terms)
+                || leaf.sort()
+                    != &Sort::Array(
+                        Box::new(Sort::BitVec(bits)),
+                        Box::new(scalar_slice_sort(*kind)?),
+                    )
+            {
+                return Err("logical composite observation has invalid leaf storage".into());
+            }
+        }
+        let mut cursor = 0;
+        let value = descriptor
+            .shape
+            .observe(&self.terms, leaves, index, &mut cursor)?;
+        if cursor != leaves.len() {
+            return Err("logical composite observation omitted leaf storage".into());
+        }
+        Ok(value)
+    }
+
     pub(super) fn composite_slice_region(
         &self,
         source: &Value,

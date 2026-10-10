@@ -1,0 +1,19 @@
+args=2 spread=None
+local _0 Mut bool user=None
+local _1 Mut &'{erased} mut Closure(DefId(core::slice::cmp::{impl#17}::slice_contains::{closure#
+  | 0}), [T/#0, i16, Binder { value: extern "RustCall" fn((&'{erased} T/#0,)) -> bool, bound_vars: [
+  | ] }, (&'{erased} T/#0,)]) user=None
+local _2 Not &'{erased} T/#0 user=None
+local _3 Mut &'{erased} T/#0 user=None
+block bb0 cleanup=false
+assign local=_3 path=[]
+use No
+copy _1/[Deref, Field(0, &'{erased} T/#0)]
+call <T as core::cmp::PartialEq>::eq destination=_0/[] target=Some(bb1) unwind=Unreachable sourc
+  | e=OverloadedOperator
+const-value ZeroSized FnDef(DefId(core::cmp::PartialEq::eq), Binder { value: [T/#0, T/#0], bound
+  | _vars: [] })
+move _2/[]
+move _3/[]
+block bb1 cleanup=false
+return

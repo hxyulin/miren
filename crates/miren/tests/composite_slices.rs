@@ -97,14 +97,6 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
                     UnknownCategory::Semantics,
                     "only read-only byte slices and byte arrays are modeled",
                 ),
-                "full_composite_contains" => (
-                    UnknownCategory::Semantics,
-                    "whole composite slice membership is unsupported",
-                ),
-                "full_composite_equality" => (
-                    UnknownCategory::Semantics,
-                    "whole composite slice equality is unsupported",
-                ),
                 "oversized_type_array" => (
                     UnknownCategory::ResourceLimit,
                     "composite slice type array exceeds the 128-element shape budget",
@@ -214,8 +206,8 @@ fn typed_composite_slices_retain_fields_views_and_caller_sources() {
         ("empty_reference_array", ProofStatus::Unknown),
         ("empty_refined_array", ProofStatus::Unknown),
         ("wholly_zero_sized", ProofStatus::Proved),
-        ("full_composite_contains", ProofStatus::Unknown),
-        ("full_composite_equality", ProofStatus::Unknown),
+        ("full_composite_contains", ProofStatus::Proved),
+        ("full_composite_equality", ProofStatus::Proved),
         ("deferred_iteration", ProofStatus::Proved),
         ("oversized_type_array", ProofStatus::Unknown),
         (

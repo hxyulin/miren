@@ -1,0 +1,9 @@
+args=2 spread=None
+local _0 Mut bool user=None
+local _1 Not &'{erased} () user=None
+local _2 Not &'{erased} () user=None
+block bb0 cleanup=false
+assign local=_0 path=[]
+use Yes
+const-value Scalar(0x00) bool
+return

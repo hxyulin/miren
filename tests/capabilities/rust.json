@@ -722,6 +722,23 @@
       "expected": "unknown",
       "unknown_reason": "no compiler-exported Rust definition matches the foreign symbol",
       "unknown_category": "missing_compiler_evidence"
+    },
+    {
+      "entry": "full_composite_predicates",
+      "family": "full_composite_predicate",
+      "expected": "proved"
+    },
+    {
+      "entry": "full_composite_predicates_wrong_claim",
+      "family": "full_composite_predicate",
+      "expected": "refuted"
+    },
+    {
+      "entry": "full_composite_predicates_missing_body",
+      "family": "full_composite_predicate",
+      "expected": "unknown",
+      "unknown_reason": "no compiler-exported Rust definition matches the foreign symbol",
+      "unknown_category": "missing_compiler_evidence"
     }
   ]
 }

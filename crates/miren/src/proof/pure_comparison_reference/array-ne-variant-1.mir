@@ -1,0 +1,14 @@
+args=2 spread=None
+local _0 Mut bool user=None
+local _1 Not &'{erased} [T/#0; N/#2] user=None
+local _2 Not &'{erased} [U/#1; N/#2] user=None
+block bb0 cleanup=false
+call <T as core::array::equality::SpecArrayEq<U, N>>::spec_ne destination=_0/[] target=Some(bb1)
+  |  unwind=Continue source=Normal
+const-value ZeroSized FnDef(DefId(core::array::equality::SpecArrayEq::spec_ne), Binder { value:
+  > U+0020
+  | [T/#0, U/#1, N/#2], bound_vars: [] })
+move _1/[]
+move _2/[]
+block bb1 cleanup=false
+return

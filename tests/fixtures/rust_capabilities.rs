@@ -1412,8 +1412,57 @@ pub fn tracked_call_destination_missing_body(mut value: u16) {
     }
 }
 
+#[inline(never)]
+fn full_composite_selected(values: &[(u16, [u16; 2])], index: usize) -> (u16, [u16; 2]) {
+    values[index]
+}
+
+pub fn full_composite_predicates(values: &[(u16, [u16; 2])], index: usize) {
+    if index < values.len() {
+        let selected = full_composite_selected(values, index);
+        assert!(values.contains(&selected));
+        assert!(values == values);
+    }
+}
+
+pub fn full_composite_predicates_wrong_claim(values: &[(u16, [u16; 2])], index: usize) {
+    if index < values.len() {
+        let selected = full_composite_selected(values, index);
+        assert!(!values.contains(&selected));
+    }
+}
+
+#[cfg(not(test))]
+unsafe extern "Rust" {
+    fn opaque_full_composite_predicate(value: (u16, [u16; 2])) -> bool;
+}
+
+#[cfg(not(test))]
+pub fn full_composite_predicates_missing_body(values: &[(u16, [u16; 2])], index: usize) -> bool {
+    if index < values.len() {
+        let selected = full_composite_selected(values, index);
+        assert!(values.contains(&selected));
+        unsafe { opaque_full_composite_predicate(selected) }
+    } else {
+        false
+    }
+}
+
 #[cfg(test)]
 mod native {
+    #[test]
+    fn full_composite_predicate_controls() {
+        for index in [0, 1, 128, 129, usize::MAX] {
+            full_composite_predicates(&[(3, [5, 7]); 129], index);
+        }
+    }
+
+    #[test]
+    #[should_panic]
+    fn full_composite_predicates_wrong_claim_panics() {
+        full_composite_predicates_wrong_claim(&[(3, [5, 7]); 129], 128);
+    }
+
     #[test]
     fn tracked_call_destination_controls() {
         for (left, right) in [(3, 7), (0, u16::MAX), (19, 19)] {

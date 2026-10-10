@@ -1,0 +1,23 @@
+args=2 spread=None
+local _0 Mut bool user=None
+local _1 Not &'{erased} (T/#0,) user=None
+local _2 Not &'{erased} (T/#0,) user=None
+local _3 Mut &'{erased} T/#0 user=None
+local _4 Mut &'{erased} T/#0 user=None
+block bb0 cleanup=false
+StorageLive(_3)
+assign local=_3 path=[]
+ref '{erased} Shared local=_1 path=[Deref, Field(0, T/#0)]
+StorageLive(_4)
+assign local=_4 path=[]
+ref '{erased} Shared local=_2 path=[Deref, Field(0, T/#0)]
+call <T as core::cmp::PartialEq>::ne destination=_0/[] target=Some(bb1) unwind=Continue source=O
+  | verloadedOperator
+const-value ZeroSized FnDef(DefId(core::cmp::PartialEq::ne), Binder { value: [T/#0, T/#0], bound
+  | _vars: [] })
+move _3/[]
+move _4/[]
+block bb1 cleanup=false
+StorageDead(_4)
+StorageDead(_3)
+return

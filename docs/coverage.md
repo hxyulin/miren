@@ -1579,3 +1579,30 @@ UNKNOWN results. The unchanged pointer-redirection pair now yields PROVED and RE
 host/ARM O0/O2; actual replacement mutation refutes and fails valid native execution. The dedicated
 twenty-root matrix yields eight PROVED, three REFUTED and nine UNKNOWN per configuration. Final
 integrated validation remains pending.
+
+
+Stage 172 extends full-length immutable tuple/fixed-array slice equality and membership using a
+compiler-certified pure comparison plan. Primitive numeric comparisons preserve Float NaN and
+signed-zero behavior and decoded Char equality. One logical index selects all occurrence columns.
+Complete original types, source validity and extent checks precede quantifier and empty shortcuts.
+Actual pinned core MIR is matched completely, including selected transitive comparators, closure
+transport, evaluated layout constants and guarded target-width cursor arithmetic. Missing reachable
+bodies remain UNKNOWN. No runtime input-length cap or library-name-only success rule is introduced.
+Custom nominal comparisons continue actual bounded body execution; unsupported one-byte composite
+transport and mixed finite/descriptor equality retain explicit UNKNOWN. Thirty-two dedicated roots
+yield fourteen PROVED, six REFUTED and twelve UNKNOWN in every profile. Actual leaf mutation refutes
+unchanged claims and fails native tests. Integration follows Stage 175; final checks are pending.
+
+
+Final validation passes all 709 Rust tests and 68 Python tests. Formatting, lint, debug/release
+builds, cargo deny, documentation and manual hooks pass. All 760 tracked main files match the
+final snapshot byte for byte; fresh main builds, sixteen related integration tests, four metadata
+tests and 68 Python tests pass. Both frozen surveys yield 212 PROVED, 188 REFUTED and 136 UNKNOWN
+at `/tmp/miren-stage172-capabilities-20261010` and
+`/tmp/miren-stage172-merged-capabilities-20261010`. All 392 previously completed parent roots
+retain identical outcomes, obligation details and query text. All 536 main/isolate outcomes,
+queries, models, premises and diagnostic details match. Source, input and release hashes are
+verified. Independent source, composition and canonical correction reviews approve the final
+implementation; the correction review is `/tmp/miren-stage172-canonical-review.md`. The interrupted
+initial hook run remains excluded from these checks. No assumptions, input caps or resource-budget
+changes are introduced. This independently authored stage integrates after actual Stage 175.

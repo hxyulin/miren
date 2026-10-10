@@ -1,0 +1,66 @@
+args=2 spread=None
+local _0 Mut bool user=None
+local _1 Not &'{erased} [T/#0] user=None
+local _2 Not &'{erased} [U/#1] user=None
+local _3 Not usize user=None
+local _4 Mut bool user=None
+local _5 Mut usize user=None
+local _6 Mut *const T/#0 user=None
+local _7 Mut *const U/#1 user=None
+local _8 Mut *const [T/#0] user=None
+local _9 Mut *const [U/#1] user=None
+block bb0 cleanup=false
+StorageLive(_3)
+assign local=_3 path=[]
+unary PtrMetadata
+copy _1/[]
+StorageLive(_4)
+StorageLive(_5)
+assign local=_5 path=[]
+unary PtrMetadata
+copy _2/[]
+assign local=_4 path=[]
+binary Eq
+copy _3/[]
+move _5/[]
+switch SwitchTargets { values: [Pu128(0)], targets: [bb3, bb1] }
+move _4/[]
+block bb1 cleanup=false
+StorageDead(_5)
+StorageLive(_6)
+StorageLive(_8)
+assign local=_8 path=[]
+raw Const local=_1 path=[Deref]
+assign local=_6 path=[]
+cast PtrToPtr target=*const T/#0
+copy _8/[]
+StorageDead(_8)
+StorageLive(_7)
+StorageLive(_9)
+assign local=_9 path=[]
+raw Const local=_2 path=[Deref]
+assign local=_7 path=[]
+cast PtrToPtr target=*const U/#1
+copy _9/[]
+StorageDead(_9)
+call <T as core::slice::cmp::SlicePartialEq<U>>::equal_same_length destination=_0/[] target=Some
+  | (bb2) unwind=Unreachable source=Normal
+const-value ZeroSized FnDef(DefId(core::slice::cmp::SlicePartialEq::equal_same_length), Binder {
+  |  value: [T/#0, U/#1], bound_vars: [] })
+move _6/[]
+move _7/[]
+move _3/[]
+block bb2 cleanup=false
+StorageDead(_7)
+StorageDead(_6)
+goto -> bb4
+block bb3 cleanup=false
+StorageDead(_5)
+assign local=_0 path=[]
+use Yes
+const-value Scalar(0x00) bool
+goto -> bb4
+block bb4 cleanup=false
+StorageDead(_4)
+StorageDead(_3)
+return

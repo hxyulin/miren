@@ -1,0 +1,105 @@
+args=2 spread=None
+local _0 Mut bool user=None
+local _1 Not &'{erased} T/#0 user=None
+local _2 Not &'{erased} [T/#0] user=None
+local _3 Mut &'{erased} mut core::slice::Iter<'{erased}, T/#0> user=None
+local _4 Mut core::slice::Iter<'{erased}, T/#0> user=None
+local _5 Mut Closure(DefId(core::slice::cmp::{impl#17}::slice_contains::{closure#0}), [T/#0, i16
+  | , Binder { value: extern "RustCall" fn((&'{erased} T/#0,)) -> bool, bound_vars: [] }, (&'{erased
+  | } T/#0,)]) user=None
+local _6 Not usize user=None
+local _7 Not core::ptr::NonNull<T/#0> user=None
+local _8 Mut core::ptr::NonNull<[T/#0]> user=None
+local _9 Not *const T/#0 user=None
+local _10 Mut *mut T/#0 user=None
+local _11 Mut *mut T/#0 user=None
+local _12 Mut *const [T/#0] user=None
+local _13 Mut *mut T/#0 user=None
+local _14 Mut *mut [T/#0] user=None
+block bb0 cleanup=false
+StorageLive(_3)
+StorageLive(_4)
+StorageLive(_9)
+StorageLive(_6)
+assign local=_6 path=[]
+unary PtrMetadata
+copy _2/[]
+StorageLive(_7)
+StorageLive(_8)
+StorageLive(_12)
+assign local=_12 path=[]
+raw Const local=_2 path=[Deref]
+assign local=_8 path=[]
+cast Transmute target=core::ptr::NonNull<[T/#0]>
+copy _12/[]
+StorageDead(_12)
+StorageLive(_13)
+StorageLive(_14)
+assign local=_14 path=[]
+cast Transmute target=*mut [T/#0]
+copy _8/[]
+assign local=_13 path=[]
+cast PtrToPtr target=*mut T/#0
+copy _14/[]
+StorageDead(_14)
+assign local=_7 path=[]
+cast Transmute target=core::ptr::NonNull<T/#0>
+copy _13/[]
+StorageDead(_13)
+StorageDead(_8)
+switch SwitchTargets { values: [Pu128(0)], targets: [bb3, bb2] }
+const-unevaluated UnevaluatedConst { def: DefId(core::mem::SizedTypeProperties::IS_ZST), args: [
+  | T/#0], promoted: None } bool
+block bb1 cleanup=false
+StorageDead(_5)
+StorageDead(_4)
+StorageDead(_3)
+return
+block bb2 cleanup=false
+assign local=_9 path=[]
+cast Transmute target=*const T/#0
+copy _6/[]
+goto -> bb4
+block bb3 cleanup=false
+StorageLive(_10)
+StorageLive(_11)
+assign local=_11 path=[]
+cast Transmute target=*mut T/#0
+copy _7/[]
+assign local=_10 path=[]
+binary Offset
+copy _11/[]
+copy _6/[]
+StorageDead(_11)
+assign local=_9 path=[]
+cast PtrToPtr target=*const T/#0
+copy _10/[]
+StorageDead(_10)
+goto -> bb4
+block bb4 cleanup=false
+assign local=_4 path=[]
+aggregate Adt(DefId(core::slice::iter::Iter), 0, ['{erased}, T/#0], Some(UserType(4)), None)
+copy _7/[]
+copy _9/[]
+const-value ZeroSized core::marker::PhantomData<&'{erased} T/#0>
+StorageDead(_7)
+StorageDead(_6)
+StorageDead(_9)
+assign local=_3 path=[]
+ref '{erased} Mut { kind: TwoPhaseBorrow } local=_4 path=[]
+StorageLive(_5)
+assign local=_5 path=[]
+aggregate Closure(DefId(core::slice::cmp::{impl#17}::slice_contains::{closure#0}), [T/#0, i16, B
+  | inder { value: extern "RustCall" fn((&'{erased} T/#0,)) -> bool, bound_vars: [] }, (&'{erased} T
+  | /#0,)])
+copy _1/[]
+call <core::slice::Iter<'_, T> as core::iter::Iterator>::any::<{closure@<T as core::slice::cmp::
+  | SliceContains>::slice_contains::{closure#0}}> destination=_0/[] target=Some(bb1) unwind=Unreacha
+  | ble source=Normal
+const-value ZeroSized FnDef(DefId(core::iter::traits::iterator::Iterator::any), Binder { value:
+  > U+0020
+  | [core::slice::Iter<'{erased}, T/#0>, Closure(DefId(core::slice::cmp::{impl#17}::slice_contains::
+  | {closure#0}), [T/#0, i16, Binder { value: extern "RustCall" fn((&'{erased} T/#0,)) -> bool, boun
+  | d_vars: [] }, (&'{erased} T/#0,)])], bound_vars: [] })
+move _3/[]
+move _5/[]

@@ -66,6 +66,8 @@ mod pointer_atomic_shapes;
 mod pointer_atomics;
 mod pointer_handles;
 mod pointer_validity;
+mod pure_comparison_templates;
+mod pure_comparisons;
 mod reference_graph;
 mod replay_inputs;
 mod retry_frontiers;

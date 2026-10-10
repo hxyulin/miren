@@ -1,0 +1,22 @@
+args=2 spread=None
+local _0 Mut bool user=None
+local _1 Not &'{erased} usize user=None
+local _2 Not &'{erased} usize user=None
+local _3 Mut usize user=None
+local _4 Mut usize user=None
+block bb0 cleanup=false
+StorageLive(_3)
+assign local=_3 path=[]
+use Yes
+copy _1/[Deref]
+StorageLive(_4)
+assign local=_4 path=[]
+use Yes
+copy _2/[Deref]
+assign local=_0 path=[]
+binary Eq
+move _3/[]
+move _4/[]
+StorageDead(_4)
+StorageDead(_3)
+return

@@ -1,0 +1,55 @@
+args=2 spread=None
+local _0 Mut bool user=None
+local _1 Not &'{erased} (U/#0, T/#1) user=None
+local _2 Not &'{erased} (U/#0, T/#1) user=None
+local _3 Mut bool user=None
+local _4 Mut &'{erased} U/#0 user=None
+local _5 Mut &'{erased} U/#0 user=None
+local _6 Mut &'{erased} T/#1 user=None
+local _7 Mut &'{erased} T/#1 user=None
+block bb0 cleanup=false
+StorageLive(_3)
+StorageLive(_4)
+assign local=_4 path=[]
+ref '{erased} Shared local=_1 path=[Deref, Field(0, U/#0)]
+StorageLive(_5)
+assign local=_5 path=[]
+ref '{erased} Shared local=_2 path=[Deref, Field(0, U/#0)]
+call <U as core::cmp::PartialEq>::ne destination=_3/[] target=Some(bb1) unwind=Continue source=O
+  | verloadedOperator
+const-value ZeroSized FnDef(DefId(core::cmp::PartialEq::ne), Binder { value: [U/#0, U/#0], bound
+  | _vars: [] })
+move _4/[]
+move _5/[]
+block bb1 cleanup=false
+switch SwitchTargets { values: [Pu128(0)], targets: [bb3, bb2] }
+move _3/[]
+block bb2 cleanup=false
+StorageDead(_5)
+StorageDead(_4)
+assign local=_0 path=[]
+use Yes
+const-value Scalar(0x01) bool
+goto -> bb5
+block bb3 cleanup=false
+StorageDead(_5)
+StorageDead(_4)
+StorageLive(_6)
+assign local=_6 path=[]
+ref '{erased} Shared local=_1 path=[Deref, Field(1, T/#1)]
+StorageLive(_7)
+assign local=_7 path=[]
+ref '{erased} Shared local=_2 path=[Deref, Field(1, T/#1)]
+call <T as core::cmp::PartialEq>::ne destination=_0/[] target=Some(bb4) unwind=Continue source=O
+  | verloadedOperator
+const-value ZeroSized FnDef(DefId(core::cmp::PartialEq::ne), Binder { value: [T/#1, T/#1], bound
+  | _vars: [] })
+move _6/[]
+move _7/[]
+block bb4 cleanup=false
+StorageDead(_7)
+StorageDead(_6)
+goto -> bb5
+block bb5 cleanup=false
+StorageDead(_3)
+return

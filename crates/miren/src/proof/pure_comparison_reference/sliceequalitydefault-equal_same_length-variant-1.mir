@@ -1,0 +1,132 @@
+args=3 spread=None
+local _0 Mut bool user=None
+local _1 Not *const A/#0 user=None
+local _2 Not *const B/#1 user=None
+local _3 Not usize user=None
+local _4 Mut core::ops::Range<usize> user=None
+local _5 Mut core::option::Option<usize> user=None
+local _6 Mut &'{erased} mut core::ops::Range<usize> user=None
+local _7 Not usize user=None
+local _8 Mut bool user=None
+local _9 Mut &'{erased} A/#0 user=None
+local _10 Not *const A/#0 user=None
+local _11 Mut &'{erased} B/#1 user=None
+local _12 Not *const B/#1 user=None
+local _13 Mut bool user=None
+local _14 Mut &'{erased} usize user=None
+local _15 Mut &'{erased} usize user=None
+local _16 Not usize user=None
+local _17 Mut usize user=None
+local _18 Mut usize user=None
+local _19 Mut usize user=None
+local _20 Not () user=None
+block bb0 cleanup=false
+assign local=_4 path=[]
+aggregate Adt(DefId(core::ops::range::Range), 0, [usize], None, None)
+const-value Scalar(0x00000000) usize
+copy _3/[]
+goto -> bb1
+block bb1 cleanup=false
+StorageLive(_5)
+StorageLive(_13)
+StorageLive(_18)
+assign local=_18 path=[]
+use Yes
+copy _4/[Field(0, usize)]
+StorageLive(_19)
+assign local=_19 path=[]
+use Yes
+copy _4/[Field(1, usize)]
+assign local=_13 path=[]
+binary Lt
+move _18/[]
+move _19/[]
+StorageDead(_19)
+StorageDead(_18)
+switch SwitchTargets { values: [Pu128(0)], targets: [bb7, bb6] }
+move _13/[]
+block bb2 cleanup=false
+StorageDead(_12)
+StorageDead(_11)
+StorageDead(_10)
+StorageDead(_9)
+switch SwitchTargets { values: [Pu128(0)], targets: [bb4, bb3] }
+move _8/[]
+block bb3 cleanup=false
+assign local=_0 path=[]
+use Yes
+const-value Scalar(0x00) bool
+StorageDead(_8)
+StorageDead(_7)
+StorageDead(_5)
+goto -> bb5
+block bb4 cleanup=false
+StorageDead(_8)
+StorageDead(_7)
+StorageDead(_5)
+goto -> bb1
+block bb5 cleanup=false
+return
+block bb6 cleanup=false
+StorageLive(_16)
+assign local=_16 path=[]
+use Yes
+copy _4/[Field(0, usize)]
+StorageLive(_17)
+switch SwitchTargets { values: [Pu128(0)], targets: [bb9, bb8] }
+runtime-checks UbChecks
+block bb7 cleanup=false
+StorageDead(_13)
+StorageDead(_5)
+assign local=_0 path=[]
+use Yes
+const-value Scalar(0x01) bool
+goto -> bb5
+block bb8 cleanup=false
+call core::num::<impl usize>::unchecked_add::precondition_check destination=_20/[] target=Some(b
+  | b9) unwind=Unreachable source=Normal
+const-value ZeroSized FnDef(DefId(core::num::{impl#11}::unchecked_add::precondition_check), Bind
+  | er { value: [], bound_vars: [] })
+copy _16/[]
+const-value Scalar(0x00000001) usize
+block bb9 cleanup=false
+assign local=_17 path=[]
+binary AddUnchecked
+copy _16/[]
+const-value Scalar(0x00000001) usize
+assign local=_4 path=[Field(0, usize)]
+use Yes
+move _17/[]
+StorageDead(_17)
+assign local=_5 path=[]
+aggregate Adt(DefId(core::option::Option), 1, [usize], None, None)
+copy _16/[]
+StorageDead(_16)
+StorageDead(_13)
+StorageLive(_7)
+assign local=_7 path=[]
+use Yes
+copy _5/[Downcast(Some("Some"), 1), Field(0, usize)]
+StorageLive(_8)
+StorageLive(_9)
+StorageLive(_10)
+assign local=_10 path=[]
+binary Offset
+copy _1/[]
+copy _7/[]
+assign local=_9 path=[]
+ref '{erased} Shared local=_10 path=[Deref]
+StorageLive(_11)
+StorageLive(_12)
+assign local=_12 path=[]
+binary Offset
+copy _2/[]
+copy _7/[]
+assign local=_11 path=[]
+ref '{erased} Shared local=_12 path=[Deref]
+call <A as core::cmp::PartialEq<B>>::ne destination=_8/[] target=Some(bb2) unwind=Unreachable so
+  | urce=OverloadedOperator
+const-value ZeroSized FnDef(DefId(core::cmp::PartialEq::ne), Binder { value: [A/#0, B/#1], bound
+  | _vars: [] })
+move _9/[]
+move _11/[]

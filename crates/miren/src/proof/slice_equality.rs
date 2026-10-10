@@ -67,16 +67,43 @@ impl<'tcx> Engine<'tcx> {
         };
         let left = left.materialize()?;
         let right = right.materialize()?;
-        if matches!(left, Value::CompositeSlice { .. })
+        let composite = if matches!(left, Value::CompositeSlice { .. })
             || matches!(right, Value::CompositeSlice { .. })
         {
-            return Err(self.categorized_error(
-                UnknownCategory::Semantics,
-                "whole composite slice equality is unsupported".into(),
-            ));
-        }
-        let left_length = self.equality_slice_length(&left, &state.conditions)?;
-        let right_length = self.equality_slice_length(&right, &state.conditions)?;
+            if !matches!(
+                (&left, &right),
+                (Value::CompositeSlice { .. }, Value::CompositeSlice { .. })
+            ) || left_element != right_element
+            {
+                return Err(self.categorized_error(
+                    UnknownCategory::Semantics,
+                    "mixed composite slice equality is unsupported".into(),
+                ));
+            }
+            let Some(plan) = self.pure_comparison_shape(left_element)? else {
+                return Err(self.categorized_error(
+                    UnknownCategory::Semantics,
+                    "whole composite slice equality is unsupported".into(),
+                ));
+            };
+            // Full free source/extent certification precedes body checks and all shortcuts.
+            let left_length = self.composite_slice_length(&left, &state.conditions)?;
+            let right_length = self.composite_slice_length(&right, &state.conditions)?;
+            self.certify_pure_comparison(left_element, instance)?;
+            Some((plan, left_length, right_length))
+        } else {
+            None
+        };
+        let left_length = if let Some((_, length, _)) = &composite {
+            length.clone()
+        } else {
+            self.equality_slice_length(&left, &state.conditions)?
+        };
+        let right_length = if let Some((_, _, length)) = &composite {
+            length.clone()
+        } else {
+            self.equality_slice_length(&right, &state.conditions)?
+        };
         let same_length =
             symbolic::binary(&self.terms, "eq", left_length.clone(), right_length)?.boolean()?;
         let negate = name == Symbol::intern("ne");
@@ -98,6 +125,32 @@ impl<'tcx> Engine<'tcx> {
             return Ok(Some(returns));
         }
         let (length, bits, _) = left_length.integer()?;
+        if let Some((plan, _, _)) = composite {
+            let index = self.fresh(Sort::BitVec(bits));
+            let left_item = self.composite_slice_logical_item(&left, left_element, &index)?;
+            let right_item = self.composite_slice_logical_item(&right, right_element, &index)?;
+            let equal = self.pure_comparison_equal(&plan, &left_item, &right_item)?;
+            let inside = self
+                .terms
+                .apply(Op::BvUnsignedLt, &[index.clone(), length])?;
+            let predicate = self.terms.apply(Op::Or, &[symbolic::not(&inside), equal])?;
+            let equal = self
+                .terms
+                .quantify(miren::smt::Quantifier::Forall, &index, &predicate)?;
+            self.record_model(
+                callee,
+                concat!(
+                    "full-domain pure composite slice equality; ",
+                    "scoped universal structural numeric equality",
+                ),
+            );
+            returns.push(Return {
+                value: Value::Bool(if negate { symbolic::not(&equal) } else { equal }),
+                conditions,
+                memory: state.memory.clone(),
+            });
+            return Ok(Some(returns));
+        }
         if matches!(
             (&left, &right),
             (Value::ScalarSlice { .. }, Value::ScalarSlice { .. })
