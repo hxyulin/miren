@@ -1286,3 +1286,8 @@ Float numeric/storage correspondence uses a checked decoding relation for exact 
 The relation preserves SMT equality, NaN storage payloads and signed zero. Mutable float validation
 still authenticates the issued producer pair before constructing or proving that relation; this
 refactor adds no scalar-call permissions or producer certificates.
+
+Known integer table calls share one private dispatch loop after callable and argument evaluation.
+Unary and binary preparation retain validation and Move order; target branches preserve actual
+returned Memory and existing result certificates. This refactor adds no callable family, Repeat
+permission or execution budget.

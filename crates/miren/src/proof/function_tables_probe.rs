@@ -20,12 +20,16 @@ fn compiler_known_function_table_prepared_calls() {
     let dependency = root.join("dependency.rs");
     std::fs::write(
         &dependency,
-        "#![no_std]\n#[inline(never)] pub fn unavailable(value: u16) -> u16 { value }\n",
+        concat!(
+            "#![no_std]\n#![forbid(unsafe_code)]\n",
+            "#[inline(never)] pub fn unavailable(value: u16) -> u16 { value }\n",
+        ),
     )
     .unwrap();
     std::fs::write(
         &source,
         r#"#![no_std]
+#![forbid(unsafe_code)]
 #![feature(custom_mir, core_intrinsics)]
 use core::intrinsics::mir::*;
 extern crate alloc;
@@ -462,6 +466,9 @@ fn check_prepared_calls<'tcx>(tcx: TyCtxt<'tcx>) {
         .unwrap()
         .unwrap();
     assert_eq!(returns.len(), 2);
+    let mut incompatible = returns[0].1.conditions.clone();
+    incompatible.extend(returns[1].1.conditions.iter().cloned());
+    assert!(!engine.feasible(&incompatible).unwrap());
     for (position, (consumed, result)) in returns.iter().enumerate() {
         assert!(engine.operand(moved, &body, consumed, func).is_err());
         assert!(
@@ -1137,6 +1144,9 @@ fn check_two_argument_calls<'tcx>(tcx: TyCtxt<'tcx>, output: &std::path::Path) {
             .unwrap()
             .unwrap();
         assert_eq!(returns.len(), 2);
+        let mut incompatible = returns[0].1.conditions.clone();
+        incompatible.extend(returns[1].1.conditions.iter().cloned());
+        assert!(!engine.feasible(&incompatible).unwrap());
         for (position, (consumed, result)) in returns.iter().enumerate() {
             assert!(
                 engine

@@ -43,6 +43,12 @@ struct TwoArgumentIntegerSignature<'tcx> {
     result: IntegerSignature<'tcx>,
 }
 
+// Values are already evaluated and consumed before this private dispatch carrier is built.
+enum EvaluatedIntegerArguments {
+    One(Value),
+    Two(Vec<Value>),
+}
+
 #[derive(Clone, PartialEq)]
 pub(super) struct Choice<'tcx> {
     original: Ty<'tcx>,
@@ -523,42 +529,15 @@ impl<'tcx> Engine<'tcx> {
             });
         }
         self.validate_owned_call_arguments(std::slice::from_ref(&value), &consumed.memory)?;
-        let mut returns = Vec::new();
-        for (position, instance) in instances.into_iter().enumerate() {
-            let mut conditions = consumed.conditions.clone();
-            conditions.push(self.terms.apply(
-                Op::Equal,
-                &[
-                    choice.index.clone(),
-                    self.terms.bit_vector(
-                        position as u128,
-                        u32::from(self.tcx.sess.target.pointer_width),
-                    )?,
-                ],
-            )?);
-            if !self.feasible(&conditions)? {
-                continue;
-            }
-            if self.specification(instance)?.is_some() {
-                return Err(
-                    "function table configured target is outside the initial domain".into(),
-                );
-            }
-            let mut branch = consumed.clone();
-            self.byte_copy_call_eligibility(instance, true, &mut branch);
-            for result in self.call_instance(
-                instance,
-                vec![value.clone()],
-                conditions,
-                branch.memory.clone(),
-                call.stack,
-                call.site,
-            )? {
-                self.validate_table_result(&result.value, integer.result)?;
-                returns.push((branch.clone(), result));
-            }
-        }
-        Ok(Some(returns))
+        self.dispatch_evaluated_integer_table(
+            &consumed,
+            call,
+            &choice,
+            instances,
+            EvaluatedIntegerArguments::One(value),
+            integer.result,
+        )
+        .map(Some)
     }
 
     fn prepared_two_argument_table_call(
@@ -645,6 +624,27 @@ impl<'tcx> Engine<'tcx> {
         self.validate_table_result(&second, integer.second)?;
         let values = vec![first, second];
         self.validate_owned_call_arguments(&values, &consumed.memory)?;
+        self.dispatch_evaluated_integer_table(
+            &consumed,
+            call,
+            choice,
+            instances,
+            EvaluatedIntegerArguments::Two(values),
+            integer.result,
+        )
+        .map(Some)
+    }
+
+    fn dispatch_evaluated_integer_table(
+        &mut self,
+        consumed: &State,
+        call: TableCall<'_, 'tcx>,
+        choice: &Choice<'tcx>,
+        instances: Vec<ty::Instance<'tcx>>,
+        arguments: EvaluatedIntegerArguments,
+        result_signature: IntegerSignature<'tcx>,
+    ) -> Result<Vec<(State, Return)>, String> {
+        let bits = u32::from(self.tcx.sess.target.pointer_width);
         let mut returns = Vec::new();
         for (position, instance) in instances.into_iter().enumerate() {
             let mut conditions = consumed.conditions.clone();
@@ -665,19 +665,23 @@ impl<'tcx> Engine<'tcx> {
             }
             let mut branch = consumed.clone();
             self.byte_copy_call_eligibility(instance, true, &mut branch);
+            let values = match &arguments {
+                EvaluatedIntegerArguments::One(value) => vec![value.clone()],
+                EvaluatedIntegerArguments::Two(values) => values.clone(),
+            };
             for result in self.call_instance(
                 instance,
-                values.clone(),
+                values,
                 conditions,
                 branch.memory.clone(),
                 call.stack,
                 call.site,
             )? {
-                self.validate_table_result(&result.value, integer.result)?;
+                self.validate_table_result(&result.value, result_signature)?;
                 returns.push((branch.clone(), result));
             }
         }
-        Ok(Some(returns))
+        Ok(returns)
     }
 }
 
