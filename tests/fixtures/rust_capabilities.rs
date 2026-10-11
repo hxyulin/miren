@@ -3409,3 +3409,51 @@ mod float_hierarchy_native {
         super::float_hierarchy_selected(&mut [0.0; 129], f32::from_bits(0x7fc0_1234));
     }
 }
+struct AssociatedHierarchyLocal;
+impl AssociatedHierarchyLocal {
+    #[inline(never)]
+    fn scalar(word: u16) -> u16 {
+        word ^ 0
+    }
+    #[inline(never)]
+    fn leaf(values: &mut [u16], word: u16) {
+        if values.len() > 0 {
+            values[0] = Self::scalar(word);
+        }
+    }
+    #[inline(never)]
+    fn outer(values: &mut [u16], word: u16) {
+        Self::leaf(&mut *values, word);
+    }
+    #[inline(never)]
+    fn deeper(values: &mut [u16], word: u16) {
+        Self::outer(values, word);
+    }
+}
+pub fn local_associated_hierarchy_selected(values: &mut [u16], word: u16) {
+    if values.len() > 0 {
+        AssociatedHierarchyLocal::outer(values, word);
+        assert!(values[0] == word);
+    }
+}
+pub fn local_associated_hierarchy_wrong_claim(values: &mut [u16], word: u16) {
+    if values.len() > 0 {
+        AssociatedHierarchyLocal::outer(values, word);
+        assert!(values[0] != word);
+    }
+}
+pub fn local_associated_hierarchy_deeper_unknown(values: &mut [u16], word: u16) {
+    if values.len() > 0 {
+        AssociatedHierarchyLocal::deeper(values, word);
+        assert!(values[0] == word);
+    }
+}
+#[cfg(test)]
+mod local_associated_hierarchy_native {
+    #[test]
+    fn mutation_guard() {
+        for word in [0, 1, 17, u16::MAX] {
+            super::local_associated_hierarchy_selected(&mut [0; 129], word);
+        }
+    }
+}

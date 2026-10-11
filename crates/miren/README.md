@@ -1212,3 +1212,18 @@ callers. Compiler-only malformed Return clones preserve refusal before frame rel
 publication, rather than claiming whole-call rollback.
 Corrected ROOT validation passes all 22 required checks, including 843 workspace tests.
 Fresh native and debug/release comparisons preserve strict unknown and missing-body boundaries.
+
+Stage212's actual211 migration adds checked local static associated hierarchy routing. Original
+function arguments and normalized signatures remain tied to the selected complete compiler instance.
+The associated route bounds borrowed type and body inventories before its own re-resolution,
+normalization and body cloning; sampled cached bodies receive the same checks. These bounded passes
+leave the earlier dispatcher resolution unchanged. Compiler controls cover associated Char Unicode
+returns and Float raw-pair validation without granting new element domains. Receiver methods,
+virtual calls and nonlocal associated bodies gain no permissions. Legacy free-function dispatch
+remains unchanged. This source checkpoint precedes migrated fixture and compatibility captures.
+
+Measured local associated fixtures support inherent, implemented-trait, default-trait and generic
+static calls. Wrong claims and actual scalar-body mutations refute. Deeper and retained-view
+boundaries remain unknown. Genuine omitted dependency bodies also remain unknown for empty callers;
+optimized retained element stores keep their direct-element frontier. The append-only three-case
+global upkeep and broad compatibility captures precede independent ROOT validation.

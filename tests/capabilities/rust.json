@@ -1261,6 +1261,24 @@
       "expected": "unknown",
       "unknown_reason": "float_hierarchy_outer bb0: hierarchy exceeds the single nested-child scope",
       "unknown_category": "semantics"
+    },
+    {
+      "entry": "local_associated_hierarchy_selected",
+      "family": "local_associated_hierarchy",
+      "expected": "proved"
+    },
+    {
+      "entry": "local_associated_hierarchy_wrong_claim",
+      "family": "local_associated_hierarchy",
+      "expected": "refuted"
+    },
+    {
+      "entry": "local_associated_hierarchy_deeper_unknown",
+      "family": "local_associated_hierarchy",
+      "expected": "unknown",
+      "unknown_reason":
+        "AssociatedHierarchyLocal::outer bb0: hierarchy exceeds the single nested-child scope",
+      "unknown_category": "semantics"
     }
   ]
 }

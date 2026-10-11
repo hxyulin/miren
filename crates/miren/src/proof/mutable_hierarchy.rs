@@ -1,6 +1,242 @@
 //! Checked single nested whole-u16 child hierarchy with persistent generation and epoch.
 use super::*;
+use rustc_middle::mir::PlaceElem;
+use rustc_middle::mir::visit::{PlaceContext, Visitor};
 use std::rc::Rc;
+
+// Only the new associated route uses this borrowed inventory. No selected body is cloned here.
+struct AssociatedBodyWork<'a, 'tcx> {
+    engine: &'a Engine<'tcx>,
+    arguments: ty::GenericArgsRef<'tcx>,
+    locals: usize,
+    work: usize,
+    error: Option<String>,
+}
+
+impl<'tcx> AssociatedBodyWork<'_, 'tcx> {
+    fn charge(&mut self, count: usize) -> Result<(), String> {
+        self.work = self.work.saturating_add(count);
+        if self.work > MAX_INPUT_VALUES {
+            return Err(self.engine.categorized_error(
+                UnknownCategory::ResourceLimit,
+                "associated borrowed Body exceeds existing work budget".into(),
+            ));
+        }
+        Ok(())
+    }
+
+    fn original_type(&mut self, original: Ty<'tcx>, depth: usize) -> Result<(), String> {
+        self.charge(1)?;
+        if depth >= MAX_INPUT_DEPTH {
+            return Err(self.engine.categorized_error(
+                UnknownCategory::ResourceLimit,
+                "associated borrowed Body type exceeds existing depth budget".into(),
+            ));
+        }
+        match original.kind() {
+            ty::Bool | ty::Char | ty::Int(_) | ty::Uint(_) | ty::Float(_) | ty::Str | ty::Never => {
+                Ok(())
+            }
+            ty::Ref(_, inner, _) | ty::RawPtr(inner, _) | ty::Slice(inner) => {
+                self.original_type(*inner, depth + 1)
+            }
+            ty::Array(inner, count) => {
+                self.charge(1)?;
+                if count.try_to_target_usize(self.engine.tcx).is_none() {
+                    return Err("associated borrowed array extent is unsupported".into());
+                }
+                self.original_type(*inner, depth + 1)
+            }
+            ty::Tuple(fields) => {
+                self.charge(fields.len())?;
+                for field in fields.iter() {
+                    self.original_type(field, depth + 1)?;
+                }
+                Ok(())
+            }
+            ty::Adt(_, arguments) => self.generic_arguments(arguments, depth + 1),
+            ty::FnDef(_, arguments) => self.generic_arguments(arguments.skip_binder(), depth + 1),
+            ty::Param(parameter) => {
+                let Some(original) = self
+                    .arguments
+                    .get(parameter.index as usize)
+                    .and_then(|argument| argument.as_type())
+                else {
+                    return Err("associated borrowed Body Param mapping differs".into());
+                };
+                self.original_type(original, depth + 1)
+            }
+            _ => Err("associated borrowed Body type grammar is unsupported".into()),
+        }
+    }
+
+    fn generic_arguments(
+        &mut self,
+        arguments: ty::GenericArgsRef<'tcx>,
+        depth: usize,
+    ) -> Result<(), String> {
+        self.charge(arguments.len())?;
+        for argument in arguments.iter() {
+            match argument.kind() {
+                ty::GenericArgKind::Type(original) => self.original_type(original, depth)?,
+                ty::GenericArgKind::Lifetime(_) => {}
+                ty::GenericArgKind::Const(_) => {
+                    return Err("associated borrowed const substitution is unsupported".into());
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+impl<'tcx> Visitor<'tcx> for AssociatedBodyWork<'_, 'tcx> {
+    fn visit_ty(&mut self, original: Ty<'tcx>, _: rustc_middle::mir::visit::TyContext) {
+        if self.error.is_none() {
+            self.error = self.original_type(original, 0).err();
+        }
+    }
+
+    fn visit_place(
+        &mut self,
+        place: &Place<'tcx>,
+        _: PlaceContext,
+        _: rustc_middle::mir::Location,
+    ) {
+        if self.error.is_some() {
+            return;
+        }
+        if place.local.as_usize() >= self.locals {
+            self.error = Some("associated borrowed place local is unavailable".into());
+            return;
+        }
+        if place.projection.len() >= MAX_INPUT_DEPTH {
+            self.error = Some(self.engine.categorized_error(
+                UnknownCategory::ResourceLimit,
+                "associated borrowed projection exceeds existing depth budget".into(),
+            ));
+            return;
+        }
+        self.error = self.charge(place.projection.len()).err();
+        for element in place.projection {
+            if self.error.is_some() {
+                break;
+            }
+            match element {
+                PlaceElem::Field(_, original) | PlaceElem::OpaqueCast(original) => {
+                    self.error = self.original_type(original, 0).err();
+                }
+                PlaceElem::UnwrapUnsafeBinder(_) => {
+                    self.error = Some("associated borrowed unsafe binder is unsupported".into());
+                }
+                PlaceElem::Deref
+                | PlaceElem::Index(_)
+                | PlaceElem::ConstantIndex { .. }
+                | PlaceElem::Subslice { .. }
+                | PlaceElem::Downcast(_, _)
+                | PlaceElem::PhantomDeref => {}
+            }
+        }
+    }
+
+    fn visit_user_type_projection(&mut self, projection: &rustc_middle::mir::UserTypeProjection) {
+        if self.error.is_some() {
+            return;
+        }
+        self.error = self.charge(projection.projs.len()).err();
+        if self.error.is_none() && projection.projs.len() >= MAX_INPUT_DEPTH {
+            self.error = Some(self.engine.categorized_error(
+                UnknownCategory::ResourceLimit,
+                "associated borrowed user projection exceeds existing depth budget".into(),
+            ));
+        }
+    }
+
+    fn visit_operand(&mut self, operand: &Operand<'tcx>, location: rustc_middle::mir::Location) {
+        if self.error.is_none() {
+            self.error = self.charge(1).err();
+        }
+        if self.error.is_none() {
+            self.super_operand(operand, location);
+        }
+    }
+
+    fn visit_const_operand(
+        &mut self,
+        constant: &rustc_middle::mir::ConstOperand<'tcx>,
+        _: rustc_middle::mir::Location,
+    ) {
+        if self.error.is_some() {
+            return;
+        }
+        match constant.const_ {
+            rustc_middle::mir::Const::Val(
+                rustc_middle::mir::ConstValue::Scalar(_) | rustc_middle::mir::ConstValue::ZeroSized,
+                original,
+            ) => self.error = self.original_type(original, 0).err(),
+            _ => self.error = Some("associated borrowed constant grammar is unsupported".into()),
+        }
+    }
+
+    fn visit_ty_const(&mut self, _: ty::Const<'tcx>, _: rustc_middle::mir::Location) {
+        if self.error.is_none() {
+            self.error = Some("associated borrowed type constant is unsupported".into());
+        }
+    }
+
+    fn visit_rvalue(&mut self, value: &Rvalue<'tcx>, location: rustc_middle::mir::Location) {
+        if self.error.is_some() {
+            return;
+        }
+        if let Rvalue::Aggregate(kind, operands) = value {
+            self.error = self.charge(operands.len()).err();
+            if self.error.is_none()
+                && !matches!(
+                    **kind,
+                    rustc_middle::mir::AggregateKind::Tuple
+                        | rustc_middle::mir::AggregateKind::Array(_)
+                )
+            {
+                self.error = Some("associated borrowed aggregate grammar is unsupported".into());
+            }
+        }
+        if self.error.is_none() {
+            self.super_rvalue(value, location);
+        }
+    }
+
+    fn visit_terminator(
+        &mut self,
+        terminator: &rustc_middle::mir::Terminator<'tcx>,
+        location: rustc_middle::mir::Location,
+    ) {
+        if self.error.is_some() {
+            return;
+        }
+        match &terminator.kind {
+            TerminatorKind::Call { args, .. } => self.error = self.charge(args.len()).err(),
+            TerminatorKind::SwitchInt { targets, .. } => {
+                self.error = self.charge(targets.all_targets().len()).err();
+            }
+            TerminatorKind::InlineAsm { .. } => {
+                self.error = Some("associated borrowed inline assembly is unsupported".into());
+            }
+            _ => {}
+        }
+        if self.error.is_none() {
+            self.super_terminator(terminator, location);
+        }
+    }
+
+    fn visit_statement(
+        &mut self,
+        statement: &rustc_middle::mir::Statement<'tcx>,
+        location: rustc_middle::mir::Location,
+    ) {
+        if self.error.is_none() {
+            self.super_statement(statement, location);
+        }
+    }
+}
 
 const ISSUANCE_ENABLED: bool = true;
 const INTEGER_HIERARCHY_ENABLED: bool = true;
@@ -8,6 +244,38 @@ const BOOL_HIERARCHY_ENABLED: bool = true;
 const CHAR_HIERARCHY_ENABLED: bool = true;
 const FLOAT_HIERARCHY_ENABLED: bool = true;
 const DORMANT_CALLS_ENABLED: bool = true;
+const ASSOCIATED_HIERARCHY_ENABLED: bool = true;
+
+fn associated_hierarchy_enabled() -> bool {
+    #[cfg(test)]
+    if TEST_ASSOCIATED_HIERARCHY.with(std::cell::Cell::get) {
+        return true;
+    }
+    ASSOCIATED_HIERARCHY_ENABLED
+}
+
+#[cfg(test)]
+std::thread_local! {
+    static TEST_ASSOCIATED_HIERARCHY: std::cell::Cell<bool> =
+        const { std::cell::Cell::new(false) };
+}
+
+#[cfg(test)]
+struct TestAssociatedHierarchy(bool);
+
+#[cfg(test)]
+impl TestAssociatedHierarchy {
+    fn enable() -> Self {
+        Self(TEST_ASSOCIATED_HIERARCHY.with(|value| value.replace(true)))
+    }
+}
+
+#[cfg(test)]
+impl Drop for TestAssociatedHierarchy {
+    fn drop(&mut self) {
+        TEST_ASSOCIATED_HIERARCHY.with(|value| value.set(self.0));
+    }
+}
 
 fn integer_hierarchy_enabled() -> bool {
     #[cfg(test)]
@@ -718,6 +986,420 @@ impl<'tcx> Engine<'tcx> {
         Ok(())
     }
 
+    fn mutable_hierarchy_associated_type_work(
+        &self,
+        original: Ty<'tcx>,
+        depth: usize,
+        work: &mut usize,
+    ) -> Result<(), String> {
+        *work = work.saturating_add(1);
+        if depth >= MAX_INPUT_DEPTH || *work > MAX_INPUT_VALUES {
+            return Err(self.categorized_error(
+                UnknownCategory::ResourceLimit,
+                "associated original type exceeds existing depth/work budget".into(),
+            ));
+        }
+        match original.kind() {
+            ty::Bool | ty::Char | ty::Int(_) | ty::Uint(_) | ty::Float(_) | ty::Str | ty::Never => {
+                Ok(())
+            }
+            ty::Ref(_, inner, _) | ty::Slice(inner) | ty::RawPtr(inner, _) => {
+                self.mutable_hierarchy_associated_type_work(*inner, depth + 1, work)
+            }
+            ty::Array(inner, count) => {
+                *work = work.saturating_add(1);
+                if *work > MAX_INPUT_VALUES {
+                    return Err(self.categorized_error(
+                        UnknownCategory::ResourceLimit,
+                        "associated original array exceeds existing work budget".into(),
+                    ));
+                }
+                // This accessor only reads an already-literal value; it performs no evaluation.
+                if count.try_to_target_usize(self.tcx).is_none() {
+                    return Err("associated original array extent is not literal".into());
+                }
+                self.mutable_hierarchy_associated_type_work(*inner, depth + 1, work)
+            }
+            ty::Tuple(fields) => {
+                for field in fields.iter() {
+                    self.mutable_hierarchy_associated_type_work(field, depth + 1, work)?;
+                }
+                Ok(())
+            }
+            ty::Adt(_, args) => {
+                self.mutable_hierarchy_associated_argument_work(args, depth + 1, work)
+            }
+            ty::FnDef(_, args) => {
+                self.mutable_hierarchy_associated_argument_work(args.skip_binder(), depth + 1, work)
+            }
+            _ => Err("associated original generic type grammar is unsupported".into()),
+        }
+    }
+
+    fn mutable_hierarchy_associated_argument_work(
+        &self,
+        arguments: ty::GenericArgsRef<'tcx>,
+        depth: usize,
+        work: &mut usize,
+    ) -> Result<(), String> {
+        for argument in arguments.iter() {
+            *work = work.saturating_add(1);
+            if depth >= MAX_INPUT_DEPTH || *work > MAX_INPUT_VALUES {
+                return Err(self.categorized_error(
+                    UnknownCategory::ResourceLimit,
+                    "associated arguments exceed existing depth/work budget".into(),
+                ));
+            }
+            match argument.kind() {
+                ty::GenericArgKind::Type(original) => {
+                    self.mutable_hierarchy_associated_type_work(original, depth, work)?;
+                }
+                ty::GenericArgKind::Lifetime(_) => {}
+                ty::GenericArgKind::Const(_) => {
+                    return Err("associated original const argument is unsupported".into());
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn mutable_hierarchy_associated_signature_type_work(
+        &self,
+        original: Ty<'tcx>,
+        arguments: ty::GenericArgsRef<'tcx>,
+        depth: usize,
+        work: &mut usize,
+    ) -> Result<(), String> {
+        *work = work.saturating_add(1);
+        if depth >= MAX_INPUT_DEPTH || *work > MAX_INPUT_VALUES {
+            return Err(self.categorized_error(
+                UnknownCategory::ResourceLimit,
+                "associated raw signature exceeds existing depth/work budget".into(),
+            ));
+        }
+        match original.kind() {
+            ty::Bool | ty::Char | ty::Int(_) | ty::Uint(_) | ty::Float(_) | ty::Never => Ok(()),
+            ty::Ref(_, inner, _) | ty::Slice(inner) => self
+                .mutable_hierarchy_associated_signature_type_work(
+                    *inner,
+                    arguments,
+                    depth + 1,
+                    work,
+                ),
+            ty::Tuple(fields) => {
+                if fields.len() > MAX_INPUT_VALUES.saturating_sub(*work) {
+                    return Err(self.categorized_error(
+                        UnknownCategory::ResourceLimit,
+                        "associated raw signature fields exceed existing budget".into(),
+                    ));
+                }
+                for field in fields.iter() {
+                    self.mutable_hierarchy_associated_signature_type_work(
+                        field,
+                        arguments,
+                        depth + 1,
+                        work,
+                    )?;
+                }
+                Ok(())
+            }
+            ty::Param(parameter) => {
+                let Some(argument) = arguments.get(parameter.index as usize) else {
+                    return Err(self.categorized_error(
+                        UnknownCategory::Semantics,
+                        "associated raw signature Param lacks original argument".into(),
+                    ));
+                };
+                let ty::GenericArgKind::Type(substituted) = argument.kind() else {
+                    return Err(self.categorized_error(
+                        UnknownCategory::Semantics,
+                        "associated raw signature Param argument is not a Type".into(),
+                    ));
+                };
+                self.mutable_hierarchy_associated_signature_type_work(
+                    substituted,
+                    arguments,
+                    depth + 1,
+                    work,
+                )
+            }
+            _ => Err(self.categorized_error(
+                UnknownCategory::Semantics,
+                "associated raw signature type grammar is unsupported".into(),
+            )),
+        }
+    }
+
+    fn mutable_hierarchy_associated_signature_work(
+        &self,
+        definition: DefId,
+        arguments: ty::GenericArgsRef<'tcx>,
+        work: &mut usize,
+    ) -> Result<(), String> {
+        if self.tcx.def_kind(definition) != DefKind::AssocFn
+            || self.tcx.associated_item(definition).is_method()
+        {
+            return Err("associated raw signature requires static AssocFn".into());
+        }
+        // Identity access borrows the raw signature. It applies neither generic substitution
+        // nor normalization.
+        let signature = self
+            .tcx
+            .fn_sig(definition)
+            .instantiate_identity()
+            .skip_binder();
+        if signature.inputs().len() > MAX_INPUT_VALUES.saturating_sub(*work) {
+            return Err(self.categorized_error(
+                UnknownCategory::ResourceLimit,
+                "associated raw signature input count exceeds existing budget".into(),
+            ));
+        }
+        for original in signature.inputs() {
+            self.mutable_hierarchy_associated_signature_type_work(*original, arguments, 0, work)?;
+        }
+        self.mutable_hierarchy_associated_signature_type_work(
+            signature.output(),
+            arguments,
+            0,
+            work,
+        )
+    }
+
+    fn mutable_hierarchy_associated_borrowed_body(
+        &self,
+        instance: ty::Instance<'tcx>,
+        body: &Body<'tcx>,
+    ) -> Result<(), String> {
+        let mut work = 0;
+        self.mutable_hierarchy_associated_argument_work(instance.args, 0, &mut work)?;
+        self.mutable_hierarchy_associated_signature_work(
+            instance.def_id(),
+            instance.args,
+            &mut work,
+        )?;
+        self.mutable_hierarchy_associated_borrowed_body_work(instance, body, &mut work)
+    }
+
+    fn mutable_hierarchy_associated_borrowed_body_work(
+        &self,
+        instance: ty::Instance<'tcx>,
+        body: &Body<'tcx>,
+        work: &mut usize,
+    ) -> Result<(), String> {
+        if body.source.instance != instance.def
+            || body.source.def_id() != instance.def_id()
+            || body.source.promoted.is_some()
+        {
+            return Err("associated borrowed Body provenance differs".into());
+        }
+        self.mutable_u16_body_budget(body)?;
+        let mut inventory = AssociatedBodyWork {
+            engine: self,
+            arguments: instance.args,
+            locals: body.local_decls.len(),
+            work: *work,
+            error: None,
+        };
+        inventory.generic_arguments(instance.args, 0)?;
+        inventory.charge(
+            body.local_decls
+                .len()
+                .saturating_add(body.basic_blocks.len()),
+        )?;
+        inventory.charge(
+            body.source_scopes
+                .len()
+                .saturating_add(body.var_debug_info.len()),
+        )?;
+        if !body.user_type_annotations.is_empty()
+            || body.coverage_early_info.is_some()
+            || body.coverage_mir_info.is_some()
+            || body
+                .var_debug_info
+                .iter()
+                .any(|info| info.composite.is_some())
+            || body.local_decls.iter().any(|local| local.user_ty.is_some())
+        {
+            return Err("associated borrowed auxiliary Body grammar is unsupported".into());
+        }
+        if let Some(constants) = &body.required_consts {
+            inventory.charge(constants.len())?;
+        }
+        if let Some(items) = &body.mentioned_items {
+            inventory.charge(items.len())?;
+            for item in items {
+                match item.node {
+                    rustc_middle::mir::MentionedItem::Fn(original)
+                    | rustc_middle::mir::MentionedItem::Drop(original)
+                    | rustc_middle::mir::MentionedItem::Closure(original) => {
+                        inventory.original_type(original, 0)?;
+                    }
+                    rustc_middle::mir::MentionedItem::UnsizeCast {
+                        source_ty,
+                        target_ty,
+                    } => {
+                        inventory.original_type(source_ty, 0)?;
+                        inventory.original_type(target_ty, 0)?;
+                    }
+                }
+            }
+        }
+        for block in body.basic_blocks.iter() {
+            inventory.charge(block.statements.len().saturating_add(1))?;
+        }
+        for scope in body.source_scopes.iter() {
+            if let Some((instance, _)) = scope.inlined {
+                inventory.generic_arguments(instance.args, 0)?;
+            }
+        }
+        for local in body.local_decls.iter() {
+            if let rustc_middle::mir::ClearCrossCrate::Set(info) = &local.local_info
+                && let rustc_middle::mir::LocalInfo::User(rustc_middle::mir::BindingForm::Var(
+                    binding,
+                )) = info.as_ref()
+            {
+                inventory.charge(binding.introductions.len())?;
+                if let Some((Some(place), _)) = binding.opt_match_place {
+                    inventory.visit_place(
+                        &place,
+                        PlaceContext::NonMutatingUse(
+                            rustc_middle::mir::visit::NonMutatingUseContext::Inspect,
+                        ),
+                        rustc_middle::mir::Location::START,
+                    );
+                    if let Some(error) = inventory.error.take() {
+                        return Err(error);
+                    }
+                }
+            }
+        }
+        inventory.visit_body(body);
+        *work = inventory.work;
+        inventory.error.map_or(Ok(()), Err)
+    }
+
+    fn mutable_hierarchy_associated_preflight(
+        &self,
+        instance: ty::Instance<'tcx>,
+        work: &mut usize,
+    ) -> Result<(), String> {
+        if !matches!(instance.def, ty::InstanceKind::Item(_))
+            || self.tcx.def_kind(instance.def_id()) != DefKind::AssocFn
+            || !instance.def_id().is_local()
+            || self.tcx.associated_item(instance.def_id()).is_method()
+        {
+            return Err("associated hierarchy requires a local static Item".into());
+        }
+        if !self.tcx.is_mir_available(instance.def_id()) {
+            return Err(self.missing_body_reason(instance.def_id()));
+        }
+        // Inspect immutable compiler metadata before instantiation can clone the selected body.
+        let original = self.tcx.instance_mir(instance.def);
+        if original.source.instance != instance.def
+            || original.source.promoted.is_some()
+            || original.coroutine.is_some()
+        {
+            return Err("associated hierarchy original Body provenance differs".into());
+        }
+        self.mutable_hierarchy_associated_borrowed_body_work(instance, original, work)?;
+        if let Some(cached) = self.bodies.borrow().get(&instance) {
+            self.mutable_hierarchy_associated_borrowed_body_work(instance, cached, work)?;
+        }
+        Ok(())
+    }
+
+    // This branch authenticates compiler identity only; it never issues a lease.
+    fn mutable_hierarchy_associated_identity(
+        &self,
+        original: Ty<'tcx>,
+        instance: ty::Instance<'tcx>,
+    ) -> Result<bool, String> {
+        if !associated_hierarchy_enabled() {
+            return Ok(false);
+        }
+        let ty::FnDef(definition, arguments) = original.kind() else {
+            return Ok(false);
+        };
+        if self.tcx.def_kind(*definition) != DefKind::AssocFn
+            || !matches!(instance.def, ty::InstanceKind::Item(_))
+            || self.tcx.def_kind(instance.def_id()) != DefKind::AssocFn
+            || !instance.def_id().is_local()
+        {
+            return Ok(false);
+        }
+        if self.tcx.associated_item(*definition).is_method()
+            || self.tcx.associated_item(instance.def_id()).is_method()
+        {
+            return Ok(false);
+        }
+        if arguments.skip_binder().len() > MAX_INPUT_VALUES
+            || instance.args.len() > MAX_INPUT_VALUES
+        {
+            return Err(self.categorized_error(
+                UnknownCategory::ResourceLimit,
+                "associated hierarchy arguments exceed existing budget".into(),
+            ));
+        }
+        let mut work = 0;
+        self.mutable_hierarchy_associated_argument_work(arguments.skip_binder(), 0, &mut work)?;
+        self.mutable_hierarchy_associated_argument_work(instance.args, 0, &mut work)?;
+        self.mutable_hierarchy_associated_signature_work(
+            *definition,
+            arguments.skip_binder(),
+            &mut work,
+        )?;
+        self.mutable_hierarchy_associated_signature_work(
+            instance.def_id(),
+            instance.args,
+            &mut work,
+        )?;
+        if self.resolve_function_item(*definition, arguments.skip_binder())? != instance {
+            return Ok(false);
+        }
+        self.mutable_hierarchy_associated_preflight(instance, &mut work)?;
+        let original_signature = self
+            .tcx
+            .try_normalize_erasing_regions(
+                ty::TypingEnv::fully_monomorphized(),
+                self.tcx
+                    .fn_sig(*definition)
+                    .instantiate(self.tcx, arguments.skip_binder()),
+            )
+            .map_err(|error| format!("associated original signature normalization: {error:?}"))?;
+        let original_signature = self
+            .tcx
+            .instantiate_bound_regions_with_erased(original_signature);
+        let selected_signature = self
+            .tcx
+            .instantiate_bound_regions_with_erased(self.call_poly_signature(instance)?);
+        Ok(original_signature == selected_signature
+            && original_signature.safety() == rustc_hir::Safety::Safe
+            && original_signature.abi() == rustc_abi::ExternAbi::Rust
+            && !original_signature.c_variadic())
+    }
+
+    fn mutable_hierarchy_associated_body(
+        &self,
+        instance: ty::Instance<'tcx>,
+        selected: &Body<'tcx>,
+    ) -> Result<(), String> {
+        if self.tcx.def_kind(instance.def_id()) != DefKind::AssocFn {
+            return Ok(());
+        }
+        if !associated_hierarchy_enabled()
+            || !instance.def_id().is_local()
+            || self.tcx.associated_item(instance.def_id()).is_method()
+            || !self.tcx.is_mir_available(instance.def_id())
+            || selected.source.instance != instance.def
+            || selected.source.def_id() != instance.def_id()
+            || selected.source.promoted.is_some()
+            || selected.coroutine.is_some()
+        {
+            return Err("associated hierarchy selected Body provenance differs".into());
+        }
+        self.mutable_hierarchy_associated_borrowed_body(instance, selected)
+    }
+
     fn mutable_hierarchy_route(
         &mut self,
         state: &State,
@@ -820,7 +1502,14 @@ impl<'tcx> Engine<'tcx> {
         else {
             return Ok(false);
         };
-        if *definition != call.instance.def_id()
+        if self.tcx.def_kind(*definition) == DefKind::AssocFn {
+            if !self.mutable_hierarchy_associated_identity(
+                func.ty(&call.body.local_decls, self.tcx),
+                call.instance,
+            )? {
+                return Ok(false);
+            }
+        } else if *definition != call.instance.def_id()
             || self.resolve_function_item(*definition, generic.skip_binder())? != call.instance
         {
             return Ok(false);
@@ -851,6 +1540,7 @@ impl<'tcx> Engine<'tcx> {
             return Ok(false);
         }
         let selected = self.instantiated_body(call.instance)?;
+        self.mutable_hierarchy_associated_body(call.instance, &selected)?;
         self.mutable_hierarchy_selector(&selected, position + 1)
     }
 
@@ -877,9 +1567,23 @@ impl<'tcx> Engine<'tcx> {
         float_original: Option<Ty<'tcx>>,
     ) -> Result<Option<ty::FnSig<'tcx>>, String> {
         if !matches!(instance.def, ty::InstanceKind::Item(_))
-            || self.tcx.def_kind(instance.def_id()) != DefKind::Fn
+            || !(self.tcx.def_kind(instance.def_id()) == DefKind::Fn
+                || (associated_hierarchy_enabled()
+                    && instance.def_id().is_local()
+                    && self.tcx.def_kind(instance.def_id()) == DefKind::AssocFn
+                    && !self.tcx.associated_item(instance.def_id()).is_method()))
         {
             return Ok(None);
+        }
+        if self.tcx.def_kind(instance.def_id()) == DefKind::AssocFn {
+            let mut work = 0;
+            self.mutable_hierarchy_associated_argument_work(instance.args, 0, &mut work)?;
+            self.mutable_hierarchy_associated_signature_work(
+                instance.def_id(),
+                instance.args,
+                &mut work,
+            )?;
+            self.mutable_hierarchy_associated_preflight(instance, &mut work)?;
         }
         let signature = self
             .tcx
@@ -929,10 +1633,14 @@ impl<'tcx> Engine<'tcx> {
             || args.len() != original_args.len()
             || destination != *original_destination
             || target != *original_target
-            || !matches!(func.ty(&body.local_decls, self.tcx).kind(), ty::FnDef(d, _)
+            || !(matches!(func.ty(&body.local_decls, self.tcx).kind(), ty::FnDef(d, _)
                 if *d == instance.def_id())
-            || !matches!(instance.def, ty::InstanceKind::Item(_))
-            || self.tcx.def_kind(instance.def_id()) != DefKind::Fn
+                && matches!(instance.def, ty::InstanceKind::Item(_))
+                && self.tcx.def_kind(instance.def_id()) == DefKind::Fn
+                || self.mutable_hierarchy_associated_identity(
+                    func.ty(&body.local_decls, self.tcx),
+                    instance,
+                )?)
             || !matches!(unwind, rustc_middle::mir::UnwindAction::Unreachable)
             || target.is_none()
             || !destination.projection.is_empty()
@@ -946,6 +1654,12 @@ impl<'tcx> Engine<'tcx> {
         };
         if self.resolve_function_item(*definition, actual_args.skip_binder())? != instance {
             return Err("hierarchy selected Instance differs from original Call".into());
+        }
+        if self.tcx.def_kind(*definition) == DefKind::AssocFn
+            && (site.0 != body.source.def_id()
+                || site.1 != body.basic_blocks[block].terminator().source_info.span)
+        {
+            return Err("associated hierarchy Call occurrence differs".into());
         }
         let signature = self
             .tcx
@@ -961,6 +1675,28 @@ impl<'tcx> Engine<'tcx> {
             || destination.ty(&body.local_decls, self.tcx).ty != signature.output()
         {
             return Err("hierarchy requires synchronous primitive-return Rust Item".into());
+        }
+        if self.tcx.def_kind(*definition) == DefKind::AssocFn {
+            for (operand, original) in args.iter().zip(signature.inputs()) {
+                if self
+                    .tcx
+                    .erase_and_anonymize_regions(operand.node.ty(&body.local_decls, self.tcx))
+                    != *original
+                {
+                    return Err("associated hierarchy original operand type differs".into());
+                }
+                if self.mutable_hierarchy_primitive_for(*original, float_original)
+                    && let Operand::Copy(place) | Operand::Move(place) = operand.node
+                {
+                    self.mutable_hierarchy_dormant_operand(
+                        body,
+                        state,
+                        place,
+                        *original,
+                        float_original,
+                    )?;
+                }
+            }
         }
         let mut source = None;
         for (position, arg) in args.iter().enumerate() {
@@ -1006,6 +1742,7 @@ impl<'tcx> Engine<'tcx> {
             }
         }
         let selected = self.instantiated_body(instance)?;
+        self.mutable_hierarchy_associated_body(instance, &selected)?;
         self.mutable_u16_body_budget(&selected)?;
         if selected.arg_count != args.len()
             || selected.return_ty() != signature.output()
@@ -1384,6 +2121,14 @@ impl<'tcx> Engine<'tcx> {
                 continue;
             };
             let instance = self.resolve_function_item(*definition, generic.skip_binder())?;
+            if self.tcx.def_kind(*definition) == DefKind::AssocFn
+                && !self.mutable_hierarchy_associated_identity(
+                    func.ty(&selected.local_decls, self.tcx),
+                    instance,
+                )?
+            {
+                continue;
+            }
             let Some(signature) =
                 self.mutable_hierarchy_routing_signature(instance, args.len(), float_original)?
             else {
@@ -1988,7 +2733,11 @@ pub(super) fn compiler_element_boundary_probe<'tcx>(
         .unwrap()
         .unwrap();
     assert!(!results.is_empty());
-    let leaf_name = if is_bool {
+    let associated_char =
+        engine.tcx.item_name(root.source.def_id()).as_str() == "root_associated_char";
+    let leaf_name = if associated_char {
+        "AssociatedDomains::leaf_char"
+    } else if is_bool {
         "leaf_bool"
     } else if is_char {
         "leaf_char"
@@ -2006,13 +2755,12 @@ pub(super) fn compiler_element_boundary_probe<'tcx>(
             .any(|entry| entry.function == leaf_name)
     );
     if is_char {
-        assert!(
-            engine
-                .proof
-                .body_entries
-                .iter()
-                .any(|entry| entry.function == "scalar_char")
-        );
+        assert!(engine.proof.body_entries.iter().any(|entry| entry.function
+            == if associated_char {
+                "AssociatedDomains::scalar_char"
+            } else {
+                "scalar_char"
+            }));
     }
     for result in results {
         let backing = engine.mutable_u16_backing(0, &result.memory).unwrap();
@@ -2029,7 +2777,7 @@ pub(super) fn compiler_element_boundary_probe<'tcx>(
             compiler_bool_return_probe(engine, root, block, source, &result);
         } else if is_char {
             compiler_char_return_probe(engine, root, block, source, &result);
-            compiler_char_scalar_probe(engine, &result);
+            compiler_char_scalar_probe(engine, &result, associated_char);
         }
     }
 }
@@ -2126,6 +2874,796 @@ fn compiler_bool_return_probe<'tcx>(
     denied.push(nonempty);
     denied.push(symbolic::not(&observed));
     assert!(!engine.feasible(&denied).unwrap());
+}
+
+#[cfg(test)]
+pub(super) fn compiler_associated_probe<'tcx>(
+    engine: &mut Engine<'tcx>,
+    root: &Rc<Body<'tcx>>,
+    output: &std::path::Path,
+) {
+    assert!(!TEST_ASSOCIATED_HIERARCHY.with(std::cell::Cell::get));
+    assert_eq!(associated_hierarchy_enabled(), ASSOCIATED_HIERARCHY_ENABLED);
+    let (block, data) = root
+        .basic_blocks
+        .iter_enumerated()
+        .find(|(_, data)| matches!(data.terminator().kind, TerminatorKind::Call { .. }))
+        .unwrap();
+    let TerminatorKind::Call {
+        func,
+        args,
+        destination,
+        target,
+        ..
+    } = &data.terminator().kind
+    else {
+        unreachable!()
+    };
+    let original = func.ty(&root.local_decls, engine.tcx);
+    let ty::FnDef(definition, generic) = original.kind() else {
+        unreachable!()
+    };
+    let instance = engine
+        .resolve_function_item(*definition, generic.skip_binder())
+        .unwrap();
+    let unused_const_root = engine
+        .tcx
+        .iter_local_def_id()
+        .find(|local| {
+            engine.tcx.def_kind(local.to_def_id()) == DefKind::Fn
+                && engine.tcx.item_name(local.to_def_id()).as_str() == "root_unused_const"
+        })
+        .unwrap()
+        .to_def_id();
+    let unused_body = engine
+        .tcx
+        .instance_mir(ty::InstanceKind::Item(unused_const_root));
+    let unused_func = unused_body
+        .basic_blocks
+        .iter()
+        .find_map(|block| {
+            if let TerminatorKind::Call { func, .. } = &block.terminator().kind {
+                Some(func)
+            } else {
+                None
+            }
+        })
+        .unwrap();
+    let unused_original = unused_func.ty(&unused_body.local_decls, engine.tcx);
+    let ty::FnDef(unused_definition, unused_arguments) = unused_original.kind() else {
+        unreachable!()
+    };
+    // The unchanged dispatcher can already resolve the item. The following check is route-local.
+    let unused_instance = engine
+        .resolve_function_item(*unused_definition, unused_arguments.skip_binder())
+        .unwrap();
+    let bodies_before = engine.bodies.borrow().len();
+    let signatures_before = engine.call_signatures.borrow().len();
+    assert!(
+        engine
+            .mutable_hierarchy_associated_identity(unused_original, unused_instance)
+            .unwrap_err()
+            .contains("const argument")
+    );
+    let nonliteral = ty::Const::new_param(
+        engine.tcx,
+        ty::ParamConst {
+            index: 0,
+            name: rustc_span::Symbol::intern("N"),
+        },
+    );
+    let array = Ty::new_array_with_const_len(engine.tcx, engine.tcx.types.u16, nonliteral);
+    let mut work = 0;
+    assert!(
+        engine
+            .mutable_hierarchy_associated_type_work(array, 0, &mut work)
+            .unwrap_err()
+            .contains("not literal")
+    );
+    assert_eq!(engine.bodies.borrow().len(), bodies_before);
+    assert_eq!(engine.call_signatures.borrow().len(), signatures_before);
+
+    let mut memory = Memory::default();
+    let mut conditions = Vec::new();
+    let value = engine
+        .mutable_u16_input(engine.tcx.types.u16, &mut memory, &mut conditions)
+        .unwrap();
+    let mut state = State {
+        locals: vec![None; root.local_decls.len()],
+        addresses: vec![None; root.local_decls.len()],
+        missing_places: Default::default(),
+        conditions,
+        memory,
+    };
+    state.locals[1] = Some(value);
+    for statement in &data.statements {
+        if let StatementKind::Assign(a) = &statement.kind
+            && matches!(a.1, Rvalue::Ref(_, BorrowKind::Mut { .. }, _))
+        {
+            assert!(
+                engine
+                    .mutable_u16_stage(root, &mut state, a.0, &a.1, &statement.kind)
+                    .unwrap()
+            );
+        }
+    }
+    let call = || super::mutable_u16_children::ChildCall {
+        body: root,
+        block,
+        instance,
+        args,
+        destination: *destination,
+        target: *target,
+        stack: &[],
+        site: (root.source.def_id(), data.terminator().source_info.span),
+    };
+    if !ASSOCIATED_HIERARCHY_ENABLED {
+        assert!(!engine.mutable_hierarchy_route(&state, &call()).unwrap());
+    }
+    let _scope = TestAssociatedHierarchy::enable();
+    if engine.tcx.def_kind(instance.def_id()) == DefKind::AssocFn
+        && engine.tcx.associated_item(instance.def_id()).is_method()
+    {
+        assert!(
+            !engine
+                .mutable_hierarchy_associated_identity(original, instance)
+                .unwrap()
+        );
+        assert!(
+            engine
+                .mutable_hierarchy_routing_signature(instance, args.len(), None)
+                .unwrap()
+                .is_none()
+        );
+        assert!(!engine.mutable_hierarchy_route(&state, &call()).unwrap());
+        let data_before = state.memory.mutable_u16[0].data.clone();
+        assert!(
+            engine
+                .mutable_hierarchy_call(&mut state, call())
+                .unwrap()
+                .is_none()
+        );
+        assert_eq!(state.memory.mutable_u16[0].data, data_before);
+        assert!(state.memory.mutable_hierarchy.is_none());
+        return;
+    }
+    assert!(engine.mutable_hierarchy_route(&state, &call()).unwrap());
+    let named_static = |name: &str| {
+        engine
+            .tcx
+            .iter_local_def_id()
+            .map(|id| id.to_def_id())
+            .find(|id| {
+                engine.tcx.def_kind(*id) == DefKind::AssocFn
+                    && engine.tcx.item_name(*id).as_str() == name
+            })
+            .unwrap()
+    };
+    let no_args = engine.tcx.mk_args(&[]);
+    let deep_signature = named_static("signature_deep");
+    let deep_instance = ty::Instance {
+        def: ty::InstanceKind::Item(deep_signature),
+        args: no_args,
+    };
+    assert!(
+        engine
+            .call_signatures
+            .borrow()
+            .get(&deep_instance)
+            .is_none()
+    );
+    let mut work = 0;
+    assert!(
+        engine
+            .mutable_hierarchy_associated_signature_work(deep_signature, no_args, &mut work,)
+            .is_err()
+    );
+    assert!(
+        engine
+            .mutable_hierarchy_routing_signature(deep_instance, 1, None)
+            .is_err()
+    );
+    assert!(
+        engine
+            .call_signatures
+            .borrow()
+            .get(&deep_instance)
+            .is_none()
+    );
+    let wide_signature = named_static("signature_wide");
+    let mut work = 0;
+    engine
+        .mutable_hierarchy_associated_signature_work(wide_signature, no_args, &mut work)
+        .unwrap();
+    assert!(work > 255);
+    assert!(
+        engine
+            .mutable_hierarchy_associated_signature_work(wide_signature, no_args, &mut work,)
+            .is_err()
+    );
+    let wide_instance = ty::Instance {
+        def: ty::InstanceKind::Item(wide_signature),
+        args: no_args,
+    };
+    let wide_original = Ty::new_fn_def(engine.tcx, wide_signature, ty::Binder::dummy(no_args));
+    assert!(
+        engine
+            .mutable_hierarchy_associated_identity(wide_original, wide_instance)
+            .is_err()
+    );
+    assert!(
+        engine
+            .call_signatures
+            .borrow()
+            .get(&wide_instance)
+            .is_none()
+    );
+    let generic_signature = named_static("signature_generic");
+    let mut substituted = engine.tcx.types.u16;
+    for _ in 0..14 {
+        substituted = Ty::new_imm_ref(engine.tcx, engine.tcx.lifetimes.re_erased, substituted);
+    }
+    let generic_args = engine.tcx.mk_args(&[substituted.into()]);
+    let mut work = 0;
+    engine
+        .mutable_hierarchy_associated_argument_work(generic_args, 0, &mut work)
+        .unwrap();
+    assert!(engine.mutable_hierarchy_associated_signature_work(
+        generic_signature, generic_args, &mut work,
+    ).is_err());
+    assert!(
+        engine
+            .mutable_hierarchy_associated_signature_work(generic_signature, no_args, &mut 0,)
+            .is_err()
+    );
+    let wrong_kind = engine.tcx.mk_args(&[engine.tcx.lifetimes.re_erased.into()]);
+    assert!(
+        engine
+            .mutable_hierarchy_associated_signature_work(generic_signature, wrong_kind, &mut 0,)
+            .is_err()
+    );
+    let raw_signature = engine
+        .tcx
+        .fn_sig(generic_signature)
+        .instantiate_identity()
+        .skip_binder();
+    let ty::Ref(_, inner, _) = raw_signature.inputs()[0].kind() else {
+        unreachable!()
+    };
+    let ty::Ref(_, parameter, _) = inner.kind() else {
+        unreachable!()
+    };
+    let recursive_args = engine.tcx.mk_args(&[(*parameter).into()]);
+    assert!(
+        engine
+            .mutable_hierarchy_associated_signature_work(generic_signature, recursive_args, &mut 0,)
+            .is_err()
+    );
+    let alias_signature = engine
+        .tcx
+        .iter_local_def_id()
+        .map(|id| id.to_def_id())
+        .find(|id| {
+            engine.tcx.def_kind(*id) == DefKind::AssocFn
+                && engine.tcx.item_name(*id).as_str() == "signature_alias"
+                && engine.tcx.def_kind(engine.tcx.parent(*id)) == DefKind::Trait
+        })
+        .unwrap();
+    assert!(
+        engine
+            .mutable_hierarchy_associated_signature_work(alias_signature, no_args, &mut 0,)
+            .is_err()
+    );
+    assert!(
+        engine
+            .call_signatures
+            .borrow()
+            .keys()
+            .all(|instance| instance.def_id() != generic_signature
+                && instance.def_id() != alias_signature)
+    );
+    let reason = engine
+        .mutable_hierarchy_associated_signature_work(deep_signature, no_args, &mut 0)
+        .unwrap_err();
+    assert_eq!(
+        engine.unknown_causes.borrow().get(&reason),
+        Some(&UnknownCategory::ResourceLimit),
+    );
+    let mut work = 0;
+    engine
+        .mutable_hierarchy_associated_signature_work(wide_signature, no_args, &mut work)
+        .unwrap();
+    let reason = engine
+        .mutable_hierarchy_associated_signature_work(wide_signature, no_args, &mut work)
+        .unwrap_err();
+    assert_eq!(
+        engine.unknown_causes.borrow().get(&reason),
+        Some(&UnknownCategory::ResourceLimit),
+    );
+    for (definition, arguments) in [
+        (generic_signature, no_args),
+        (generic_signature, wrong_kind),
+        (alias_signature, no_args),
+    ] {
+        let reason = engine
+            .mutable_hierarchy_associated_signature_work(definition, arguments, &mut 0)
+            .unwrap_err();
+        assert_eq!(
+            engine.unknown_causes.borrow().get(&reason),
+            Some(&UnknownCategory::Semantics),
+        );
+    }
+    let closure = engine
+        .tcx
+        .iter_local_def_id()
+        .find(|local| {
+            engine.tcx.def_kind(local.to_def_id()) == DefKind::Closure
+                && engine.tcx.coroutine_kind(local.to_def_id()).is_none()
+        })
+        .unwrap()
+        .to_def_id();
+    let closure_instance = ty::Instance {
+        def: ty::InstanceKind::Item(closure),
+        args: engine.tcx.mk_args(&[]),
+    };
+    assert!(
+        engine
+            .mutable_hierarchy_routing_signature(closure_instance, 0, None)
+            .unwrap()
+            .is_none()
+    );
+    let closure_original = Ty::new_fn_def(
+        engine.tcx,
+        closure,
+        ty::Binder::dummy(engine.tcx.mk_args(&[])),
+    );
+    assert!(
+        !engine
+            .mutable_hierarchy_associated_identity(closure_original, closure_instance)
+            .unwrap()
+    );
+    if engine.tcx.def_kind(*definition) == DefKind::AssocFn {
+        assert!(
+            engine
+                .mutable_hierarchy_associated_identity(original, instance)
+                .unwrap()
+        );
+        let wrong = ty::Instance {
+            def: ty::InstanceKind::Item(root.source.def_id()),
+            args: engine.tcx.mk_args(&[]),
+        };
+        assert!(
+            !engine
+                .mutable_hierarchy_associated_identity(original, wrong)
+                .unwrap()
+        );
+        if !instance.args.is_empty() {
+            let wrong_arguments = ty::Instance {
+                def: instance.def,
+                args: engine.tcx.mk_args(&[engine.tcx.types.u16.into()]),
+            };
+            assert!(
+                !engine
+                    .mutable_hierarchy_associated_identity(original, wrong_arguments)
+                    .unwrap()
+            );
+        }
+        let selected_signature = engine.call_poly_signature(instance).unwrap();
+        engine.call_signatures.borrow_mut().insert(
+            instance,
+            selected_signature
+                .map_bound(|signature| signature.set_safety(rustc_hir::Safety::Unsafe)),
+        );
+        assert!(
+            !engine
+                .mutable_hierarchy_associated_identity(original, instance)
+                .unwrap()
+        );
+        engine
+            .call_signatures
+            .borrow_mut()
+            .insert(instance, selected_signature);
+        let mut deep = engine.tcx.types.u16;
+        for _ in 0..17 {
+            deep = Ty::new_slice(engine.tcx, deep);
+        }
+        let forged_original = Ty::new_fn_def(
+            engine.tcx,
+            *definition,
+            ty::Binder::dummy(engine.tcx.mk_args(&[deep.into()])),
+        );
+        assert!(
+            engine
+                .mutable_hierarchy_associated_identity(forged_original, instance)
+                .is_err()
+        );
+        let too_many = engine
+            .tcx
+            .mk_args_from_iter((0..513).map(|_| ty::GenericArg::from(engine.tcx.types.u16)));
+        let forged_original = Ty::new_fn_def(engine.tcx, *definition, ty::Binder::dummy(too_many));
+        assert!(
+            engine
+                .mutable_hierarchy_associated_identity(forged_original, instance)
+                .is_err()
+        );
+        let selected = engine.instantiated_body(instance).unwrap();
+        // Hostile cached MIR is bounded before normalization, effect or cache publication.
+        let mut huge_aggregate = (*selected).clone();
+        let statement = huge_aggregate
+            .basic_blocks
+            .as_mut()
+            .iter_mut()
+            .flat_map(|block| &mut block.statements)
+            .find(|statement| matches!(statement.kind, StatementKind::Assign(_)))
+            .unwrap();
+        let StatementKind::Assign(assignment) = &mut statement.kind else {
+            unreachable!()
+        };
+        assignment.1 = Rvalue::Aggregate(
+            Box::new(rustc_middle::mir::AggregateKind::Tuple),
+            (0..513)
+                .map(|_| Operand::Copy(rustc_middle::mir::RETURN_PLACE.into()))
+                .collect(),
+        );
+        let error = engine
+            .mutable_hierarchy_associated_borrowed_body(instance, &huge_aggregate)
+            .unwrap_err();
+        assert!(error.contains("work budget"));
+        engine
+            .bodies
+            .borrow_mut()
+            .insert(instance, Rc::new(huge_aggregate));
+        assert!(engine.mutable_hierarchy_route(&state, &call()).is_err());
+        engine
+            .bodies
+            .borrow_mut()
+            .insert(instance, selected.clone());
+        let mut projection = (*selected).clone();
+        let statement = projection
+            .basic_blocks
+            .as_mut()
+            .iter_mut()
+            .flat_map(|block| &mut block.statements)
+            .find(|statement| matches!(statement.kind, StatementKind::Assign(_)))
+            .unwrap();
+        let StatementKind::Assign(assignment) = &mut statement.kind else {
+            unreachable!()
+        };
+        assignment.1 = Rvalue::Use(
+            Operand::Copy(Place {
+                local: rustc_middle::mir::RETURN_PLACE,
+                projection: engine.tcx.mk_place_elems(&[ProjectionElem::Deref; 17]),
+            }),
+            rustc_middle::mir::WithRetag::No,
+        );
+        assert!(
+            engine
+                .mutable_hierarchy_associated_borrowed_body(instance, &projection)
+                .unwrap_err()
+                .contains("depth budget")
+        );
+        let mut deep_original = engine.tcx.types.u16;
+        for _ in 0..17 {
+            deep_original = Ty::new_slice(engine.tcx, deep_original);
+        }
+        let mut unwrap = (*selected).clone();
+        let statement = unwrap
+            .basic_blocks
+            .as_mut()
+            .iter_mut()
+            .flat_map(|block| &mut block.statements)
+            .find(|statement| matches!(statement.kind, StatementKind::Assign(_)))
+            .unwrap();
+        let StatementKind::Assign(assignment) = &mut statement.kind else {
+            unreachable!()
+        };
+        assignment.1 = Rvalue::Use(
+            Operand::Copy(Place {
+                local: rustc_middle::mir::RETURN_PLACE,
+                projection: engine
+                    .tcx
+                    .mk_place_elems(&[PlaceElem::UnwrapUnsafeBinder(deep_original)]),
+            }),
+            rustc_middle::mir::WithRetag::No,
+        );
+        assert!(
+            engine
+                .mutable_hierarchy_associated_borrowed_body(instance, &unwrap)
+                .unwrap_err()
+                .contains("unsafe binder")
+        );
+        for count in [17, 513] {
+            let mut ascribe = (*selected).clone();
+            let mut statement = ascribe
+                .basic_blocks
+                .iter()
+                .flat_map(|block| &block.statements)
+                .next()
+                .unwrap()
+                .clone();
+            statement.kind = StatementKind::AscribeUserType(
+                Box::new((
+                    Place::from(rustc_middle::mir::RETURN_PLACE),
+                    rustc_middle::mir::UserTypeProjection {
+                        base: ty::UserTypeAnnotationIndex::from_usize(0),
+                        projs: vec![ProjectionElem::Deref; count],
+                    },
+                )),
+                ty::Variance::Invariant,
+            );
+            ascribe.basic_blocks.as_mut()[rustc_middle::mir::START_BLOCK]
+                .statements
+                .push(statement);
+            assert!(
+                engine
+                    .mutable_hierarchy_associated_borrowed_body(instance, &ascribe)
+                    .unwrap_err()
+                    .contains("budget")
+            );
+        }
+        let mut deep_local = (*selected).clone();
+        deep_local.local_decls[rustc_middle::mir::RETURN_PLACE].ty = deep_original;
+        assert!(
+            engine
+                .mutable_hierarchy_associated_borrowed_body(instance, &deep_local)
+                .unwrap_err()
+                .contains("depth budget")
+        );
+        let mut wide_local = (*selected).clone();
+        wide_local.local_decls[rustc_middle::mir::RETURN_PLACE].ty =
+            Ty::new_tup(engine.tcx, &vec![engine.tcx.types.u16; 513]);
+        assert!(
+            engine
+                .mutable_hierarchy_associated_borrowed_body(instance, &wide_local)
+                .unwrap_err()
+                .contains("work budget")
+        );
+        let mut function_operand = (*selected).clone();
+        let statement = function_operand
+            .basic_blocks
+            .as_mut()
+            .iter_mut()
+            .flat_map(|block| &mut block.statements)
+            .find(|statement| matches!(statement.kind, StatementKind::Assign(_)))
+            .unwrap();
+        let StatementKind::Assign(assignment) = &mut statement.kind else {
+            unreachable!()
+        };
+        assignment.1 = Rvalue::Use(
+            Operand::Constant(Box::new(rustc_middle::mir::ConstOperand {
+                span: rustc_span::DUMMY_SP,
+                user_ty: None,
+                const_: rustc_middle::mir::Const::Val(
+                    rustc_middle::mir::ConstValue::ZeroSized,
+                    Ty::new_fn_def(engine.tcx, *definition, ty::Binder::dummy(too_many)),
+                ),
+            })),
+            rustc_middle::mir::WithRetag::No,
+        );
+        assert!(
+            engine
+                .mutable_hierarchy_associated_borrowed_body(instance, &function_operand)
+                .unwrap_err()
+                .contains("work budget")
+        );
+        let bodies_before = engine.bodies.borrow().len();
+        let signatures_before = engine.call_signatures.borrow().len();
+        let mut introductions = (*selected).clone();
+        introductions.local_decls[rustc_middle::mir::RETURN_PLACE].local_info =
+            rustc_middle::mir::ClearCrossCrate::Set(Box::new(rustc_middle::mir::LocalInfo::User(
+                rustc_middle::mir::BindingForm::Var(rustc_middle::mir::VarBindingForm {
+                    binding_mode: rustc_hir::BindingMode::NONE,
+                    opt_ty_info: None,
+                    opt_match_place: None,
+                    pat_span: rustc_span::DUMMY_SP,
+                    introductions: (0..513)
+                        .map(|_| rustc_middle::mir::VarBindingIntroduction {
+                            span: rustc_span::DUMMY_SP,
+                            is_shorthand: false,
+                        })
+                        .collect(),
+                }),
+            )));
+        assert!(
+            engine
+                .mutable_hierarchy_associated_borrowed_body(instance, &introductions)
+                .unwrap_err()
+                .contains("work budget")
+        );
+        let mut array_kind = (*selected).clone();
+        let statement = array_kind
+            .basic_blocks
+            .as_mut()
+            .iter_mut()
+            .flat_map(|block| &mut block.statements)
+            .find(|statement| matches!(statement.kind, StatementKind::Assign(_)))
+            .unwrap();
+        let StatementKind::Assign(assignment) = &mut statement.kind else {
+            unreachable!()
+        };
+        assignment.1 = Rvalue::Aggregate(
+            Box::new(rustc_middle::mir::AggregateKind::Array(deep_original)),
+            std::iter::empty().collect(),
+        );
+        assert!(
+            engine
+                .mutable_hierarchy_associated_borrowed_body(instance, &array_kind)
+                .unwrap_err()
+                .contains("depth budget")
+        );
+        let mut mentioned = (*selected).clone();
+        mentioned.mentioned_items = Some(vec![rustc_span::Spanned {
+            node: rustc_middle::mir::MentionedItem::Fn(Ty::new_fn_def(
+                engine.tcx,
+                *definition,
+                ty::Binder::dummy(too_many),
+            )),
+            span: rustc_span::DUMMY_SP,
+        }]);
+        assert!(
+            engine
+                .mutable_hierarchy_associated_borrowed_body(instance, &mentioned)
+                .unwrap_err()
+                .contains("work budget")
+        );
+        assert_eq!(engine.bodies.borrow().len(), bodies_before);
+        assert_eq!(engine.call_signatures.borrow().len(), signatures_before);
+        let mut wrong_mapping = (*selected).clone();
+        wrong_mapping.local_decls[rustc_middle::mir::RETURN_PLACE].ty =
+            Ty::new_param(engine.tcx, 513, rustc_span::Symbol::intern("T"));
+        assert!(
+            engine
+                .mutable_hierarchy_associated_borrowed_body(instance, &wrong_mapping)
+                .unwrap_err()
+                .contains("Param mapping")
+        );
+        let mut forged = (*selected).clone();
+        forged.source.instance = wrong.def;
+        assert!(
+            engine
+                .mutable_hierarchy_associated_body(instance, &forged)
+                .is_err()
+        );
+        engine.bodies.borrow_mut().insert(instance, Rc::new(forged));
+        assert!(engine.mutable_hierarchy_route(&state, &call()).is_err());
+        let mut promoted = (*selected).clone();
+        promoted.source.promoted = Some(rustc_middle::mir::Promoted::from_usize(0));
+        assert!(
+            engine
+                .mutable_hierarchy_associated_body(instance, &promoted)
+                .is_err()
+        );
+        let coroutine = engine
+            .tcx
+            .iter_local_def_id()
+            .find(|local| engine.tcx.coroutine_kind(local.to_def_id()).is_some())
+            .unwrap()
+            .to_def_id();
+        let metadata = engine
+            .tcx
+            .instance_mir(ty::InstanceKind::Item(coroutine))
+            .coroutine
+            .clone()
+            .unwrap();
+        let mut coroutine_body = (*selected).clone();
+        coroutine_body.coroutine = Some(metadata);
+        assert!(
+            engine
+                .mutable_hierarchy_associated_body(instance, &coroutine_body)
+                .is_err()
+        );
+        let mut spread = (*selected).clone();
+        spread.spread_arg = Some(rustc_middle::mir::Local::from_usize(1));
+        assert!(
+            engine
+                .mutable_hierarchy_associated_body(instance, &spread)
+                .is_err()
+        );
+        engine.bodies.borrow_mut().insert(instance, selected);
+    }
+    let source = match args[0].node {
+        Operand::Copy(p) | Operand::Move(p) => p.local.as_usize(),
+        _ => unreachable!(),
+    };
+    let mut consumed = state.clone();
+    consumed.missing_places.consume(source, Vec::new()).unwrap();
+    assert!(!engine.mutable_hierarchy_route(&consumed, &call()).unwrap());
+    if engine.tcx.def_kind(*definition) == DefKind::AssocFn {
+        let mut wrong_site = call();
+        wrong_site.site.1 = rustc_span::DUMMY_SP;
+        let mut rejected = state.clone();
+        let data_before = rejected.memory.mutable_u16[0].data.clone();
+        assert!(
+            engine
+                .mutable_hierarchy_call(&mut rejected, wrong_site)
+                .is_err()
+        );
+        assert_eq!(rejected.memory.mutable_u16[0].data, data_before);
+        assert!(rejected.memory.mutable_hierarchy.is_none());
+        let copied_args = args.to_vec();
+        let mut copied_call = call();
+        copied_call.args = &copied_args;
+        assert!(!matches!(
+            engine.mutable_hierarchy_call(&mut rejected, copied_call),
+            Ok(Some(_))
+        ));
+        assert_eq!(rejected.memory.mutable_u16[0].data, data_before);
+        assert!(rejected.memory.mutable_hierarchy.is_none());
+        let duplicate_body = Rc::new((**root).clone());
+        let duplicate_data = &duplicate_body.basic_blocks[block];
+        let TerminatorKind::Call {
+            args: duplicate_args,
+            ..
+        } = &duplicate_data.terminator().kind
+        else {
+            unreachable!()
+        };
+        let mut duplicate_call = call();
+        duplicate_call.body = &duplicate_body;
+        duplicate_call.args = duplicate_args;
+        assert!(!matches!(
+            engine.mutable_hierarchy_route(&state, &duplicate_call),
+            Ok(true)
+        ));
+        assert_eq!(state.memory.mutable_u16[0].data, data_before);
+        assert!(state.memory.mutable_hierarchy.is_none());
+    }
+    let earlier_entries = std::mem::take(&mut engine.proof.body_entries);
+    let results = engine
+        .mutable_hierarchy_call(&mut state, call())
+        .unwrap()
+        .unwrap();
+    assert!(!results.is_empty());
+    for result in results {
+        engine.mutable_hierarchy_namespace(&result.memory).unwrap();
+        assert!(
+            result.memory.mutable_u16[0]
+                .hierarchy
+                .as_ref()
+                .unwrap()
+                .owners
+                .is_empty()
+        );
+    }
+    assert!(
+        engine
+            .proof
+            .body_entries
+            .iter()
+            .any(|entry| entry.function.contains("leaf"))
+    );
+    assert!(
+        engine
+            .proof
+            .body_entries
+            .iter()
+            .any(|entry| entry.function == engine.tcx.def_path_str(instance.def_id()))
+    );
+    let selected = engine.instantiated_body(instance).unwrap();
+    let label = engine
+        .tcx
+        .item_name(root.source.def_id())
+        .as_str()
+        .to_string();
+    std::fs::write(
+        output.join(format!("{label}-selected.mir")),
+        format!("{selected:#?}"),
+    )
+    .unwrap();
+    std::fs::write(
+        output.join(format!("{label}-selected.json")),
+        serde_json::to_string_pretty(&serde_json::json!({
+            "original": format!("{original:?}"),
+            "selected_instance": format!("{instance:?}"),
+            "selected_signature": format!("{:?}", engine.call_poly_signature(instance).unwrap()),
+            "original_definition": format!("{definition:?}"),
+            "selected_definition": format!("{:?}", instance.def_id()),
+            "entered_bodies": engine.proof.body_entries,
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+    engine.proof.body_entries.extend(earlier_entries);
 }
 
 #[cfg(test)]
@@ -2228,13 +3766,18 @@ fn compiler_char_return_probe<'tcx>(
 }
 
 #[cfg(test)]
-fn compiler_char_scalar_probe<'tcx>(engine: &mut Engine<'tcx>, result: &Return) {
+fn compiler_char_scalar_probe<'tcx>(engine: &mut Engine<'tcx>, result: &Return, associated: bool) {
+    let root_name = if associated {
+        "root_associated_scalar_char"
+    } else {
+        "root_scalar_char"
+    };
     let definition = engine
         .tcx
         .iter_local_def_id()
         .find(|d| {
             engine.tcx.def_kind(d.to_def_id()) == DefKind::Fn
-                && engine.tcx.item_name(d.to_def_id()).as_str() == "root_scalar_char"
+                && engine.tcx.item_name(d.to_def_id()).as_str() == root_name
         })
         .unwrap()
         .to_def_id();
@@ -3818,6 +5361,32 @@ mod tests {
         );
         assert!(!TEST_CHAR_HIERARCHY.with(std::cell::Cell::get));
         assert_eq!(char_hierarchy_enabled(), CHAR_HIERARCHY_ENABLED);
+    }
+
+    #[test]
+    fn scoped_associated_selection_restores_nested_and_panicking_tests() {
+        assert!(!TEST_ASSOCIATED_HIERARCHY.with(std::cell::Cell::get));
+        assert_eq!(associated_hierarchy_enabled(), ASSOCIATED_HIERARCHY_ENABLED);
+        {
+            let _outer = TestAssociatedHierarchy::enable();
+            assert!(TEST_ASSOCIATED_HIERARCHY.with(std::cell::Cell::get));
+            {
+                let _inner = TestAssociatedHierarchy::enable();
+                assert!(associated_hierarchy_enabled());
+            }
+            assert!(TEST_ASSOCIATED_HIERARCHY.with(std::cell::Cell::get));
+        }
+        assert!(!TEST_ASSOCIATED_HIERARCHY.with(std::cell::Cell::get));
+        assert!(
+            std::panic::catch_unwind(|| {
+                let _scope = TestAssociatedHierarchy::enable();
+                assert!(TEST_ASSOCIATED_HIERARCHY.with(std::cell::Cell::get));
+                panic!("test associated restoration");
+            })
+            .is_err()
+        );
+        assert!(!TEST_ASSOCIATED_HIERARCHY.with(std::cell::Cell::get));
+        assert_eq!(associated_hierarchy_enabled(), ASSOCIATED_HIERARCHY_ENABLED);
     }
 
     #[test]

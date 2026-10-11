@@ -163,3 +163,7 @@ Nested whole-slice helpers now support exact f32/f64 backing and scalar returns,
 NaN payloads and signed-zero bits. Wrong claims and actual helper mutations refute; missing bodies
 and deeper nesting remain UNKNOWN. The validated capability suite covers 230 cases across
 78 families. See [coverage and evidence](docs/rust-capabilities.md).
+
+Stage212's isolated local static associated hierarchy checkpoint preserves the committed Stage211
+baseline and appends three measured controls. Its proposed 233-case/79-family manifest remains
+pending full surveys and ROOT validation; scoped evidence is recorded in the capability documents.

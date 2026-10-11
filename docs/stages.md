@@ -6146,3 +6146,49 @@ Evidence is under /tmp/miren-stage211-root-corrected-full-checks,
 /tmp/miren-stage211-root-corrected-survey, /tmp/miren-stage211-root-corrected-replay and
 /tmp/miren-stage211-root-corrected-native. A final docs-only closure preserves all 923 other
 validated source files. These are capability cases, not full Rust parity or firmware coverage.
+
+## Stage212 local static associated hierarchy
+
+Local static associated calls now correlate original function arguments and normalized safe
+signatures with the complete selected local instance. Receiver methods, virtual dispatch and
+nonlocal associated bodies remain unsupported. Existing Bool, Char and Float validity and return
+protocols remain in force; compiler controls exercise the shared Char and Float validators.
+
+Borrowed original and selected arguments and raw signatures are bounded before this route's
+re-resolution. Original and cached body inventories are bounded after that resolution, before
+subsequent signature normalization and body cloning. The earlier dispatcher resolution is
+unchanged. Unsupported aliases, constant substitutions and unsafe-binder projections refuse
+conservatively. The shared preflight limits remain 512 work units and depth 16; publication
+validation is a separate bounded pass, not a total engine cost bound.
+
+Fresh 13-root measurements give five proved, five refuted and three unknown per profile. An actual
+xor-zero to xor-one helper mutation refutes selected claims with unchanged assertions. Eight fresh
+dependency archives retain body checks for empty callers: retained O0 selected and empty calls
+prove; retained O2 empty calls prove while selected calls stop at direct element stores. Omitted
+bodies remain unknown. No missing-body shortcut or new assumption is introduced.
+
+Four completed host/ARM O0/O2 surveys each cover 233 cases across 79 families: 96 proved, 81 refuted
+and 56 unknown. All 230 parent entries remain intact. Required ROOT validation passed 22 checks,
+including 847 workspace Rust tests, 68 Python tests, lint, release builds, dependency policy and
+manual hooks. Eight fresh native runs execute one test each: four originals pass and four actual
+helper mutants fail. Finite native inputs do not constrain symbolic analysis.
+
+Fresh ROOT comparisons bind the committed Stage211 release to the Stage212 debug build, then that
+debug build to release. Each phase compares 6,952 proof objects. The parent comparison preserves
+6,826 literal complete objects, records 120 named changes and six narrowly checked fold deadline
+contexts, preserves all 12,284 baseline queries/models, and records 12,490 current queries/models.
+The debug/release comparison preserves 6,947 literal complete objects and all 12,490 queries/models,
+with five deadline contexts. UNKNOWN partial queries are included. This validates the parent to
+release transitively; it does not claim two direct parent captures.
+
+Separate comparisons of existing owner captures with ROOT captures allow only explicit,
+byte-equivalent source-path associations. They preserve 6,947 and 6,946 complete objects after
+those associations, respectively; no complete object is literally equal across working directories.
+All 12,490 queries/models remain exact in both comparisons. Each additional wrapping-add stopping
+frame has its own fresh, hash-bound pair review; this creates no general timeout exception.
+
+Evidence is under /tmp/miren-stage212-root-full-checks, /tmp/miren-stage212-root-survey,
+/tmp/miren-stage212-root-replay, /tmp/miren-stage212-root-owner-continuation and
+/tmp/miren-stage212-root-final-data. Final documentation closure changes only these three coverage
+records, preserving the other 929 validated source files and historical captures. These are
+capability cases, not full Rust parity or firmware coverage.

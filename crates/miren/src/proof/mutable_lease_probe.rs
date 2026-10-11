@@ -833,6 +833,20 @@ fn compiler_cases<'tcx>(tcx: TyCtxt<'tcx>, output: &std::path::Path) {
         )
         .unwrap();
     }
+    for name in [
+        "root_associated",
+        "root_trait",
+        "root_default",
+        "root_generic",
+        "root_receiver",
+    ] {
+        let instance = engine
+            .resolve_function_item(find(name), tcx.mk_args(&[]))
+            .unwrap();
+        let body = engine.instantiated_body(instance).unwrap();
+        super::mutable_hierarchy::compiler_associated_probe(&mut engine, &body, output);
+        std::fs::write(output.join(format!("{name}.mir")), format!("{body:#?}")).unwrap();
+    }
     for name in ["root_len", "outer_len", "leaf_len", "scalar"] {
         let instance = engine
             .resolve_function_item(find(name), tcx.mk_args(&[]))
@@ -849,6 +863,7 @@ fn compiler_cases<'tcx>(tcx: TyCtxt<'tcx>, output: &std::path::Path) {
         ("root_usize", tcx.types.usize, tcx.types.u64),
         ("root_bool", tcx.types.bool, tcx.types.char),
         ("root_char", tcx.types.char, tcx.types.u32),
+        ("root_associated_char", tcx.types.char, tcx.types.u32),
     ] {
         let instance = engine
             .resolve_function_item(find(name), tcx.mk_args(&[]))
@@ -880,7 +895,11 @@ fn compiler_cases<'tcx>(tcx: TyCtxt<'tcx>, output: &std::path::Path) {
         )
         .unwrap();
     }
-    for (name, original) in [("root_f32", tcx.types.f32), ("root_f64", tcx.types.f64)] {
+    for (name, original) in [
+        ("root_f32", tcx.types.f32),
+        ("root_f64", tcx.types.f64),
+        ("root_associated_f32", tcx.types.f32),
+    ] {
         let instance = engine
             .resolve_function_item(find(name), tcx.mk_args(&[]))
             .unwrap();
@@ -1375,11 +1394,11 @@ fn compiler_nested_whole_u16_inactive_lifecycle() {
         .unwrap()
         .as_nanos();
     let root = std::env::temp_dir().join(format!(
-        "miren-stage211-parent210-upkeep-compiler-{}-{nonce}",
+        "miren-stage212-parent211-compiler-{}-{nonce}",
         std::process::id()
     ));
     eprintln!(
-        "Stage211 actual210 upkeep unique compiler scratch: {}",
+        "Stage212 actual211 unique compiler scratch: {}",
         root.display()
     );
     std::fs::create_dir(&root).unwrap();
@@ -1427,10 +1446,63 @@ fn compiler_nested_whole_u16_inactive_lifecycle() {
             "#[inline(never)] fn leaf_f64(v:&mut[f64])->f64 { if v.len()>0 { ",
             "let x=scalar_f64(v[0]); v[0]=x; x } else { -0.0 } }\n",
             "#[inline(never)] fn outer_f64(v:&mut[f64])->f64 { leaf_f64(&mut *(&mut *v)) }\n",
-            "pub fn root_f64(v:&mut[f64])->f64 { outer_f64(v) }\n"
+            "pub fn root_f64(v:&mut[f64])->f64 { outer_f64(v) }\n",
+            "struct AssociatedDomains; impl AssociatedDomains {\n",
+            "#[inline(never)] fn scalar_char(word:char)->char { word }\n",
+            "#[inline(never)] fn leaf_char(v:&mut[char]) { if v.len()>0 { ",
+            "v[0]=Self::scalar_char('a'); } }\n",
+            "#[inline(never)] fn outer_char(v:&mut[char]) { Self::leaf_char(&mut *v); }\n",
+            "#[inline(never)] fn scalar_f32(x:f32)->f32 { x }\n",
+            "#[inline(never)] fn leaf_f32(v:&mut[f32])->f32 { if v.len()>0 { ",
+            "let x=Self::scalar_f32(v[0]); v[0]=x; x } else { -0.0 } }\n",
+            "#[inline(never)] fn outer_f32(v:&mut[f32])->f32 { Self::leaf_f32(&mut *v) } }\n",
+            "pub fn root_associated_char(v:&mut[char]) { AssociatedDomains::outer_char(v); }\n",
+            "pub fn root_associated_scalar_char(word:char)->char { ",
+            "AssociatedDomains::scalar_char(word) }\n",
+            "pub fn root_associated_f32(v:&mut[f32])->f32 { AssociatedDomains::outer_f32(v) }\n",
+            "pub struct Local; trait Child { fn scalar(word:u16)->u16;\n",
+            "fn leaf(v:&mut[u16]); fn outer(v:&mut[u16]);\n",
+            "#[inline(never)] fn default_outer(v:&mut[u16]) { Self::leaf(v); } }\n",
+            "impl Child for Local { #[inline(never)] fn scalar(word:u16)->u16 { word ^ 0 }\n",
+            "#[inline(never)] fn leaf(v:&mut[u16]) {\n",
+            "if v.len()>0 { v[0]=<Self as Child>::scalar(17); } }\n",
+            "#[inline(never)] fn outer(v:&mut[u16]) {\n",
+            "Self::leaf(&mut *v); } }\n",
+            "impl Local { #[inline(never)] fn scalar(word:u16)->u16 { word ^ 0 }\n",
+            "#[inline(never)] fn inherent_leaf(v:&mut[u16]) {\n",
+            "if v.len()>0 { v[0]=Self::scalar(17); } }\n",
+            "#[inline(never)] fn inherent_outer(v:&mut[u16]) {\n",
+            "Self::inherent_leaf(&mut *v); } }\n",
+            "#[inline(never)] fn generic_outer<T:Child>(v:&mut[u16]) { T::leaf(v); }\n",
+            "pub fn root_associated(v:&mut[u16]) { Local::inherent_outer(v); }\n",
+            "pub fn root_trait(v:&mut[u16]) { <Local as Child>::outer(v); }\n",
+            "pub fn root_default(v:&mut[u16]) { <Local as Child>::default_outer(v); }\n",
+            "pub fn root_generic(v:&mut[u16]) { generic_outer::<Local>(v); }\n",
+            "struct UnusedConst<const N:usize>; impl<const N:usize> UnusedConst<N> {\n",
+            "#[inline(never)] fn outer(v:&mut[u16]) { Local::inherent_leaf(v); } }\n",
+            "pub fn root_unused_const(v:&mut[u16]) { UnusedConst::<1>::outer(v); }\n",
+            "trait Receiver { fn receive(&mut self); }\n",
+            "impl Receiver for [u16] { #[inline(never)] fn receive(&mut self) {\n",
+            "if self.len()>0 { self[0]=17; } } }\n",
+            "pub fn root_receiver(v:&mut[u16]) { <[u16] as Receiver>::receive(v); }\n",
+            "pub fn unrelated_closure() { let call=|| 17u16; let _=call(); }\n",
+            "pub async fn unrelated_async() {}\n"
         ),
     )
     .unwrap();
+    let mut source_text = std::fs::read_to_string(&source).unwrap();
+    source_text.push_str(&format!(
+        "impl Local {{ pub fn signature_deep(_: {}u16) {{}}\n\
+         pub fn signature_wide(_: ({})) {{}}\n\
+         pub fn signature_generic<T>(_: &&T) {{}} }}\n",
+        "&".repeat(17),
+        vec!["u16"; 255].join(",\n"),
+    ));
+    source_text.push_str(concat!(
+        "pub trait SignatureAlias { type Word; fn signature_alias(_:Self::Word); }\n",
+        "impl SignatureAlias for Local { type Word=u16; fn signature_alias(_:u16) {} }\n"
+    ));
+    std::fs::write(&source, source_text).unwrap();
     for (target, tag) in [(None, "host"), (Some("thumbv7em-none-eabihf"), "arm")] {
         for opt in [0, 2] {
             let output = root.join(format!("{tag}-o{opt}"));
