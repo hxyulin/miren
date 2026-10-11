@@ -3245,3 +3245,59 @@ mod native_nested_bool {
         super::nested_bool_child_call(&mut [false; 129], true);
     }
 }
+
+#[inline(never)]
+pub fn nested_char_word(word: char) -> char {
+    if word == '\0' { '\0' } else { word }
+}
+#[inline(never)]
+pub fn nested_char_leaf(values: &mut [char], word: char) {
+    if values.len() > 0 {
+        values[0] = nested_char_word(word);
+    }
+}
+#[inline(never)]
+pub fn nested_char_outer(values: &mut [char], word: char) -> char {
+    nested_char_leaf(&mut *(&mut *values), word);
+    nested_char_word(word)
+}
+#[inline(never)]
+pub fn nested_char_deeper(values: &mut [char], word: char) {
+    nested_char_outer(values, word);
+}
+pub fn nested_char_child_call(values: &mut [char], word: char) {
+    if values.len() > 1 {
+        let old = values[1];
+        let returned = nested_char_outer(values, word);
+        assert!(values[0] == word && returned == word);
+        assert!(values[1] == old);
+    }
+}
+pub fn nested_char_wrong_claim(values: &mut [char], word: char) {
+    if values.len() > 0 {
+        nested_char_outer(values, word);
+        assert!(values[0] != word);
+    }
+}
+pub fn nested_char_deeper_unknown(values: &mut [char], word: char) {
+    if values.len() > 0 {
+        nested_char_deeper(values, word);
+        assert!(values[0] == word);
+    }
+}
+#[cfg(test)]
+mod native_nested_char {
+    extern crate std;
+    #[test]
+    fn actual_data_and_sibling() {
+        for length in 0..=129 {
+            for word in ['\0', 'a', '\u{d7ff}', '\u{e000}', '\u{10ffff}'] {
+                super::nested_char_child_call(&mut std::vec!['x'; length], word);
+            }
+        }
+    }
+    #[test]
+    fn mutation_guard() {
+        super::nested_char_child_call(&mut ['x'; 129], '\0');
+    }
+}

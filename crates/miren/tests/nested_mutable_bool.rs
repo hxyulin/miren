@@ -137,7 +137,7 @@ fn run_native(executable: &Path) -> std::process::Output {
 }
 
 #[test]
-fn bool_hierarchy_uses_actual_bodies_and_preserves_char_frontiers() {
+fn bool_and_char_hierarchies_use_actual_bodies() {
     let entries: Vec<_> = ["boolean", "character"]
         .into_iter()
         .flat_map(|module| {
@@ -151,15 +151,11 @@ fn bool_hierarchy_uses_actual_bodies_and_preserves_char_frontiers() {
             ]
             .into_iter()
             .map(move |entry| {
-                let status = if module == "character" {
-                    ProofStatus::Unknown
-                } else {
-                    match entry {
-                        "selected" | "sibling" | "scalar_return" => ProofStatus::Proved,
-                        "wrong" | "bounds" => ProofStatus::Refuted,
-                        "deeper" => ProofStatus::Unknown,
-                        _ => unreachable!(),
-                    }
+                let status = match entry {
+                    "selected" | "sibling" | "scalar_return" => ProofStatus::Proved,
+                    "wrong" | "bounds" => ProofStatus::Refuted,
+                    "deeper" => ProofStatus::Unknown,
+                    _ => unreachable!(),
                 };
                 (format!("{module}::{entry}"), status)
             })

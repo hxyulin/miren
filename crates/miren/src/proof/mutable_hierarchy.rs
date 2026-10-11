@@ -5,6 +5,7 @@ use std::rc::Rc;
 const ISSUANCE_ENABLED: bool = true;
 const INTEGER_HIERARCHY_ENABLED: bool = true;
 const BOOL_HIERARCHY_ENABLED: bool = true;
+const CHAR_HIERARCHY_ENABLED: bool = true;
 const DORMANT_CALLS_ENABLED: bool = true;
 
 fn integer_hierarchy_enabled() -> bool {
@@ -64,6 +65,35 @@ impl TestBoolHierarchy {
 impl Drop for TestBoolHierarchy {
     fn drop(&mut self) {
         TEST_BOOL_HIERARCHY.with(|value| value.set(self.0));
+    }
+}
+fn char_hierarchy_enabled() -> bool {
+    #[cfg(test)]
+    if TEST_CHAR_HIERARCHY.with(std::cell::Cell::get) {
+        return true;
+    }
+    CHAR_HIERARCHY_ENABLED
+}
+
+#[cfg(test)]
+std::thread_local! {
+    static TEST_CHAR_HIERARCHY: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+#[cfg(test)]
+struct TestCharHierarchy(bool);
+
+#[cfg(test)]
+impl TestCharHierarchy {
+    fn enable() -> Self {
+        Self(TEST_CHAR_HIERARCHY.with(|value| value.replace(true)))
+    }
+}
+
+#[cfg(test)]
+impl Drop for TestCharHierarchy {
+    fn drop(&mut self) {
+        TEST_CHAR_HIERARCHY.with(|value| value.set(self.0));
     }
 }
 
@@ -769,6 +799,7 @@ impl<'tcx> Engine<'tcx> {
                 && matches!(original.kind(), ty::Int(_) | ty::Uint(_))
                 && original != self.tcx.types.u8)
             || (bool_hierarchy_enabled() && original == self.tcx.types.bool)
+            || (char_hierarchy_enabled() && original == self.tcx.types.char)
     }
 
     fn mutable_hierarchy_reference(&self, original: Ty<'tcx>) -> bool {
@@ -1568,6 +1599,13 @@ impl Engine<'_> {
     ) -> Result<(), String> {
         self.mutable_hierarchy_primitive_value(self.tcx.types.bool, value, &[])
     }
+    pub(super) fn mutable_hierarchy_char_value_probe(
+        &self,
+        value: &Value,
+        conditions: &[Term],
+    ) -> Result<(), String> {
+        self.mutable_hierarchy_primitive_value(self.tcx.types.char, value, conditions)
+    }
 }
 
 #[cfg(test)]
@@ -1633,15 +1671,35 @@ pub(super) fn compiler_element_boundary_probe<'tcx>(
         site: (root.source.def_id(), data.terminator().source_info.span),
     };
     let is_bool = element == engine.tcx.types.bool;
+    let is_char = element == engine.tcx.types.char;
     assert_eq!(
         engine.mutable_hierarchy_route(&state, &call()).unwrap(),
         if is_bool {
             BOOL_HIERARCHY_ENABLED
+        } else if is_char {
+            CHAR_HIERARCHY_ENABLED
         } else {
             INTEGER_HIERARCHY_ENABLED
         }
     );
-    let _integer_scope = (!is_bool).then(TestIntegerHierarchy::enable);
+    if is_char && !CHAR_HIERARCHY_ENABLED {
+        let mut disabled = state.clone();
+        let slots = disabled.memory.storage_slots();
+        let data = disabled.memory.mutable_u16[0].data.clone();
+        let conditions = disabled.conditions.clone();
+        assert!(
+            engine
+                .mutable_hierarchy_call(&mut disabled, call())
+                .unwrap()
+                .is_none()
+        );
+        assert!(disabled.memory.mutable_hierarchy.is_none());
+        assert_eq!(disabled.memory.storage_slots(), slots);
+        assert_eq!(disabled.memory.mutable_u16[0].data, data);
+        assert_eq!(disabled.conditions, conditions);
+    }
+    let _integer_scope = (!is_bool && !is_char).then(TestIntegerHierarchy::enable);
+    let _char_scope = is_char.then(TestCharHierarchy::enable);
     let _bool_scope = is_bool.then(TestBoolHierarchy::enable);
     assert!(engine.mutable_hierarchy_route(&state, &call()).unwrap());
     for excluded in [
@@ -1653,7 +1711,8 @@ pub(super) fn compiler_element_boundary_probe<'tcx>(
     ] {
         assert_eq!(
             engine.mutable_hierarchy_element(excluded),
-            bool_hierarchy_enabled() && excluded == engine.tcx.types.bool
+            (bool_hierarchy_enabled() && excluded == engine.tcx.types.bool)
+                || (char_hierarchy_enabled() && excluded == engine.tcx.types.char)
         );
     }
     let selected = engine.instantiated_body(instance).unwrap();
@@ -1696,8 +1755,13 @@ pub(super) fn compiler_element_boundary_probe<'tcx>(
             .is_none()
     );
     assert_eq!(wrong_state.memory.mutable_u16[0].data, before);
-    if is_bool {
-        super::mutable_u16::compiler_bool_hierarchy_backing_probe(engine, &state.memory);
+    if is_char {
+        super::mutable_u16::compiler_char_hierarchy_backing_probe(engine, &state.memory);
+    }
+    if is_bool || is_char {
+        if is_bool {
+            super::mutable_u16::compiler_bool_hierarchy_backing_probe(engine, &state.memory);
+        }
         let mut consumed = state.clone();
         consumed.missing_places.consume(source, Vec::new()).unwrap();
         assert!(!engine.mutable_hierarchy_route(&consumed, &call()).unwrap());
@@ -1729,6 +1793,8 @@ pub(super) fn compiler_element_boundary_probe<'tcx>(
     assert!(!results.is_empty());
     let leaf_name = if is_bool {
         "leaf_bool"
+    } else if is_char {
+        "leaf_char"
     } else if element == engine.tcx.types.i32 {
         "leaf_i32"
     } else {
@@ -1742,6 +1808,15 @@ pub(super) fn compiler_element_boundary_probe<'tcx>(
             .iter()
             .any(|entry| entry.function == leaf_name)
     );
+    if is_char {
+        assert!(
+            engine
+                .proof
+                .body_entries
+                .iter()
+                .any(|entry| entry.function == "scalar_char")
+        );
+    }
     for result in results {
         let backing = engine.mutable_u16_backing(0, &result.memory).unwrap();
         assert_eq!(
@@ -1755,6 +1830,9 @@ pub(super) fn compiler_element_boundary_probe<'tcx>(
         assert!(hierarchy.issued >= 2);
         if is_bool {
             compiler_bool_return_probe(engine, root, block, source, &result);
+        } else if is_char {
+            compiler_char_return_probe(engine, root, block, source, &result);
+            compiler_char_scalar_probe(engine, &result);
         }
     }
 }
@@ -1851,6 +1929,356 @@ fn compiler_bool_return_probe<'tcx>(
     denied.push(nonempty);
     denied.push(symbolic::not(&observed));
     assert!(!engine.feasible(&denied).unwrap());
+}
+
+#[cfg(test)]
+fn compiler_char_return_probe<'tcx>(
+    engine: &mut Engine<'tcx>,
+    root: &Rc<Body<'tcx>>,
+    block: rustc_middle::mir::BasicBlock,
+    source: usize,
+    result: &Return,
+) {
+    super::mutable_u16::compiler_char_hierarchy_backing_probe(engine, &result.memory);
+    let backing = engine
+        .mutable_u16_backing(0, &result.memory)
+        .unwrap()
+        .clone();
+    let original = backing.hierarchy.as_ref().unwrap();
+    let current = original.metadata(0).unwrap();
+    original.observe(current).unwrap();
+    assert!(
+        original
+            .observe(Metadata {
+                epoch: current.epoch - 1,
+                ..current
+            })
+            .is_err()
+    );
+    assert!(
+        engine
+            .mutable_u16_role_live(
+                0,
+                &symbolic::MutableU16Role::HierarchyChild {
+                    lease: original.issued
+                },
+                &result.memory
+            )
+            .is_err()
+    );
+    let mut no_namespace = result.memory.clone();
+    no_namespace.mutable_hierarchy = None;
+    assert!(engine.mutable_u16_backing(0, &no_namespace).is_err());
+    let mut stale_generation = result.memory.clone();
+    Rc::make_mut(&mut stale_generation.mutable_u16)[0].generation = original.issued + 1;
+    assert!(engine.mutable_u16_backing(0, &stale_generation).is_err());
+    let mut missing = result.memory.clone();
+    missing
+        .missing_places
+        .consume(backing.allocation, Vec::new())
+        .unwrap();
+    assert!(engine.mutable_u16_backing(0, &missing).is_err());
+    let frame = engine.mutable_u16_register_frame(root).unwrap();
+    let tip = Tip {
+        frame,
+        statement: block.as_usize(),
+        local: source,
+    };
+    let mut next = original.clone();
+    let slots = result.memory.storage_slots();
+    let lease = next.issue(0, tip.clone(), slots).unwrap();
+    assert!(next.access(0).is_err());
+    let mut wrong_tip = tip.clone();
+    wrong_tip.local += 1;
+    assert!(next.enter(&wrong_tip, frame, slots).is_err());
+    let ticket = next.enter(&tip, frame, slots).unwrap();
+    next.access(lease).unwrap();
+    assert!(next.access(0).is_err());
+    let mut rollback = next.clone();
+    rollback.epoch = ticket.epoch_floor - 1;
+    assert!(rollback.release(&ticket).is_err());
+    next.release(&ticket).unwrap();
+    next.access(0).unwrap();
+    assert!(next.access(lease).is_err());
+    let mut exhausted = original.clone();
+    assert!(matches!(
+        exhausted.issue(0, tip, MAX_INPUT_VALUES),
+        Err(TransitionError::Resource(_))
+    ));
+    let bits = u32::from(engine.tcx.sess.target.pointer_width);
+    let zero = symbolic::integer(&engine.terms, 0, bits, false);
+    let nonempty = symbolic::binary(&engine.terms, "lt", zero.clone(), backing.length.clone())
+        .unwrap()
+        .boolean()
+        .unwrap();
+    let observed = engine
+        .terms
+        .apply(
+            Op::Select,
+            &[backing.data.clone(), zero.integer().unwrap().0.clone()],
+        )
+        .unwrap();
+    assert_eq!(observed.sort(), &Sort::BitVec(32));
+    let expected = engine.terms.bit_vector(u128::from('a'), 32).unwrap();
+    let equal = engine
+        .terms
+        .apply(Op::Equal, &[observed, expected])
+        .unwrap();
+    let mut denied = result.conditions.clone();
+    denied.push(nonempty);
+    denied.push(symbolic::not(&equal));
+    assert!(!engine.feasible(&denied).unwrap());
+}
+
+#[cfg(test)]
+fn compiler_char_scalar_probe<'tcx>(engine: &mut Engine<'tcx>, result: &Return) {
+    let definition = engine
+        .tcx
+        .iter_local_def_id()
+        .find(|d| {
+            engine.tcx.def_kind(d.to_def_id()) == DefKind::Fn
+                && engine.tcx.item_name(d.to_def_id()).as_str() == "root_scalar_char"
+        })
+        .unwrap()
+        .to_def_id();
+    let root_instance = engine
+        .resolve_function_item(definition, engine.tcx.mk_args(&[]))
+        .unwrap();
+    let body = engine.instantiated_body(root_instance).unwrap();
+    let (block, data) = body
+        .basic_blocks
+        .iter_enumerated()
+        .find(|(_, b)| matches!(b.terminator().kind, TerminatorKind::Call { .. }))
+        .unwrap();
+    let TerminatorKind::Call {
+        func,
+        args,
+        destination,
+        target,
+        ..
+    } = &data.terminator().kind
+    else {
+        unreachable!()
+    };
+    let ty::FnDef(definition, generic) = func.ty(&body.local_decls, engine.tcx).kind() else {
+        unreachable!()
+    };
+    let instance = engine
+        .resolve_function_item(*definition, generic.skip_binder())
+        .unwrap();
+    let selected = engine.instantiated_body(instance).unwrap();
+    let (Operand::Copy(source) | Operand::Move(source)) = args[0].node else {
+        unreachable!()
+    };
+    let call = || super::mutable_u16_children::ChildCall {
+        body: &body,
+        block,
+        instance,
+        args,
+        destination: *destination,
+        target: *target,
+        stack: &[],
+        site: (body.source.def_id(), data.terminator().source_info.span),
+    };
+    let base = State {
+        locals: vec![None; body.local_decls.len()],
+        addresses: vec![None; body.local_decls.len()],
+        missing_places: Default::default(),
+        conditions: result.conditions.clone(),
+        memory: result.memory.clone(),
+    };
+    let prepare = |engine: &mut Engine<'tcx>, value: Value| {
+        let mut state = base.clone();
+        state.locals[1] = Some(value);
+        for statement in &data.statements {
+            if let StatementKind::Assign(a) = &statement.kind {
+                let value = engine
+                    .rvalue(body.source.def_id(), &body, &mut state, &a.1)
+                    .unwrap();
+                engine
+                    .store_assignment_value(&body, &mut state, a.0, value, &statement.kind)
+                    .unwrap();
+            }
+        }
+        state
+    };
+    let pair_def = engine
+        .tcx
+        .iter_local_def_id()
+        .find(|d| {
+            engine.tcx.def_kind(d.to_def_id()) == DefKind::Fn
+                && engine.tcx.item_name(d.to_def_id()).as_str() == "root_pair_char"
+        })
+        .unwrap()
+        .to_def_id();
+    let pair_instance = engine
+        .resolve_function_item(pair_def, engine.tcx.mk_args(&[]))
+        .unwrap();
+    let pair = engine.instantiated_body(pair_instance).unwrap();
+    let mut pair_state = base.clone();
+    pair_state.locals = vec![None; pair.local_decls.len()];
+    pair_state.addresses = vec![None; pair.local_decls.len()];
+    pair_state.locals[1] = Some(Value::Tuple(vec![
+        symbolic::integer(&engine.terms, 65, 32, false),
+        symbolic::integer(&engine.terms, 65, 32, false),
+    ]));
+    for (index, valid) in [(1, true), (0, false)] {
+        let place = Place {
+            local: rustc_middle::mir::Local::from_usize(1),
+            projection: engine.tcx.mk_place_elems(&[ProjectionElem::Field(
+                rustc_abi::FieldIdx::from_usize(index),
+                engine.tcx.types.char,
+            )]),
+        };
+        assert_eq!(engine.mutable_hierarchy_dormant_operand(
+            &pair, &pair_state, place, engine.tcx.types.char,
+        ).is_ok(), valid);
+    }
+    let frame = engine.mutable_u16_register_frame(&body).unwrap();
+    let foreign = Context::default();
+    for value in [
+        symbolic::integer(&engine.terms, 0xd800, 32, false),
+        symbolic::integer(&engine.terms, 0xdfff, 32, false),
+        symbolic::integer(&engine.terms, 0x110000, 32, false),
+        symbolic::integer(&engine.terms, 65, 32, true),
+        symbolic::integer(&engine.terms, 65, 16, false),
+        symbolic::integer(&foreign, 65, 32, false),
+        Value::Bool(engine.terms.boolean(true)),
+    ] {
+        let mut dormant = prepare(engine, symbolic::integer(&engine.terms, 65, 32, false));
+        dormant.locals[source.local.as_usize()] = Some(value.clone());
+        let before = dormant.clone();
+        assert!(engine.mutable_hierarchy_call(&mut dormant, call()).is_err());
+        assert_eq!(dormant.conditions, before.conditions);
+        assert_eq!(
+            dormant.memory.mutable_u16[0].data,
+            before.memory.mutable_u16[0].data
+        );
+        let mut active = before;
+        let slots = active.memory.storage_slots();
+        let hierarchy = Rc::make_mut(&mut active.memory.mutable_u16)[0]
+            .hierarchy
+            .as_mut()
+            .unwrap();
+        let tip = Tip {
+            frame,
+            statement: block.as_usize(),
+            local: source.local.as_usize(),
+        };
+        hierarchy.issue(0, tip.clone(), slots).unwrap();
+        hierarchy.enter(&tip, frame, slots).unwrap();
+        let before = active.clone();
+        assert!(
+            engine
+                .mutable_hierarchy_scalar_call(&mut active, &selected, call())
+                .is_err()
+        );
+        assert_eq!(active.conditions, before.conditions);
+        assert_eq!(
+            active.memory.mutable_u16[0].data,
+            before.memory.mutable_u16[0].data
+        );
+    }
+    for scalar in [0, 0xd7ff, 0xe000, 0x10ffff] {
+        let value = symbolic::integer(&engine.terms, scalar, 32, false);
+        let mut state = prepare(engine, value.clone());
+        let returns = engine
+            .mutable_hierarchy_call(&mut state, call())
+            .unwrap()
+            .unwrap();
+        for returned in returns {
+            assert_eq!(returned.value.integer().unwrap(), value.integer().unwrap());
+            engine
+                .mutable_hierarchy_char_value_probe(&returned.value, &returned.conditions)
+                .unwrap();
+            assert_eq!(
+                returned.memory.mutable_u16[0].data,
+                base.memory.mutable_u16[0].data
+            );
+        }
+    }
+    for wrong_local in [
+        rustc_middle::mir::RETURN_PLACE,
+        rustc_middle::mir::Local::from_usize(1),
+    ] {
+        let mut forged = (*selected).clone();
+        forged.local_decls[wrong_local].ty = engine.tcx.types.u32;
+        engine.bodies.borrow_mut().insert(instance, Rc::new(forged));
+        let mut state = prepare(engine, symbolic::integer(&engine.terms, 65, 32, false));
+        let before = state.clone();
+        assert!(engine.mutable_hierarchy_call(&mut state, call()).is_err());
+        assert_eq!(
+            state.memory.mutable_u16[0].data,
+            before.memory.mutable_u16[0].data
+        );
+        assert_eq!(state.conditions, before.conditions);
+        engine
+            .bodies
+            .borrow_mut()
+            .insert(instance, selected.clone());
+    }
+    // A malformed cached MIR constant is a boundary control, never native invalid Char.
+    for invalid in [0xd800_u128, 0xdfff, 0x110000] {
+        let mut forged = (*selected).clone();
+        let assignment = forged
+            .basic_blocks
+            .as_mut()
+            .iter_mut()
+            .flat_map(|b| &mut b.statements)
+            .find_map(|s| match &mut s.kind {
+                StatementKind::Assign(a) if a.0.local == rustc_middle::mir::RETURN_PLACE => Some(a),
+                _ => None,
+            })
+            .unwrap();
+        let Rvalue::Use(operand, _) = &mut assignment.1 else {
+            unreachable!()
+        };
+        *operand = Operand::Constant(Box::new(rustc_middle::mir::ConstOperand {
+            span: rustc_span::DUMMY_SP,
+            user_ty: None,
+            const_: rustc_middle::mir::Const::Val(
+                rustc_middle::mir::ConstValue::Scalar(
+                    rustc_middle::mir::interpret::Scalar::from_uint(
+                        invalid,
+                        rustc_abi::Size::from_bytes(4),
+                    ),
+                ),
+                engine.tcx.types.char,
+            ),
+        }));
+        let forged = Rc::new(forged);
+        engine.bodies.borrow_mut().insert(instance, forged.clone());
+        let mut state = prepare(engine, symbolic::integer(&engine.terms, 65, 32, false));
+        let before = state.clone();
+        assert!(engine.mutable_hierarchy_call(&mut state, call()).is_err());
+        assert_eq!(
+            state.memory.mutable_u16[0].data,
+            before.memory.mutable_u16[0].data
+        );
+        assert_eq!(state.conditions, before.conditions);
+        let mut active = before;
+        let slots = active.memory.storage_slots();
+        let hierarchy = Rc::make_mut(&mut active.memory.mutable_u16)[0]
+            .hierarchy
+            .as_mut()
+            .unwrap();
+        let tip = Tip {
+            frame,
+            statement: block.as_usize(),
+            local: source.local.as_usize(),
+        };
+        hierarchy.issue(0, tip.clone(), slots).unwrap();
+        hierarchy.enter(&tip, frame, slots).unwrap();
+        assert!(
+            engine
+                .mutable_hierarchy_scalar_call(&mut active, &forged, call())
+                .is_err()
+        );
+        engine
+            .bodies
+            .borrow_mut()
+            .insert(instance, selected.clone());
+    }
 }
 
 #[cfg(test)]
@@ -2428,6 +2856,37 @@ mod tests {
         );
         assert!(!TEST_BOOL_HIERARCHY.with(std::cell::Cell::get));
         assert_eq!(bool_hierarchy_enabled(), BOOL_HIERARCHY_ENABLED);
+    }
+
+    #[test]
+    fn scoped_char_selection_restores_nested_and_panicking_tests() {
+        assert!(!TEST_CHAR_HIERARCHY.with(std::cell::Cell::get));
+        assert_eq!(char_hierarchy_enabled(), CHAR_HIERARCHY_ENABLED);
+        {
+            let _outer = TestCharHierarchy::enable();
+            assert!(TEST_CHAR_HIERARCHY.with(std::cell::Cell::get));
+            assert!(char_hierarchy_enabled());
+            {
+                let _inner = TestCharHierarchy::enable();
+                assert!(TEST_CHAR_HIERARCHY.with(std::cell::Cell::get));
+                assert!(char_hierarchy_enabled());
+            }
+            assert!(TEST_CHAR_HIERARCHY.with(std::cell::Cell::get));
+            assert!(char_hierarchy_enabled());
+        }
+        assert!(!TEST_CHAR_HIERARCHY.with(std::cell::Cell::get));
+        assert_eq!(char_hierarchy_enabled(), CHAR_HIERARCHY_ENABLED);
+        assert!(
+            std::panic::catch_unwind(|| {
+                let _scope = TestCharHierarchy::enable();
+                assert!(TEST_CHAR_HIERARCHY.with(std::cell::Cell::get));
+                assert!(char_hierarchy_enabled());
+                panic!("test scoped Char restoration");
+            })
+            .is_err()
+        );
+        assert!(!TEST_CHAR_HIERARCHY.with(std::cell::Cell::get));
+        assert_eq!(char_hierarchy_enabled(), CHAR_HIERARCHY_ENABLED);
     }
 
     #[test]

@@ -1174,7 +1174,20 @@ body refusal. Full ROOT validation, release replay and commit remain pending.
 
 The whole-slice nested hierarchy also accepts exact original Bool with its logical Bool codec,
 layout1/1 and existing current-memory/epoch/owner checks. Actual nested body and scalar-return
-results are checked; Char remains outside this extension. Retained library O0 bodies support
+results are checked. Retained library O0 bodies support
 selected and empty callers, omitted bodies stay MissingCompilerEvidence UNKNOWN even when empty,
 and an optimized retained store may reach the existing unsupported shape frontier. No new raw,
 retained-reference, interval or deeper hierarchy permission is granted.
+
+The whole-slice nested hierarchy also accepts exact original Char with its BV32 Char codec and
+existing Unicode validity checks at scalar argument, result and store boundaries. Actual public
+Call/stage/Return tests preserve current backing data and sibling elements. No validity premise,
+value repair or extra lifetime permission is added. Actual helper mutations refute unchanged
+claims; wrong claims and out-of-bounds observations refute, while deeper nesting remains UNKNOWN.
+Retained O0 Char helpers support selected and empty callers. Omitted bodies remain
+MissingCompilerEvidence UNKNOWN even when empty. Optimized retained selected callers currently
+reach an unsupported ConstantIndex observation; this is separate from Unicode validity.
+
+Stage209 actual208 candidate upkeep preserves the committed Bool, metadata and interval foundation.
+The original actual203 plus pending208 disabled history remains separate. Production changes are
+limited to the reviewed Char selector flag; required full ROOT validation and commit are pending.

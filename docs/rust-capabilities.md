@@ -11,8 +11,10 @@ execution at O0 and O2, positive/refuted/unknown controls, a source mutation tha
 structured UNKNOWN reporting, and passing repository checks. Completion establishes a repeatable
 baseline. It does not establish full Rust support or a completed memory-model refactor.
 
-The scoped Stage208 manifest contains 221 cases across 75 families. Fresh actual207-based profiles
-measure 89 PROVED, 77 REFUTED and 55 UNKNOWN each; full ROOT validation remains pending.
+The scoped Stage209 manifest contains 224 cases across 76 families. Fresh actual208-based profiles
+measure 91 PROVED, 78 REFUTED and 55 UNKNOWN each; full ROOT validation remains pending.
+The historical committed Stage208 survey measured 221 cases across 75 families, with
+89 PROVED, 77 REFUTED and 55 UNKNOWN per profile.
 The historical committed Stage207 survey measured 218 cases across 74 families, with
 87 PROVED, 76 REFUTED and 55 UNKNOWN in each host/ARM O0/O2 profile.
 The historical committed Stage203 survey measured 212 cases across 72 families, with
@@ -1915,4 +1917,79 @@ native cases impose no bound on symbolic inputs. Final evidence is under
 `/tmp/miren-stage208-root-full-checks`, `/tmp/miren-stage208-root-survey`,
 `/tmp/miren-stage208-root-replay` and `/tmp/miren-stage208-root-native`. Final documentation
 closure preserves all 915 other tested source files. These counts describe capability cases,
+not full Rust parity or firmware coverage.
+
+Stage209 actual208 candidate adds exact original Char to the bounded whole-slice nested protocol.
+Current backing, epoch, owner and Unicode validity checks remain in force; no assumptions, repairs,
+retained-reference or deeper nesting grants are added. Four-profile diagnostics for the original
+six Char roots yield three PROVED, two REFUTED and one UNKNOWN per profile. Actual zero-to-'B'
+scalar helper mutations refute selected, sibling and scalar-return claims in all four profiles.
+The existing Bool fixture's Char routes now have the same measured outcomes; Bool routes retain
+their previous results. Actual public compiler tests retain scalar, metadata and interval checks.
+
+Three Char global cases append to the exact committed Stage208 221-case prefix: selected data and
+sibling preservation PROVED, wrong claim REFUTED and deeper nesting Semantics UNKNOWN. Their
+actual helper mutation refutes unchanged claims. Genuine retained O0 Char libraries prove selected
+and empty callers; omitted libraries stay MissingCompilerEvidence UNKNOWN including empty callers.
+Retained optimized empty callers prove, while selected callers reach the existing ConstantIndex
+read frontier before Char decoding. This is not a missing-body or Unicode-validity success claim.
+Fresh safe native Unicode extrema and lengths through 129 impose no bound on symbolic inputs.
+
+This checkpoint describes candidate diagnostics on actual committed Stage208. Historical disabled
+and actual203/pending208 evidence remains separate. Completed ROOT validation is recorded below;
+capability counts do not establish full Rust parity.
+
+Current actual208-based Stage209 scoped validation passes ten checks with 29 actual tests: current
+public compiler lifecycle, Unicode/current-memory refusal controls, RAII restoration, Char and
+related integration suites, metadata/interval compiler anchors, formatting, lint and debug build.
+Current active compiler assets and their unique scratch are associated with the current e47
+analyzer;
+the original disabled 728 and sole-flag 6d snapshots remain immutable historical evidence.
+
+Fresh same-source/cwd/mode committed208-to-candidate replay runs 180 command pairs and compares
+4,724 proof objects; 4,633 match fully. Its 8,312 baseline emitted query/model
+pairs are exact: 8,292 occur in fully matching objects, and 20 are exact prefixes
+inside explicitly changed Char objects. Candidate reports emit 8,624 queries in total; newly
+reached queries are reported separately from baseline compatibility. Changed objects include the
+eight measured original nested Char case promotions, new Char outcomes, existing Bool-fixture Char
+outcomes and precise later UNKNOWN frontiers; no whole-object equality is claimed for these.
+The only deadline contexts differ at the named query/model-free scalar_slice_unbounded_fold root,
+with the same literal 30-second ResourceLimit budget and every residual field exact. Raw observed
+profiles and literal details/call chains are retained in the replay ledger, without normalization.
+
+Four complete current 224-case profiles measure 91 PROVED, 78 REFUTED and 55 UNKNOWN. Fresh current
+Char global original/mutant controls execute actual helper bodies, with unchanged selected claims
+refuted by zero-to-'B' mutation. Four rebuilt safe global native runs select two tests each:
+originals
+exit 0 and mutants exit 101 under ten-second limits. Earlier four one-test Char native diagnostics
+remain explicitly separate, with identical current fixture bytes. The native controls do not bind
+symbolic input lengths. Eight genuine Char rlibs are rebuilt for current retained/omitted controls;
+optimized selected ConstantIndex refusal and omitted empty-caller body requirements are preserved.
+
+Evidence: /tmp/miren-stage209-parent208-upkeep-fidelity/ledger.json,
+/tmp/miren-stage209-parent208-upkeep-global-controls/ledger.json,
+/tmp/miren-stage209-parent208-upkeep-native/ledger.json and
+/tmp/miren-stage209-parent208-upkeep-core-freeze.json. Owner source and Cargo remain stopped.
+These scoped owner captures are separate from the fresh combined ROOT validation below.
+
+Completed ROOT Stage209 validation passes all 22 required checks: 839 Rust workspace tests,
+68 Python tests, formatting, lint, debug/release builds, dependency checks, documentation,
+twelve example checks and manual hooks. Four fresh release profiles match 224 cases across
+76 families: 91 PROVED, 78 REFUTED and 55 UNKNOWN, with no errors or new assumptions.
+
+Fresh owner-to-ROOT debug replay compares 4,724 proof objects: 4,722 match fully, and all
+8,624 emitted queries and models match exactly. ROOT debug-to-release compares the same objects:
+4,723 match fully, and all 8,624 queries and models match exactly. Only explicitly named
+query/model-free unbounded-fold deadline contexts may differ in literal detail or call chain;
+every residual field and the same 30-second budget remain exact. No reports, paths, queries
+or models are normalized. These candidate-to-candidate counts are separate from the 8,312
+parent-to-candidate baseline queries and measured Char promotions above.
+
+Eight fresh ROOT native executions rebuild dedicated and global originals and actual helper
+mutants at O0/O2. Each selects one or two actual tests under ten-second limits: four originals
+pass and four mutants fail with exit 101. Assertions remain unchanged. Finite native examples
+impose no bound on symbolic inputs. Final evidence is under
+`/tmp/miren-stage209-root-full-checks`, `/tmp/miren-stage209-root-survey`,
+`/tmp/miren-stage209-root-replay` and `/tmp/miren-stage209-root-native`. Final factual docs
+closure preserves all 917 other tested source files. These counts describe capability cases,
 not full Rust parity or firmware coverage.

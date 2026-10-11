@@ -848,6 +848,7 @@ fn compiler_cases<'tcx>(tcx: TyCtxt<'tcx>, output: &std::path::Path) {
         ("root_i32", tcx.types.i32, tcx.types.u32),
         ("root_usize", tcx.types.usize, tcx.types.u64),
         ("root_bool", tcx.types.bool, tcx.types.char),
+        ("root_char", tcx.types.char, tcx.types.u32),
     ] {
         let instance = engine
             .resolve_function_item(find(name), tcx.mk_args(&[]))
@@ -859,6 +860,25 @@ fn compiler_cases<'tcx>(tcx: TyCtxt<'tcx>, output: &std::path::Path) {
             original,
             wrong,
         );
+    }
+    for name in [
+        "root_char",
+        "outer_char",
+        "leaf_char",
+        "scalar_char",
+        "root_scalar_char",
+        "root_pair_char",
+        "char_store",
+    ] {
+        let instance = engine
+            .resolve_function_item(find(name), tcx.mk_args(&[]))
+            .unwrap();
+        let body = engine.instantiated_body(instance).unwrap();
+        std::fs::write(
+            output.join(format!("char-{name}.mir")),
+            format!("{body:#?}"),
+        )
+        .unwrap();
     }
     std::fs::write(
         output.join("direct-adapter-trace.json"),
@@ -1343,10 +1363,13 @@ fn compiler_nested_whole_u16_inactive_lifecycle() {
         .unwrap()
         .as_nanos();
     let root = std::env::temp_dir().join(format!(
-        "miren-stage208-parent207-compiler-{}-{nonce}",
+        "miren-stage209-parent208-compiler-{}-{nonce}",
         std::process::id()
     ));
-    eprintln!("Stage208 unique compiler scratch: {}", root.display());
+    eprintln!(
+        "Stage209 actual208 unique compiler scratch: {}",
+        root.display()
+    );
     std::fs::create_dir_all(&root).unwrap();
     let source = root.join("fixture.rs");
     std::fs::write(
@@ -1374,7 +1397,15 @@ fn compiler_nested_whole_u16_inactive_lifecycle() {
             "pub fn root_usize(v:&mut[usize]) { outer_usize(v); }\n",
             "#[inline(never)] fn leaf_bool(v:&mut[bool]) { if v.len()>0 { v[0]=true; } }\n",
             "#[inline(never)] fn outer_bool(v:&mut[bool]) { leaf_bool(&mut *(&mut *v)); }\n",
-            "pub fn root_bool(v:&mut[bool]) { outer_bool(v); }\n"
+            "pub fn root_bool(v:&mut[bool]) { outer_bool(v); }\n",
+            "#[inline(never)] fn scalar_char(word:char)->char { word }\n",
+            "#[inline(never)] fn leaf_char(v:&mut[char]) { if v.len()>0 { ",
+            "v[0]=scalar_char('a'); } }\n",
+            "#[inline(never)] fn outer_char(v:&mut[char]) { leaf_char(&mut *(&mut *v)); }\n",
+            "pub fn root_char(v:&mut[char]) { outer_char(v); }\n",
+            "pub fn root_scalar_char(word:char)->char { scalar_char(word) }\n",
+            "pub fn root_pair_char(pair:(u32,char))->char { scalar_char(pair.1) }\n",
+            "pub fn char_store(v:&mut[char],index:usize,word:char) { v[index]=word; }\n"
         ),
     )
     .unwrap();

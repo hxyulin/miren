@@ -165,7 +165,7 @@ fn logical_char_stores_and_actual_child_bodies_cover_four_profiles() {
         ("shared", U),
         ("raw", U),
         ("escape", U),
-        ("nested", U),
+        ("nested", P),
         ("float64_unknown", U),
         ("float_unknown", U),
         ("u8_unknown", P),
@@ -193,7 +193,6 @@ fn logical_char_stores_and_actual_child_bodies_cover_four_profiles() {
                 ("method", "metadata needs original direct root"),
                 ("raw", "child needs direct abort-only Rust body"),
                 ("escape", "staging needs a private whole tip"),
-                ("nested", "mutable char staging needs a pending child"),
                 (
                     "reached_panic",
                     "ancestor admits only direct scalar Rust frames",

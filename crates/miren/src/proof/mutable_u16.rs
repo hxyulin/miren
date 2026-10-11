@@ -998,6 +998,182 @@ pub(super) fn compiler_bool_hierarchy_backing_probe(engine: &mut Engine<'_>, mem
 }
 
 #[cfg(test)]
+pub(super) fn compiler_char_hierarchy_backing_probe(engine: &mut Engine<'_>, memory: &Memory) {
+    let backing = engine.mutable_u16_backing(0, memory).unwrap();
+    let certificate = backing.certificate;
+    let issued = engine.mutable_integer_types[certificate].clone();
+    assert_eq!(issued.original, engine.tcx.types.char);
+    assert_eq!(issued.element, symbolic::ScalarSliceElement::Char);
+    assert_eq!((issued.bytes, issued.alignment), (4, 4));
+    for original in [
+        engine.tcx.types.u32,
+        engine.tcx.types.i32,
+        engine.tcx.types.bool,
+    ] {
+        engine.mutable_integer_types[certificate].original = original;
+        assert!(engine.mutable_u16_backing(0, memory).is_err());
+        engine.mutable_integer_types[certificate] = issued.clone();
+    }
+    for (bytes, alignment) in [(1, 4), (4, 1)] {
+        engine.mutable_integer_types[certificate].bytes = bytes;
+        engine.mutable_integer_types[certificate].alignment = alignment;
+        assert!(engine.mutable_u16_backing(0, memory).is_err());
+        engine.mutable_integer_types[certificate] = issued.clone();
+    }
+    engine.mutable_integer_types[certificate].element = symbolic::ScalarSliceElement::Integer {
+        bits: 32,
+        signed: false,
+    };
+    assert!(engine.mutable_u16_backing(0, memory).is_err());
+    engine.mutable_integer_types[certificate] = issued;
+    let foreign = Context::default();
+    let bits = u32::from(engine.tcx.sess.target.pointer_width);
+    let mut wrong_context = memory.clone();
+    std::rc::Rc::make_mut(&mut wrong_context.mutable_u16)[0].data = foreign
+        .symbol(
+            99,
+            Sort::Array(Box::new(Sort::BitVec(bits)), Box::new(Sort::BitVec(32))),
+        )
+        .unwrap();
+    assert!(engine.mutable_u16_backing(0, &wrong_context).is_err());
+    let symbolic = engine.terms.symbol(987, Sort::BitVec(32)).unwrap();
+    let symbolic_value = Value::Int {
+        expression: symbolic.clone(),
+        bits: 32,
+        signed: false,
+    };
+    for wrong in [
+        symbolic::integer(&engine.terms, 0xd800, 32, false),
+        symbolic::integer(&engine.terms, 0xdfff, 32, false),
+        symbolic::integer(&engine.terms, 0x110000, 32, false),
+        symbolic::integer(&engine.terms, 65, 32, true),
+        symbolic::integer(&engine.terms, 65, 16, false),
+        symbolic::integer(&foreign, 65, 32, false),
+        Value::Bool(engine.terms.boolean(true)),
+        Value::Int {
+            expression: engine.terms.boolean(true),
+            bits: 32,
+            signed: false,
+        },
+        symbolic_value.clone(),
+    ] {
+        assert!(
+            engine
+                .mutable_hierarchy_char_value_probe(&wrong, &[])
+                .is_err()
+        );
+    }
+    for scalar in [0, 0xd7ff, 0xe000, 0x10ffff] {
+        engine
+            .mutable_hierarchy_char_value_probe(
+                &symbolic::integer(&engine.terms, scalar, 32, false),
+                &[],
+            )
+            .unwrap();
+    }
+    let equal = engine
+        .terms
+        .apply(
+            Op::Equal,
+            &[symbolic, engine.terms.bit_vector(0xe000, 32).unwrap()],
+        )
+        .unwrap();
+    let conditions = vec![equal];
+    let original_conditions = conditions.clone();
+    engine
+        .mutable_hierarchy_char_value_probe(&symbolic_value, &conditions)
+        .unwrap();
+    assert_eq!(conditions, original_conditions);
+    compiler_char_store_probe(engine);
+}
+
+#[cfg(test)]
+fn compiler_char_store_probe(engine: &mut Engine<'_>) {
+    let definition = engine
+        .tcx
+        .hir_body_owners()
+        .find(|owner| engine.tcx.item_name(owner.to_def_id()).as_str() == "char_store")
+        .unwrap();
+    let instance = engine
+        .resolve_function_item(definition.to_def_id(), engine.tcx.mk_args(&[]))
+        .unwrap();
+    let body = engine.instantiated_body(instance).unwrap();
+    let bits = u32::from(engine.tcx.sess.target.pointer_width);
+    let mut memory = Memory::default();
+    let mut conditions = Vec::new();
+    let root = engine
+        .mutable_u16_input(engine.tcx.types.char, &mut memory, &mut conditions)
+        .unwrap();
+    std::rc::Rc::make_mut(&mut memory.mutable_u16)[0].length =
+        symbolic::integer(&engine.terms, 2, bits, false);
+    let mut state = State {
+        locals: vec![None; body.local_decls.len()],
+        addresses: vec![None; body.local_decls.len()],
+        missing_places: Default::default(),
+        memory,
+        conditions,
+    };
+    state.locals[1] = Some(root);
+    state.locals[2] = Some(symbolic::integer(&engine.terms, 0, bits, false));
+    let place = Place {
+        local: rustc_middle::mir::Local::from_usize(1),
+        projection: engine.tcx.mk_place_elems(&[
+            ProjectionElem::Deref,
+            ProjectionElem::Index(rustc_middle::mir::Local::from_usize(2)),
+        ]),
+    };
+    let unproven = Value::Int {
+        expression: engine.terms.symbol(988, Sort::BitVec(32)).unwrap(),
+        bits: 32,
+        signed: false,
+    };
+    for value in [
+        symbolic::integer(&engine.terms, 0xd800, 32, false),
+        symbolic::integer(&engine.terms, 0xdfff, 32, false),
+        symbolic::integer(&engine.terms, 0x110000, 32, false),
+        unproven,
+    ] {
+        let before = state.clone();
+        assert!(
+            engine
+                .mutable_u16_store(&body, &mut state, place, &value)
+                .is_err()
+        );
+        assert_eq!(
+            state.memory.mutable_u16[0].data,
+            before.memory.mutable_u16[0].data
+        );
+        assert_eq!(
+            state.memory.mutable_u16[0].generation,
+            before.memory.mutable_u16[0].generation
+        );
+        assert_eq!(
+            state.memory.mutable_u16[0].phase,
+            before.memory.mutable_u16[0].phase
+        );
+        assert_eq!(state.conditions, before.conditions);
+        assert_eq!(state.memory.storage_slots(), before.memory.storage_slots());
+    }
+    for scalar in [0, 0xd7ff, 0xe000, 0x10ffff] {
+        let conditions = state.conditions.clone();
+        let value = symbolic::integer(&engine.terms, scalar, 32, false);
+        assert!(
+            engine
+                .mutable_u16_store(&body, &mut state, place, &value)
+                .unwrap()
+        );
+        assert_eq!(state.conditions, conditions);
+        let observed = engine
+            .mutable_u16_read(Some(&body), &state, place)
+            .unwrap()
+            .unwrap();
+        engine
+            .prove_char_value(&observed, &state.conditions)
+            .unwrap();
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
     #[test]
