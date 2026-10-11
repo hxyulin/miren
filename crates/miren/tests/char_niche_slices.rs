@@ -78,8 +78,8 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
         assert!(proof.entry_assumptions.is_empty());
         if *expected == ProofStatus::Unknown {
             let (category, reason) = match *name {
-                "nonzero_niche" | "ref_zero" | "refined_zero" | "wrapped_niche" | "multi_niche"
-                | "mutable" | "competing" => (
+                "ref_zero" | "refined_zero" | "wrapped_niche" | "multi_niche" | "mutable"
+                | "competing" => (
                     UnknownCategory::Semantics,
                     "only read-only byte slices and byte arrays are modeled",
                 ),
@@ -206,7 +206,8 @@ fn char_niche_slices_preserve_active_values_and_exact_source() {
         ("metadata", ProofStatus::Proved),
         ("multi_niche", ProofStatus::Unknown),
         ("mutable", ProofStatus::Unknown),
-        ("nonzero_niche", ProofStatus::Unknown),
+        // Original source is PROVED in all four profiles after exact NZ16 certification.
+        ("nonzero_niche", ProofStatus::Proved),
         ("occurrence", ProofStatus::Proved),
         ("ref_zero", ProofStatus::Unknown),
         ("refined_zero", ProofStatus::Unknown),

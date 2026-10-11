@@ -2826,3 +2826,78 @@ comparisons are `/tmp/miren-stage198-parent201-full-checks`,
 `/tmp/miren-stage198-parent201-full-survey` and `/tmp/miren-stage198-parent201-release-fidelity`.
 Final owner source is sealed by `/tmp/miren-stage198-parent201-final-owner-source-freeze.json`.
 Root integration, fresh main validation and commit readiness remain separate pending gates.
+
+
+Historical Stage 199 actual196 source/focused checkpoint (before actual200 adoption):
+
+Stage 199 admits a bounded readonly NonZero niche domain: exact `Option<NonZero<u16>>` and ordinary
+local two-variant empty/payload enums with the compiler's zero-only niche. Every original wrapper,
+associated restricted inner, variant, layout and field is certified even under zero-length arrays.
+One unsigned16 column supplies the legal tag and correlated latent payload. A zero latent payload is
+never repaired into a standalone NonZero. Typed projections authenticate original declarations and
+raw recorded field types; standalone operands and helper arguments/returns prove nonzero under
+existing conditions. The selected core getter requires its available complete instantiated body;
+this certificate is reported separately from actual helper body execution.
+
+Source authentication charges every type and variant, including empty variants, with one cumulative
+512-work detector budget and depth 16. Pointer niches, other niche widths, mutable niches,
+membership, equality and new-shape Horn reconstruction remain unsupported. Existing source and
+single-root policies remain unchanged. A supported producer reaching unsupported whole membership
+supplies the global UNKNOWN control; genuine omitted foreign helper MIR is tested by the separate
+dual-rlib suite.
+
+On actual committed Stage 196, the unchanged final 27-source baseline is UNKNOWN in every profile.
+Enabled host/ARM O0/O2 reports contain 12 PROVED, 4 REFUTED and 11 UNKNOWN roots per profile. The
+actual selected helper mutation refutes the unchanged claim with its body entry and a query/model;
+finite 129 native originals exit 0 and mutant guards exit 101 at O0/O2 under ten-second limits. No
+MAX-length native experiment or invalid custom MIR execution is used. Retained dependency helpers
+prove; genuine omitted selected helper bodies remain UNKNOWN with MissingCompilerEvidence.
+
+The original tagged, Bool and Char niche fixtures each advance only their NZ16 control to PROVED,
+with all four unchanged-source reports preserved before harness-only upkeep. All other 908 full old
+proof objects match exactly: 648 completed pairs, 568 completed queries and 596 queries including
+partial UNKNOWN obligations. Models, query node IDs, inputs/replay and body provenance are
+unchanged. Detector accounting corrections, earlier disabled checkpoints and stale harness failures
+remain preserved. Three append-only global cases give a candidate 197-case, 67-family manifest,
+expecting 78 PROVED, 68 REFUTED and 51 UNKNOWN per profile. Their P/R/U and actual-helper mutation
+controls pass all four profiles, with safe original/mutant native 0/101 evidence. Core/source review
+is complete; parent adoption, full-stage surveys and required root validation remain separate
+pending work.
+
+Historical Stage 199 actual200 adoption began on committed Stage 200 c86bc0f in a separate owner.
+All Stage 200 source and global cases remain; the three Stage 199 cases append afterward.
+The combined candidate has 200 cases in 68 families, expecting 79 PROVED, 69 REFUTED and
+52 UNKNOWN per profile. Fresh global captures confirm the three new P/R/U controls in all profiles.
+Original actual196
+archives retain their original source, binary, solver and native scopes. Refreshed actual200
+compiler, source and fidelity evidence now confirm the bounded source checkpoint; final source
+review and root validation remain required.
+
+
+Stage 199's new owner preserves committed Stage 201 c0d47e1 and its complete 200-case prefix.
+Three NZ16 controls bring the manifest to 203 cases in 69 families, with 80 PROVED,
+70 REFUTED and 53 UNKNOWN per profile. Owner validation passes 813 Rust tests, 68 Python tests,
+formatting, lint, debug and release builds, dependency checks, documentation and manual hooks.
+The fresh release retains all 1,524 scoped full proof objects and 1,344 queries exactly.
+Among 812 global comparisons, 810 full objects match exactly; only the host O0 and ARM O2
+query-free, 30-second ResourceLimit fold call chains differ. All other fields and all 1,496
+queries match. Raw differences remain recorded without normalization or budget changes.
+Eight fresh safe native controls retain original exit 0 and helper-mutant exit 101 at O0/O2.
+Root integration and fresh-main validation remain separate readiness gates.
+The successful actual200 809-Rust/68-Python history and its release captures retain their
+original scope; they are not relabeled as Stage 201 captures.
+
+
+Stage 199's new owner preserves committed Stage 198 e4ffe01 and its complete 203-case prefix.
+Three NZ16 controls bring the manifest to 206 cases in 70 families, with 82 PROVED,
+71 REFUTED and 53 UNKNOWN per profile. Owner validation passes 817 Rust tests, 68 Python tests,
+formatting, lint, debug and release builds, dependency checks, documentation and manual hooks.
+The fresh release retains all 1,604 scoped full proof objects and 1,480 queries exactly.
+Among 824 global comparisons, 822 full objects match exactly; only the host O2 and ARM O0
+query-free, 30-second ResourceLimit fold contexts differ. ARM O0 also changes the context
+prefix of the same timeout detail. All other fields and all 1,524 queries match.
+Raw differences remain recorded without normalization or budget changes.
+Eight fresh safe native controls retain original exit 0 and helper-mutant exit 101 at O0/O2.
+Root integration and fresh-main validation remain separate readiness gates.
+The successful actual201 validation and release captures above retain their historical
+source, binary, native and solver scopes. They are not relabeled as actual198 validation.

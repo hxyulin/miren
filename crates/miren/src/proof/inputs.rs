@@ -7,6 +7,7 @@ impl<'tcx> Engine<'tcx> {
         &self,
         instance: ty::Instance<'tcx>,
         values: &[Value],
+        conditions: &[Term],
     ) -> Result<Option<Value>, String> {
         let callee = instance.def_id();
         let Some(nonzero) = self
@@ -16,9 +17,9 @@ impl<'tcx> Engine<'tcx> {
             return Ok(None);
         };
         let parent = self.tcx.parent(callee);
-        if self.tcx.item_name(callee) != rustc_span::Symbol::intern("get")
+        if self.tcx.def_kind(callee) != DefKind::AssocFn
             || callee.krate != nonzero.krate
-            || self.tcx.def_kind(callee) != DefKind::AssocFn
+            || self.tcx.item_name(callee) != rustc_span::Symbol::intern("get")
             || !matches!(self.tcx.def_kind(parent), DefKind::Impl { of_trait: false })
         {
             return Ok(None);
@@ -47,6 +48,13 @@ impl<'tcx> Engine<'tcx> {
             || signature.c_variadic()
         {
             return Ok(None);
+        }
+        if nonzero_niches::ENABLE_RUNTIME && signature.output() == self.tcx.types.u16 {
+            self.nonzero_get_body_certificate(instance, *receiver)?;
+            let [value] = values else {
+                return Err("nonzero getter argument count mismatch".into());
+            };
+            self.nonzero_niche_admission(*receiver, value, conditions)?;
         }
         let Some((bits, signed)) = self.integer_type(signature.output()) else {
             return Ok(None);

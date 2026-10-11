@@ -1120,6 +1120,23 @@
       "expected": "unknown",
       "unknown_reason": "hierarchy exceeds the single nested-child scope",
       "unknown_category": "semantics"
+    },
+    {
+      "entry": "readonly_nonzero_niche_selected",
+      "family": "readonly_nonzero_niche",
+      "expected": "proved"
+    },
+    {
+      "entry": "readonly_nonzero_niche_wrong_claim",
+      "family": "readonly_nonzero_niche",
+      "expected": "refuted"
+    },
+    {
+      "entry": "readonly_nonzero_niche_contains_unknown",
+      "family": "readonly_nonzero_niche",
+      "expected": "unknown",
+      "unknown_reason": "whole composite slice membership is unsupported",
+      "unknown_category": "semantics"
     }
   ]
 }

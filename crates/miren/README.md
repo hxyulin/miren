@@ -1126,3 +1126,19 @@ raw pointers, reference returns, induction and non-u16 hierarchies remain unsupp
 selected bodies remain UNKNOWN; optimized dependency bodies with unsupported store shapes also
 remain UNKNOWN. The test-only scoped issuer switch exercises the same public routing and lifecycle
 checks, including ordinary noncandidates and missing-cache refusal.
+
+Readonly slices of `Option<NonZero<u16>>` and ordinary local empty/payload enums may use the
+compiler's exact zero-only niche. The original wrapper, associated restricted inner type,
+all variants and layouts are certified even under zero-length arrays. One raw column supplies
+both the legal tag and latent payload; zero denotes the empty variant and is never repaired
+into a standalone NonZero. Copy and Move projections authenticate original local declarations
+and raw recorded field types through a bounded linear original projection walk. Whole aggregate
+copies do not scan unrelated descendants; later standalone extraction still authenticates the
+actual leaf. Unresolved extraction paths refuse, and depth exhaustion remains ResourceLimit.
+Standalone operand, helper argument and return admissions require
+exact wrapper storage and a nonzero proof under current conditions. The selected core getter
+requires an available complete instantiated body matching its exact receiver-to-result
+transmute; this is a body certificate, not fabricated executed-body attribution. Its bounded
+scan rejects cleanup, spread, tainted and coroutine metadata. Pointer niches, other widths,
+mutable niches, whole-slice comparison and the new shape's induction reconstruction remain
+unsupported. Existing source, lifetime, single-root and shape-budget restrictions apply.

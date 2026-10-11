@@ -45,6 +45,12 @@ This is an experimental side project. It requires a pinned nightly compiler, sup
 Rust, and has not completed a soundness audit. Unsupported operations and unfinished proofs return
 UNKNOWN. A solver counterexample is not automatically a confirmed runtime panic.
 
+Readonly `Option<NonZero<u16>>` slices and exact local empty/payload enums retain the compiler's
+zero-only niche, with correlated tags and guarded payload observations. Original type, body,
+lifetime and resource checks remain required; pointer niches, mutable niches and whole-slice
+comparison are separate unsupported domains. See the [capability
+evidence](docs/rust-capabilities.md).
+
 ## Install
 
 The toolchain file installs the matching nightly, compiler development components and ARM target.

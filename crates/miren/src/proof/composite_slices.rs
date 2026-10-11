@@ -32,6 +32,7 @@ pub(super) enum CompositeShape {
         name: String,
         fields: Vec<(String, CompositeShape)>,
     },
+    NonZeroNiche(Box<nonzero_niches::Schema>),
     Sum {
         name: String,
         bits: u32,
@@ -226,6 +227,9 @@ impl<'tcx> Engine<'tcx> {
                 Ok(Some(CompositeShape::Array(shapes)))
             }
             ty::Adt(def, args) if allow_sums && def.is_enum() => {
+                if let Some(schema) = self.nonzero_niche_shape(ty, depth, nodes)? {
+                    return Ok(Some(CompositeShape::NonZeroNiche(Box::new(schema))));
+                }
                 self.readonly_sum_shape(ty, *def, args, depth, nodes)
             }
             ty::Adt(def, _)
@@ -929,7 +933,7 @@ impl CompositeShape {
 
     fn contains_sum(&self) -> bool {
         match self {
-            Self::Sum { .. } => true,
+            Self::Sum { .. } | Self::NonZeroNiche(_) => true,
             Self::Primitive(_) => false,
             Self::Tuple(fields) | Self::Array(fields) => fields.iter().any(Self::contains_sum),
             Self::Struct { fields, .. } => fields.iter().any(|(_, field)| field.contains_sum()),
@@ -938,7 +942,7 @@ impl CompositeShape {
 
     fn has_primitive_storage(&self) -> bool {
         match self {
-            Self::Primitive(_) | Self::Sum { .. } => true,
+            Self::Primitive(_) | Self::Sum { .. } | Self::NonZeroNiche(_) => true,
             Self::Tuple(fields) | Self::Array(fields) => {
                 fields.iter().any(Self::has_primitive_storage)
             }
@@ -950,6 +954,10 @@ impl CompositeShape {
 
     fn leaves(&self, output: &mut Vec<ScalarSliceElement>) {
         match self {
+            Self::NonZeroNiche(_) => output.push(ScalarSliceElement::Integer {
+                bits: 16,
+                signed: false,
+            }),
             Self::Sum {
                 bits,
                 signed,
@@ -988,6 +996,7 @@ impl CompositeShape {
         cursor: &mut usize,
     ) -> Result<Value, String> {
         match self {
+            Self::NonZeroNiche(schema) => schema.observe(context, leaves, index, cursor),
             Self::Sum {
                 name,
                 bits,
@@ -1083,7 +1092,10 @@ impl CompositeShape {
                     Self::Tuple(_) if values.is_empty() => Ok(Value::Unit),
                     Self::Tuple(_) => Ok(Value::Tuple(values)),
                     Self::Array(_) => Ok(Value::Elements(values.into())),
-                    Self::Primitive(_) | Self::Struct { .. } | Self::Sum { .. } => unreachable!(),
+                    Self::Primitive(_)
+                    | Self::Struct { .. }
+                    | Self::Sum { .. }
+                    | Self::NonZeroNiche(_) => unreachable!(),
                 }
             }
         }

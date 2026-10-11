@@ -111,7 +111,7 @@ impl<'tcx> Engine<'tcx> {
         if let Some(value) = self.static_atomic_wrapper_call(instance, values, state)? {
             return Ok(Some(value));
         }
-        if let Some(value) = self.nonzero_get(instance, values)? {
+        if let Some(value) = self.nonzero_get(instance, values, &state.conditions)? {
             self.record_model(callee, "nonzero integer value");
             return Ok(Some(value));
         }

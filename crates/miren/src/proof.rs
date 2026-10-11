@@ -76,6 +76,7 @@ mod mutable_slice_ranges;
 mod mutable_u16;
 mod mutable_u16_children;
 mod nominal_comparisons;
+mod nonzero_niches;
 mod nonzero_options;
 mod opaque_function_inputs;
 #[cfg(test)]
@@ -1219,6 +1220,7 @@ impl<'tcx> Engine<'tcx> {
             owned_boxes::owner_occurrences(&arguments)?
         };
         for (local, value) in body.args_iter().zip(&arguments) {
+            self.nonzero_niche_admission(body.local_decls[local].ty, value, &conditions)?;
             self.owned_box_type_value(body.local_decls[local].ty, value, &memory)?;
             self.validate_readonly_slice_value(
                 body.local_decls[local].ty,
@@ -1399,6 +1401,7 @@ impl<'tcx> Engine<'tcx> {
                     } else {
                         self.local(&state, 0)?
                     };
+                    self.nonzero_niche_admission(body.return_ty(), &value, &state.conditions)?;
                     self.mutable_u16_exit(body, &mutable_u16_arguments, &state.memory)?;
                     self.owned_box_type_value(body.return_ty(), &value, &state.memory)?;
                     self.validate_owned_exit(
@@ -2484,6 +2487,7 @@ impl<'tcx> Engine<'tcx> {
     ) -> Result<Value, String> {
         match operand {
             Operand::Copy(place) | Operand::Move(place) => {
+                self.nonzero_niche_operand_path(body, *place)?;
                 let value = self.read_place(state, *place, Some(body))?;
                 if matches!(
                     value,
@@ -2500,6 +2504,11 @@ impl<'tcx> Engine<'tcx> {
                         "mutable u16 root Copy/Move transport is unsupported".into(),
                     ));
                 }
+                self.nonzero_niche_admission(
+                    place.ty(&body.local_decls, self.tcx).ty,
+                    &value,
+                    &state.conditions,
+                )?;
                 self.owned_box_type_value(
                     place.ty(&body.local_decls, self.tcx).ty,
                     &value,

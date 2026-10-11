@@ -78,8 +78,7 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
         assert!(proof.entry_assumptions.is_empty());
         if *expected == ProofStatus::Unknown {
             let (category, reason) = match *name {
-                "mutable_root" | "reference_zero" | "refined_zero" | "dropped_zero"
-                | "niche_nonzero" => (
+                "mutable_root" | "reference_zero" | "refined_zero" | "dropped_zero" => (
                     UnknownCategory::Semantics,
                     "only read-only byte slices and byte arrays are modeled",
                 ),
@@ -224,7 +223,8 @@ fn direct_tag_slices_preserve_active_payload_and_source_validity() {
         ("mutable_root", ProofStatus::Unknown),
         ("niche_bool", ProofStatus::Proved),
         ("niche_char", ProofStatus::Proved),
-        ("niche_nonzero", ProofStatus::Unknown),
+        // Original source is PROVED in all four profiles after exact NZ16 certification.
+        ("niche_nonzero", ProofStatus::Proved),
         ("numerical_bits", ProofStatus::Proved),
         ("option_selected", ProofStatus::Proved),
         ("option_unwrap", ProofStatus::Refuted),

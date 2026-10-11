@@ -2948,3 +2948,54 @@ mod native_nested_whole_u16 {
         assert_eq!(values[0], 7);
     }
 }
+
+
+#[inline(never)]
+pub fn nonzero_niche_selected_value(value: Option<core::num::NonZeroU16>) -> u16 {
+    match value {
+        None => 0,
+        Some(value) => value.get(),
+    }
+}
+
+pub fn readonly_nonzero_niche_selected(values: &[Option<core::num::NonZeroU16>], index: usize) {
+    if index < values.len() {
+        let value = values[index];
+        match value {
+            None => assert!(nonzero_niche_selected_value(value) == 0),
+            Some(word) => assert!(nonzero_niche_selected_value(value) == word.get()),
+        }
+    }
+}
+
+pub fn readonly_nonzero_niche_wrong_claim(values: &[Option<core::num::NonZeroU16>], index: usize) {
+    if index < values.len() {
+        if let Some(word) = values[index] {
+            assert!(nonzero_niche_selected_value(Some(word)) == 0);
+        }
+    }
+}
+
+pub fn readonly_nonzero_niche_contains_unknown(
+    values: &[Option<core::num::NonZeroU16>],
+    needle: Option<core::num::NonZeroU16>,
+) {
+    let _ = values.contains(&needle);
+}
+
+#[cfg(test)]
+mod native_readonly_nonzero_niche {
+    #[test]
+    fn selected_nonzero_values_keep_actual_getter() {
+        let mut values = [None; 129];
+        for (index, value) in values.iter_mut().enumerate() {
+            if index % 3 != 0 {
+                *value = core::num::NonZeroU16::new(index as u16 + 1);
+            }
+        }
+        values[128] = core::num::NonZeroU16::new(u16::MAX);
+        for index in 0..values.len() {
+            super::readonly_nonzero_niche_selected(&values, index);
+        }
+    }
+}

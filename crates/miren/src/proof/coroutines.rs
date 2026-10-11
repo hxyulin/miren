@@ -89,6 +89,61 @@ impl<'tcx> Engine<'tcx> {
         visitor.error.map_or(Ok(visitor.places), Err)
     }
 
+    // Type-only lookup for a lowered operand. Initialization, active-state and permission
+    // checks still run in the existing reader/consumer; this returns no executable value.
+    pub(super) fn coroutine_original_operand_place(
+        &self,
+        body: &Body<'tcx>,
+        place: Place<'tcx>,
+    ) -> Result<Option<Place<'tcx>>, String> {
+        let places = self.coroutine_places.borrow();
+        if places.len() > MAX_INPUT_VALUES {
+            return Err(self.categorized_error(
+                UnknownCategory::ResourceLimit,
+                "original coroutine operand lookup exceeds the 512-node limit".into(),
+            ));
+        }
+        let mut matches = places.iter().filter(|(owner, certificate)| {
+            matches_body(owner, body)
+                && certificate.lowered.local == place.local
+                && place.projection.starts_with(certificate.lowered.projection)
+        });
+        let Some((_, certificate)) = matches.next() else {
+            return Ok(None);
+        };
+        if matches.any(|(_, other)| {
+            other.original != certificate.original || other.lowered != certificate.lowered
+        }) {
+            return Err("coroutine lowered operand has ambiguous original provenance".into());
+        }
+        if !matches!(certificate.coroutine.kind(), ty::Coroutine(..))
+            || certificate.owner.ty(&body.local_decls, self.tcx).ty != certificate.coroutine
+            || certificate.original.ty(&body.local_decls, self.tcx).ty != certificate.field_ty
+            || certificate.lowered.ty(&body.local_decls, self.tcx).ty != certificate.field_ty
+        {
+            return Err("coroutine original operand type no longer matches its body".into());
+        }
+        let suffix = &place.projection[certificate.lowered.projection.len()..];
+        if certificate
+            .original
+            .projection
+            .len()
+            .saturating_add(suffix.len())
+            > 16
+        {
+            return Err(self.categorized_error(
+                UnknownCategory::ResourceLimit,
+                "original coroutine operand path exceeds depth16".into(),
+            ));
+        }
+        let mut projection = certificate.original.projection.to_vec();
+        projection.extend_from_slice(suffix);
+        Ok(Some(Place {
+            local: certificate.original.local,
+            projection: self.tcx.mk_place_elems(&projection),
+        }))
+    }
+
     pub(super) fn coroutine_move_storage(
         &self,
         body: &Body<'tcx>,
@@ -102,7 +157,9 @@ impl<'tcx> Engine<'tcx> {
         let Some((_, certificate)) = matches.next() else {
             return Ok(None);
         };
-        if matches.any(|(_, other)| other.original != certificate.original) {
+        if matches.any(|(_, other)| {
+            other.original != certificate.original || other.lowered != certificate.lowered
+        }) {
             return Err("coroutine lowered place has ambiguous original provenance".into());
         }
         let (allocation, mut path, _) = self.memory_path(state, certificate.owner)?;
@@ -128,7 +185,9 @@ impl<'tcx> Engine<'tcx> {
         let Some((_, certificate)) = matches.next() else {
             return Ok(None);
         };
-        if matches.any(|(_, other)| other.original != certificate.original) {
+        if matches.any(|(_, other)| {
+            other.original != certificate.original || other.lowered != certificate.lowered
+        }) {
             return Err("coroutine lowered place has ambiguous original provenance".into());
         }
         let ty::Coroutine(id, args) = certificate.coroutine.kind() else {
@@ -601,4 +660,98 @@ impl<'tcx> MutVisitor<'tcx> for CoroutinePlaces<'tcx> {
             }
         }
     }
+}
+
+#[cfg(test)]
+pub(super) fn check_original_operand_lookup(tcx: TyCtxt<'_>) {
+    let id = tcx
+        .hir_body_owners()
+        .find(|id| {
+            tcx.def_kind(*id) == DefKind::Closure
+                && matches!(
+                    tcx.type_of(*id)
+                        .instantiate_identity()
+                        .skip_norm_wip()
+                        .kind(),
+                    ty::Coroutine(..)
+                )
+        })
+        .unwrap();
+    let engine = super::nonzero_niches::test_engine(tcx);
+    let mut body = tcx.optimized_mir(id).clone();
+    let certificates = engine.flatten_coroutine_places(&mut body).unwrap();
+    assert!(!certificates.is_empty());
+    let owner = std::rc::Rc::new(body);
+    let weak = std::rc::Rc::downgrade(&owner);
+    engine.coroutine_places.borrow_mut().extend(
+        certificates
+            .iter()
+            .cloned()
+            .map(|certificate| (weak.clone(), certificate)),
+    );
+    let certificate = certificates
+        .iter()
+        .find(|certificate| certificate.variant.is_some())
+        .unwrap();
+    assert_eq!(
+        engine
+            .coroutine_original_operand_place(&owner, certificate.lowered)
+            .unwrap(),
+        Some(certificate.original)
+    );
+    let unrelated = owner.as_ref().clone();
+    assert!(
+        engine
+            .coroutine_original_operand_place(&unrelated, certificate.lowered)
+            .unwrap()
+            .is_none()
+    );
+    let mut projection = certificate.lowered.projection.to_vec();
+    let ProjectionElem::Field(field, _) = *projection.last().unwrap() else {
+        unreachable!()
+    };
+    *projection.last_mut().unwrap() = ProjectionElem::Field(field, tcx.types.bool);
+    let forged = Place {
+        projection: tcx.mk_place_elems(&projection),
+        ..certificate.lowered
+    };
+    assert!(
+        engine
+            .coroutine_original_operand_place(&owner, forged)
+            .unwrap()
+            .is_none()
+    );
+    let mut ambiguous = certificate.clone();
+    ambiguous.original = Place::from(certificate.original.local);
+    engine
+        .coroutine_places
+        .borrow_mut()
+        .push((weak.clone(), ambiguous));
+    assert!(
+        engine
+            .coroutine_original_operand_place(&owner, certificate.lowered)
+            .is_err()
+    );
+    engine.coroutine_places.borrow_mut().pop();
+    let mut different_prefix = certificate.clone();
+    different_prefix.lowered = Place::from(certificate.lowered.local);
+    engine
+        .coroutine_places
+        .borrow_mut()
+        .push((weak.clone(), different_prefix));
+    assert!(
+        engine
+            .coroutine_original_operand_place(&owner, certificate.lowered)
+            .is_err()
+    );
+    engine.coroutine_places.borrow_mut().pop();
+    let mut stale = certificate.clone();
+    stale.field_ty = tcx.types.bool;
+    engine.coroutine_places.borrow_mut().clear();
+    engine.coroutine_places.borrow_mut().push((weak, stale));
+    assert!(
+        engine
+            .coroutine_original_operand_place(&owner, certificate.lowered)
+            .is_err()
+    );
 }
