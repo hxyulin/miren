@@ -5891,3 +5891,110 @@ inputs. Earlier failed full runs, owner checkpoints and actual-parent evidence r
 recorded. Final evidence is under `/tmp/miren-stage207-root-final-full-checks`,
 `/tmp/miren-stage207-root-final-survey`, `/tmp/miren-stage207-root-replay` and
 `/tmp/miren-stage207-root-native`. These counts describe Rust capability cases, not fleet coverage.
+
+
+## Stage208 historical actual203 checkpoint: nested whole Bool child calls
+
+This scoped owner is based on committed Stage203 dc1cad57 and preserves its integer hierarchy.
+It admits exact original Bool backing with the issued one-byte layout and logical Bool codec.
+Nested calls retain current owner, epoch, generation, masks and returned Memory checks. Char,
+shared child arguments, deeper nesting and interval composition remain outside this admission.
+No input bound, contract premise, runtime check or missing-body shortcut is added.
+
+Fresh dedicated host/ARM O0/O2 controls measure three Bool PROVED, two REFUTED and one UNKNOWN
+per profile; all six Char controls remain UNKNOWN. Actual scalar helper xor-false-to-xor-true
+mutations refute all three unchanged selected, sibling and scalar-return claims in all profiles.
+Genuine nongeneric dependency controls prove retained O0 selected and empty callers. Retained O2
+selected stores remain UNKNOWN at their existing lowering frontier, while empty callers prove.
+Omitted selected and empty bodies remain MissingCompilerEvidence, including empty inputs.
+
+Fresh automatic compatibility replay checks 108 prior command groups: 3,472 proof objects,
+3,468 exact whole objects and all 5,924 old emitted queries exact. Its only changes are four
+measured old mutable_bool_slices::nested UNKNOWN-to-PROVED promotions. The separate new Bool
+controls retain their deeper UNKNOWN frontier; they are not counted as prior whole-object matches.
+
+The owner appends three Bool globals to the exact Stage203 212-case source prefix, with the sole
+old Bool nested manifest expectation updated to its measured PROVED result. Fresh custom-solver
+profiles measure 215 cases across 73 families: 87 PROVED, 75 REFUTED and 53 UNKNOWN each. Of 848
+prior global proof pairs, 842 match wholly, four are that Bool promotion and two retain query-free
+30-second ResourceLimit call-chain variations. Every remaining field and all 1,580 old emitted
+queries match exactly. These are actual203-plus-Bool counts, separate from Stage205 intervals.
+
+Fresh native dependency, dedicated and global controls compile safe current sources with
+finite lengths through 129 under ten-second limits; originals pass and helper mutants fail with
+exit 101. They impose no proof input bound. Scoped compiler, RAII restoration, dedicated, old
+related and closure tests, formatting, lint and debug build pass. An initial unqualified exact
+RAII filter selected zero tests; the corrective qualified filter selects one actual passing test.
+
+Evidence is retained under `/tmp/miren-stage208-upkeep-automatic-fidelity`,
+`/tmp/miren-stage208-upkeep-full-global`, `/tmp/miren-stage208-upkeep-foreign-final`,
+`/tmp/miren-stage208-upkeep-foreign-mutation` and `/tmp/miren-stage208-upkeep-global-mutation`.
+Independent upkeep review, latest-parent adoption, full validation, release replay and ROOT
+commit readiness remain separate gates. Historical disabled and flag-only checkpoints remain intact.
+
+Current Stage208 adoption is based on committed Stage207 799b714, preserving its u16 metadata
+certificate, proper integer intervals and exact 218-case source prefix. Its manifest updates only
+the measured old Bool nested UNKNOWN-to-PROVED expectation and appends three Bool controls.
+Four fresh 221-case profiles measure 89 PROVED, 77 REFUTED and 55 UNKNOWN across 75 families.
+These actual207 scoped counts are separate from the historical actual203 checkpoint above.
+
+Fresh same-source/cwd replay compares actual207 release452ef with candidatee05 in 164 paired
+command groups: 4,660 proof objects and 4,602 fully identical objects. Those FULL objects contain
+8,164 exact queries; another 12 baseline queries are exact active prefixes in changed Bool objects,
+for 8,176 baseline emitted queries exact in total. Old108 compatibility contributes 3,472 pairs,
+3,468 full matches and 5,924 queries;
+its only changes are four old Bool nested promotions. All44 current207 metadata, interval,
+closure and foreign anchors match fully: 244 pairs and 612 queries. New Bool originals and
+helper mutants are separate controls, with three PROVED, two REFUTED and one UNKNOWN per
+original profile; six Char controls remain UNKNOWN. All three actual Bool helper mutants refute.
+
+Combined globals compare 884 objects, with 866 full matches and 1,624 queries inside FULL objects.
+Four more baseline queries match active prefixes in changed new Bool controls: 1,628 ALL exact.
+New Bool original/mutant controls separately contain 12 baseline queries: four in FULL Char
+objects and eight exact active prefixes in changed Bool sibling objects.
+Four old Bool promotions, twelve new control/frontier changes and two named query-free fold
+ResourceLimit contexts are explicitly catalogued. Host O0 changes its call chain; host O2 changes
+only the literal closure timeout prefix. Every other field matches, with no report normalization.
+
+Eight freshly built nongeneric dependency libraries produce 16 reports: retained O0 selected
+and empty callers prove; retained O2 selected stores remain Semantics UNKNOWN at the existing
+whole-element lowering, while empty callers prove. Omitted selected and empty bodies remain
+MissingCompilerEvidence. Fresh dependency and global helper mutations refute with actual body,
+query and model evidence. Twelve native executions select one or two actual tests under
+ten-second limits: six originals pass and six safe helper mutants fail with exit101. Finite
+lengths through129 do not bound proof inputs. Source, compiler, library, executable and raw
+output hashes are retained separately.
+
+Current scoped checks pass29 actual tests, formatting, lint and build. Two setup/filter mistakes
+were stopped and archived; corrected metadata and interval filters each select one actual test.
+The inherited hierarchy probe initially reused a shared temporary scratch directory. A subsequent
+cfgtest-only correction selects a unique per-invocation directory and passes its actual compiler
+test, formatting, lint and build. The normal analyzer remains byte-identicale05. Initial capture
+source associations are preserved and explicitly adopted across that test-only correction;
+no historical scratch-asset equivalence or new execution is claimed. Actual208 historical and
+actual207 adoption evidence remain distinct. Full ROOT validation and replay are recorded
+separately below. Current scoped evidence is under `/tmp/miren-stage208-parent207-fidelity`,
+`/tmp/miren-stage208-parent207-foreign`, `/tmp/miren-stage208-parent207-scratch-upkeep` and
+`/tmp/miren-stage208-parent207-core-freeze.json`.
+
+Completed ROOT Stage208 validation passes all 22 required checks: 835 Rust workspace tests,
+68 Python tests, formatting, lint, debug/release builds, dependency checks, documentation,
+twelve example checks and manual hooks. Four fresh release profiles match 221 cases across
+75 families: 89 PROVED, 77 REFUTED and 55 UNKNOWN, with no errors or new assumptions.
+
+Fresh owner-to-ROOT debug replay compares 4,660 proof objects: 4,658 match fully, and all
+8,292 emitted queries and models match exactly. ROOT debug-to-release replay compares the
+same 4,660 objects: 4,659 match fully, and all 8,292 queries and models match exactly.
+Only explicitly named query/model-free unbounded-fold deadline contexts may differ in their
+literal detail or call chain; every residual field and the same 30-second budget are retained.
+No reports, paths, queries or models are normalized. These candidate-to-candidate counts are
+separate from the parent-to-candidate 8,176 baseline queries and measured Bool promotions above.
+
+Twelve fresh ROOT native executions rebuild current originals and actual helper mutants;
+foreign libraries are rebuilt too. Each selects one or two actual tests under ten-second limits:
+six originals pass and six mutants fail with exit 101, without changing assertions. Finite
+native cases impose no bound on symbolic inputs. Final evidence is under
+`/tmp/miren-stage208-root-full-checks`, `/tmp/miren-stage208-root-survey`,
+`/tmp/miren-stage208-root-replay` and `/tmp/miren-stage208-root-native`. Final documentation
+closure preserves all 915 other tested source files. These counts describe capability cases,
+not full Rust parity or firmware coverage.

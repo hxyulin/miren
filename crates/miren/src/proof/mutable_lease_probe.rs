@@ -847,12 +847,13 @@ fn compiler_cases<'tcx>(tcx: TyCtxt<'tcx>, output: &std::path::Path) {
     for (name, original, wrong) in [
         ("root_i32", tcx.types.i32, tcx.types.u32),
         ("root_usize", tcx.types.usize, tcx.types.u64),
+        ("root_bool", tcx.types.bool, tcx.types.char),
     ] {
         let instance = engine
             .resolve_function_item(find(name), tcx.mk_args(&[]))
             .unwrap();
         let body = engine.instantiated_body(instance).unwrap();
-        super::mutable_hierarchy::compiler_integer_boundary_probe(
+        super::mutable_hierarchy::compiler_element_boundary_probe(
             &mut engine,
             &body,
             original,
@@ -1337,7 +1338,15 @@ fn compiler_nested_whole_u16_inactive_lifecycle() {
             rustc_driver::Compilation::Stop
         }
     }
-    let root = std::path::PathBuf::from("/tmp/miren-stage203-parent202/compiler-lifecycle");
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!(
+        "miren-stage208-parent207-compiler-{}-{nonce}",
+        std::process::id()
+    ));
+    eprintln!("Stage208 unique compiler scratch: {}", root.display());
     std::fs::create_dir_all(&root).unwrap();
     let source = root.join("fixture.rs");
     std::fs::write(
@@ -1362,7 +1371,10 @@ fn compiler_nested_whole_u16_inactive_lifecycle() {
             "pub fn root_i32(v:&mut[i32]) { outer_i32(v); }\n",
             "#[inline(never)] fn leaf_usize(v:&mut[usize]) { if v.len()>0 { v[0]=17; } }\n",
             "#[inline(never)] fn outer_usize(v:&mut[usize]) { leaf_usize(&mut *(&mut *v)); }\n",
-            "pub fn root_usize(v:&mut[usize]) { outer_usize(v); }\n"
+            "pub fn root_usize(v:&mut[usize]) { outer_usize(v); }\n",
+            "#[inline(never)] fn leaf_bool(v:&mut[bool]) { if v.len()>0 { v[0]=true; } }\n",
+            "#[inline(never)] fn outer_bool(v:&mut[bool]) { leaf_bool(&mut *(&mut *v)); }\n",
+            "pub fn root_bool(v:&mut[bool]) { outer_bool(v); }\n"
         ),
     )
     .unwrap();

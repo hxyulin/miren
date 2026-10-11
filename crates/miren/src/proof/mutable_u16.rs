@@ -946,6 +946,58 @@ impl<'tcx> Engine<'tcx> {
 }
 
 #[cfg(test)]
+pub(super) fn compiler_bool_hierarchy_backing_probe(engine: &mut Engine<'_>, memory: &Memory) {
+    let backing = engine.mutable_u16_backing(0, memory).unwrap();
+    let certificate = backing.certificate;
+    let issued = engine.mutable_integer_types[certificate].clone();
+    assert_eq!(issued.original, engine.tcx.types.bool);
+    assert_eq!(issued.element, symbolic::ScalarSliceElement::Bool);
+    assert_eq!((issued.bytes, issued.alignment), (1, 1));
+    for original in [
+        engine.tcx.types.u8,
+        engine.tcx.types.i8,
+        engine.tcx.types.char,
+    ] {
+        engine.mutable_integer_types[certificate].original = original;
+        assert!(engine.mutable_u16_backing(0, memory).is_err());
+        engine.mutable_integer_types[certificate] = issued.clone();
+    }
+    for (bytes, alignment) in [(0, 1), (1, 2)] {
+        engine.mutable_integer_types[certificate].bytes = bytes;
+        engine.mutable_integer_types[certificate].alignment = alignment;
+        assert!(engine.mutable_u16_backing(0, memory).is_err());
+        engine.mutable_integer_types[certificate] = issued.clone();
+    }
+    engine.mutable_integer_types[certificate].element = symbolic::ScalarSliceElement::Integer {
+        bits: 8,
+        signed: false,
+    };
+    assert!(engine.mutable_u16_backing(0, memory).is_err());
+    engine.mutable_integer_types[certificate] = issued;
+    let foreign = Context::default();
+    let bits = u32::from(engine.tcx.sess.target.pointer_width);
+    let mut context = memory.clone();
+    std::rc::Rc::make_mut(&mut context.mutable_u16)[0].data = foreign
+        .symbol(
+            99,
+            Sort::Array(Box::new(Sort::BitVec(bits)), Box::new(Sort::Bool)),
+        )
+        .unwrap();
+    assert!(engine.mutable_u16_backing(0, &context).is_err());
+    for wrong in [
+        symbolic::integer(&engine.terms, 1, 8, false),
+        Value::Bool(engine.terms.bit_vector(1, 8).unwrap()),
+        Value::Bool(foreign.boolean(true)),
+    ] {
+        assert!(
+            engine
+                .mutable_hierarchy_primitive_value_probe(&wrong)
+                .is_err()
+        );
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
     #[test]

@@ -4,6 +4,7 @@ use std::rc::Rc;
 
 const ISSUANCE_ENABLED: bool = true;
 const INTEGER_HIERARCHY_ENABLED: bool = true;
+const BOOL_HIERARCHY_ENABLED: bool = true;
 const DORMANT_CALLS_ENABLED: bool = true;
 
 fn integer_hierarchy_enabled() -> bool {
@@ -33,6 +34,36 @@ impl TestIntegerHierarchy {
 impl Drop for TestIntegerHierarchy {
     fn drop(&mut self) {
         TEST_INTEGER_HIERARCHY.with(|value| value.set(self.0));
+    }
+}
+
+fn bool_hierarchy_enabled() -> bool {
+    #[cfg(test)]
+    if TEST_BOOL_HIERARCHY.with(std::cell::Cell::get) {
+        return true;
+    }
+    BOOL_HIERARCHY_ENABLED
+}
+
+#[cfg(test)]
+std::thread_local! {
+    static TEST_BOOL_HIERARCHY: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+#[cfg(test)]
+struct TestBoolHierarchy(bool);
+
+#[cfg(test)]
+impl TestBoolHierarchy {
+    fn enable() -> Self {
+        Self(TEST_BOOL_HIERARCHY.with(|value| value.replace(true)))
+    }
+}
+
+#[cfg(test)]
+impl Drop for TestBoolHierarchy {
+    fn drop(&mut self) {
+        TEST_BOOL_HIERARCHY.with(|value| value.set(self.0));
     }
 }
 
@@ -192,9 +223,7 @@ impl<'tcx> Engine<'tcx> {
             || !hierarchy.origin.data_context.belongs_to(&self.terms)
             || !backing.data.belongs_to(&self.terms)
             || hierarchy.origin.data_context.sort() != backing.data.sort()
-            || !self.mutable_hierarchy_integer_element(
-                self.mutable_interval_element(backing.certificate)?,
-            )
+            || !self.mutable_hierarchy_element(self.mutable_interval_element(backing.certificate)?)
             || hierarchy.issued < backing.generation
         {
             return Err("disabled hierarchy original owner differs".into());
@@ -303,9 +332,7 @@ impl<'tcx> Engine<'tcx> {
             || destination.local.as_usize() <= body.arg_count
             || source.local == destination.local
             || state.addresses[destination.local.as_usize()].is_some()
-            || !self.mutable_hierarchy_integer_element(
-                self.mutable_interval_element(backing.certificate)?,
-            )
+            || !self.mutable_hierarchy_element(self.mutable_interval_element(backing.certificate)?)
             || !self.mutable_u16_matches(
                 body.local_decls[source.local].ty,
                 id,
@@ -681,15 +708,14 @@ impl<'tcx> Engine<'tcx> {
                     symbolic::MutableU16Role::Root | symbolic::MutableU16Role::Child { .. }
                 )
                 || state.missing_places.check(local, &[]).is_err()
-                || !self.mutable_hierarchy_integer_reference(call.body.local_decls[place.local].ty)
+                || !self.mutable_hierarchy_reference(call.body.local_decls[place.local].ty)
             {
                 return Ok(false);
             }
             let backing = self.mutable_u16_backing(*id, &state.memory)?;
             if backing.interval.is_some()
-                || !self.mutable_hierarchy_integer_element(
-                    self.mutable_interval_element(backing.certificate)?,
-                )
+                || !self
+                    .mutable_hierarchy_element(self.mutable_interval_element(backing.certificate)?)
                 || !self.mutable_u16_matches(
                     call.body.local_decls[place.local].ty,
                     *id,
@@ -722,7 +748,7 @@ impl<'tcx> Engine<'tcx> {
         else {
             return Ok(false);
         };
-        if !self.mutable_hierarchy_integer_reference(signature.inputs()[position])
+        if !self.mutable_hierarchy_reference(signature.inputs()[position])
             || signature
                 .inputs()
                 .iter()
@@ -737,17 +763,18 @@ impl<'tcx> Engine<'tcx> {
         self.mutable_hierarchy_selector(&selected, position + 1)
     }
 
-    fn mutable_hierarchy_integer_element(&self, original: Ty<'tcx>) -> bool {
+    fn mutable_hierarchy_element(&self, original: Ty<'tcx>) -> bool {
         original == self.tcx.types.u16
             || (integer_hierarchy_enabled()
                 && matches!(original.kind(), ty::Int(_) | ty::Uint(_))
                 && original != self.tcx.types.u8)
+            || (bool_hierarchy_enabled() && original == self.tcx.types.bool)
     }
 
-    fn mutable_hierarchy_integer_reference(&self, original: Ty<'tcx>) -> bool {
+    fn mutable_hierarchy_reference(&self, original: Ty<'tcx>) -> bool {
         matches!(original.kind(), ty::Ref(_, pointee, rustc_hir::Mutability::Mut)
             if matches!(pointee.kind(), ty::Slice(element)
-                if self.mutable_hierarchy_integer_element(*element)))
+                if self.mutable_hierarchy_element(*element)))
     }
 
     fn mutable_hierarchy_routing_signature(
@@ -933,7 +960,7 @@ impl<'tcx> Engine<'tcx> {
             .iter()
             .enumerate()
             .any(|(i, t)| i != position && !self.mutable_hierarchy_primitive(*t))
-            || !self.mutable_hierarchy_integer_element(
+            || !self.mutable_hierarchy_element(
                 self.mutable_interval_element(state.memory.mutable_u16[id].certificate)?,
             )
         {
@@ -1103,7 +1130,7 @@ impl<'tcx> Engine<'tcx> {
             || selected
                 .local_decls
                 .get(root)
-                .is_none_or(|d| !self.mutable_hierarchy_integer_reference(d.ty))
+                .is_none_or(|d| !self.mutable_hierarchy_reference(d.ty))
         {
             return Ok(false);
         }
@@ -1117,9 +1144,9 @@ impl<'tcx> Engine<'tcx> {
                             && lineage.contains(&p.local)
                             && selected.local_decls[p.local].ty == selected.local_decls[root].ty
                             && selected.local_decls[a.0.local].ty == selected.local_decls[root].ty
-                            && self.mutable_hierarchy_integer_reference(
+                            && self.mutable_hierarchy_reference(
                                 selected.local_decls[p.local].ty)
-                            && self.mutable_hierarchy_integer_reference(
+                            && self.mutable_hierarchy_reference(
                                 selected.local_decls[a.0.local].ty));
                         lineage.remove(&a.0.local);
                         if follows {
@@ -1157,12 +1184,12 @@ impl<'tcx> Engine<'tcx> {
             let mut receiver = None;
             let mut eligible = true;
             for (position, (operand, original)) in args.iter().zip(signature.inputs()).enumerate() {
-                if self.mutable_hierarchy_integer_reference(*original) {
+                if self.mutable_hierarchy_reference(*original) {
                     let follows = matches!(operand.node, Operand::Copy(p) | Operand::Move(p)
                         if p.projection.is_empty() && lineage.contains(&p.local)
                         && *original == selected.local_decls[root].ty
                         && selected.local_decls[p.local].ty == selected.local_decls[root].ty
-                        && self.mutable_hierarchy_integer_reference(
+                        && self.mutable_hierarchy_reference(
                                 selected.local_decls[p.local].ty));
                     if !follows || receiver.replace(position).is_some() {
                         eligible = false;
@@ -1534,7 +1561,17 @@ pub(super) fn compiler_probe<'tcx>(
 }
 
 #[cfg(test)]
-pub(super) fn compiler_integer_boundary_probe<'tcx>(
+impl Engine<'_> {
+    pub(super) fn mutable_hierarchy_primitive_value_probe(
+        &self,
+        value: &Value,
+    ) -> Result<(), String> {
+        self.mutable_hierarchy_primitive_value(self.tcx.types.bool, value, &[])
+    }
+}
+
+#[cfg(test)]
+pub(super) fn compiler_element_boundary_probe<'tcx>(
     engine: &mut Engine<'tcx>,
     root: &Rc<Body<'tcx>>,
     element: Ty<'tcx>,
@@ -1595,11 +1632,17 @@ pub(super) fn compiler_integer_boundary_probe<'tcx>(
         stack: &[],
         site: (root.source.def_id(), data.terminator().source_info.span),
     };
+    let is_bool = element == engine.tcx.types.bool;
     assert_eq!(
         engine.mutable_hierarchy_route(&state, &call()).unwrap(),
-        INTEGER_HIERARCHY_ENABLED
+        if is_bool {
+            BOOL_HIERARCHY_ENABLED
+        } else {
+            INTEGER_HIERARCHY_ENABLED
+        }
     );
-    let _scope = TestIntegerHierarchy::enable();
+    let _integer_scope = (!is_bool).then(TestIntegerHierarchy::enable);
+    let _bool_scope = is_bool.then(TestBoolHierarchy::enable);
     assert!(engine.mutable_hierarchy_route(&state, &call()).unwrap());
     for excluded in [
         engine.tcx.types.u8,
@@ -1608,7 +1651,10 @@ pub(super) fn compiler_integer_boundary_probe<'tcx>(
         engine.tcx.types.f32,
         engine.tcx.types.f64,
     ] {
-        assert!(!engine.mutable_hierarchy_integer_element(excluded));
+        assert_eq!(
+            engine.mutable_hierarchy_element(excluded),
+            bool_hierarchy_enabled() && excluded == engine.tcx.types.bool
+        );
     }
     let selected = engine.instantiated_body(instance).unwrap();
     assert!(engine.mutable_hierarchy_selector(&selected, 1).unwrap());
@@ -1650,14 +1696,43 @@ pub(super) fn compiler_integer_boundary_probe<'tcx>(
             .is_none()
     );
     assert_eq!(wrong_state.memory.mutable_u16[0].data, before);
+    if is_bool {
+        super::mutable_u16::compiler_bool_hierarchy_backing_probe(engine, &state.memory);
+        let mut consumed = state.clone();
+        consumed.missing_places.consume(source, Vec::new()).unwrap();
+        assert!(!engine.mutable_hierarchy_route(&consumed, &call()).unwrap());
+        let original_data = consumed.memory.mutable_u16[0].data.clone();
+        assert!(
+            engine
+                .mutable_hierarchy_call(&mut consumed, call())
+                .unwrap()
+                .is_none()
+        );
+        assert_eq!(consumed.memory.mutable_u16[0].data, original_data);
+        let mut consumed_backing = state.clone();
+        let allocation = consumed_backing.memory.mutable_u16[0].allocation;
+        consumed_backing
+            .memory
+            .missing_places
+            .consume(allocation, Vec::new())
+            .unwrap();
+        assert!(
+            engine
+                .mutable_hierarchy_route(&consumed_backing, &call())
+                .is_err()
+        );
+    }
     let results = engine
         .mutable_hierarchy_call(&mut state, call())
         .unwrap()
         .unwrap();
     assert!(!results.is_empty());
-    let leaf_name = if element == engine.tcx.types.i32 {
+    let leaf_name = if is_bool {
+        "leaf_bool"
+    } else if element == engine.tcx.types.i32 {
         "leaf_i32"
     } else {
+        assert_eq!(element, engine.tcx.types.usize);
         "leaf_usize"
     };
     assert!(
@@ -1678,7 +1753,104 @@ pub(super) fn compiler_integer_boundary_probe<'tcx>(
         let hierarchy = backing.hierarchy.as_ref().unwrap();
         assert!(hierarchy.owners.is_empty() && hierarchy.pending.is_none());
         assert!(hierarchy.issued >= 2);
+        if is_bool {
+            compiler_bool_return_probe(engine, root, block, source, &result);
+        }
     }
+}
+
+#[cfg(test)]
+fn compiler_bool_return_probe<'tcx>(
+    engine: &mut Engine<'tcx>,
+    root: &Rc<Body<'tcx>>,
+    block: rustc_middle::mir::BasicBlock,
+    source: usize,
+    result: &Return,
+) {
+    super::mutable_u16::compiler_bool_hierarchy_backing_probe(engine, &result.memory);
+    let backing = engine
+        .mutable_u16_backing(0, &result.memory)
+        .unwrap()
+        .clone();
+    let original = backing.hierarchy.as_ref().unwrap();
+    let current = original.metadata(0).unwrap();
+    original.observe(current).unwrap();
+    assert!(
+        original
+            .observe(Metadata {
+                epoch: current.epoch - 1,
+                ..current
+            })
+            .is_err()
+    );
+    assert!(
+        engine
+            .mutable_u16_role_live(
+                0,
+                &symbolic::MutableU16Role::HierarchyChild {
+                    lease: original.issued
+                },
+                &result.memory
+            )
+            .is_err()
+    );
+    let mut no_namespace = result.memory.clone();
+    no_namespace.mutable_hierarchy = None;
+    assert!(engine.mutable_u16_backing(0, &no_namespace).is_err());
+    let mut stale_generation = result.memory.clone();
+    Rc::make_mut(&mut stale_generation.mutable_u16)[0].generation = original.issued + 1;
+    assert!(engine.mutable_u16_backing(0, &stale_generation).is_err());
+    let mut missing = result.memory.clone();
+    missing
+        .missing_places
+        .consume(backing.allocation, Vec::new())
+        .unwrap();
+    assert!(engine.mutable_u16_backing(0, &missing).is_err());
+    let frame = engine.mutable_u16_register_frame(root).unwrap();
+    let tip = Tip {
+        frame,
+        statement: block.as_usize(),
+        local: source,
+    };
+    let mut next = original.clone();
+    let slots = result.memory.storage_slots();
+    let lease = next.issue(0, tip.clone(), slots).unwrap();
+    assert!(next.access(0).is_err());
+    let mut wrong_tip = tip.clone();
+    wrong_tip.local += 1;
+    assert!(next.enter(&wrong_tip, frame, slots).is_err());
+    let ticket = next.enter(&tip, frame, slots).unwrap();
+    next.access(lease).unwrap();
+    assert!(next.access(0).is_err());
+    let mut rollback = next.clone();
+    rollback.epoch = ticket.epoch_floor - 1;
+    assert!(rollback.release(&ticket).is_err());
+    next.release(&ticket).unwrap();
+    next.access(0).unwrap();
+    assert!(next.access(lease).is_err());
+    let mut exhausted = original.clone();
+    assert!(matches!(
+        exhausted.issue(0, tip, MAX_INPUT_VALUES),
+        Err(TransitionError::Resource(_))
+    ));
+    let bits = u32::from(engine.tcx.sess.target.pointer_width);
+    let zero = symbolic::integer(&engine.terms, 0, bits, false);
+    let nonempty = symbolic::binary(&engine.terms, "lt", zero.clone(), backing.length.clone())
+        .unwrap()
+        .boolean()
+        .unwrap();
+    let observed = engine
+        .terms
+        .apply(
+            Op::Select,
+            &[backing.data.clone(), zero.integer().unwrap().0.clone()],
+        )
+        .unwrap();
+    assert_eq!(observed.sort(), &Sort::Bool);
+    let mut denied = result.conditions.clone();
+    denied.push(nonempty);
+    denied.push(symbolic::not(&observed));
+    assert!(!engine.feasible(&denied).unwrap());
 }
 
 #[cfg(test)]
@@ -2225,6 +2397,37 @@ mod tests {
         );
         assert!(!TEST_ISSUANCE.with(std::cell::Cell::get));
         assert_eq!(issuance_enabled(), ISSUANCE_ENABLED);
+    }
+
+    #[test]
+    fn scoped_bool_selection_restores_nested_and_panicking_tests() {
+        assert!(!TEST_BOOL_HIERARCHY.with(std::cell::Cell::get));
+        assert_eq!(bool_hierarchy_enabled(), BOOL_HIERARCHY_ENABLED);
+        {
+            let _outer = TestBoolHierarchy::enable();
+            assert!(TEST_BOOL_HIERARCHY.with(std::cell::Cell::get));
+            assert!(bool_hierarchy_enabled());
+            {
+                let _inner = TestBoolHierarchy::enable();
+                assert!(TEST_BOOL_HIERARCHY.with(std::cell::Cell::get));
+                assert!(bool_hierarchy_enabled());
+            }
+            assert!(TEST_BOOL_HIERARCHY.with(std::cell::Cell::get));
+            assert!(bool_hierarchy_enabled());
+        }
+        assert!(!TEST_BOOL_HIERARCHY.with(std::cell::Cell::get));
+        assert_eq!(bool_hierarchy_enabled(), BOOL_HIERARCHY_ENABLED);
+        assert!(
+            std::panic::catch_unwind(|| {
+                let _scope = TestBoolHierarchy::enable();
+                assert!(TEST_BOOL_HIERARCHY.with(std::cell::Cell::get));
+                assert!(bool_hierarchy_enabled());
+                panic!("test scoped bool restoration");
+            })
+            .is_err()
+        );
+        assert!(!TEST_BOOL_HIERARCHY.with(std::cell::Cell::get));
+        assert_eq!(bool_hierarchy_enabled(), BOOL_HIERARCHY_ENABLED);
     }
 
     #[test]

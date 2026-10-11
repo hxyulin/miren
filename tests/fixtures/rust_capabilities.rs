@@ -3188,3 +3188,60 @@ mod stage207_metadata_native {
         }
     }
 }
+
+#[inline(never)]
+pub fn nested_bool_word(word: bool) -> bool {
+    word ^ false
+}
+#[inline(never)]
+pub fn nested_bool_leaf(values: &mut [bool], word: bool) {
+    if values.len() > 0 {
+        values[0] = nested_bool_word(word);
+    }
+}
+#[inline(never)]
+pub fn nested_bool_outer(values: &mut [bool], word: bool) -> bool {
+    nested_bool_leaf(&mut *(&mut *values), word);
+    nested_bool_word(word)
+}
+#[inline(never)]
+pub fn nested_bool_deeper(values: &mut [bool], word: bool) {
+    nested_bool_outer(values, word);
+}
+pub fn nested_bool_child_call(values: &mut [bool], word: bool) {
+    if values.len() > 1 {
+        let sibling = values[1];
+        let returned = nested_bool_outer(values, word);
+        assert!(values[0] == word && returned == word);
+        assert!(values[1] == sibling);
+    }
+}
+pub fn nested_bool_wrong_claim(values: &mut [bool], word: bool) {
+    if values.len() > 0 {
+        nested_bool_outer(values, word);
+        assert!(values[0] != word);
+    }
+}
+pub fn nested_bool_deeper_unknown(values: &mut [bool], word: bool) {
+    if values.len() > 0 {
+        nested_bool_deeper(values, word);
+        assert!(values[0] == word);
+    }
+}
+#[cfg(test)]
+mod native_nested_bool {
+    extern crate std;
+    #[test]
+    fn actual_data_and_sibling() {
+        for length in 0..=129 {
+            for word in [false, true] {
+                let mut values = std::vec![false; length];
+                super::nested_bool_child_call(&mut values, word);
+            }
+        }
+    }
+    #[test]
+    fn mutation_guard() {
+        super::nested_bool_child_call(&mut [false; 129], true);
+    }
+}

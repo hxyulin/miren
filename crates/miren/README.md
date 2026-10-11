@@ -1171,3 +1171,10 @@ other primitive elements remain outside this bounded certificate. Existing `len`
 unchanged. Diagnostic host/ARM O0/O2 captures prove root, whole child and proper empty/nonempty
 views, refute wrong claims and actual scalar-helper mutations, and retain genuine missing-child
 body refusal. Full ROOT validation, release replay and commit remain pending.
+
+The whole-slice nested hierarchy also accepts exact original Bool with its logical Bool codec,
+layout1/1 and existing current-memory/epoch/owner checks. Actual nested body and scalar-return
+results are checked; Char remains outside this extension. Retained library O0 bodies support
+selected and empty callers, omitted bodies stay MissingCompilerEvidence UNKNOWN even when empty,
+and an optimized retained store may reach the existing unsupported shape frontier. No new raw,
+retained-reference, interval or deeper hierarchy permission is granted.
