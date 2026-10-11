@@ -207,7 +207,7 @@ pub fn literal_constant(index: usize, a: u16, b: i32) {
                     &caller,
                     &[
                         ("selected", expected),
-                        ("constant", ProofStatus::Unknown),
+                        ("constant", expected),
                         ("literal_constant", expected),
                     ],
                     target,
@@ -225,19 +225,17 @@ pub fn literal_constant(index: usize, a: u16, b: i32) {
                     .proof
                     .as_ref()
                     .unwrap();
-                assert!(
+                assert_eq!(
                     repeat
-                        .obligations
-                        .iter()
-                        .any(|q| q.detail
-                            == "constant bb0: repeat operand needs a small owned value")
-                );
-                assert!(
-                    !repeat
                         .body_entries
                         .iter()
-                        .any(|entry| entry.function == "two_argument_external::constant")
+                        .any(|entry| entry.function == "two_argument_external::constant"),
+                    ENABLED && retained,
                 );
+                if ENABLED && !retained {
+                    assert!(repeat.obligations.iter().any(|q| q.unknown_category
+                        == Some(miren::UnknownCategory::MissingCompilerEvidence)));
+                }
                 if ENABLED && retained {
                     let literal = report
                         .functions

@@ -1311,10 +1311,7 @@
     {
       "entry": "integer_table_two_args_repeat_unknown",
       "family": "integer_function_tables_two_args",
-      "expected": "unknown",
-      "unknown_category": "unclassified",
-      "unknown_reason":
-        "integer_table_two_args_repeat_unknown bb0: repeat operand needs a small owned value"
+      "expected": "proved"
     }
   ]
 }

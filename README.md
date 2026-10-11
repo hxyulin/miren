@@ -59,8 +59,10 @@ suffix indices, preserving compiler types and current Memory. The validated capa
 covers 239 cases across 81 families.
 
 Known local integer function tables support one or two integer arguments, preserving exact
-compiler signatures and executing selected helper bodies. Repeat-produced pointers remain
-unsupported. See the [capability evidence](docs/rust-capabilities.md) for scope and limits.
+compiler signatures and executing selected helper bodies. Authenticated MIR Repeat assignments
+can construct bounded arrays of known integer function pointers. Selected calls still require
+actual bodies; opaque targets and pointer-bearing product repeats remain unsupported.
+See the [capability evidence](docs/rust-capabilities.md) for scope and limits.
 
 ## Install
 

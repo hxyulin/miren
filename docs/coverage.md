@@ -330,7 +330,8 @@ steps preserve allocation/projection identity instead of snapshotting pointee va
 aliases observe writes through earlier yielded references; mutable elements update caller storage.
 Reference liveness and frame-escape checks still apply. Owned Cell/atomic elements, element
 Clone/views/destructors and symbolic skips between different reference identities stay UNKNOWN.
-Repeating identity-bearing values remains unsupported.
+Repeating reference/storage identities remains unsupported. The separate Stage217 Repeat planner
+accepts only authenticated known integer function pointers; it does not repeat general references.
 
 Owned array cursors preserve value order, forward/reverse skips, count/last, checked predicate
 callbacks and fold/rfold. Callback bodies execute rather than supplying assumed results. Shared
@@ -3535,3 +3536,19 @@ cover 239 cases across 81 families with 98 PROVED, 83 REFUTED and 58 UNKNOWN eac
 and order mutations fail native execution; omitted dependency bodies remain UNKNOWN. Fresh
 release compatibility preserves all 5,228 rich queried obligations/models on frozen owner inputs.
 See Stage216 in [the stage history](stages.md) for complete evidence and comparison boundaries.
+
+## Stage217: known integer function-pointer Repeat
+
+Authenticated MIR Repeat assignments construct bounded arrays of known safe integer function
+pointers, retaining exact executing Instance, cached assignment occurrence and compiler types.
+Construction has the existing 128-entry/256-value limits; symbolic table dispatch remains capped
+at 16 targets. Zero construction is distinct from selected-body availability. Constant-return
+helpers still execute their retained bodies; omission remains MissingCompilerEvidence UNKNOWN.
+Opaque targets and pointer-bearing product repeats gain no permissions.
+
+The original assertions remain unchanged. Actual helper identity and binary argument-order
+mutations refute and fail native execution. Owner comparisons cover 60 groups and 3,472 pairs,
+with 3,390 literal FULL objects, 80 exact named changes and two narrow query-free timeout contexts.
+All 5,228 baseline rich queried obligations/models remain exact; current ALL is 5,368, including
+UNKNOWN partials. Fresh ROOT release compatibility and required checks are recorded separately
+in Stage217 in [the stage history](stages.md). These are selected capability measurements.

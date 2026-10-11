@@ -1262,8 +1262,22 @@ remain UNKNOWN under separately recorded comparison rules. See the Stage215 capa
 Stage216 supports known two-argument integer function tables with exact compiler A/B/R types,
 safe Rust signatures, all-target validation and actual selected bodies. Argument evaluation
 occurs once in order before branch cloning; current returned Memory is preserved. Repeat-produced
-pointers remain UNKNOWN. All 22 ROOT checks pass, including 864 Rust tests and 68 Python tests;
+pointers remained UNKNOWN at Stage216. All 22 ROOT checks passed, including 864 Rust tests
+and 68 Python tests;
 four surveys cover 239 cases across 81 families. Fresh release compatibility preserves all
 5,228 rich queried obligations/models on frozen owner inputs. Actual helper/order mutations
 refute unchanged assertions and fail natively; omitted bodies remain UNKNOWN. See Stage216 in
 the stage history for complete evidence. Historical actual213/214 preparations keep their scope.
+
+Stage217 adds authenticated MIR Repeat assignments for known safe integer function pointers.
+Exact full Instance, live cached Body/Assign occurrence, original types and target metadata remain
+required. Construction is limited to 128 entries and the existing 256-value budget; symbolic
+function-table dispatch remains limited to 16 targets. Shared 512-work/depth-16 preflight bounds
+original metadata before the new route's queries, normalization and materialization. MIR operand
+evaluation occurs once, including zero length; refusal does not publish the destination or restore
+a consumed Move. Actual selected bodies remain required even for constant-return helpers.
+Retained-body controls prove and omitted-body controls reach MissingCompilerEvidence UNKNOWN;
+zero construction makes no selected-body availability claim. Helper identity and binary argument-
+order mutations refute unchanged assertions and fail natively. Opaque targets and pointer-bearing
+product repeats remain unsupported. Current validation and comparison evidence are in Stage217
+of the stage history; these measurements do not establish full Rust parity.

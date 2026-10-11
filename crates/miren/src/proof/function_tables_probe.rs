@@ -1307,3 +1307,639 @@ fn check_two_argument_calls<'tcx>(tcx: TyCtxt<'tcx>, output: &std::path::Path) {
         );
     }
 }
+
+#[test]
+fn compiler_known_pointer_repeat_authenticates_cached_assignments() {
+    struct Capture(std::path::PathBuf);
+    impl rustc_driver::Callbacks for Capture {
+        fn after_analysis<'tcx>(
+            &mut self,
+            _: &rustc_interface::interface::Compiler,
+            tcx: TyCtxt<'tcx>,
+        ) -> rustc_driver::Compilation {
+            check_known_repeats(tcx, &self.0);
+            rustc_driver::Compilation::Stop
+        }
+    }
+    let stamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let root =
+        std::env::temp_dir().join(format!("miren-known-repeat-{}-{stamp}", std::process::id(),));
+    std::fs::create_dir(&root).unwrap();
+    let source = root.join("fixture.rs");
+    std::fs::write(
+        &source,
+        r#"#![no_std]
+#![forbid(unsafe_code)]
+#[inline(never)] pub fn identity(value: u16) -> u16 { value }
+#[inline(never)] pub fn binary(a: u16, b: i32) -> i64 { (a as i64) - (b as i64) }
+#[inline(never)] pub fn generic<T: Copy>(value: T) -> T { value }
+pub fn result_bool(_: u16) -> bool { true }
+pub fn result_char(_: u16) -> char { 'A' }
+pub fn result_float(_: u16) -> f32 { 0.0 }
+pub fn over_arity(_: u16, _: u16, _: u16) -> u16 { 0 }
+pub extern "C" fn foreign(value: u16) -> u16 { value }
+pub struct Holder<T> { pub callback: T }
+pub fn record(value: Holder<fn(u16)->u16>) -> [fn(u16)->u16;2] { [value.callback;2] }
+pub fn twice(value: fn(u16)->u16) -> [fn(u16)->u16;2] { [value;2] }
+pub fn generic_repeat<T: Copy>(_: T, value: fn(u16)->u16) -> [fn(u16)->u16;2] { [value;2] }
+pub fn once(value: fn(u16)->u16) -> [fn(u16)->u16;1] { [value;1] }
+pub fn sixteen(value: fn(u16)->u16) -> [fn(u16)->u16;16] { [value;16] }
+pub fn large(value: fn(u16)->u16) -> [fn(u16)->u16;128] { [value;128] }
+pub fn too_large(value: fn(u16)->u16) -> [fn(u16)->u16;129] { [value;129] }
+"#,
+    )
+    .unwrap();
+    for target in [None, Some("thumbv7em-none-eabihf")] {
+        for level in [0, 2] {
+            let output = root.join(format!("{}-o{level}", target.unwrap_or("host")));
+            std::fs::create_dir(&output).unwrap();
+            let mut args = vec![
+                "rustc".into(),
+                "--crate-type=lib".into(),
+                "--edition=2024".into(),
+                source.display().to_string(),
+                "--out-dir".into(),
+                output.display().to_string(),
+                "-Cpanic=abort".into(),
+                "-Coverflow-checks=yes".into(),
+                "-Zmir-opt-level=0".into(),
+                format!("-Copt-level={level}"),
+            ];
+            if let Some(target) = target {
+                args.extend(["--target".into(), target.into()]);
+            }
+            rustc_driver::run_compiler(&args, &mut Capture(output));
+        }
+    }
+    // Retain source/MIR/control assets in this exclusive invocation directory for association.
+    println!("known Repeat compiler assets: {}", root.display());
+}
+
+fn repeat_state(body: &Body<'_>) -> State {
+    State {
+        locals: vec![None; body.local_decls.len()],
+        missing_places: Default::default(),
+        conditions: Vec::new(),
+        addresses: vec![None; body.local_decls.len()],
+        memory: Default::default(),
+    }
+}
+
+fn check_known_repeats<'tcx>(tcx: TyCtxt<'tcx>, output: &std::path::Path) {
+    use super::super::aggregates::RepeatWork;
+    let mut engine = test_engine(tcx);
+    let find = |name: &str| {
+        tcx.mir_keys(())
+            .iter()
+            .map(|id| id.to_def_id())
+            .find(|id| tcx.def_kind(*id) == DefKind::Fn && tcx.item_name(*id).as_str() == name)
+            .unwrap()
+    };
+    let mut observations = Vec::new();
+    for name in ["once", "twice", "sixteen", "large", "too_large"] {
+        let definition = find(name);
+        let instance = engine
+            .resolve_function_item(definition, tcx.mk_args(&[]))
+            .unwrap();
+        let original = engine.instantiated_body(instance).unwrap();
+        std::fs::write(output.join(format!("{name}.mir")), format!("{original:#?}")).unwrap();
+        let (block, position) = original
+            .basic_blocks
+            .iter_enumerated()
+            .find_map(|(block, data)| {
+                data.statements
+                    .iter()
+                    .position(|statement| {
+                        matches!(&statement.kind,
+                StatementKind::Assign(pair) if matches!(pair.1, Rvalue::Repeat(..)))
+                    })
+                    .map(|position| (block, position))
+            })
+            .expect("actual unoptimized compiler Repeat");
+        let StatementKind::Assign(pair) = &original.basic_blocks[block].statements[position].kind
+        else {
+            panic!("actual Assign");
+        };
+        let Rvalue::Repeat(operand, _) = &pair.1 else {
+            panic!("actual Repeat");
+        };
+        let (Operand::Copy(source) | Operand::Move(source)) = operand else {
+            panic!("actual local Repeat operand");
+        };
+        let signature = original.local_decls[source.local].ty;
+        let selected = engine
+            .resolve_function_item(find("identity"), tcx.mk_args(&[]))
+            .unwrap();
+        let token = engine
+            .register_function_pointer(Target::Known {
+                instance: selected,
+                signature,
+            })
+            .unwrap();
+        let mut state = repeat_state(&original);
+        state.locals[source.local.as_usize()] = Some(Value::FunctionPointer { id: token });
+        let registry = engine.function_pointers.borrow().len();
+        let actual = engine.known_repeat_assignment(
+            instance,
+            &original,
+            &mut state,
+            pair.0,
+            &pair.1,
+            &original.basic_blocks[block].statements[position].kind,
+        );
+        if name == "too_large" {
+            assert!(actual.is_err());
+            assert!(state.missing_places.is_empty());
+        } else {
+            let Value::Elements(values) = actual.unwrap().unwrap() else {
+                panic!("Elements");
+            };
+            let count = match name {
+                "once" => 1,
+                "twice" => 2,
+                "sixteen" => 16,
+                "large" => 128,
+                "too_large" => unreachable!(),
+                _ => unreachable!(),
+            };
+            assert_eq!(values.len(), count);
+            assert!(
+                values.iter().all(|value| {
+                    matches!(value, Value::FunctionPointer { id } if *id == token)
+                })
+            );
+        }
+        assert!(state.locals[pair.0.local.as_usize()].is_none());
+        assert_eq!(registry, engine.function_pointers.borrow().len());
+        let detached = original.as_ref().clone();
+        let before = engine.call_signatures.borrow().len();
+        assert!(
+            engine
+                .known_repeat_assignment(
+                    instance,
+                    &detached,
+                    &mut state,
+                    pair.0,
+                    &pair.1,
+                    &original.basic_blocks[block].statements[position].kind
+                )
+                .is_err()
+        );
+        let detached_statement = original.basic_blocks[block].statements[position]
+            .kind
+            .clone();
+        assert!(
+            engine
+                .known_repeat_assignment(
+                    instance,
+                    &original,
+                    &mut state,
+                    pair.0,
+                    &pair.1,
+                    &detached_statement
+                )
+                .is_err()
+        );
+        assert_eq!(before, engine.call_signatures.borrow().len());
+        observations.push(format!(
+            "{name}: actual Repeat/cached identity/refusal controls"
+        ));
+        if name != "twice" {
+            continue;
+        }
+        for count in [0, 1, 16, 128, 129] {
+            // Deliberate cached-MIR Move mutation, separate from safe compiler lowering.
+            let mut changed = original.as_ref().clone();
+            let array = Ty::new_array(tcx, signature, count);
+            changed.local_decls[pair.0.local].ty = array;
+            let ty::Array(_, length) = array.kind() else {
+                unreachable!()
+            };
+            let StatementKind::Assign(assignment) =
+                &mut changed.basic_blocks_mut()[block].statements[position].kind
+            else {
+                unreachable!()
+            };
+            assignment.1 = Rvalue::Repeat(Operand::Move(*source), *length);
+            let changed = std::rc::Rc::new(changed);
+            engine.bodies.borrow_mut().insert(instance, changed.clone());
+            let statement = &changed.basic_blocks[block].statements[position].kind;
+            let StatementKind::Assign(assignment) = statement else {
+                unreachable!()
+            };
+            let mut moved = repeat_state(&changed);
+            moved.locals[source.local.as_usize()] = Some(Value::FunctionPointer { id: token });
+            let result = engine.known_repeat_assignment(
+                instance,
+                &changed,
+                &mut moved,
+                assignment.0,
+                &assignment.1,
+                statement,
+            );
+            if count <= 128 {
+                assert!(result.is_ok());
+                assert!(!moved.missing_places.is_empty());
+                // A second operand evaluation would fail this consumed Move.
+                assert!(
+                    engine
+                        .known_repeat_assignment(
+                            instance,
+                            &changed,
+                            &mut moved,
+                            assignment.0,
+                            &assignment.1,
+                            statement
+                        )
+                        .is_err()
+                );
+            } else {
+                assert!(result.is_err());
+                assert!(moved.missing_places.is_empty());
+            }
+            if count == 0 {
+                let opaque = engine
+                    .register_function_pointer(Target::Opaque { signature })
+                    .unwrap();
+                let mut bad = repeat_state(&changed);
+                bad.locals[source.local.as_usize()] = Some(Value::FunctionPointer { id: opaque });
+                let cache = engine.call_signatures.borrow().len();
+                assert!(
+                    engine
+                        .known_repeat_assignment(
+                            instance,
+                            &changed,
+                            &mut bad,
+                            assignment.0,
+                            &assignment.1,
+                            statement
+                        )
+                        .is_err()
+                );
+                assert!(!bad.missing_places.is_empty());
+                assert!(bad.locals[assignment.0.local.as_usize()].is_none());
+                assert_eq!(cache, engine.call_signatures.borrow().len());
+                observations.push("post-evaluation target refusal preserves zero Move".into());
+            }
+            assert!(moved.locals[assignment.0.local.as_usize()].is_none());
+            observations.push(format!(
+                "cached Move count{count}: consumed once iff admitted"
+            ));
+        }
+        engine
+            .bodies
+            .borrow_mut()
+            .insert(instance, original.clone());
+        let mut missing = repeat_state(&original);
+        assert!(
+            engine
+                .known_repeat_assignment(
+                    instance,
+                    &original,
+                    &mut missing,
+                    pair.0,
+                    &pair.1,
+                    &original.basic_blocks[block].statements[position].kind
+                )
+                .is_err()
+        );
+        let mut stale = repeat_state(&original);
+        stale.locals[source.local.as_usize()] = Some(Value::FunctionPointer { id: usize::MAX });
+        assert!(
+            engine
+                .known_repeat_assignment(
+                    instance,
+                    &original,
+                    &mut stale,
+                    pair.0,
+                    &pair.1,
+                    &original.basic_blocks[block].statements[position].kind
+                )
+                .is_err()
+        );
+        let opaque = engine
+            .register_function_pointer(Target::Opaque { signature })
+            .unwrap();
+        stale.locals[source.local.as_usize()] = Some(Value::FunctionPointer { id: opaque });
+        assert!(
+            engine
+                .known_repeat_assignment(
+                    instance,
+                    &original,
+                    &mut stale,
+                    pair.0,
+                    &pair.1,
+                    &original.basic_blocks[block].statements[position].kind
+                )
+                .is_err()
+        );
+        let wrong = engine
+            .resolve_function_item(find("binary"), tcx.mk_args(&[]))
+            .unwrap();
+        let wrong = engine
+            .register_function_pointer(Target::Known {
+                instance: wrong,
+                signature,
+            })
+            .unwrap();
+        stale.locals[source.local.as_usize()] = Some(Value::FunctionPointer { id: wrong });
+        let signatures = engine.call_signatures.borrow().len();
+        assert!(
+            engine
+                .known_repeat_assignment(
+                    instance,
+                    &original,
+                    &mut stale,
+                    pair.0,
+                    &pair.1,
+                    &original.basic_blocks[block].statements[position].kind
+                )
+                .is_err()
+        );
+        assert_eq!(signatures, engine.call_signatures.borrow().len());
+        observations.push("missing/stale/opaque/wrong-signature refusal".into());
+    }
+    let record_instance = engine
+        .resolve_function_item(find("record"), tcx.mk_args(&[]))
+        .unwrap();
+    let record = engine.instantiated_body(record_instance).unwrap();
+    let holder = record
+        .local_decls
+        .iter_enumerated()
+        .find_map(|(local, declaration)| {
+            matches!(declaration.ty.kind(), ty::Adt(..)).then_some(local)
+        })
+        .unwrap();
+    let ty::Adt(def, args) = record.local_decls[holder].ty.kind() else {
+        unreachable!()
+    };
+    let signature = def
+        .non_enum_variant()
+        .fields
+        .iter()
+        .next()
+        .unwrap()
+        .ty(tcx, args)
+        .skip_norm_wip();
+    let field = Place {
+        local: holder,
+        projection: tcx.mk_place_elems(&[ProjectionElem::Field(0usize.into(), signature)]),
+    };
+    assert_eq!(
+        engine
+            .repeat_place_type(&record, field, &mut RepeatWork::new())
+            .unwrap(),
+        signature,
+    );
+    let forged = Place {
+        local: holder,
+        projection: tcx.mk_place_elems(&[ProjectionElem::Field(0usize.into(), tcx.types.u32)]),
+    };
+    assert!(
+        engine
+            .repeat_place_type(&record, forged, &mut RepeatWork::new())
+            .is_err()
+    );
+    let mut disguised = record.as_ref().clone();
+    disguised.local_decls[holder].ty = Ty::new_adt(tcx, *def, tcx.mk_args(&[tcx.types.u32.into()]));
+    assert!(
+        engine
+            .repeat_place_type(&disguised, field, &mut RepeatWork::new())
+            .is_err()
+    );
+    let mut deep = tcx.types.u16;
+    for _ in 0..MAX_INPUT_DEPTH {
+        deep = Ty::new_tup(tcx, &[deep]);
+    }
+    assert!(
+        engine
+            .repeat_type_work(deep, tcx.mk_args(&[]), 0, &mut RepeatWork::new())
+            .is_err()
+    );
+    let wide = Ty::new_tup(tcx, &vec![tcx.types.u16; MAX_INPUT_VALUES + 1]);
+    assert!(
+        engine
+            .repeat_type_work(wide, tcx.mk_args(&[]), 0, &mut RepeatWork::new())
+            .is_err()
+    );
+    assert!(
+        engine
+            .repeat_charge(&mut RepeatWork::new(), MAX_INPUT_VALUES + 1)
+            .is_err()
+    );
+    let generic = find("generic");
+    for original in [tcx.types.u16, tcx.types.u32, deep, wide] {
+        let instance = ty::Instance::new_raw(generic, tcx.mk_args(&[original.into()]));
+        let token = engine
+            .register_function_pointer(Target::Known {
+                instance,
+                signature,
+            })
+            .unwrap();
+        let cache = engine.call_signatures.borrow().len();
+        let result = engine.validate_repeat_target(
+            &Value::FunctionPointer { id: token },
+            signature,
+            &mut RepeatWork::new(),
+        );
+        if original == tcx.types.u16 {
+            assert!(result.is_ok());
+        } else {
+            assert!(result.is_err());
+            assert_eq!(cache, engine.call_signatures.borrow().len());
+        }
+    }
+    for name in [
+        "result_bool",
+        "result_char",
+        "result_float",
+        "over_arity",
+        "foreign",
+    ] {
+        let raw = tcx
+            .fn_sig(find(name))
+            .instantiate_identity()
+            .skip_norm_wip();
+        let original = Ty::new_fn_ptr(tcx, raw);
+        assert!(
+            engine
+                .repeat_type_work(original, tcx.mk_args(&[]), 0, &mut RepeatWork::new())
+                .is_err()
+        );
+    }
+    let raw = tcx
+        .fn_sig(find("identity"))
+        .instantiate_identity()
+        .skip_norm_wip();
+    let unsafe_signature = Ty::new_fn_ptr(
+        tcx,
+        raw.map_bound(|signature| signature.set_safety(rustc_hir::Safety::Unsafe)),
+    );
+    assert!(
+        engine
+            .repeat_type_work(
+                unsafe_signature,
+                tcx.mk_args(&[]),
+                0,
+                &mut RepeatWork::new()
+            )
+            .is_err()
+    );
+    // Same cached body under a different full key is ambiguous, never a fresh authority.
+    let alias = ty::Instance::new_raw(
+        record_instance.def_id(),
+        tcx.mk_args(&[tcx.types.u16.into()]),
+    );
+    engine.bodies.borrow_mut().insert(alias, record.clone());
+    let twice = engine
+        .resolve_function_item(find("twice"), tcx.mk_args(&[]))
+        .unwrap();
+    let body = engine.instantiated_body(twice).unwrap();
+    let statement = body
+        .basic_blocks
+        .iter()
+        .flat_map(|block| &block.statements)
+        .find(|statement| {
+            matches!(&statement.kind, StatementKind::Assign(pair)
+            if matches!(pair.1, Rvalue::Repeat(..)))
+        })
+        .unwrap();
+    let StatementKind::Assign(pair) = &statement.kind else {
+        unreachable!()
+    };
+    let alias = ty::Instance::new_raw(twice.def_id(), tcx.mk_args(&[tcx.types.u16.into()]));
+    engine.bodies.borrow_mut().insert(alias, body.clone());
+    let mut state = repeat_state(&body);
+    assert!(
+        engine
+            .known_repeat_assignment(twice, &body, &mut state, pair.0, &pair.1, &statement.kind)
+            .is_err()
+    );
+    engine.bodies.borrow_mut().remove(&alias);
+    let Rvalue::Repeat(operand, _) = &pair.1 else {
+        unreachable!()
+    };
+    let (Operand::Copy(source) | Operand::Move(source)) = operand else {
+        unreachable!()
+    };
+    let selected = engine
+        .resolve_function_item(find("identity"), tcx.mk_args(&[]))
+        .unwrap();
+    let token = engine
+        .register_function_pointer(Target::Known {
+            instance: selected,
+            signature,
+        })
+        .unwrap();
+    state.locals[source.local.as_usize()] = Some(Value::FunctionPointer { id: token });
+    // Remove the authenticated key: a sole same-DefId substitute must still refuse.
+    engine.bodies.borrow_mut().remove(&twice);
+    engine.bodies.borrow_mut().insert(alias, body.clone());
+    let before = engine.call_signatures.borrow().len();
+    assert!(
+        engine
+            .known_repeat_assignment(twice, &body, &mut state, pair.0, &pair.1, &statement.kind)
+            .is_err()
+    );
+    assert!(state.missing_places.is_empty());
+    assert!(state.locals[pair.0.local.as_usize()].is_none());
+    assert_eq!(before, engine.call_signatures.borrow().len());
+    engine.bodies.borrow_mut().remove(&alias);
+    engine.bodies.borrow_mut().insert(twice, body.clone());
+    let generic_owner = engine
+        .resolve_function_item(find("generic_repeat"), tcx.mk_args(&[tcx.types.u16.into()]))
+        .unwrap();
+    let selected = engine
+        .resolve_function_item(find("identity"), tcx.mk_args(&[]))
+        .unwrap();
+    let token = engine
+        .register_function_pointer(Target::Known {
+            instance: selected,
+            signature,
+        })
+        .unwrap();
+    let returns = engine
+        .execute_body(
+            generic_owner,
+            vec![
+                symbolic::integer(&engine.terms, 0, 16, false),
+                Value::FunctionPointer { id: token },
+            ],
+            Vec::new(),
+            Memory::default(),
+            &[],
+        )
+        .unwrap();
+    assert_eq!(returns.len(), 1);
+    assert!(matches!(&returns[0].value, Value::Elements(values) if values.len() == 2));
+    observations.push("sole substituted-key refusal/full generic execute_body positive".into());
+    observations.push("raw ADT Param/forged FieldTy/depth/work/pre-normalization/full-key".into());
+    let selected = engine
+        .resolve_function_item(find("identity"), tcx.mk_args(&[]))
+        .unwrap();
+    let known = Target::Known {
+        instance: selected,
+        signature,
+    };
+    let choice = Choice {
+        original: Ty::new_array(tcx, signature, 2),
+        signature,
+        index: symbolic::integer(
+            &engine.terms,
+            0,
+            tcx.sess.target.pointer_width.into(),
+            false,
+        )
+        .integer()
+        .unwrap()
+        .0
+        .clone(),
+        targets: vec![0, 0],
+    };
+    let choice = engine
+        .register_function_pointer(Target::Choice(choice))
+        .unwrap();
+    assert!(
+        engine
+            .validate_repeat_target(
+                &Value::FunctionPointer { id: choice },
+                signature,
+                &mut RepeatWork::new()
+            )
+            .is_err()
+    );
+    // Direct cached-registry fault setup, not a claim that safe source naturally fills it.
+    *engine.function_pointers.borrow_mut() = vec![known; 512];
+    let binary = tcx
+        .fn_sig(find("binary"))
+        .instantiate_identity()
+        .skip_norm_wip();
+    assert!(
+        engine
+            .register_function_pointer(Target::Opaque {
+                signature: Ty::new_fn_ptr(tcx, binary),
+            })
+            .is_err()
+    );
+    assert!(
+        engine
+            .validate_repeat_target(
+                &Value::FunctionPointer { id: 0 },
+                signature,
+                &mut RepeatWork::new()
+            )
+            .is_ok()
+    );
+    assert_eq!(engine.function_pointers.borrow().len(), 512);
+    assert_eq!(super::super::aggregates::known_repeat_cost(0), Some(2));
+    assert_eq!(super::super::aggregates::known_repeat_cost(128), Some(129));
+    assert_eq!(
+        super::super::aggregates::known_repeat_cost(usize::MAX),
+        None
+    );
+    observations.push("Choice/full registry/checked-cost fault; no natural cost exhaustion".into());
+    std::fs::write(output.join("controls.txt"), observations.join("\n")).unwrap();
+}

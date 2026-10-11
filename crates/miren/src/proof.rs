@@ -1323,7 +1323,7 @@ impl<'tcx> Engine<'tcx> {
                 }
             }
             for statement in &body.basic_blocks[block].statements {
-                self.statement(id, body, &mut state, &statement.kind)
+                self.statement(instance, body, &mut state, &statement.kind)
                     .map_err(|reason| {
                         format!(
                             "{} bb{}: {reason}",
@@ -2104,11 +2104,12 @@ impl<'tcx> Engine<'tcx> {
 
     fn statement(
         &mut self,
-        id: DefId,
+        instance: ty::Instance<'tcx>,
         body: &Body<'tcx>,
         state: &mut State,
         statement: &StatementKind<'tcx>,
     ) -> Result<(), String> {
+        let id = instance.def_id();
         match statement {
             StatementKind::Intrinsic(intrinsic) => match intrinsic.as_ref() {
                 rustc_middle::mir::NonDivergingIntrinsic::Assume(operand) => {
@@ -2132,6 +2133,11 @@ impl<'tcx> Engine<'tcx> {
                 let (place, value) = assignment.as_ref();
                 if self.mutable_u16_stage(body, state, *place, value, statement)? {
                     return Ok(());
+                }
+                if let Some(value) =
+                    self.known_repeat_assignment(instance, body, state, *place, value, statement)?
+                {
+                    return self.store_assignment_value(body, state, *place, value, statement);
                 }
                 let value = self.rvalue(id, body, state, value)?;
                 self.store_assignment_value(body, state, *place, value, statement)

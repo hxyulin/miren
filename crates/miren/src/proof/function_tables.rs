@@ -84,6 +84,67 @@ pub(super) struct TableSource<'a, 'tcx> {
 }
 
 impl<'tcx> Engine<'tcx> {
+    pub(super) fn validate_repeat_target(
+        &self,
+        value: &Value,
+        expected: Ty<'tcx>,
+        work: &mut super::aggregates::RepeatWork,
+    ) -> Result<(), String> {
+        self.repeat_type_work(expected, self.tcx.mk_args(&[]), 0, work)?;
+        let Value::FunctionPointer { id } = value else {
+            return Err("known Repeat operand lacks its evaluated function-pointer token".into());
+        };
+        let (instance, signature) = {
+            let pointers = self.function_pointers.borrow();
+            let target = pointers
+                .get(*id)
+                .ok_or("known Repeat target registry entry is unavailable")?;
+            match target {
+                Target::Known {
+                    instance,
+                    signature,
+                } => (*instance, *signature),
+                Target::Opaque { .. } | Target::Choice(_) => {
+                    return Err("known Repeat refuses opaque or nested Choice targets".into());
+                }
+            }
+        };
+        if !matches!(instance.def, ty::InstanceKind::Item(_))
+            || !matches!(
+                self.tcx.def_kind(instance.def_id()),
+                DefKind::Fn | DefKind::AssocFn
+            )
+            || signature != expected
+        {
+            return Err("known Repeat target original Instance/signature differs".into());
+        }
+        self.repeat_argument_work(instance.args, 0, work)?;
+        let raw = self
+            .tcx
+            .fn_sig(instance.def_id())
+            .instantiate_identity()
+            .skip_norm_wip();
+        if !raw.bound_vars().is_empty() {
+            return Err("known Repeat selected bound signature is unsupported".into());
+        }
+        self.repeat_signature_work(raw.skip_binder(), instance.args, 0, work)?;
+        let instantiated = self
+            .tcx
+            .fn_sig(instance.def_id())
+            .instantiate(self.tcx, instance.args)
+            .skip_norm_wip();
+        if instantiated != expected.fn_sig(self.tcx) {
+            return Err(
+                "known Repeat raw substituted signature differs from original FnPtr".into(),
+            );
+        }
+        if !self.table_signature(expected) {
+            return Err("known Repeat target family is not enabled".into());
+        }
+        self.validate_table_target(*id, expected)?;
+        Ok(())
+    }
+
     fn original_integer_signature(&self, original: Ty<'tcx>) -> Option<IntegerSignature<'tcx>> {
         if !matches!(original.kind(), ty::Int(_) | ty::Uint(_)) {
             return None;

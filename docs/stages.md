@@ -6388,3 +6388,62 @@ Evidence is under /tmp/miren-two-args-parent215, /tmp/miren-stage216-root-repeat
 /tmp/miren-stage216-root-repeat-category-survey and
 /tmp/miren-stage216-root-release-integration. These are selected Rust capability measurements,
 not full Rust parity or firmware coverage.
+
+## Stage217: known integer function-pointer Repeat
+
+The assignment planner accepts MIR Repeat of known function pointers only for the existing safe
+integer table families. It authenticates the exact executing Instance, live cached Rc Body and
+actual Assign/Rvalue/destination occurrence. Original source/destination types, literal extent,
+Copy/Freeze and raw target arguments/signatures remain checked. Shared 512-work/depth-16 preflight
+bounds the new route before its compiler queries, target normalization and materialization.
+Operand evaluation occurs once, including zero length. A refused assignment publishes no
+destination and does not restore a consumed Move. Existing 128-entry and 256-value construction
+limits remain; symbolic table dispatch still refuses more than 16 targets. Known count128 has
+cost129 within cap256, not a natural construction-budget exhaustion test. Count129 refuses.
+Opaque targets, nested Choice and generic pointer-bearing product Repeat remain unsupported.
+
+Selected calls execute their actual bodies with unchanged assertions and current returned Memory.
+Four-profile own controls measure five Proved, two Refuted and four Unknown roots. Actual identity
+XOR0-to-XOR1 and binary subtraction argument-order mutations produce new Refuted counterexamples
+from baseline UNKNOWN, enter the selected helper and retain concrete queried models. They are
+not preservation of a nonexistent baseline Refuted query. Six fresh native controls execute one
+test each: two originals exit zero and four mutants exit101. Eight guarded genuine dependency
+builds retain or omit MIR. Retained selected/constant callers enter their exact external bodies
+and prove; omission reaches MissingCompilerEvidence UNKNOWN. Zero construction remains Proved
+without executing the target and makes no body-availability claim. The global helper Repeat
+control also proves honestly because its repeated first target is not the mutated second helper.
+
+The committed216 release-to-owner comparison contains 60 groups and 3,472 complete selected pairs.
+It preserves 3,390 literal FULL objects. Exactly 80 named changes comprise 36 UNKNOWN-to-Proved,
+16 UNKNOWN-to-Refuted and 28 UNKNOWN-to-UNKNOWN later/refined frontiers. All 5,228 baseline rich
+queried obligations/models remain exact prefixes, including UNKNOWN partial queries; current ALL
+is 5,368. Changed proofs contain zero baseline queries. Every previously Refuted proof remains
+literal FULL. Two query-free fold timeout differences satisfy the closed root/root-plus-closure
+predicate with full residual equality. No third-frame exception, path rewriting or normalization
+is accepted. Original stopped captures are preserved; their first nine objects are qualified
+without recapture and only the remaining 59 groups are freshly executed.
+
+Fresh ROOT release comparison reuses the exact frozen owner inputs and after reports.
+Across 60 groups and 3,472 selected pairs, 3,470 complete Proof objects are literal FULL
+and all 5,368 rich queried obligations/models match exactly. The two ARM fold timeout
+contexts satisfy the same closed predicate with full residual equality. No owner baseline
+is rerun, no paths are rewritten and no changed outcome is accepted in this comparison.
+
+All 22 required ROOT checks pass: formatting, lint, workspace tests, Python tooling, release
+builds, dependency policy, documentation, three examples including ARM release builds,
+manual hooks and the four-profile capability survey. The outer workspace Cargo summaries
+contain 868 passing Rust tests; the tooling suite passes 68 tests. A nested one-test native
+summary in guarded_arithmetic is excluded from the outer total. Original and helper-mutated
+Repeat cases, compiler controls and genuine dependency-body controls are also validated.
+
+The fresh survey covers the unchanged 239-case, 81-family inventory with
+99 Proved, 83 Refuted and 57 Unknown in each host/ARM O0/O2 profile.
+Only the measured existing global Repeat expectation changes to Proved; the other 238 entries
+stay exact. The existing two-argument foreign harness now requires the retained Repeat constant
+body or the omitted body's exact Missing frontier. Its original caller assertions and separate
+literal-constant controls remain unchanged. Counts are selected cases, not a Rust parity percentage.
+
+Evidence is under /tmp/miren-known-repeat-parent216, /tmp/miren-stage217-root-full-checks and
+/tmp/miren-stage217-root-release-comparison. Provisional parallel Float and integer-driver
+refactors are not
+part of this stage. Their later actual-parent reassociation and validation remain separate.

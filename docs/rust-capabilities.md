@@ -11,10 +11,12 @@ execution at O0 and O2, positive/refuted/unknown controls, a source mutation tha
 structured UNKNOWN reporting, and passing repository checks. Completion establishes a repeatable
 baseline. It does not establish full Rust support or a completed memory-model refactor.
 
-The current manifest contains 239 cases across 81 families. Stage216 host/ARM O0/O2 surveys
-measure 98 PROVED, 83 REFUTED and 58 UNKNOWN each. Required ROOT checks pass; details and
-limitations are recorded in Stage216 in [the stage history](stages.md).
-All 236 parent entries remain intact.
+The current manifest contains 239 cases across 81 families. Stage217 host/ARM O0/O2 surveys
+measure 99 PROVED, 83 REFUTED and 57 UNKNOWN each
+after fresh validation.
+Required ROOT check results and limitations are recorded in Stage217 in
+[the stage history](stages.md). The measured existing Repeat entry advances from UNKNOWN to
+PROVED; the other 238 case objects and all original guest assertions remain unchanged.
 The historical Stage213 surveys measured 96 PROVED, 81 REFUTED and 56 UNKNOWN per profile
 across 79 families. The historical committed Stage211 survey measured 230 cases across
 78 families: 95 PROVED, 80 REFUTED and 55 UNKNOWN per profile.
@@ -2275,3 +2277,15 @@ Real helper and order mutations refute unchanged assertions and fail natively. G
 and omitted dependency controls preserve the body-availability boundary. No assumptions or
 trusted calls are added. Full validation and raw comparison scope are in
 [the stage history](stages.md).
+
+## Stage217: known integer function-pointer Repeat
+
+The existing Repeat control now proves through an authenticated cached assignment and known
+integer target. This changes the existing case's expectation rather than adding a new manifest
+case. Exact original types, full Instance, Copy/Freeze, source/body and resource checks remain
+required. Construction and dispatch have separate limits; opaque/Choice and pointer-bearing
+product targets remain unsupported. Retained constant helpers enter their actual bodies and
+prove, while omitted helpers reach MissingCompilerEvidence UNKNOWN. Zero construction is not
+an availability proof. Helper identity and binary argument-order mutations preserve assertions
+and produce actual counterexamples and native failures. Complete validation and strict raw
+comparison scope are recorded in [the stage history](stages.md).

@@ -7,6 +7,322 @@ const MAX_INPUT_ELEMENTS: usize = 256;
 pub(super) const MAX_ENUM_VARIANTS: usize = 64;
 pub(super) const MAX_FIELDLESS_ENUM_VARIANTS: usize = 256;
 
+pub(super) fn known_repeat_cost(count: usize) -> Option<usize> {
+    count.saturating_sub(1).checked_add(2)
+}
+
+// This budget belongs only to the new Repeat admission, not generic aggregate consumers.
+pub(super) struct RepeatWork {
+    used: usize,
+}
+
+impl RepeatWork {
+    pub(super) fn new() -> Self {
+        Self { used: 0 }
+    }
+}
+
+impl<'tcx> Engine<'tcx> {
+    pub(super) fn repeat_charge(&self, work: &mut RepeatWork, count: usize) -> Result<(), String> {
+        work.used = work.used.saturating_add(count);
+        if work.used > MAX_INPUT_VALUES {
+            return Err(self.categorized_error(
+                UnknownCategory::ResourceLimit,
+                "known Repeat exceeds existing 512-node work budget".into(),
+            ));
+        }
+        Ok(())
+    }
+
+    pub(super) fn repeat_type_work(
+        &self,
+        original: Ty<'tcx>,
+        arguments: ty::GenericArgsRef<'tcx>,
+        depth: usize,
+        work: &mut RepeatWork,
+    ) -> Result<Ty<'tcx>, String> {
+        self.repeat_charge(work, 1)?;
+        if depth >= MAX_INPUT_DEPTH {
+            return Err(self.categorized_error(
+                UnknownCategory::ResourceLimit,
+                "known Repeat original type exceeds depth16".into(),
+            ));
+        }
+        match original.kind() {
+            ty::Bool | ty::Char | ty::Int(_) | ty::Uint(_) | ty::Float(_) | ty::Never => {}
+            ty::Param(parameter) => {
+                let selected = arguments
+                    .get(parameter.index as usize)
+                    .and_then(|argument| argument.as_type())
+                    .ok_or("known Repeat original Param mapping differs")?;
+                return self.repeat_type_work(selected, arguments, depth + 1, work);
+            }
+            ty::Tuple(fields) => {
+                self.repeat_charge(work, fields.len())?;
+                for field in fields.iter() {
+                    self.repeat_type_work(field, arguments, depth + 1, work)?;
+                }
+            }
+            ty::Adt(_, args) => self.repeat_argument_work(args, depth + 1, work)?,
+            ty::Array(element, count) => {
+                self.repeat_charge(work, 1)?;
+                count
+                    .try_to_target_usize(self.tcx)
+                    .ok_or("known Repeat original array extent is not literal")?;
+                self.repeat_type_work(*element, arguments, depth + 1, work)?;
+            }
+            ty::FnPtr(..) => {
+                let signature = original.fn_sig(self.tcx);
+                if !signature.bound_vars().is_empty() {
+                    return Err("known Repeat bound callable variables are unsupported".into());
+                }
+                self.repeat_signature_work(signature.skip_binder(), arguments, depth + 1, work)?;
+            }
+            _ => return Err("known Repeat original type grammar is unsupported".into()),
+        }
+        Ok(original)
+    }
+
+    pub(super) fn repeat_argument_work(
+        &self,
+        arguments: ty::GenericArgsRef<'tcx>,
+        depth: usize,
+        work: &mut RepeatWork,
+    ) -> Result<(), String> {
+        self.repeat_charge(work, arguments.len())?;
+        for argument in arguments.iter() {
+            match argument.kind() {
+                ty::GenericArgKind::Type(original) => {
+                    self.repeat_type_work(original, arguments, depth, work)?;
+                }
+                ty::GenericArgKind::Lifetime(_) => {}
+                ty::GenericArgKind::Const(_) => {
+                    return Err("known Repeat const substitution is unsupported".into());
+                }
+            }
+        }
+        Ok(())
+    }
+
+    pub(super) fn repeat_signature_work(
+        &self,
+        signature: ty::FnSig<'tcx>,
+        arguments: ty::GenericArgsRef<'tcx>,
+        depth: usize,
+        work: &mut RepeatWork,
+    ) -> Result<(), String> {
+        let arity = signature.inputs().len();
+        if !(1..=2).contains(&arity)
+            || signature.safety() != rustc_hir::Safety::Safe
+            || signature.abi() != rustc_abi::ExternAbi::Rust
+            || signature.c_variadic()
+        {
+            return Err(
+                "known Repeat needs a safe Rust integer callable with one or two args".into(),
+            );
+        }
+        self.repeat_charge(work, arity + 1)?;
+        let result = signature.output();
+        for original in signature.inputs().iter().chain(std::iter::once(&result)) {
+            let selected = self.repeat_type_work(*original, arguments, depth, work)?;
+            if !matches!(selected.kind(), ty::Int(_) | ty::Uint(_)) {
+                return Err("known Repeat signature needs exact original integer types".into());
+            }
+        }
+        Ok(())
+    }
+
+    pub(super) fn repeat_place_type(
+        &self,
+        body: &Body<'tcx>,
+        place: Place<'tcx>,
+        work: &mut RepeatWork,
+    ) -> Result<Ty<'tcx>, String> {
+        let declaration = body
+            .local_decls
+            .get(place.local)
+            .ok_or("known Repeat local is outside its original Body")?;
+        self.repeat_charge(work, place.projection.len())?;
+        if place.projection.len() > MAX_INPUT_DEPTH {
+            return Err(self.categorized_error(
+                UnknownCategory::ResourceLimit,
+                "known Repeat place exceeds depth16".into(),
+            ));
+        }
+        let mut original = declaration.ty;
+        self.repeat_type_work(original, self.tcx.mk_args(&[]), 0, work)?;
+        let mut variant = None;
+        for part in place.projection {
+            match part {
+                ProjectionElem::Downcast(_, index) => {
+                    let ty::Adt(def, _) = original.kind() else {
+                        return Err("known Repeat downcast lacks original enum".into());
+                    };
+                    if !def.is_enum()
+                        || index.as_usize() >= def.variants().len()
+                        || variant.is_some()
+                    {
+                        return Err("known Repeat original variant differs".into());
+                    }
+                    variant = Some(index);
+                }
+                ProjectionElem::Field(index, recorded) => {
+                    self.repeat_type_work(recorded, self.tcx.mk_args(&[]), 0, work)?;
+                    let selected = match original.kind() {
+                        ty::Tuple(fields) => fields.get(index.as_usize()).copied(),
+                        ty::Adt(def, args) => {
+                            let fields = if def.is_struct() {
+                                &def.non_enum_variant().fields
+                            } else if def.is_enum() {
+                                &def.variants()[variant
+                                    .ok_or("known Repeat enum field lacks original downcast")?]
+                                .fields
+                            } else {
+                                return Err("known Repeat union field is unsupported".into());
+                            };
+                            let field = fields
+                                .get(index)
+                                .ok_or("known Repeat field exceeds original inventory")?;
+                            // Bound raw field Param expansion before field.ty substitutes.
+                            let raw = self
+                                .tcx
+                                .type_of(field.did)
+                                .instantiate_identity()
+                                .skip_norm_wip();
+                            self.repeat_type_work(raw, args, 0, work)?;
+                            Some(field.ty(self.tcx, args).skip_norm_wip())
+                        }
+                        _ => None,
+                    }
+                    .ok_or("known Repeat field lacks original compiler parent")?;
+                    if selected != recorded {
+                        return Err(
+                            "known Repeat FieldTy differs from original compiler type".into()
+                        );
+                    }
+                    original = selected;
+                    variant = None;
+                }
+                _ => return Err("known Repeat needs an owned local or fixed field path".into()),
+            }
+        }
+        if variant.is_some() {
+            return Err("known Repeat dangling downcast is unsupported".into());
+        }
+        self.owned_field_footprint(body, place)?;
+        Ok(original)
+    }
+
+    pub(super) fn known_repeat_assignment(
+        &self,
+        executing: ty::Instance<'tcx>,
+        body: &Body<'tcx>,
+        state: &mut State,
+        destination: Place<'tcx>,
+        rvalue: &Rvalue<'tcx>,
+        occurrence: &StatementKind<'tcx>,
+    ) -> Result<Option<Value>, String> {
+        let Rvalue::Repeat(operand, length) = rvalue else {
+            return Ok(None);
+        };
+        let candidate = match operand {
+            Operand::Copy(place) | Operand::Move(place) => {
+                let Some(declaration) = body.local_decls.get(place.local) else {
+                    return Err("known Repeat operand local is outside its Body".into());
+                };
+                if let Some(ProjectionElem::Field(_, recorded)) = place.projection.last() {
+                    *recorded
+                } else {
+                    declaration.ty
+                }
+            }
+            Operand::Constant(constant) => constant.const_.ty(),
+            Operand::RuntimeChecks(_) => return Ok(None),
+        };
+        if !matches!(candidate.kind(), ty::FnPtr(..)) {
+            return Ok(None);
+        }
+        let mut work = RepeatWork::new();
+        let cached = self.bodies.borrow();
+        self.repeat_charge(&mut work, cached.len())?;
+        let mut matches = cached
+            .iter()
+            .filter(|(_, candidate)| std::ptr::eq(candidate.as_ref(), body));
+        let (instance, original) = matches
+            .next()
+            .ok_or("known Repeat requires an authenticated current cached Body")?;
+        if matches.next().is_some()
+            || *instance != executing
+            || body.source.instance != instance.def
+        {
+            return Err("known Repeat cached full Instance/Body association differs".into());
+        }
+        let instance = *instance;
+        let original = original.clone();
+        drop(cached);
+        self.repeat_argument_work(instance.args, 0, &mut work)?;
+        self.repeat_charge(&mut work, original.local_decls.len())?;
+        self.repeat_charge(&mut work, original.basic_blocks.len())?;
+        for block in original.basic_blocks.iter() {
+            self.repeat_charge(&mut work, block.statements.len())?;
+        }
+        let found = original.basic_blocks.iter().any(|block| {
+            block.statements.iter().any(|statement| {
+                std::ptr::eq(&statement.kind, occurrence)
+                    && matches!(&statement.kind, StatementKind::Assign(assignment)
+                        if assignment.0 == destination && std::ptr::eq(&assignment.1, rvalue))
+            })
+        });
+        if !found {
+            return Err("known Repeat is not its actual cached Assign occurrence".into());
+        }
+        let destination_ty = self.repeat_place_type(body, destination, &mut work)?;
+        let source_ty = match operand {
+            Operand::Copy(place) | Operand::Move(place) => {
+                self.repeat_place_type(body, *place, &mut work)?
+            }
+            Operand::Constant(constant) => {
+                let original = constant.const_.ty();
+                self.repeat_type_work(original, self.tcx.mk_args(&[]), 0, &mut work)?;
+                original
+            }
+            Operand::RuntimeChecks(_) => {
+                return Err("known Repeat cannot authenticate runtime-check operand".into());
+            }
+        };
+        let ty::Array(element, extent) = destination_ty.kind() else {
+            return Err("known Repeat destination needs its original array type".into());
+        };
+        let count = length
+            .try_to_target_usize(self.tcx)
+            .ok_or("known Repeat length is not literal target usize")?;
+        let count = usize::try_from(count).map_err(|_| "known Repeat length exceeds host usize")?;
+        if count > MAX_ARRAY_BYTES as usize
+            || *element != source_ty
+            || extent != length
+            || !matches!(source_ty.kind(), ty::FnPtr(..))
+        {
+            return Err("known Repeat original element/count exceeds its exact domain".into());
+        }
+        let env = ty::TypingEnv::fully_monomorphized();
+        if !self.tcx.type_is_copy_modulo_regions(env, source_ty)
+            || !source_ty.is_freeze(self.tcx, env)
+        {
+            return Err("known Repeat original FnPtr needs Copy and Freeze".into());
+        }
+        self.tcx
+            .layout_of(env.as_query_input(destination_ty))
+            .map_err(|error| format!("known Repeat array layout is unavailable: {error:?}"))?;
+        let cost = known_repeat_cost(count).ok_or("known Repeat construction cost overflow")?;
+        if cost > symbolic::MAX_REPEAT_VALUES {
+            return Err("known Repeat exceeds existing 256-value construction budget".into());
+        }
+        let value = self.evaluate_operand(executing.def_id(), body, state, operand)?;
+        self.validate_repeat_target(&value, source_ty, &mut work)?;
+        Ok(Some(Value::Elements(vec![value; count].into())))
+    }
+}
+
 impl<'tcx> Engine<'tcx> {
     pub(super) fn enum_input(
         &mut self,
