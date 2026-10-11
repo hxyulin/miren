@@ -3457,3 +3457,65 @@ mod local_associated_hierarchy_native {
         }
     }
 }
+
+#[inline(never)]
+fn owned_suffix_word(word: u16) -> u16 {
+    word ^ 0
+}
+
+pub fn owned_suffix_selected(
+    mut values: [[[u16; 2]; 2]; 2],
+    i: usize,
+    j: usize,
+    k: usize,
+    word: u16,
+) {
+    if i < 2 && j < 2 && k < 2 {
+        let old = values;
+        values[i][j][k] = owned_suffix_word(word);
+        assert!(values[i][j][k] == word);
+        assert!(values[i ^ 1][j][k] == old[i ^ 1][j][k]);
+    }
+}
+
+pub fn owned_suffix_wrong_claim(
+    mut values: [[[u16; 2]; 2]; 2],
+    i: usize,
+    j: usize,
+    k: usize,
+    word: u16,
+) {
+    if i < 2 && j < 2 && k < 2 {
+        values[i][j][k] = owned_suffix_word(word);
+        assert!(values[i][j][k] == word ^ 1);
+    }
+}
+
+pub fn owned_suffix_budget_unknown(
+    mut values: [[[u16; 4]; 4]; 4],
+    i: usize,
+    j: usize,
+    k: usize,
+    word: u16,
+) {
+    if i < 4 && j < 4 && k < 4 {
+        values[i][j][k] = owned_suffix_word(word);
+        assert!(values[i][j][k] == word);
+    }
+}
+
+#[cfg(test)]
+mod owned_suffix_native {
+    #[test]
+    fn mutation_guard() {
+        for i in 0..2 {
+            for j in 0..2 {
+                for k in 0..2 {
+                    for word in [0, 1, 17, u16::MAX] {
+                        super::owned_suffix_selected([[[3; 2]; 2]; 2], i, j, k, word);
+                    }
+                }
+            }
+        }
+    }
+}

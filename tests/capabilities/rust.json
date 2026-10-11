@@ -1279,6 +1279,24 @@
       "unknown_reason":
         "AssociatedHierarchyLocal::outer bb0: hierarchy exceeds the single nested-child scope",
       "unknown_category": "semantics"
+    },
+    {
+      "entry": "owned_suffix_selected",
+      "family": "owned_symbolic_suffix",
+      "expected": "proved"
+    },
+    {
+      "entry": "owned_suffix_wrong_claim",
+      "family": "owned_symbolic_suffix",
+      "expected": "refuted"
+    },
+    {
+      "entry": "owned_suffix_budget_unknown",
+      "family": "owned_symbolic_suffix",
+      "expected": "unknown",
+      "unknown_category": "resource_limit",
+      "unknown_reason":
+        "owned_suffix_budget_unknown bb7: owned symbolic suffix exceeds its shared node or depth budget"
     }
   ]
 }

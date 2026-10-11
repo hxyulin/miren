@@ -1239,3 +1239,14 @@ empty array control retains its earlier unsupported boundary. Compiler mutation,
 negative and finite native controls remain required. Broad compatibility and full validation
 are separate from the completed targeted checkpoint; the earlier Stage211 preparation is retained
 as historical evidence.
+
+Stage214 adds bounded owned u16 symbolic suffix writes after the existing Single/Indexed
+planner refuses a suffix with at least two unresolved indices. Original types, compiler usize
+indices, current or captured destinations, correlated masks and cumulative 512-work/depth-16
+preflight remain checked before one current local or Memory publication. Existing guest assertions
+stay unchanged. Helper mutations refute, omitted bodies stay unknown, and excessive work stays
+ResourceLimit UNKNOWN. All 22 ROOT checks pass, including 856 Rust tests and 68 Python tests;
+four surveys cover 236 cases across 80 families with 97 proved, 82 refuted and 57 unknown each.
+Fresh ROOT debug/release comparisons preserve all queried obligations/models on frozen owner
+inputs. References, other scalar domains, from-end paths and input or return rights gain no
+permissions. See the Stage214 capability evidence for scope and limitations.

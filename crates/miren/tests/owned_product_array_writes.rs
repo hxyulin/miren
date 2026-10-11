@@ -90,8 +90,7 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
         }
         if *expected == ProofStatus::Unknown {
             let (category, reason) = match *name {
-                "dynamic_twice" | "retained" | "reference_zero" | "refined_zero" | "drop_zero"
-                | "core_zero" => (
+                "retained" | "reference_zero" | "refined_zero" | "drop_zero" | "core_zero" => (
                     UnknownCategory::Semantics,
                     "array write index is not uniquely determined",
                 ),
@@ -190,7 +189,7 @@ fn product_roots_preserve_owned_sibling_spans() {
         ("wrong_sibling", ProofStatus::Refuted),
         ("bounds", ProofStatus::Refuted),
         ("panicking_effect", ProofStatus::Refuted),
-        ("dynamic_twice", ProofStatus::Unknown),
+        ("dynamic_twice", ProofStatus::Proved),
         ("retained", ProofStatus::Unknown),
         ("reference_zero", ProofStatus::Unknown),
         ("refined_zero", ProofStatus::Unknown),

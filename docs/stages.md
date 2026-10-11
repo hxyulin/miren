@@ -6243,3 +6243,60 @@ Evidence is under /tmp/miren-stage213-parent212, /tmp/miren-stage213-root-full-c
 Final factual documentation closure changes four files and preserves the other 933 validated
 source files. These measurements describe selected capability cases, not full Rust parity or
 firmware coverage.
+
+## Stage214: bounded owned writes through symbolic suffix indices
+
+Owned u16 tuples, plain structs and fixed arrays now support writes whose suffix contains at
+least two unresolved compiler usize indices. The existing Single/Indexed planner runs first.
+The fallback authenticates original field and element types, current or captured destination
+indices, array extents and correlated masks. It preflights cumulative Cartesian rows, leaves
+and path depth against the shared 512-work/depth-16 limits before materializing new targets.
+A successful update publishes once to current local storage or Memory. It never restores an
+older pre-call Memory snapshot. Refusal can retain solver-context and diagnostic metadata;
+this is not whole-engine rollback. References, other scalar types and reverse paths gain no
+new permissions.
+
+The unchanged ten-root fixture measures seven PROVED, two REFUTED and one UNKNOWN in each
+host/ARM O0/O2 profile. An actual xor-zero to xor-one helper mutation refutes seven selected
+claims with unchanged assertions. The pre-existing wrong-claim control becomes PROVED under
+that mutant, and is reported as such. Eight genuine retained/omitted dependency archives retain
+actual body checks; omitted bodies remain MissingCompilerEvidence UNKNOWN. Eight native runs
+execute one test each: originals pass and actual helper mutants fail under a ten-second limit.
+Finite native samples do not constrain the symbolic input domain.
+
+Fresh recovery justified only the three inherited dynamic-twice harness promotions, preserving
+the original guest files and baseline queried obligations. The initial stale-expectation failure
+remains historical. The global fixture and manifest preserve all 233 parent entries and append
+three guarded symbolic-suffix cases. Each four-profile survey now covers 236 cases across
+80 families: 97 PROVED, 82 REFUTED and 57 UNKNOWN. The new oversized suffix stays UNKNOWN with
+its specifically measured ResourceLimit frontier; it is never treated as successful.
+
+The proportional owner corpus covers the current full survey, affected families, original and
+mutated helpers, and genuine dependencies. Its 1,988 parent-to-candidate proof pairs preserve
+1,889 literal complete objects, record 96 named changes and three strict query-free fold timeout
+contexts. All 5,440 baseline queried obligations/models remain preserved, with 5,884 current
+ones and 308 exact changed baseline prefixes. UNKNOWN partial queries are included.
+Full-workspace owner debug/release comparison preserves 1,985 literal complete objects and all
+5,884 queried obligations/models. Separate raw comparisons bind the earlier scoped candidate to
+both full-workspace builds without assuming binary equivalence or rerunning native evidence.
+
+All 22 required ROOT checks pass, including 856 Rust tests across 196 outer Cargo target
+summaries, 68 Python tests, lint, release builds, dependency policy, examples and manual hooks.
+The ROOT test suite also executes original and actual helper-mutant native fixtures at O0/O2.
+
+Fresh ROOT debug and release binaries each execute 64 groups with 1,988 proof pairs against the
+corresponding full-workspace owner binary. Both comparisons preserve all 5,884 rich queried
+obligations/models. Debug preserves 1,986 literal complete objects, with two strict query-free
+fold timeout contexts; release preserves 1,985, with three such contexts. Each phase retains
+literal owner input paths, archives and working directories. No source-path rewriting, proof
+field injection, promotion allowance or inherited extra-frame exception is used. This is execution
+of ROOT-built analyzers on frozen owner inputs; ROOT workspace tests and its four fresh surveys
+have their own source scope. The independently reviewed parent-to-owner change and fresh
+ROOT-after equality compose without repeating the historical full corpus.
+
+Evidence is under /tmp/miren-stage214-parent213, /tmp/miren-stage214-root-full-checks,
+/tmp/miren-stage214-root-survey, /tmp/miren-stage214-root-debug-integration,
+/tmp/miren-stage214-root-release-integration and /tmp/miren-stage214-root-final-data.
+Final factual documentation closure changes five files and preserves the other 934 tested and
+captured source files. These are selected capability measurements, not full Rust parity or
+firmware coverage.

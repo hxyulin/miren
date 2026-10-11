@@ -29,6 +29,28 @@ enum ProductWritePlan<'tcx> {
         index: Term,
         targets: Vec<ProductPathTarget<'tcx>>,
     },
+    Guarded {
+        targets: Vec<ProductPathTarget<'tcx>>,
+        masks: Vec<Term>,
+    },
+}
+
+const SYMBOLIC_SUFFIX_WRITES_ENABLED: bool = true;
+
+#[cfg(test)]
+thread_local! {
+    static SYMBOLIC_SUFFIX_OVERRIDE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+fn symbolic_suffix_writes_enabled() -> bool {
+    #[cfg(test)]
+    {
+        SYMBOLIC_SUFFIX_WRITES_ENABLED || SYMBOLIC_SUFFIX_OVERRIDE.get()
+    }
+    #[cfg(not(test))]
+    {
+        SYMBOLIC_SUFFIX_WRITES_ENABLED
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -51,6 +73,74 @@ pub(super) fn known_owned_write_frontier(error: &str) -> bool {
         "non-scalar array index is not uniquely determined on this path"
             | "array write index is not uniquely determined"
     )
+}
+
+struct SuffixDestination<'a> {
+    indices: Option<&'a CapturedDestinationIndices>,
+    rows: usize,
+}
+
+struct SuffixSource<'a, 'tcx> {
+    body: &'a Body<'tcx>,
+    state: &'a State,
+    indices: Option<&'a CapturedDestinationIndices>,
+}
+
+struct SuffixPath<'a, 'tcx> {
+    original: Ty<'tcx>,
+    shape: &'a OwnedChoiceShape,
+    projections: &'a [rustc_middle::mir::PlaceElem<'tcx>],
+    start: usize,
+    depth: usize,
+    mask: Option<Term>,
+}
+
+struct SuffixScan<'tcx> {
+    budget: usize,
+    count: usize,
+    rows: usize,
+    materialize: bool,
+    targets: Vec<ProductPathTarget<'tcx>>,
+    masks: Vec<Term>,
+}
+
+fn suffix_u16_inventory(shape: &OwnedChoiceShape, depth: usize) -> Result<Option<usize>, String> {
+    if depth > MAX_CHOICE_DEPTH {
+        return Err("owned suffix shape exceeds its depth budget".into());
+    }
+    let mut count = 1_usize;
+    let children: &[OwnedChoiceShape] = match shape {
+        OwnedChoiceShape::Primitive(ScalarSliceElement::Integer {
+            bits: 16,
+            signed: false,
+        }) => {
+            return Ok(Some(1));
+        }
+        OwnedChoiceShape::Primitive(_) | OwnedChoiceShape::ByteArray(_) => return Ok(None),
+        OwnedChoiceShape::Tuple(children) | OwnedChoiceShape::Array(children) => children,
+        OwnedChoiceShape::Struct { fields, .. } => {
+            for (_, child) in fields {
+                let Some(nodes) = suffix_u16_inventory(child, depth + 1)? else {
+                    return Ok(None);
+                };
+                count = count.saturating_add(nodes);
+                if count > MAX_CHOICE_NODES {
+                    return Err("owned suffix shape exceeds its node budget".into());
+                }
+            }
+            return Ok(Some(count));
+        }
+    };
+    for child in children {
+        let Some(nodes) = suffix_u16_inventory(child, depth + 1)? else {
+            return Ok(None);
+        };
+        count = count.saturating_add(nodes);
+        if count > MAX_CHOICE_NODES {
+            return Err("owned suffix shape exceeds its node budget".into());
+        }
+    }
+    Ok(Some(count))
 }
 
 impl<'tcx> Engine<'tcx> {
@@ -301,16 +391,21 @@ impl<'tcx> Engine<'tcx> {
         let Some(shape) = self.owned_product_shape(original)? else {
             return Ok(false);
         };
-        let Some(ProductWritePlan::Indexed { index, targets }) = self.owned_product_write_plan(
+        let Some(plan) = self.owned_product_write_plan(
             body,
             state,
             original,
             &shape,
             place.projection,
-            indices,
+            SuffixDestination { indices, rows: 1 },
         )?
         else {
             return Ok(false);
+        };
+        let targets = match &plan {
+            ProductWritePlan::Single(_) => return Ok(false),
+            ProductWritePlan::Indexed { targets, .. }
+            | ProductWritePlan::Guarded { targets, .. } => targets,
         };
         let target = targets
             .first()
@@ -350,7 +445,15 @@ impl<'tcx> Engine<'tcx> {
             .iter()
             .map(|target| target.span.clone())
             .collect::<Vec<_>>();
-        let masks = indexed_product_masks(&self.terms, bits, &index, &spans)?;
+        let masks = match &plan {
+            ProductWritePlan::Single(_) => unreachable!(),
+            ProductWritePlan::Indexed { index, .. } => {
+                indexed_product_masks(&self.terms, bits, index, &spans)?
+            }
+            ProductWritePlan::Guarded { masks, .. } => {
+                spans.into_iter().zip(masks.iter().cloned()).collect()
+            }
+        };
         let updated =
             conditional_indexed_product(&self.terms, bits, &shape, &masks, &replacement, &old)?;
         if let Some(allocation) = allocation {
@@ -493,13 +596,25 @@ impl<'tcx> Engine<'tcx> {
         let Some(shape) = self.owned_product_shape(*element)? else {
             return Ok(false);
         };
-        let Some(plan) =
-            self.owned_product_write_plan(body, state, *element, &shape, fields, indices)?
+        let Some(plan) = self.owned_product_write_plan(
+            body,
+            state,
+            *element,
+            &shape,
+            fields,
+            SuffixDestination {
+                indices,
+                rows: elements.len(),
+            },
+        )?
         else {
             return Ok(false);
         };
         if matches!(mode, OwnedWriteMode::Known)
-            && !matches!(plan, ProductWritePlan::Indexed { .. })
+            && !matches!(
+                plan,
+                ProductWritePlan::Indexed { .. } | ProductWritePlan::Guarded { .. }
+            )
         {
             return Ok(false);
         }
@@ -510,7 +625,8 @@ impl<'tcx> Engine<'tcx> {
         )?;
         let target = match &plan {
             ProductWritePlan::Single(target) => target,
-            ProductWritePlan::Indexed { targets, .. } => {
+            ProductWritePlan::Indexed { targets, .. }
+            | ProductWritePlan::Guarded { targets, .. } => {
                 if elements
                     .len()
                     .checked_mul(targets.len())
@@ -571,6 +687,27 @@ impl<'tcx> Engine<'tcx> {
                         &old,
                     )?
                 }
+                ProductWritePlan::Guarded { targets, masks } => {
+                    let masks = targets
+                        .iter()
+                        .zip(masks)
+                        .map(|(target, mask)| {
+                            Ok((
+                                target.span.clone(),
+                                self.terms
+                                    .apply(Op::And, &[condition.clone(), mask.clone()])?,
+                            ))
+                        })
+                        .collect::<Result<Vec<_>, String>>()?;
+                    conditional_indexed_product(
+                        &self.terms,
+                        bits,
+                        &shape,
+                        &masks,
+                        &replacement,
+                        &old,
+                    )?
+                }
                 ProductWritePlan::Single(_) if fields.is_empty() => {
                     conditional_product(&self.terms, bits, &shape, &condition, &replacement, &old)?
                 }
@@ -597,6 +734,360 @@ impl<'tcx> Engine<'tcx> {
     }
 
     fn owned_product_write_plan(
+        &self,
+        body: &Body<'tcx>,
+        state: &State,
+        original: Ty<'tcx>,
+        shape: &OwnedChoiceShape,
+        projections: &[rustc_middle::mir::PlaceElem<'tcx>],
+        destination: SuffixDestination<'_>,
+    ) -> Result<Option<ProductWritePlan<'tcx>>, String> {
+        let SuffixDestination { indices, rows } = destination;
+        let old = self.owned_product_write_plan_legacy(
+            body,
+            state,
+            original,
+            shape,
+            projections,
+            indices,
+        )?;
+        if !symbolic_suffix_writes_enabled() || old.is_some() {
+            return Ok(old);
+        }
+        if projections.len() > MAX_CHOICE_DEPTH {
+            return Err(self.suffix_resource_error());
+        }
+        // The old None must correspond to at least two unresolved indices in this suffix.
+        let bits = u32::from(self.tcx.sess.target.pointer_width);
+        let mut unresolved = 0;
+        for projection in projections {
+            match projection {
+                ProjectionElem::Index(local) => {
+                    if body.local_decls[*local].ty != self.tcx.types.usize {
+                        return Err("owned suffix index requires original compiler usize".into());
+                    }
+                    let value = self.destination_index(state, *local, indices)?;
+                    if fixed_index_value(&self.terms, &value, bits)?.is_none() {
+                        unresolved += 1;
+                    }
+                }
+                ProjectionElem::Field(..)
+                | ProjectionElem::ConstantIndex {
+                    from_end: false, ..
+                } => {}
+                _ => return Ok(None),
+            }
+        }
+        if unresolved < 2 {
+            return Ok(None);
+        }
+        let mut budget = 0;
+        let Some(inventory) =
+            suffix_u16_inventory(shape, 0).map_err(|_| self.suffix_resource_error())?
+        else {
+            return Ok(None);
+        };
+        // Flatten/rebuild current rows and replacement, plus repeated span inventory scans.
+        self.suffix_charge(
+            &mut budget,
+            inventory.saturating_mul(rows).saturating_mul(3),
+        )?;
+        let mut scan = SuffixScan {
+            budget,
+            count: 0,
+            rows,
+            materialize: false,
+            targets: Vec::new(),
+            masks: Vec::new(),
+        };
+        self.owned_suffix_walk(
+            &SuffixSource {
+                body,
+                state,
+                indices,
+            },
+            SuffixPath {
+                original,
+                shape,
+                projections,
+                start: 0,
+                depth: 0,
+                mask: None,
+            },
+            &mut scan,
+        )?;
+        if scan.count == 0 {
+            return Err("owned suffix write has no feasible target".into());
+        }
+        // All Cartesian paths, cloned target schemas and masks have been precharged.
+        let capacity = scan.count;
+        // conditional_indexed_product searches the bounded target inventory for every old leaf.
+        self.suffix_charge(
+            &mut scan.budget,
+            capacity
+                .saturating_mul(product_leaf_count(shape)?)
+                .saturating_mul(rows),
+        )?;
+        scan.materialize = true;
+        scan.count = 0;
+        scan.targets = Vec::with_capacity(capacity);
+        scan.masks = Vec::with_capacity(capacity);
+        self.owned_suffix_walk(
+            &SuffixSource {
+                body,
+                state,
+                indices,
+            },
+            SuffixPath {
+                original,
+                shape,
+                projections,
+                start: 0,
+                depth: 0,
+                mask: None,
+            },
+            &mut scan,
+        )?;
+        if scan.count != capacity {
+            return Err("owned suffix inventory changed during materialization".into());
+        }
+        let spans = scan
+            .targets
+            .iter()
+            .map(|target| target.span.clone())
+            .collect::<Vec<_>>();
+        validate_indexed_spans(&spans, product_leaf_count(shape)?, 1)?;
+        Ok(Some(ProductWritePlan::Guarded {
+            targets: scan.targets,
+            masks: scan.masks,
+        }))
+    }
+
+    fn suffix_resource_error(&self) -> String {
+        self.categorized_error(
+            UnknownCategory::ResourceLimit,
+            "owned symbolic suffix exceeds its shared node or depth budget".into(),
+        )
+    }
+
+    fn suffix_charge(&self, budget: &mut usize, amount: usize) -> Result<(), String> {
+        *budget = budget.saturating_add(amount);
+        if *budget > MAX_CHOICE_NODES {
+            return Err(self.suffix_resource_error());
+        }
+        Ok(())
+    }
+
+    fn owned_suffix_walk(
+        &self,
+        source: &SuffixSource<'_, 'tcx>,
+        path: SuffixPath<'_, 'tcx>,
+        scan: &mut SuffixScan<'tcx>,
+    ) -> Result<(), String> {
+        let SuffixSource {
+            body,
+            state,
+            indices,
+        } = *source;
+        let SuffixPath {
+            original,
+            shape,
+            projections,
+            start,
+            depth,
+            mask,
+        } = path;
+        if depth > MAX_CHOICE_DEPTH {
+            return Err(self.suffix_resource_error());
+        }
+        if !scan.materialize {
+            let inventory = suffix_u16_inventory(shape, 0)
+                .map_err(|_| self.suffix_resource_error())?
+                .ok_or("owned suffix shape lost its original u16 inventory")?;
+            self.suffix_charge(
+                &mut scan.budget,
+                inventory.saturating_mul(2).saturating_add(4),
+            )?;
+        }
+        let Some((projection, rest)) = projections.split_first() else {
+            if original != self.tcx.types.u16
+                || *shape
+                    != OwnedChoiceShape::Primitive(ScalarSliceElement::Integer {
+                        bits: 16,
+                        signed: false,
+                    })
+            {
+                return Err("owned suffix target requires original u16 scalar".into());
+            }
+            if !scan.materialize {
+                self.suffix_charge(
+                    &mut scan.budget,
+                    scan.rows
+                        .saturating_mul(depth.saturating_mul(3).saturating_add(5)),
+                )?;
+            } else {
+                scan.targets.push(ProductPathTarget {
+                    original,
+                    shape: shape.clone(),
+                    span: start
+                        ..start
+                            .checked_add(1)
+                            .ok_or("owned suffix target offset overflow")?,
+                });
+                scan.masks
+                    .push(mask.ok_or("owned suffix target lacks symbolic selection")?);
+            }
+            scan.count += 1;
+            return Ok(());
+        };
+        match projection {
+            ProjectionElem::Field(index, recorded) => {
+                let index = index.as_usize();
+                let child_ty = match (original.kind(), shape) {
+                    (ty::Tuple(types), OwnedChoiceShape::Tuple(children))
+                        if types.len() == children.len() =>
+                    {
+                        *types
+                            .get(index)
+                            .ok_or("owned suffix tuple field is invalid")?
+                    }
+                    (ty::Adt(def, args), OwnedChoiceShape::Struct { name, fields })
+                        if self.plain_composite_struct(*def)
+                            && self.tcx.def_path_str(def.did()) == *name
+                            && def.non_enum_variant().fields.len() == fields.len() =>
+                    {
+                        let declared = &def.non_enum_variant().fields;
+                        if declared
+                            .iter()
+                            .zip(fields)
+                            .any(|(field, (name, _))| field.name.as_str() != name)
+                        {
+                            return Err("owned suffix struct field identity mismatch".into());
+                        }
+                        declared
+                            .get(rustc_abi::FieldIdx::from_usize(index))
+                            .ok_or("owned suffix struct field is invalid")?
+                            .ty(self.tcx, args)
+                            .skip_norm_wip()
+                    }
+                    _ => return Err("owned suffix field lacks original product identity".into()),
+                };
+                if child_ty != *recorded {
+                    return Err("owned suffix field differs from original compiler type".into());
+                }
+                let (child, offset) = product_field(shape, index)?;
+                self.owned_suffix_walk(
+                    source,
+                    SuffixPath {
+                        original: child_ty,
+                        shape: child,
+                        projections: rest,
+                        start: start
+                            .checked_add(offset)
+                            .ok_or("owned suffix field offset overflow")?,
+                        depth: depth + 1,
+                        mask,
+                    },
+                    scan,
+                )
+            }
+            ProjectionElem::Index(_)
+            | ProjectionElem::ConstantIndex {
+                from_end: false, ..
+            } => {
+                let (ty::Array(child_ty, count), OwnedChoiceShape::Array(children)) =
+                    (original.kind(), shape)
+                else {
+                    return Err("owned suffix index lacks original fixed array".into());
+                };
+                if count.try_to_target_usize(self.tcx) != Some(children.len() as u64) {
+                    return Err("owned suffix extent differs from compiler array".into());
+                }
+                let bits = u32::from(self.tcx.sess.target.pointer_width);
+                let (fixed, value) = match projection {
+                    ProjectionElem::Index(local) => {
+                        if body.local_decls[*local].ty != self.tcx.types.usize {
+                            return Err(
+                                "owned suffix index requires original compiler usize".into()
+                            );
+                        }
+                        let value = self.destination_index(state, *local, indices)?;
+                        let fixed = fixed_index_value(&self.terms, &value, bits)?;
+                        (fixed, Some(value))
+                    }
+                    ProjectionElem::ConstantIndex {
+                        offset,
+                        min_length,
+                        from_end: false,
+                    } => {
+                        let fixed = usize::try_from(*offset)
+                            .map_err(|_| "owned suffix constant index exceeds host capacity")?;
+                        checked_fixed_index(children.len() as u64, fixed, Some(*min_length))?;
+                        (Some(fixed), None)
+                    }
+                    _ => unreachable!(),
+                };
+                if let Some(value) = &value {
+                    self.memory_bounds(
+                        value,
+                        &symbolic::integer(&self.terms, children.len() as u128, bits, false),
+                        &state.conditions,
+                    )?;
+                }
+                let term = value
+                    .as_ref()
+                    .map(Value::integer)
+                    .transpose()?
+                    .map(|value| value.0);
+                let mut offset = start;
+                for (position, child) in children.iter().enumerate() {
+                    if fixed.is_none_or(|fixed| fixed == position) {
+                        let child_mask = if scan.materialize && fixed.is_none() {
+                            let equal = self.terms.apply(
+                                Op::Equal,
+                                &[
+                                    term.as_ref()
+                                        .ok_or("owned suffix lacks index term")?
+                                        .clone(),
+                                    self.terms.bit_vector(position as u128, bits)?,
+                                ],
+                            )?;
+                            Some(match &mask {
+                                Some(parent) => {
+                                    self.terms.apply(Op::And, &[parent.clone(), equal])?
+                                }
+                                None => equal,
+                            })
+                        } else {
+                            mask.clone()
+                        };
+                        self.owned_suffix_walk(
+                            source,
+                            SuffixPath {
+                                original: *child_ty,
+                                shape: child,
+                                projections: rest,
+                                start: offset,
+                                depth: depth + 1,
+                                mask: child_mask,
+                            },
+                            scan,
+                        )?;
+                    }
+                    offset = offset
+                        .checked_add(product_leaf_count(child)?)
+                        .ok_or("owned suffix array offset overflow")?;
+                }
+                if fixed.is_some_and(|fixed| fixed >= children.len()) {
+                    return Err("owned suffix index outside original array".into());
+                }
+                Ok(())
+            }
+            _ => Err("unsupported owned symbolic suffix projection".into()),
+        }
+    }
+
+    fn owned_product_write_plan_legacy(
         &self,
         body: &Body<'tcx>,
         state: &State,
@@ -1590,8 +2081,648 @@ pub(super) fn rebuild(
 }
 
 #[cfg(test)]
+fn suffix_test_engine(tcx: TyCtxt<'_>) -> Engine<'_> {
+    let config = miren::ContractConfig::default();
+    let limits = miren::AnalysisLimits::default();
+    let all_failures = false;
+    let induction = false;
+    let startup = false;
+    let isolated_startup = false;
+    let async_entry = false;
+    Engine {
+        tcx,
+        terms: Context::default(),
+        next_symbol: std::cell::Cell::new(0),
+        float_encodings: BTreeMap::new(),
+        float_pairs: float_pairs::Registry::default(),
+        abstraction_symbols: std::cell::RefCell::new(BTreeMap::new()),
+        static_views: std::cell::RefCell::new(Vec::new()),
+        static_origins: Default::default(),
+        static_epoch: None,
+        static_roots: None,
+        function_pointers: std::cell::RefCell::new(Vec::new()),
+        static_addresses: std::collections::HashMap::new(),
+        tracked_addresses: Vec::new(),
+        maybe_uninit_types: Vec::new(),
+        scalar_slice_types: Vec::new(),
+        composite_slice_types: Vec::new(),
+        steps: 0,
+        call_chain: Vec::new(),
+        failed_call_chain: None,
+        trait_objects: Vec::new(),
+        input_depth: 0,
+        input_values: 0,
+        input_reservations: Vec::new(),
+        owned_projection_certificates: Vec::new(),
+        input_shapes: std::collections::HashMap::new(),
+        zero_sized_inputs: std::collections::HashMap::new(),
+        zero_sized_input_nodes: 0,
+        prefer_lazy_inputs: false,
+        building_mutable_input: false,
+        unknown_causes: std::cell::RefCell::new(BTreeMap::new()),
+        started: std::time::Instant::now(),
+        config: config.clone(),
+        all_failures,
+        induction,
+        startup,
+        isolated_startup,
+        limits,
+        resolved_contracts: BTreeMap::new(),
+        solver: std::cell::RefCell::new(Solver::with_limits(limits)),
+        mutable_u16_frames: Default::default(),
+        mutable_integer_types: Vec::new(),
+        mutable_u16_staging: Default::default(),
+        coroutine_places: Default::default(),
+        owned_box_types: Vec::new(),
+        next_owned_region: 0,
+        owned_box_constructors: Vec::new(),
+        bodies: std::cell::RefCell::new(std::collections::HashMap::new()),
+        call_signatures: std::cell::RefCell::new(std::collections::HashMap::new()),
+        proof: Proof {
+            status: ProofStatus::Proved,
+            async_entry,
+            assumptions: Vec::new(),
+            entry_assumptions: Vec::new(),
+            inputs: BTreeMap::new(),
+            models: Vec::new(),
+            invariants: Vec::new(),
+            analyzed_bodies: Vec::new(),
+            body_entries: Vec::new(),
+            body_entries_truncated: false,
+            obligations: Vec::new(),
+            trusted_calls: Vec::new(),
+            matched_contracts: Vec::new(),
+            stopped_after_counterexample: false,
+            replay_inputs: None,
+        },
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
+
+    struct SuffixOverride(bool);
+
+    impl SuffixOverride {
+        fn enabled() -> Self {
+            Self(SYMBOLIC_SUFFIX_OVERRIDE.replace(true))
+        }
+    }
+
+    impl Drop for SuffixOverride {
+        fn drop(&mut self) {
+            SYMBOLIC_SUFFIX_OVERRIDE.set(self.0);
+        }
+    }
+
+    #[test]
+    fn symbolic_suffix_override_restores_nested_and_panicking_scopes() {
+        assert!(!SYMBOLIC_SUFFIX_OVERRIDE.get());
+        let outer = SuffixOverride::enabled();
+        assert!(SYMBOLIC_SUFFIX_OVERRIDE.get());
+        {
+            let _inner = SuffixOverride::enabled();
+            assert!(symbolic_suffix_writes_enabled());
+        }
+        assert!(SYMBOLIC_SUFFIX_OVERRIDE.get());
+        drop(outer);
+        assert!(!SYMBOLIC_SUFFIX_OVERRIDE.get());
+        let result = std::panic::catch_unwind(|| {
+            let _scope = SuffixOverride::enabled();
+            panic!("scoped suffix override");
+        });
+        assert!(result.is_err());
+        assert!(!SYMBOLIC_SUFFIX_OVERRIDE.get());
+        assert_eq!(
+            symbolic_suffix_writes_enabled(),
+            SYMBOLIC_SUFFIX_WRITES_ENABLED
+        );
+    }
+
+    #[test]
+    fn compiler_owned_symbolic_suffix_writes_and_current_indices() {
+        struct Capture(std::path::PathBuf);
+        impl rustc_driver::Callbacks for Capture {
+            fn after_analysis<'tcx>(
+                &mut self,
+                _: &rustc_interface::interface::Compiler,
+                tcx: TyCtxt<'tcx>,
+            ) -> rustc_driver::Compilation {
+                check_suffix_compiler(tcx);
+                check_suffix_expansion_refusal(tcx);
+                for id in tcx.mir_keys(()).iter().copied() {
+                    if tcx.def_kind(id.to_def_id()) == DefKind::Fn {
+                        let name = tcx.item_name(id.to_def_id());
+                        std::fs::write(
+                            self.0.join(format!("{name}.mir")),
+                            format!("{:#?}", tcx.optimized_mir(id)),
+                        )
+                        .unwrap();
+                    }
+                }
+                rustc_driver::Compilation::Stop
+            }
+        }
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!(
+            "miren-stage214-compiler-{}-{nonce}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let source = root.join("fixture.rs");
+        std::fs::write(
+            &source,
+            r#"
+#![no_std]
+#![forbid(unsafe_code)]
+#![feature(custom_mir, core_intrinsics)]
+#![allow(internal_features)]
+use core::intrinsics::mir::*;
+#[inline(never)] pub fn helper(word: u16) -> u16 { word ^ 0 }
+pub fn suffix(mut a: [[[u16; 2]; 2]; 2], i: usize, j: usize, k: usize, word: u16)
+    -> [[[u16; 2]; 2]; 2] {
+    a[i][j][k] = helper(word); a
+}
+pub fn field(mut a: ([[[u16; 2]; 2]; 2], u16), i: usize, j: usize, k: usize, word: u16)
+    -> ([[[u16; 2]; 2]; 2], u16) {
+    a.0[i][j][k] = helper(word); a
+}
+#[custom_mir(dialect = "runtime", phase = "optimized")]
+pub fn destination(mut a: [[[u16; 2]; 2]; 2], i: usize, j: usize, k: usize, word: u16)
+    -> [[[u16; 2]; 2]; 2] {
+    mir! {
+        { Call(a[i][j][k] = helper(Move(word)), ReturnTo(done), UnwindUnreachable()) }
+        done = { RET = Move(a); Return() }
+    }
+}
+pub fn wide(mut a: [[[u16; 4]; 4]; 4], i: usize, j: usize, k: usize, word: u16)
+    -> [[[u16; 4]; 4]; 4] {
+    a[i][j][k] = helper(word); a
+}
+"#,
+        )
+        .unwrap();
+        for target in [None, Some("thumbv7em-none-eabihf")] {
+            for level in [0, 2] {
+                let output = root.join(format!("{}-o{level}", target.unwrap_or("host")));
+                std::fs::create_dir_all(&output).unwrap();
+                let mut args = vec![
+                    "rustc".into(),
+                    "--crate-type=lib".into(),
+                    "--edition=2024".into(),
+                    source.display().to_string(),
+                    "--out-dir".into(),
+                    output.display().to_string(),
+                    "-Cpanic=abort".into(),
+                    "-Coverflow-checks=yes".into(),
+                    format!("-Copt-level={level}"),
+                ];
+                if let Some(target) = target {
+                    args.extend(["--target".into(), target.into()]);
+                }
+                rustc_driver::run_compiler(&args, &mut Capture(output));
+            }
+        }
+        eprintln!("Stage214 compiler assets: {}", root.display());
+    }
+
+    fn cube(context: &Context) -> Value {
+        Value::Elements(
+            (0..2)
+                .map(|i| {
+                    Value::Elements(
+                        (0..2)
+                            .map(|j| {
+                                Value::Elements(
+                                    (0..2)
+                                        .map(|k| {
+                                            symbolic::integer(
+                                                context,
+                                                (1 + i * 4 + j * 2 + k) as u128,
+                                                16,
+                                                false,
+                                            )
+                                        })
+                                        .collect::<Vec<_>>()
+                                        .into(),
+                                )
+                            })
+                            .collect::<Vec<_>>()
+                            .into(),
+                    )
+                })
+                .collect::<Vec<_>>()
+                .into(),
+        )
+    }
+
+    fn check_suffix_compiler(tcx: TyCtxt<'_>) {
+        let find = |name: &str| {
+            tcx.mir_keys(())
+                .iter()
+                .copied()
+                .find(|id| {
+                    tcx.def_kind(id.to_def_id()) == DefKind::Fn
+                        && tcx.item_name(id.to_def_id()).as_str() == name
+                })
+                .unwrap()
+                .to_def_id()
+        };
+        for (name, tuple) in [("suffix", false), ("field", true), ("destination", false)] {
+            let id = find(name);
+            let mut engine = suffix_test_engine(tcx);
+            let instance = engine.resolve_function_item(id, tcx.mk_args(&[])).unwrap();
+            let body = engine.instantiated_body(instance).unwrap();
+            let store = body
+                .basic_blocks
+                .iter()
+                .flat_map(|block| &block.statements)
+                .find(|statement| {
+                    matches!(&statement.kind, StatementKind::Assign(assign)
+                    if assign.0.projection.iter()
+                        .filter(|p| matches!(p, ProjectionElem::Index(_))).count() == 3)
+                });
+            let place = if name == "destination" {
+                body.basic_blocks
+                    .iter()
+                    .find_map(|block| match &block.terminator().kind {
+                        TerminatorKind::Call { destination, .. }
+                            if destination
+                                .projection
+                                .iter()
+                                .filter(|p| matches!(p, ProjectionElem::Index(_)))
+                                .count()
+                                == 3 =>
+                        {
+                            Some(*destination)
+                        }
+                        _ => None,
+                    })
+                    .unwrap()
+            } else {
+                let StatementKind::Assign(assign) = &store.unwrap().kind else {
+                    unreachable!()
+                };
+                assign.0
+            };
+            let bits = u32::from(tcx.sess.target.pointer_width);
+            let mut state = State {
+                locals: vec![None; body.local_decls.len()],
+                addresses: vec![None; body.local_decls.len()],
+                missing_places: Default::default(),
+                memory: Default::default(),
+                conditions: vec![],
+            };
+            let original = if tuple {
+                Value::Tuple(vec![
+                    cube(&engine.terms),
+                    symbolic::integer(&engine.terms, 41, 16, false),
+                ])
+            } else {
+                cube(&engine.terms)
+            };
+            state.locals[place.local.as_usize()] = Some(original.clone());
+            for (position, projection) in place.projection.iter().enumerate() {
+                if let ProjectionElem::Index(local) = projection {
+                    let term = engine
+                        .terms
+                        .symbol(100 + position as u32, Sort::BitVec(bits))
+                        .unwrap();
+                    let index = Value::Int {
+                        expression: term,
+                        bits,
+                        signed: false,
+                    };
+                    state.conditions.push(
+                        symbolic::binary(
+                            &engine.terms,
+                            "lt",
+                            index.clone(),
+                            symbolic::integer(&engine.terms, 2, bits, false),
+                        )
+                        .unwrap()
+                        .boolean()
+                        .unwrap(),
+                    );
+                    state.locals[local.as_usize()] = Some(index);
+                }
+            }
+            let replacement = symbolic::integer(&engine.terms, 29, 16, false);
+            let before = state.locals.clone();
+            if !SYMBOLIC_SUFFIX_WRITES_ENABLED {
+                assert!(
+                    !engine
+                        .write_owned_array_element(&body, &mut state, place, &replacement, None)
+                        .unwrap()
+                );
+                assert_eq!(format!("{:?}", state.locals), format!("{before:?}"));
+            }
+            let captured = engine
+                .capture_destination_indices(&body, &state, place)
+                .unwrap()
+                .unwrap();
+            let _scope = SuffixOverride::enabled();
+            // Capture once; later locals deliberately differ from the actual captured index values.
+            for projection in place.projection {
+                if let ProjectionElem::Index(local) = projection {
+                    state.locals[local.as_usize()] =
+                        Some(symbolic::integer(&engine.terms, 0, bits, false));
+                }
+            }
+            let wrote = if tuple {
+                engine.write_owned_field_array(
+                    &body,
+                    &mut state,
+                    place,
+                    &replacement,
+                    Some(&captured),
+                )
+            } else {
+                engine.write_owned_array_element(
+                    &body,
+                    &mut state,
+                    place,
+                    &replacement,
+                    Some(&captured),
+                )
+            }
+            .unwrap();
+            assert!(wrote, "actual {name} store did not use the new suffix plan");
+            let updated = engine.local(&state, place.local.as_usize()).unwrap();
+            if tuple {
+                let Value::Tuple(fields) = &updated else {
+                    panic!("expected tuple")
+                };
+                let Value::Tuple(old) = &original else {
+                    unreachable!()
+                };
+                assert_eq!(fields[1].integer().unwrap().0, old[1].integer().unwrap().0);
+            }
+            assert_ne!(format!("{updated:?}"), format!("{original:?}"));
+            let shape = engine
+                .owned_product_shape(body.local_decls[place.local].ty)
+                .unwrap()
+                .unwrap();
+            engine
+                .validate_owned_product(
+                    body.local_decls[place.local].ty,
+                    &updated,
+                    &state.conditions,
+                )
+                .unwrap();
+            let mut nodes = 0;
+            let leaves = engine
+                .product_leaves(
+                    body.local_decls[place.local].ty,
+                    bits,
+                    &shape,
+                    &updated,
+                    &state.conditions,
+                    &mut nodes,
+                )
+                .unwrap();
+            let mut retained = state.clone();
+            retained.locals[place.local.as_usize()] = Some(original.clone());
+            assert!(
+                leaves
+                    .iter()
+                    .any(|value| symbolic::constant(&value.integer().unwrap().0).is_none())
+            );
+            // Wrong replacement and wrong index type fail before any publication.
+            let before = retained.locals.clone();
+            let bad = symbolic::integer(&engine.terms, 1, 32, false);
+            let error = if tuple {
+                engine.write_owned_field_array(&body, &mut retained, place, &bad, Some(&captured))
+            } else {
+                engine.write_owned_array_element(&body, &mut retained, place, &bad, Some(&captured))
+            };
+            assert!(error.is_err());
+            assert_eq!(format!("{:?}", retained.locals), format!("{before:?}"));
+            let mut budget = MAX_CHOICE_NODES;
+            assert!(engine.suffix_charge(&mut budget, 1).is_err());
+            assert_eq!(format!("{:?}", retained.locals), format!("{before:?}"));
+            if tuple {
+                let mut projections = place.projection.to_vec();
+                let ProjectionElem::Field(index, _) = projections[0] else {
+                    unreachable!()
+                };
+                projections[0] = ProjectionElem::Field(index, tcx.types.u16);
+                let forged = Place {
+                    local: place.local,
+                    projection: tcx.mk_place_elems(&projections),
+                };
+                assert!(
+                    engine
+                        .write_owned_field_array(&body, &mut retained, forged, &replacement, None,)
+                        .is_err()
+                );
+                assert_eq!(format!("{:?}", retained.locals), format!("{before:?}"));
+            }
+            let first_index = place
+                .projection
+                .iter()
+                .find_map(|p| {
+                    if let ProjectionElem::Index(local) = p {
+                        Some(local)
+                    } else {
+                        None
+                    }
+                })
+                .unwrap();
+            let mut bad_state = retained.clone();
+            bad_state.locals[first_index.as_usize()] =
+                Some(symbolic::integer(&engine.terms, 0, bits, true));
+            let saved = format!("{:?}", bad_state.locals);
+            let error = if tuple {
+                engine.write_owned_field_array(&body, &mut bad_state, place, &replacement, None)
+            } else {
+                engine.write_owned_array_element(&body, &mut bad_state, place, &replacement, None)
+            };
+            assert!(error.is_err());
+            assert_eq!(format!("{:?}", bad_state.locals), saved);
+            let foreign = Context::default();
+            bad_state.locals[first_index.as_usize()] = Some(Value::Int {
+                expression: foreign.symbol(900, Sort::BitVec(bits)).unwrap(),
+                bits,
+                signed: false,
+            });
+            let saved = format!("{:?}", bad_state.locals);
+            let error = if tuple {
+                engine.write_owned_field_array(&body, &mut bad_state, place, &replacement, None)
+            } else {
+                engine.write_owned_array_element(&body, &mut bad_state, place, &replacement, None)
+            };
+            assert!(error.is_err());
+            assert_eq!(format!("{:?}", bad_state.locals), saved);
+            let mut consumed = retained.clone();
+            consumed
+                .missing_places
+                .consume(first_index.as_usize(), vec![])
+                .unwrap();
+            let saved = format!("{:?}", consumed.locals);
+            let error = if tuple {
+                engine.write_owned_field_array(&body, &mut consumed, place, &replacement, None)
+            } else {
+                engine.write_owned_array_element(&body, &mut consumed, place, &replacement, None)
+            };
+            assert!(error.is_err());
+            assert_eq!(format!("{:?}", consumed.locals), saved);
+            let mut arguments = vec![original.clone()];
+            for projection in place.projection {
+                if let ProjectionElem::Index(local) = projection {
+                    arguments.push(
+                        engine
+                            .destination_index(&retained, local, Some(&captured))
+                            .unwrap(),
+                    );
+                }
+            }
+            arguments.push(replacement.clone());
+            let mut current_memory = Memory::default();
+            current_memory.push(Some(symbolic::integer(&engine.terms, 43, 16, false)));
+            let results = engine
+                .call_instance(
+                    instance,
+                    arguments,
+                    retained.conditions.clone(),
+                    current_memory,
+                    &[],
+                    (id, body.span),
+                )
+                .unwrap();
+            assert_eq!(results.len(), 1);
+            assert_eq!(results[0].memory.len(), 1);
+            assert_eq!(
+                results[0].memory[0].as_ref().unwrap().integer().unwrap().0,
+                engine.terms.bit_vector(43, 16).unwrap()
+            );
+            assert!(
+                engine
+                    .proof
+                    .body_entries
+                    .iter()
+                    .any(|entry| entry.function == "helper")
+            );
+            let mut nodes = 0;
+            let actual = engine
+                .product_leaves(
+                    body.local_decls[place.local].ty,
+                    bits,
+                    &shape,
+                    &results[0].value,
+                    &results[0].conditions,
+                    &mut nodes,
+                )
+                .unwrap();
+            assert_eq!(actual.len(), leaves.len());
+            for (actual, expected) in actual.iter().zip(&leaves) {
+                let equal = engine
+                    .terms
+                    .apply(
+                        Op::Equal,
+                        &[actual.integer().unwrap().0, expected.integer().unwrap().0],
+                    )
+                    .unwrap();
+                let mut conditions = results[0].conditions.clone();
+                conditions.push(symbolic::not(&equal));
+                assert!(!engine.feasible(&conditions).unwrap());
+            }
+        }
+    }
+
+    fn check_suffix_expansion_refusal(tcx: TyCtxt<'_>) {
+        let id = tcx
+            .mir_keys(())
+            .iter()
+            .copied()
+            .find(|id| {
+                tcx.def_kind(id.to_def_id()) == DefKind::Fn
+                    && tcx.item_name(id.to_def_id()).as_str() == "wide"
+            })
+            .unwrap()
+            .to_def_id();
+        let engine = suffix_test_engine(tcx);
+        let instance = engine.resolve_function_item(id, tcx.mk_args(&[])).unwrap();
+        let body = engine.instantiated_body(instance).unwrap();
+        let place = body
+            .basic_blocks
+            .iter()
+            .flat_map(|block| &block.statements)
+            .find_map(|statement| match &statement.kind {
+                StatementKind::Assign(assign)
+                    if assign
+                        .0
+                        .projection
+                        .iter()
+                        .filter(|p| matches!(p, ProjectionElem::Index(_)))
+                        .count()
+                        == 3 =>
+                {
+                    Some(assign.0)
+                }
+                _ => None,
+            })
+            .unwrap();
+        let row = Value::Elements(vec![symbolic::integer(&engine.terms, 7, 16, false); 4].into());
+        let slab = Value::Elements(vec![row; 4].into());
+        let storage = Value::Elements(vec![slab; 4].into());
+        let mut state = State {
+            locals: vec![None; body.local_decls.len()],
+            addresses: vec![None; body.local_decls.len()],
+            missing_places: Default::default(),
+            conditions: vec![],
+            memory: Default::default(),
+        };
+        state.locals[place.local.as_usize()] = Some(storage);
+        let bits = u32::from(tcx.sess.target.pointer_width);
+        for (position, projection) in place.projection.iter().enumerate() {
+            if let ProjectionElem::Index(local) = projection {
+                let value = Value::Int {
+                    expression: engine
+                        .terms
+                        .symbol(300 + position as u32, Sort::BitVec(bits))
+                        .unwrap(),
+                    bits,
+                    signed: false,
+                };
+                state.conditions.push(
+                    symbolic::binary(
+                        &engine.terms,
+                        "lt",
+                        value.clone(),
+                        symbolic::integer(&engine.terms, 4, bits, false),
+                    )
+                    .unwrap()
+                    .boolean()
+                    .unwrap(),
+                );
+                state.locals[local.as_usize()] = Some(value);
+            }
+        }
+        let before = format!("{:?}", state.locals);
+        let _scope = SuffixOverride::enabled();
+        let error = engine
+            .write_owned_array_element(
+                &body,
+                &mut state,
+                place,
+                &symbolic::integer(&engine.terms, 29, 16, false),
+                None,
+            )
+            .unwrap_err();
+        assert!(error.contains("shared node or depth budget"));
+        assert_eq!(
+            engine.unknown_causes.borrow().get(&error),
+            Some(&UnknownCategory::ResourceLimit)
+        );
+        assert_eq!(format!("{:?}", state.locals), before);
+        assert!(state.memory.is_empty());
+        assert!(state.addresses.iter().all(Option::is_none));
+    }
 
     #[test]
     fn indexed_product_updates_preserve_disjoint_correlation_bits_and_empty_validation() {
