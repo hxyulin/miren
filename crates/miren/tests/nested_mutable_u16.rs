@@ -138,7 +138,7 @@ fn nested_whole_children_preserve_data_and_refuse_other_routes() {
         ("shared", U),
         ("raw", U),
         ("interval", U),
-        ("signed32", U),
+        ("signed32", P),
     ];
     for target in [None, Some("thumbv7em-none-eabihf")] {
         for optimized in [false, true] {

@@ -844,6 +844,21 @@ fn compiler_cases<'tcx>(tcx: TyCtxt<'tcx>, output: &std::path::Path) {
         )
         .unwrap();
     }
+    for (name, original, wrong) in [
+        ("root_i32", tcx.types.i32, tcx.types.u32),
+        ("root_usize", tcx.types.usize, tcx.types.u64),
+    ] {
+        let instance = engine
+            .resolve_function_item(find(name), tcx.mk_args(&[]))
+            .unwrap();
+        let body = engine.instantiated_body(instance).unwrap();
+        super::mutable_hierarchy::compiler_integer_boundary_probe(
+            &mut engine,
+            &body,
+            original,
+            wrong,
+        );
+    }
     std::fs::write(
         output.join("direct-adapter-trace.json"),
         serde_json::to_string_pretty(&engine.proof).unwrap(),
@@ -1322,13 +1337,13 @@ fn compiler_nested_whole_u16_inactive_lifecycle() {
             rustc_driver::Compilation::Stop
         }
     }
-    let root = std::path::PathBuf::from("/tmp/miren-stage198-prototype/compiler-lifecycle");
+    let root = std::path::PathBuf::from("/tmp/miren-stage203-parent202/compiler-lifecycle");
     std::fs::create_dir_all(&root).unwrap();
     let source = root.join("fixture.rs");
     std::fs::write(
         &source,
         concat!(
-            "#![no_std]\n",
+            "#![no_std]\n#![forbid(unsafe_code)]\n",
             "#[inline(never)] fn scalar(word:u16)->u16 { word ^ 0 }\n",
             "#[inline(never)] fn leaf(v:&mut[u16]) { if !v.is_empty() { v[0]=scalar(v[0]); } }\n",
             "#[inline(never)] fn outer(v:&mut[u16]) { leaf(&mut *(&mut *v)); leaf(v); }\n",
@@ -1341,7 +1356,13 @@ fn compiler_nested_whole_u16_inactive_lifecycle() {
             "pub fn root_leaf_len(v:&mut[u16]) { leaf_len(v); }\n",
             "pub fn root_scalar(word:u16)->u16 { scalar(word) }\n",
             "pub fn root_wrapping(word:u16)->u16 { word.wrapping_add(1) }\n",
-            "pub fn root_pair(pair:(i16,u16))->u16 { pair.1.wrapping_add(1) }\n"
+            "pub fn root_pair(pair:(i16,u16))->u16 { pair.1.wrapping_add(1) }\n",
+            "#[inline(never)] fn leaf_i32(v:&mut[i32]) { if v.len()>0 { v[0]=17; } }\n",
+            "#[inline(never)] fn outer_i32(v:&mut[i32]) { leaf_i32(&mut *(&mut *v)); }\n",
+            "pub fn root_i32(v:&mut[i32]) { outer_i32(v); }\n",
+            "#[inline(never)] fn leaf_usize(v:&mut[usize]) { if v.len()>0 { v[0]=17; } }\n",
+            "#[inline(never)] fn outer_usize(v:&mut[usize]) { leaf_usize(&mut *(&mut *v)); }\n",
+            "pub fn root_usize(v:&mut[usize]) { outer_usize(v); }\n"
         ),
     )
     .unwrap();

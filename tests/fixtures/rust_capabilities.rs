@@ -3035,3 +3035,68 @@ pub fn integer_function_table_pair_opaque(index: usize, word: i128, other: fn(i1
         assert!(table[index](word) == word as u8);
     }
 }
+
+
+#[inline(never)]
+pub fn nested_integer_word(word: i32) -> i32 {
+    word ^ 0
+}
+
+#[inline(never)]
+pub fn nested_integer_leaf(values: &mut [i32], word: i32) {
+    if values.len() > 0 {
+        values[0] = nested_integer_word(word);
+    }
+}
+
+#[inline(never)]
+pub fn nested_integer_outer(values: &mut [i32], word: i32) {
+    nested_integer_leaf(&mut *(&mut *values), word);
+}
+
+#[inline(never)]
+pub fn nested_integer_deeper(values: &mut [i32], word: i32) {
+    nested_integer_outer(values, word);
+}
+
+pub fn nested_integer_child_call(values: &mut [i32], word: i32) {
+    if values.len() > 1 {
+        let sibling = values[1];
+        nested_integer_outer(values, word);
+        assert!(values[0] == word);
+        assert!(values[1] == sibling);
+    }
+}
+
+pub fn nested_integer_wrong_claim(values: &mut [i32], word: i32) {
+    if values.len() > 0 {
+        nested_integer_outer(values, word);
+        assert!(values[0] == (word ^ 1));
+    }
+}
+
+pub fn nested_integer_deeper_unknown(values: &mut [i32], word: i32) {
+    if values.len() > 0 {
+        nested_integer_deeper(values, word);
+        assert!(values[0] == word);
+    }
+}
+
+#[cfg(test)]
+mod native_nested_integer {
+    #![forbid(unsafe_code)]
+    extern crate std;
+    #[test]
+    fn actual_data_and_sibling() {
+        for length in 0..=129 {
+            for word in [i32::MIN, -17, 0, 17, i32::MAX] {
+                let mut values = std::vec![23; length];
+                super::nested_integer_child_call(&mut values, word);
+            }
+        }
+    }
+    #[test]
+    fn mutation_guard() {
+        super::nested_integer_child_call(&mut [23; 129], -17);
+    }
+}

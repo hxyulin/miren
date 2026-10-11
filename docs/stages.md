@@ -5766,3 +5766,49 @@ comparisons are `/tmp/miren-stage198-parent201-full-checks`,
 `/tmp/miren-stage198-parent201-full-survey` and `/tmp/miren-stage198-parent201-release-fidelity`.
 Final owner source is sealed by `/tmp/miren-stage198-parent201-final-owner-source-freeze.json`.
 Root integration, fresh main validation and commit readiness remain separate pending gates.
+
+
+Stage 203 extends the existing whole-slice nested hierarchy to original plain signed integers and
+unsigned integers except u8. Issued original type, layout and codec remain correlated at every
+staging, selected signature and current backing boundary. Same-sort types never substitute for
+one another. Existing generations, owner release, bounds, masks and storage limits stay intact;
+Bool, Char, Float, checked intervals, deeper nesting and retained references remain unsupported.
+
+The actual Stage 202 parent is `ebf857b1ab349a46dff213745ed336db26a47718`. Its function-table pairs
+and NonZero models remain intact. Historical Stage 203 actual198 captures stay separately scoped.
+The new safe 88-root fixture measures 55 PROVED, 22 REFUTED and 11 UNKNOWN per host/ARM O0/O2
+profile. Actual scalar helper mutations refute all eleven integer claims with body entries,
+queries and models. The retained foreign body succeeds at library O0; the genuine O2 store shape
+and omitted selected bodies retain precise UNKNOWN results. No compiler inputs are bounded by the
+finite 129-element native checks.
+
+Fresh comparison checks all 1,144 earlier proof objects: 1,104 remain exact and forty named
+integer-nested cases become PROVED. All 2,328 earlier emitted query prefixes remain exact. The
+original u16 fixture retains all u16 objects and 136 query prefixes; its signed32 control becomes
+PROVED. All 1,836 original current-parent NonZero and integer-pair objects and 2,396 queries match
+exactly. Old fixtures and assertions stay unchanged; only measured nested expectations are updated.
+
+Three appended global controls test nested i32 data replacement and sibling preservation, a wrong
+claim, and the deeper unsupported frontier. The global manifest has 212 cases in 72 families.
+Fresh ROOT validation passes 824 Rust tests and 68 Python tests, formatting, lint, debug
+and release builds, dependency checks, documentation, all twelve current example checks and
+manual hooks. All 22 required checks pass. Four fresh release survey profiles match 85 PROVED,
+74 REFUTED and 53 UNKNOWN for the 212-case, 72-family manifest.
+
+Fresh owner-to-ROOT debug replay compares 4,324 complete proof objects: 4,323 match fully
+and all 7,520 emitted queries match exactly. The sole ARM O2 unbounded-fold result differs
+only in its recorded query-free ResourceLimit call chain; every other field remains exact.
+Fresh ROOT debug-to-release replay compares 4,324 complete proof objects: 4,321 match fully
+and all 7,520 emitted queries match exactly. The ARM O0 fold differs in its timeout detail
+prefix and call chain; ARM O2 and host O0 differ only in their call chains. Each is the same
+query/model-free ResourceLimit at the unchanged 30-second budget, with all residual fields
+exact. Literal labeled raw pairs remain recorded without normalization or promotion exemptions.
+
+Eight fresh native executions select two tests for each original and one for each mutant:
+four originals pass and four mutants fail with exit 101 under ten-second timeouts. Source,
+compiler, executable and output hashes are retained; finite controls impose no proof input bound.
+Full logs, surveys, debug/release comparisons and native evidence are retained separately at
+`/tmp/miren-stage203-root-full-checks`, `/tmp/miren-stage203-root-full-survey`,
+`/tmp/miren-stage203-root-debug-fidelity`, `/tmp/miren-stage203-root-release-fidelity` and
+`/tmp/miren-stage203-root-combined-native`. Historical actual202 owner and actual198 evidence
+retain their original sources, binaries and counts.
