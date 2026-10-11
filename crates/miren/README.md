@@ -1191,3 +1191,9 @@ reach an unsupported ConstantIndex observation; this is separate from Unicode va
 Stage209 actual208 candidate upkeep preserves the committed Bool, metadata and interval foundation.
 The original actual203 plus pending208 disabled history remains separate. Production changes are
 limited to the reviewed Char selector flag; required full ROOT validation and commit are pending.
+
+Issued non-u8 integer, Bool and Char backings support metadata-only `is_empty` after the complete
+selected core body, original receiver and current type/layout/codec/context checks. Existing u16
+metadata behavior and element/alias/return/retained permissions are unchanged. Float and bytes are
+excluded from this scalar metadata route. Actual209 disabled and sole-flag checkpoints are kept
+separately; the active upkeep checkpoint still requires fresh full ROOT validation and commit.

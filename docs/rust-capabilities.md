@@ -1993,3 +1993,43 @@ impose no bound on symbolic inputs. Final evidence is under
 `/tmp/miren-stage209-root-replay` and `/tmp/miren-stage209-root-native`. Final factual docs
 closure preserves all 917 other tested source files. These counts describe capability cases,
 not full Rust parity or firmware coverage.
+
+Stage210 extends complete-body-certified `is_empty` to already-issued non-u8 integer, Bool
+and Char slices. Original element, receiver, body provenance and current storage/length checks
+remain required. This observes metadata and grants no element access, borrow, input or nesting
+rights. Float and byte cases keep their existing routes and limits. Available selected bodies
+execute; omitted bodies remain MissingCompilerEvidence UNKNOWN, including empty callers.
+
+Original caller claims and the 224-case global source prefix remain unchanged. The old Bool
+Char-metadata control and global integer-metadata control now prove. The manifest updates that
+one old global expectation and adds metadata P/R/excluded-Float U controls. Four current host/ARM
+O0/O2 profiles measure 227 cases across 77 families: 93 PROVED, 79 REFUTED and 55 UNKNOWN each,
+with no errors or new assumptions. Actual Boolean identity-to-negation and xor-false-to-xor-true
+helper mutations refute unchanged claims with entered bodies and query/model evidence.
+
+The actual209 owner checkpoint contains 168 own pairs: 32 FULL matches, 124 UNKNOWN-to-completed
+results and 12 query-free omitted-body UNKNOWN frontiers; current reports emit 44 queries. Its
+180 compatibility groups contain 4,724 pairs, 4,715 FULL matches and 8,624 exact baseline queries;
+eight named promotions and one query-free fold context are separately recorded. The overlapping
+four full global groups contain 908 pairs, 893 FULL matches and 1,724 exact baseline queries;
+12 named promotions and three query-free fold contexts are separate. These overlapping counts
+are not added as unique comparisons. Initial wrong-overflow-profile captures remain historical;
+all canonical full global captures enable overflow checks and report that setting explicitly.
+
+ROOT adopts 14 paths on committed209 and corrects one stale flag comment before freezing all
+924 effective sources. All 22 required checks pass: 842 Rust workspace tests, 68 Python tests,
+formatting, lint, debug/release builds, cargo deny, documentation, example checks/ARM builds,
+manual hooks and the four-profile survey. Fresh same-ROOT-source/cwd/mode comparisons contain
+4,724 pairs each: owner-to-debug has 4,721 FULL matches, debug-to-release has 4,723, and each
+preserves all 8,628 emitted queries/models. Named query-free 30-second fold context differences
+retain exact residual fields. One debug ARM O2 third-frame difference is approved only for its
+exact sealed raw pair; the general comparison rule is unchanged. Stopped comparison captures
+remain historical; continuations preserve completed rows and record fresh numeric CLI exits.
+
+Eight fresh ROOT native executions rebuild dedicated/global originals and actual helper mutants
+at O0/O2: originals run one or two tests and pass; mutants run one test and exit101. Ten-second
+limits and compiler/source/executable/output hashes are recorded. Finite native cases impose
+no symbolic input bound. Final evidence is under `/tmp/miren-stage210-root-full-checks`,
+`/tmp/miren-stage210-root-survey`, `/tmp/miren-stage210-root-replay` and
+`/tmp/miren-stage210-root-native`. Final factual docs closure preserves all 921 other tested
+source files. Capability counts describe selected cases, not full Rust parity or fleet coverage.

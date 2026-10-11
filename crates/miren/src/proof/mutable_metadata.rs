@@ -34,7 +34,50 @@ impl Drop for TestEnabled {
     }
 }
 
+// Metadata-only is_empty accepts additional existing scalar domains.
+const SCALAR_IS_EMPTY_ENABLED: bool = true;
+
+fn scalar_enabled() -> bool {
+    #[cfg(test)]
+    if TEST_SCALAR_ENABLED.with(std::cell::Cell::get) {
+        return true;
+    }
+    SCALAR_IS_EMPTY_ENABLED
+}
+
+#[cfg(test)]
+std::thread_local! {
+    static TEST_SCALAR_ENABLED: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+#[cfg(test)]
+struct TestScalarEnabled(bool);
+
+#[cfg(test)]
+impl TestScalarEnabled {
+    fn enable() -> Self {
+        Self(TEST_SCALAR_ENABLED.with(|value| value.replace(true)))
+    }
+}
+
+#[cfg(test)]
+impl Drop for TestScalarEnabled {
+    fn drop(&mut self) {
+        TEST_SCALAR_ENABLED.with(|value| value.set(self.0));
+    }
+}
+
 impl<'tcx> Engine<'tcx> {
+    fn issued_metadata_element(&self, original: Ty<'tcx>) -> bool {
+        original == self.tcx.types.u16
+            || (scalar_enabled()
+                && original != self.tcx.types.u8
+                && matches!(
+                    original.kind(),
+                    ty::Bool | ty::Char | ty::Int(_) | ty::Uint(_)
+                ))
+    }
+
     fn issued_is_empty_candidate(&self, instance: ty::Instance<'tcx>) -> bool {
         if !enabled()
             || !matches!(instance.def, ty::InstanceKind::Item(_))
@@ -63,7 +106,7 @@ impl<'tcx> Engine<'tcx> {
             && matches!(signature.inputs(), [original]
                 if matches!(original.kind(), ty::Ref(_, inner, rustc_hir::Mutability::Not)
                     if matches!(inner.kind(), ty::Slice(element)
-                        if *element == self.tcx.types.u16)))
+                        if self.issued_metadata_element(*element))))
     }
 
     // This routes metadata only. The complete body/type certificate still precedes the result.
@@ -83,9 +126,23 @@ impl<'tcx> Engine<'tcx> {
             return Err(self.missing_body_reason(instance.def_id()));
         }
         let signature = self.call_signature(instance)?;
+        let [selected_receiver] = signature.inputs() else {
+            return Err(self.categorized_error(
+                UnknownCategory::Semantics,
+                "issued is_empty original receiver or Boolean signature differs".into(),
+            ));
+        };
+        let selected_element = match selected_receiver.kind() {
+            ty::Ref(_, inner, rustc_hir::Mutability::Not) => match inner.kind() {
+                ty::Slice(element) => *element,
+                _ => return Err("issued is_empty original receiver is not a slice".into()),
+            },
+            _ => return Err("issued is_empty original receiver is not shared".into()),
+        };
         let receiver = |original: Ty<'tcx>| {
             matches!(original.kind(), ty::Ref(_, inner, rustc_hir::Mutability::Not)
-                if matches!(inner.kind(), ty::Slice(element) if *element == self.tcx.types.u16))
+                if matches!(inner.kind(), ty::Slice(element)
+                    if *element == selected_element && self.issued_metadata_element(*element)))
         };
         if signature.safety() != rustc_hir::Safety::Safe
             || signature.abi() != rustc_abi::ExternAbi::Rust
@@ -249,7 +306,13 @@ impl<'tcx> Engine<'tcx> {
         let result = symbolic::binary(&self.terms, "eq", length, zero)?;
         self.record_model(
             instance.def_id(),
-            "issued u16 metadata-only is_empty; actual body certified",
+            if matches!(signature.inputs()[0].kind(), ty::Ref(_, inner, _)
+                if matches!(inner.kind(), ty::Slice(element) if *element == self.tcx.types.u16))
+            {
+                "issued u16 metadata-only is_empty; actual body certified"
+            } else {
+                "issued scalar metadata-only is_empty; actual body certified"
+            },
         );
         Ok(Some(result))
     }

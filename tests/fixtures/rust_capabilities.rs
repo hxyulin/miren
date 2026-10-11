@@ -3301,3 +3301,37 @@ mod native_nested_char {
         super::nested_char_child_call(&mut ['x'; 129], '\0');
     }
 }
+
+#[inline(never)]
+pub fn issued_scalar_metadata_boolean(value: bool) -> bool {
+    value ^ false
+}
+
+pub fn issued_scalar_metadata(values: &mut [bool]) {
+    assert!(issued_scalar_metadata_boolean(values.is_empty()) == (values.len() == 0));
+}
+
+pub fn issued_scalar_metadata_wrong(values: &mut [bool]) {
+    assert!(issued_scalar_metadata_boolean(values.is_empty()) != (values.len() == 0));
+}
+
+pub fn issued_scalar_float_unknown(values: &mut [f32]) {
+    assert!(values.is_empty() == (values.len() == 0));
+}
+
+#[cfg(test)]
+mod native_issued_scalar_metadata {
+    extern crate std;
+
+    #[test]
+    fn finite_lengths() {
+        for length in 0..=129 {
+            super::issued_scalar_metadata(&mut std::vec![false; length]);
+        }
+    }
+
+    #[test]
+    fn mutation_guard() {
+        super::issued_scalar_metadata(&mut [false; 129]);
+    }
+}

@@ -152,3 +152,8 @@ experimental loop induction and trusted boundaries require explicit settings. Ra
 ## License
 
 Available under either the [MIT license](LICENSE-MIT) or [Apache License 2.0](LICENSE-APACHE).
+
+Stage210's actual209 owner enables exact issued scalar `is_empty` metadata for existing non-u8
+integers, Bool and Char. Original u16 behavior, element permissions and all other source claims
+are preserved. Actual disabled and sole-flag captures are archived separately; fresh active
+source/data and full ROOT validation remain pending. Float and byte metadata routes are excluded.

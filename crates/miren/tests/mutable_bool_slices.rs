@@ -163,7 +163,7 @@ fn logical_bool_stores_and_actual_child_bodies_cover_four_profiles() {
         ("raw", U),
         ("escape", U),
         ("nested", P),
-        ("char_unknown", U),
+        ("char_unknown", P),
         ("float_unknown", U),
         ("u8_unknown", P),
     ];
@@ -192,10 +192,6 @@ fn logical_bool_stores_and_actual_child_bodies_cover_four_profiles() {
                 (
                     "reached_panic",
                     "ancestor admits only direct scalar Rust frames",
-                ),
-                (
-                    "char_unknown",
-                    "mutable u16 roles require selected metadata-only operation",
                 ),
                 (
                     "float_unknown",

@@ -1,6 +1,30 @@
 use super::*;
 
 #[test]
+fn scalar_metadata_override_restores_nested_and_panicking_scopes() {
+    assert!(!TEST_SCALAR_ENABLED.with(std::cell::Cell::get));
+    assert_eq!(scalar_enabled(), SCALAR_IS_EMPTY_ENABLED);
+    {
+        let _outer = TestScalarEnabled::enable();
+        assert!(scalar_enabled());
+        assert!(TEST_SCALAR_ENABLED.with(std::cell::Cell::get));
+        {
+            let _inner = TestScalarEnabled::enable();
+            assert!(scalar_enabled());
+            assert!(TEST_SCALAR_ENABLED.with(std::cell::Cell::get));
+        }
+        let _ = std::panic::catch_unwind(|| {
+            let _inner = TestScalarEnabled::enable();
+            panic!("test");
+        });
+        assert!(scalar_enabled());
+        assert!(TEST_SCALAR_ENABLED.with(std::cell::Cell::get));
+    }
+    assert!(!TEST_SCALAR_ENABLED.with(std::cell::Cell::get));
+    assert_eq!(scalar_enabled(), SCALAR_IS_EMPTY_ENABLED);
+}
+
+#[test]
 fn metadata_override_restores_nested_and_panicking_scopes() {
     assert!(!TEST_ENABLED.with(std::cell::Cell::get));
     assert_eq!(enabled(), IS_EMPTY_ENABLED);
@@ -75,8 +99,148 @@ fn compiler_issued_is_empty_requires_exact_metadata_body_and_live_original_role(
                 let other = engine
                     .resolve_function_item(selected.def_id(), tcx.mk_args(&[element.into()]))
                     .unwrap();
-                assert!(!engine.issued_is_empty_candidate(other));
-                assert!(!engine.mutable_metadata_operation(other));
+                let admitted =
+                    SCALAR_IS_EMPTY_ENABLED && matches!(element.kind(), ty::Bool | ty::Char);
+                assert_eq!(engine.issued_is_empty_candidate(other), admitted);
+                assert_eq!(engine.mutable_metadata_operation(other), admitted);
+            }
+            {
+                let _scalar = TestScalarEnabled::enable();
+                for element in [
+                    tcx.types.i8,
+                    tcx.types.i32,
+                    tcx.types.usize,
+                    tcx.types.u128,
+                    tcx.types.bool,
+                    tcx.types.char,
+                ] {
+                    let scalar = engine
+                        .resolve_function_item(selected.def_id(), tcx.mk_args(&[element.into()]))
+                        .unwrap();
+                    assert!(engine.issued_is_empty_candidate(scalar));
+                    engine.certify_issued_is_empty(scalar).unwrap();
+                    let mut memory = Memory::default();
+                    let mut conditions = Vec::new();
+                    engine
+                        .mutable_u16_input(element, &mut memory, &mut conditions)
+                        .unwrap();
+                    let state = State {
+                        locals: vec![],
+                        addresses: vec![],
+                        missing_places: Default::default(),
+                        conditions,
+                        memory,
+                    };
+                    let metadata = Value::MutableU16 {
+                        id: 0,
+                        role: MutableU16Role::Metadata { generation: 0 },
+                    };
+                    assert!(engine.mutable_slice_is_empty(
+                        scalar, std::slice::from_ref(&metadata), &state,
+                    ).unwrap().is_some());
+                    let mut wrong_codec = state.clone();
+                    let bits = u32::from(tcx.sess.target.pointer_width);
+                    let wrong_sort = if element == tcx.types.bool {
+                        Sort::BitVec(8)
+                    } else {
+                        Sort::Bool
+                    };
+                    std::rc::Rc::make_mut(&mut wrong_codec.memory.mutable_u16)[0].data = engine
+                        .fresh(Sort::Array(
+                            Box::new(Sort::BitVec(bits)),
+                            Box::new(wrong_sort),
+                        ));
+                    let unchanged = wrong_codec.memory.mutable_u16[0].data.clone();
+                    assert!(
+                        engine
+                            .mutable_slice_is_empty(
+                                scalar,
+                                std::slice::from_ref(&metadata),
+                                &wrong_codec,
+                            )
+                            .is_err()
+                    );
+                    assert_eq!(wrong_codec.memory.mutable_u16[0].data, unchanged);
+                    let mut wrong_context = state.clone();
+                    std::rc::Rc::make_mut(&mut wrong_context.memory.mutable_u16)[0].length =
+                        Value::Int {
+                            expression: Context::default().bit_vector(0, bits).unwrap(),
+                            bits,
+                            signed: false,
+                        };
+                    assert!(
+                        engine
+                            .mutable_slice_is_empty(
+                                scalar,
+                                std::slice::from_ref(&metadata),
+                                &wrong_context,
+                            )
+                            .is_err()
+                    );
+                    let mut invalid = state.clone();
+                    invalid
+                        .memory
+                        .missing_places
+                        .consume(invalid.memory.mutable_u16[0].allocation, vec![])
+                        .unwrap();
+                    assert!(
+                        engine
+                            .mutable_slice_is_empty(
+                                scalar,
+                                std::slice::from_ref(&metadata),
+                                &invalid,
+                            )
+                            .is_err()
+                    );
+                    assert!(
+                        engine
+                            .mutable_slice_is_empty(
+                                scalar,
+                                &[Value::MutableU16 {
+                                    id: 0,
+                                    role: MutableU16Role::Metadata { generation: 1 },
+                                }],
+                                &state,
+                            )
+                            .is_err()
+                    );
+                    let wrong_element = if element == tcx.types.i32 {
+                        tcx.types.u32
+                    } else {
+                        tcx.types.i32
+                    };
+                    let wrong = engine
+                        .resolve_function_item(
+                            selected.def_id(),
+                            tcx.mk_args(&[wrong_element.into()]),
+                        )
+                        .unwrap();
+                    assert!(
+                        engine
+                            .mutable_slice_is_empty(wrong, std::slice::from_ref(&metadata), &state,)
+                            .is_err()
+                    );
+                    let original = engine.instantiated_body(scalar).unwrap();
+                    let mut forged = (*original).clone();
+                    forged.local_decls[rustc_middle::mir::Local::from_usize(1)].ty =
+                        Ty::new_imm_ref(
+                            tcx,
+                            tcx.lifetimes.re_erased,
+                            Ty::new_slice(tcx, wrong_element),
+                        );
+                    engine
+                        .bodies
+                        .borrow_mut()
+                        .insert(scalar, std::rc::Rc::new(forged));
+                    assert!(engine.certify_issued_is_empty(scalar).is_err());
+                    engine.bodies.borrow_mut().insert(scalar, original);
+                }
+                for element in [tcx.types.u8, tcx.types.f32, tcx.types.f64] {
+                    let other = engine
+                        .resolve_function_item(selected.def_id(), tcx.mk_args(&[element.into()]))
+                        .unwrap();
+                    assert!(!engine.issued_is_empty_candidate(other));
+                }
             }
             assert!(!engine.issued_is_empty_candidate(ty::Instance::mono(tcx, id)));
             let closure_body = tcx
@@ -372,8 +536,16 @@ fn compiler_issued_is_empty_requires_exact_metadata_body_and_live_original_role(
             rustc_driver::Compilation::Stop
         }
     }
-    let directory = std::path::PathBuf::from("/tmp/miren-stage207-parent205/compiler-lifecycle");
-    std::fs::create_dir_all(&directory).unwrap();
+    let time = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let directory = std::env::temp_dir().join(format!(
+        "miren-stage210-compiler-lifecycle-{}-{time}",
+        std::process::id(),
+    ));
+    // Exclusive creation refuses any collision rather than overwriting another invocation.
+    std::fs::create_dir(&directory).unwrap();
     let source = directory.join("fixture.rs");
     std::fs::write(
         &source,
