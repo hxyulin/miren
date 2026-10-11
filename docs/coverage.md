@@ -2997,3 +2997,48 @@ Full logs, surveys, debug/release comparisons and native evidence are retained s
 `/tmp/miren-stage203-root-debug-fidelity`, `/tmp/miren-stage203-root-release-fidelity` and
 `/tmp/miren-stage203-root-combined-native`. Historical actual202 owner and actual198 evidence
 retain their original sources, binaries and counts.
+
+
+## Stage205: bounded checked integer intervals
+
+This owner is based on committed Stage203 dc1cad57, with its integer hierarchy and all212
+capability cases preserved. It adds exact original i32/usize proper-interval certificates,
+validated complete core wrapper and delegated Range bodies, and current backing handoff to one
+direct child. Original guards prove start<=end<=current length. No nested interval, split,
+retained-view or returned-reference authority is added; budgets and input domains are unchanged.
+
+Dedicated compiler controls measure9 PROVED/3 REFUTED per profile; the actual xor0-to1 helper
+mutation refutes all four unchanged selected/sibling claims. Retained external O0 stores and
+empty children prove; optimized retained stores conservatively remain UNKNOWN at their existing
+whole-element lowering, and omitted selected/empty bodies remain MissingCompilerEvidence.
+Historical actual202 captures stay separate from refreshed actual203 evidence.
+
+The manifest appends three checked integer interval cases to the exact 212-case parent prefix:
+215 cases across 73 families. Fresh ROOT validation passes 827 Rust tests, 68 Python tests,
+formatting, lint, debug and release builds, dependency checks, documentation, all twelve current
+example checks and manual hooks. All 22 required checks pass. Four fresh release survey profiles
+match 86 PROVED, 75 REFUTED and 54 UNKNOWN, with no errors or new assumptions.
+
+The selected wrapper candidate rejects non-Item and non-associated definitions before querying
+the compiler signature. This fixes an observed closure compiler panic; actual closure and ordinary
+function controls refuse before signature inspection. Exact original types and complete selected
+wrapper and Range bodies remain required. Initial failed captures and their source checkpoints
+remain separately preserved.
+
+Fresh owner-to-ROOT debug replay checks 1,572 paired complete proof objects: 1,571 match fully and
+all 3,368 emitted queries match exactly. The sole host O2 unbounded-fold residual changes only its
+literal query-free 30-second timeout detail prefix. Its call chain and every other field are exact.
+Fresh ROOT debug-to-release replay checks 1,572 paired complete proof objects:
+1,571 match fully and all 3,368 emitted queries match exactly. The sole ARM O0 fold changes
+only its call chain, from the root to the root plus closure. Both literal raw pairs retain the same
+query/model-free ResourceLimit, 30-second budget and every other field. No proof, query, model or
+diagnostic normalization is used.
+
+Eight fresh ROOT native executions select one actual test each: four originals pass and four
+helper mutants fail with exit 101 under ten-second limits. Source, compiler, executable and raw
+output hashes are retained. Finite native checks impose no proof input bound. Full checks, survey,
+debug/release replay and native evidence are separately recorded in
+`/tmp/miren-stage205-root-full-checks`, `/tmp/miren-stage205-root-full-survey`,
+`/tmp/miren-stage205-root-debug-fidelity`, `/tmp/miren-stage205-root-release-fidelity` and
+`/tmp/miren-stage205-root-combined-native`. Historical actual202 owner evidence keeps its original
+source, binary and counts; earlier stage histories remain intact.

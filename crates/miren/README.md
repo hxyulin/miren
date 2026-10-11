@@ -1152,3 +1152,14 @@ substitutions. The existing single nested child, persistent generations, primiti
 and cumulative budgets apply. Bool, Char, Float, intervals, retained views and deeper hierarchies
 remain outside this extension. Original u16 paths retain their terms and permissions; actual
 selected bodies remain required before effects.
+
+
+Checked proper intervals of incoming mutable `i32` and `usize` slices now use the same bounded
+single-child protocol as `u16`. Issuance requires exact original element layout and the complete
+selected core wrapper and delegated Range bodies, including the instantiated pointer stride.
+The caller must prove `start <= end <= current length`; the child runs its actual available body
+against current backing storage. Parent reads and disjoint siblings observe the returned state.
+Empty intervals still require selected child compiler evidence. Retained intervals, nested calls,
+splits and returned ordinary references receive no additional permission. Integer interval
+certification preserves typed missing-body and resource refusals; no allocator or input premise
+is added.

@@ -9,6 +9,8 @@ mod probe;
 mod templates;
 
 const ISSUANCE_ENABLED: bool = true;
+// Original i32/usize require their complete selected compiler interval certificate.
+const INTEGER_ISSUANCE_ENABLED: bool = true;
 
 #[derive(Clone, Debug)]
 struct Issue {
@@ -48,6 +50,13 @@ impl<'tcx> Engine<'tcx> {
         self.categorized_error(UnknownCategory::Semantics, detail.into())
     }
 
+    fn interval_element_eligible(&self, certificate: usize) -> Result<bool, String> {
+        let original = self.mutable_interval_element(certificate)?;
+        Ok(original == self.tcx.types.u16
+            || (INTEGER_ISSUANCE_ENABLED
+                && templates::integer_element(self.tcx, original).is_some()))
+    }
+
     pub(super) fn validate_mutable_interval(
         &self,
         id: usize,
@@ -62,7 +71,7 @@ impl<'tcx> Engine<'tcx> {
             || backing.allocation != view.issue.allocation
             || backing.generation != view.issue.generation
             || !same_integer(&backing.length, &view.issue.capacity)
-            || self.mutable_interval_element(backing.certificate)? != self.tcx.types.u16
+            || !self.interval_element_eligible(backing.certificate)?
         {
             return Err(self.interval_error("mutable interval issued identity/phase differs"));
         }
@@ -165,12 +174,15 @@ impl<'tcx> Engine<'tcx> {
             site,
             ..
         } = call;
+        let integer = INTEGER_ISSUANCE_ENABLED
+            .then(|| templates::integer_wrapper_element(self.tcx, instance))
+            .flatten();
         if state.memory.mutable_u16.is_empty()
             || !matches!(instance.def, ty::InstanceKind::Item(_))
             || self.tcx.def_kind(instance.def_id()) != DefKind::AssocFn
             || pure_comparison_templates::definition_key(instance.def_id())
                 != "DefId(core::slice::index::{impl#1}::index_mut)"
-            || !templates::u16_wrapper_signature(self.tcx, instance)
+            || (!templates::u16_wrapper_signature(self.tcx, instance) && integer.is_none())
         {
             return Ok(None);
         }
@@ -236,7 +248,7 @@ impl<'tcx> Engine<'tcx> {
         self.mutable_u16_staging_tip(body, state, source.local.as_usize(), id, generation)?;
         let backing = self.mutable_u16_backing(id, &state.memory)?;
         if backing.interval.is_some()
-            || self.mutable_interval_element(backing.certificate)? != self.tcx.types.u16
+            || !self.interval_element_eligible(backing.certificate)?
             || !self.mutable_u16_matches(
                 body.local_decls[source.local].ty,
                 id,
@@ -252,7 +264,18 @@ impl<'tcx> Engine<'tcx> {
         {
             return Err(self.interval_error("mutable interval original root/type is unsupported"));
         }
-        templates::certify_u16_guarded_family(self.tcx, instance)?;
+        if let Some(element) = integer {
+            if self.mutable_interval_element(backing.certificate)? != element.original {
+                return Err(self.interval_error("mutable interval original integer differs"));
+            }
+            templates::certify_integer_guarded_family(self.tcx, instance, element)
+                .map_err(|error| self.categorized_error(error.category, error.reason))?;
+            if let Operand::Copy(place) | Operand::Move(place) = args[1].node {
+                self.owned_field_footprint(body, place)?;
+            }
+        } else {
+            templates::certify_u16_guarded_family(self.tcx, instance)?;
+        }
         let certificate = backing.certificate;
         let allocation = backing.allocation;
         let capacity = backing.length.clone();
@@ -339,8 +362,13 @@ impl<'tcx> Engine<'tcx> {
         self.validate_mutable_interval(id, &next.memory.mutable_u16[id])?;
         self.record_model(
             instance.def_id(),
-            "certified checked u16 interval; one pending grant, \
-            same current backing, no raw pointer or ordinary returned-reference permission",
+            if integer.is_some() {
+                "certified checked integer interval; one pending grant, \
+                same current backing, no raw pointer or ordinary returned-reference permission"
+            } else {
+                "certified checked u16 interval; one pending grant, \
+                same current backing, no raw pointer or ordinary returned-reference permission"
+            },
         );
         Ok(Some((target.unwrap(), next)))
     }

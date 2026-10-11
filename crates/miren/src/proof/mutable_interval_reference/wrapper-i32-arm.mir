@@ -1,0 +1,13 @@
+args=2 spread=None
+local _0 Mut &'{erased} mut [i32] user=None
+local _1 Not &'{erased} mut [i32] user=None
+local _2 Not core::ops::Range<usize> user=None
+block bb0 cleanup=false
+call <core::ops::Range<usize> as core::slice::SliceIndex<[i32]>>::index_mut destination=_0/[] ta
+  | rget=Some(bb1) unwind=Unreachable source=Normal
+const-value ZeroSized FnDef(DefId(core::slice::index::SliceIndex::index_mut), Binder { value: [c
+  | ore::ops::Range<usize>, [i32]], bound_vars: [] })
+move _2/[]
+move _1/[]
+block bb1 cleanup=false
+return

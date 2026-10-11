@@ -31,13 +31,99 @@ const REFERENCES: &[(&str, Family, &str)] = &[
     ),
 ];
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) struct Element<'tcx> {
+    pub(super) original: Ty<'tcx>,
+    pub(super) bytes: u64,
+    pub(super) alignment: u64,
+    pub(super) bits: u32,
+    pub(super) signed: bool,
+}
+
+/// Compiler layout facts do not issue a mutable view or authenticate storage.
+pub(super) fn integer_element<'tcx>(
+    tcx: TyCtxt<'tcx>,
+    original: Ty<'tcx>,
+) -> Option<Element<'tcx>> {
+    let (bits, signed) = if original == tcx.types.i32 {
+        (32, true)
+    } else if original == tcx.types.usize {
+        (u32::from(tcx.sess.target.pointer_width), false)
+    } else {
+        return None;
+    };
+    let layout = tcx
+        .layout_of(ty::TypingEnv::fully_monomorphized().as_query_input(original))
+        .ok()?;
+    let bytes = u64::from(bits / 8);
+    if !matches!(bits, 32 | 64)
+        || layout.size.bytes() != bytes
+        || layout.align.abi.bytes() != bytes
+        || !matches!(layout.variants, rustc_abi::Variants::Single { .. })
+    {
+        return None;
+    }
+    Some(Element {
+        original,
+        bytes,
+        alignment: bytes,
+        bits,
+        signed,
+    })
+}
+
+fn integer_body_matches(key: &str, family: Family, encoded: &str, element: Element<'_>) -> bool {
+    let wrappers = match element.original.kind() {
+        ty::Int(ty::IntTy::I32) => [
+            include_str!("mutable_interval_reference/wrapper-i32-host.mir"),
+            include_str!("mutable_interval_reference/wrapper-i32-arm.mir"),
+        ],
+        ty::Uint(ty::UintTy::Usize) => [
+            include_str!("mutable_interval_reference/wrapper-usize-host.mir"),
+            include_str!("mutable_interval_reference/wrapper-usize-arm.mir"),
+        ],
+        _ => return false,
+    };
+    match family {
+        Family::Wrapper => {
+            key == "DefId(core::slice::index::{impl#1}::index_mut)"
+                && wrappers
+                    .iter()
+                    .any(|body| body.strip_suffix('\n') == Some(encoded))
+        }
+        Family::Range => matches_body(key, family, encoded),
+    }
+}
+
+fn integer_instantiated_range_matches(encoded: &str, element: Element<'_>) -> bool {
+    let references = match element.original.kind() {
+        ty::Int(ty::IntTy::I32) => [
+            include_str!("mutable_interval_reference/range-i32-host.mir"),
+            include_str!("mutable_interval_reference/range-i32-arm.mir"),
+        ],
+        ty::Uint(ty::UintTy::Usize) => [
+            include_str!("mutable_interval_reference/range-usize-host.mir"),
+            include_str!("mutable_interval_reference/range-usize-arm.mir"),
+        ],
+        _ => return false,
+    };
+    references
+        .iter()
+        .any(|body| body.strip_suffix('\n') == Some(encoded))
+}
+
 fn matches_body(key: &str, family: Family, encoded: &str) -> bool {
     REFERENCES.iter().any(|(expected, actual, body)| {
         *expected == key && *actual == family && body.strip_suffix('\n') == Some(encoded)
     })
 }
 
-fn signature<'tcx>(tcx: TyCtxt<'tcx>, instance: ty::Instance<'tcx>, family: Family) -> bool {
+fn signature_for<'tcx>(
+    tcx: TyCtxt<'tcx>,
+    instance: ty::Instance<'tcx>,
+    family: Family,
+    element: Ty<'tcx>,
+) -> bool {
     let Ok(signature) = tcx.try_normalize_erasing_regions(
         ty::TypingEnv::fully_monomorphized(),
         tcx.fn_sig(instance.def_id())
@@ -52,7 +138,7 @@ fn signature<'tcx>(tcx: TyCtxt<'tcx>, instance: ty::Instance<'tcx>, family: Fami
     {
         return false;
     }
-    let slice = Ty::new_slice(tcx, tcx.types.u16);
+    let slice = Ty::new_slice(tcx, element);
     let reference = |original: Ty<'tcx>| {
         matches!(original.kind(),
         ty::Ref(_, inner, rustc_hir::Mutability::Mut) if *inner == slice)
@@ -72,6 +158,51 @@ fn signature<'tcx>(tcx: TyCtxt<'tcx>, instance: ty::Instance<'tcx>, family: Fami
     }
 }
 
+fn signature<'tcx>(tcx: TyCtxt<'tcx>, instance: ty::Instance<'tcx>, family: Family) -> bool {
+    signature_for(tcx, instance, family, tcx.types.u16)
+}
+
+pub(super) fn integer_wrapper_element<'tcx>(
+    tcx: TyCtxt<'tcx>,
+    instance: ty::Instance<'tcx>,
+) -> Option<Element<'tcx>> {
+    if !matches!(instance.def, ty::InstanceKind::Item(_))
+        || tcx.def_kind(instance.def_id()) != DefKind::AssocFn
+    {
+        return None;
+    }
+    [tcx.types.i32, tcx.types.usize]
+        .into_iter()
+        .find_map(|original| {
+            let element = integer_element(tcx, original)?;
+            signature_for(tcx, instance, Family::Wrapper, original).then_some(element)
+        })
+}
+
+pub(super) fn available_integer_body<'tcx>(
+    tcx: TyCtxt<'tcx>,
+    instance: ty::Instance<'tcx>,
+) -> Result<&'tcx Body<'tcx>, pure_comparison_templates::TemplateError> {
+    if !tcx.is_mir_available(instance.def_id()) {
+        return Err(pure_comparison_templates::TemplateError {
+            category: UnknownCategory::MissingCompilerEvidence,
+            reason: "interval integer selected compiler body is unavailable".into(),
+        });
+    }
+    Ok(tcx.instance_mir(instance.def))
+}
+
+pub(super) fn certify_integer_guarded_family<'tcx>(
+    tcx: TyCtxt<'tcx>,
+    root: ty::Instance<'tcx>,
+    element: Element<'tcx>,
+) -> Result<(), pure_comparison_templates::TemplateError> {
+    if integer_element(tcx, element.original) != Some(element) {
+        return Err("interval original integer layout/codec differs".into());
+    }
+    certify_guarded_family(tcx, root, Some(element))
+}
+
 pub(super) fn u16_wrapper_signature<'tcx>(tcx: TyCtxt<'tcx>, instance: ty::Instance<'tcx>) -> bool {
     signature(tcx, instance, Family::Wrapper)
 }
@@ -86,6 +217,15 @@ pub(super) fn certify_u16_guarded_family<'tcx>(
     tcx: TyCtxt<'tcx>,
     root: ty::Instance<'tcx>,
 ) -> Result<(), String> {
+    certify_guarded_family(tcx, root, None).map_err(|error| error.reason)
+}
+
+fn certify_guarded_family<'tcx>(
+    tcx: TyCtxt<'tcx>,
+    root: ty::Instance<'tcx>,
+    element: Option<Element<'tcx>>,
+) -> Result<(), pure_comparison_templates::TemplateError> {
+    let original = element.map_or(tcx.types.u16, |element| element.original);
     let core = tcx
         .lang_items()
         .sized_trait()
@@ -101,17 +241,30 @@ pub(super) fn certify_u16_guarded_family<'tcx>(
         if seen.len() > 2 {
             return Err("interval selected family graph differs".into());
         }
-        if instance.def_id().krate != core
-            || !matches!(instance.def, ty::InstanceKind::Item(_))
-            || tcx.def_kind(instance.def_id()) != DefKind::AssocFn
-            || !tcx.is_mir_available(instance.def_id())
-        {
-            return Err("interval selected body unavailable or not actual core Item".into());
+        if element.is_some() {
+            if instance.def_id().krate != core
+                || !matches!(instance.def, ty::InstanceKind::Item(_))
+                || tcx.def_kind(instance.def_id()) != DefKind::AssocFn
+            {
+                return Err("interval integer selected compiler identity differs".into());
+            }
+        } else {
+            if instance.def_id().krate != core
+                || !matches!(instance.def, ty::InstanceKind::Item(_))
+                || tcx.def_kind(instance.def_id()) != DefKind::AssocFn
+                || !tcx.is_mir_available(instance.def_id())
+            {
+                return Err("interval selected body unavailable or not actual core Item".into());
+            }
         }
-        if !signature(tcx, instance, family) {
+        if !signature_for(tcx, instance, family, original) {
             return Err("interval original selected signature differs".into());
         }
-        let generic = tcx.instance_mir(instance.def);
+        let generic = if element.is_some() {
+            available_integer_body(tcx, instance)?
+        } else {
+            tcx.instance_mir(instance.def)
+        };
         if generic.coroutine.is_some()
             || generic.tainted_by_errors.is_some()
             || generic.spread_arg.is_some()
@@ -123,12 +276,18 @@ pub(super) fn certify_u16_guarded_family<'tcx>(
             .saturating_add(generic.local_decls.len())
             .saturating_add(generic.basic_blocks.len());
         if work > 512 {
-            return Err("interval selected graph exceeds512 work".into());
+            return Err(pure_comparison_templates::TemplateError {
+                category: UnknownCategory::ResourceLimit,
+                reason: "interval selected graph exceeds512 work".into(),
+            });
         }
         for data in generic.basic_blocks.iter() {
             work = work.saturating_add(data.statements.len());
             if work > 512 {
-                return Err("interval selected graph exceeds512 work".into());
+                return Err(pure_comparison_templates::TemplateError {
+                    category: UnknownCategory::ResourceLimit,
+                    reason: "interval selected graph exceeds512 work".into(),
+                });
             }
         }
         let mono = instance
@@ -143,11 +302,25 @@ pub(super) fn certify_u16_guarded_family<'tcx>(
             Family::Range => generic,
         };
         let encoded =
-            pure_comparison_templates::encode_byte_copy_template(tcx, template_body, core)
-                .map_err(|reason| reason.reason)?;
+            pure_comparison_templates::encode_byte_copy_template(tcx, template_body, core)?;
         let key = pure_comparison_templates::definition_key(instance.def_id());
-        if !matches_body(&key, family, &encoded) || !signature(tcx, instance, family) {
+        let matched = element.map_or_else(
+            || matches_body(&key, family, &encoded),
+            |element| integer_body_matches(&key, family, &encoded, element),
+        );
+        if !matched || !signature_for(tcx, instance, family, original) {
             return Err("interval complete selected body or signature differs".into());
+        }
+        if family == Family::Range
+            && let Some(element) = element
+        {
+            let instantiated =
+                pure_comparison_templates::encode_byte_copy_template(tcx, &mono, core)?;
+            if !integer_instantiated_range_matches(&instantiated, element) {
+                return Err("interval original integer substitution/body differs".into());
+            }
+            #[cfg(test)]
+            reject_integer_instantiated_mutations(tcx, core, &mono, element)?;
         }
         if family == Family::Wrapper {
             let TerminatorKind::Call { func, .. } = &mono.basic_blocks
@@ -157,6 +330,9 @@ pub(super) fn certify_u16_guarded_family<'tcx>(
             else {
                 return Err("interval wrapper delegate differs".into());
             };
+            if element.is_some() && !matches!(func, Operand::Constant(_)) {
+                return Err("interval integer delegate is not an exact constant FnDef".into());
+            }
             let ty::FnDef(id, args) = func.ty(&mono.local_decls, tcx).kind() else {
                 return Err("interval wrapper delegate is indirect".into());
             };
@@ -169,6 +345,10 @@ pub(super) fn certify_u16_guarded_family<'tcx>(
             .map_err(|_| "interval delegate resolution failed")?
             .ok_or("interval delegate is missing")?;
             pending.push((selected, Family::Range));
+        }
+        #[cfg(test)]
+        if element.is_some() {
+            reject_integer_metadata(tcx, core, &key, family, template_body, element)?;
         }
         #[cfg(test)]
         for (block, data) in template_body.basic_blocks.iter_enumerated() {
@@ -206,7 +386,7 @@ pub(super) fn certify_u16_guarded_family<'tcx>(
                     unreachable!()
                 };
                 assignment.1 = replacement;
-                reject_mutation(tcx, core, &key, family, &changed)?;
+                reject_mutation(tcx, core, &key, family, &changed, element)?;
             }
             if let TerminatorKind::Call { .. } = &data.terminator().kind {
                 let mut changed = template_body.clone();
@@ -216,13 +396,13 @@ pub(super) fn certify_u16_guarded_family<'tcx>(
                     unreachable!()
                 };
                 args.swap(0, 1);
-                reject_mutation(tcx, core, &key, family, &changed)?;
+                reject_mutation(tcx, core, &key, family, &changed, element)?;
             }
             if matches!(data.terminator().kind, TerminatorKind::Return) {
                 let mut changed = template_body.clone();
                 changed.basic_blocks_mut()[block].terminator_mut().kind =
                     TerminatorKind::Unreachable;
-                reject_mutation(tcx, core, &key, family, &changed)?;
+                reject_mutation(tcx, core, &key, family, &changed, element)?;
             }
         }
     }
@@ -236,12 +416,145 @@ fn reject_mutation<'tcx>(
     key: &str,
     family: Family,
     changed: &Body<'tcx>,
+    element: Option<Element<'tcx>>,
 ) -> Result<(), String> {
     let encoded = pure_comparison_templates::encode_byte_copy_template(tcx, changed, core)
         .map_err(|error| error.reason)?;
-    if matches_body(key, family, &encoded) {
+    if element.map_or_else(
+        || matches_body(key, family, &encoded),
+        |element| integer_body_matches(key, family, &encoded, element),
+    ) {
         Err("interval changed endpoint/receiver/offset/fat-pointer/return was admitted".into())
     } else {
         Ok(())
     }
+}
+
+#[cfg(test)]
+fn reject_integer_metadata<'tcx>(
+    tcx: TyCtxt<'tcx>,
+    core: rustc_span::def_id::CrateNum,
+    key: &str,
+    family: Family,
+    body: &Body<'tcx>,
+    element: Option<Element<'tcx>>,
+) -> Result<(), String> {
+    let mut changed = body.clone();
+    changed.spread_arg = Some(rustc_middle::mir::Local::from_usize(1));
+    reject_mutation(tcx, core, key, family, &changed, element)?;
+    struct WrongField<'tcx> {
+        tcx: TyCtxt<'tcx>,
+        changed: bool,
+    }
+    impl<'tcx> rustc_middle::mir::visit::MutVisitor<'tcx> for WrongField<'tcx> {
+        fn tcx(&self) -> TyCtxt<'tcx> {
+            self.tcx
+        }
+
+        fn visit_place(
+            &mut self,
+            place: &mut Place<'tcx>,
+            _: rustc_middle::mir::visit::PlaceContext,
+            _: rustc_middle::mir::Location,
+        ) {
+            let mut projection = place.projection.to_vec();
+            for field in &mut projection {
+                if let ProjectionElem::Field(index, _) = field {
+                    *field = ProjectionElem::Field(*index, self.tcx.types.u32);
+                    self.changed = true;
+                }
+            }
+            place.projection = self.tcx.mk_place_elems(&projection);
+        }
+    }
+    let mut changed = body.clone();
+    let mut visitor = WrongField {
+        tcx,
+        changed: false,
+    };
+    rustc_middle::mir::visit::MutVisitor::visit_body(&mut visitor, &mut changed);
+    if visitor.changed {
+        reject_mutation(tcx, core, key, family, &changed, element)?;
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+fn reject_integer_instantiated_mutations<'tcx>(
+    tcx: TyCtxt<'tcx>,
+    core: rustc_span::def_id::CrateNum,
+    body: &Body<'tcx>,
+    element: Element<'tcx>,
+) -> Result<(), String> {
+    let reject = |changed: &Body<'tcx>| -> Result<(), String> {
+        let encoded = pure_comparison_templates::encode_byte_copy_template(tcx, changed, core)
+            .map_err(|reason| reason.reason)?;
+        if integer_instantiated_range_matches(&encoded, element) {
+            Err("interval changed original integer substitution was admitted".into())
+        } else {
+            Ok(())
+        }
+    };
+    let mut changed = body.clone();
+    changed.local_decls[rustc_middle::mir::Local::from_usize(2)].ty = Ty::new_mut_ref(
+        tcx,
+        tcx.lifetimes.re_erased,
+        Ty::new_slice(tcx, tcx.types.u32),
+    );
+    reject(&changed)?;
+    for (block, data) in body.basic_blocks.iter_enumerated() {
+        for (position, statement) in data.statements.iter().enumerate() {
+            let StatementKind::Assign(assignment) = &statement.kind else {
+                continue;
+            };
+            let replacement = match &assignment.1 {
+                Rvalue::BinaryOp(BinOp::Offset, operands) => Some(Rvalue::BinaryOp(
+                    BinOp::Offset,
+                    Box::new((operands.1.clone(), operands.0.clone())),
+                )),
+                Rvalue::Aggregate(kind, operands)
+                    if matches!(kind.as_ref(), AggregateKind::RawPtr(..)) =>
+                {
+                    let mut operands = operands.clone();
+                    operands.swap(
+                        rustc_abi::FieldIdx::from_usize(0),
+                        rustc_abi::FieldIdx::from_usize(1),
+                    );
+                    Some(Rvalue::Aggregate(kind.clone(), operands))
+                }
+                Rvalue::Use(Operand::Copy(place), retag)
+                    if place
+                        .projection
+                        .iter()
+                        .any(|step| matches!(step, ProjectionElem::Field(..))) =>
+                {
+                    let mut projection = place.projection.to_vec();
+                    for step in &mut projection {
+                        if let ProjectionElem::Field(index, _) = step {
+                            *step = ProjectionElem::Field(*index, tcx.types.u32);
+                        }
+                    }
+                    Some(Rvalue::Use(
+                        Operand::Copy(Place {
+                            local: place.local,
+                            projection: tcx.mk_place_elems(&projection),
+                        }),
+                        *retag,
+                    ))
+                }
+                _ => None,
+            };
+            if let Some(replacement) = replacement {
+                let mut changed = body.clone();
+                let StatementKind::Assign(assignment) =
+                    &mut changed.basic_blocks_mut()[block].statements[position].kind
+                else {
+                    unreachable!()
+                };
+                assignment.1 = replacement;
+                reject(&changed)?;
+            }
+        }
+    }
+    Ok(())
 }

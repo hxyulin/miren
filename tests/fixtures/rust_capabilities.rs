@@ -3100,3 +3100,50 @@ mod native_nested_integer {
         super::nested_integer_child_call(&mut [23; 129], -17);
     }
 }
+
+#[inline(never)]
+pub fn stage205_interval_value(word: i32) -> i32 {
+    word ^ 0
+}
+#[inline(never)]
+pub fn stage205_interval_leaf(values: &mut [i32], word: i32) {
+    values[0] = stage205_interval_value(word);
+}
+#[inline(never)]
+pub fn stage205_interval_outer(values: &mut [i32], word: i32) {
+    stage205_interval_leaf(values, word);
+}
+pub fn checked_integer_interval(values: &mut [i32], start: usize, end: usize, word: i32) {
+    if start < end && end <= values.len() {
+        stage205_interval_leaf(&mut values[start..end], word);
+        assert!(values[start] == word);
+    }
+}
+pub fn checked_integer_interval_wrong(values: &mut [i32], start: usize, end: usize, word: i32) {
+    if start < end && end <= values.len() {
+        stage205_interval_leaf(&mut values[start..end], word);
+        assert!(values[start] != word);
+    }
+}
+pub fn checked_integer_interval_nested_unknown(
+    values: &mut [i32], start: usize, end: usize, word: i32,
+) {
+    if start < end && end <= values.len() {
+        stage205_interval_outer(&mut values[start..end], word);
+        assert!(values[start] == word);
+    }
+}
+#[cfg(test)]
+mod stage205_interval_native {
+    use super::*;
+    #[test]
+    fn mutation_guard() {
+        for word in [i32::MIN, -1, 0, 1, i32::MAX] {
+            for start in 0..129 {
+                let mut values = [0_i32; 129];
+                checked_integer_interval(&mut values, start, 129, word);
+                assert!(values[start] == word);
+            }
+        }
+    }
+}

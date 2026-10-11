@@ -3,6 +3,7 @@ use super::*;
 fn compiler_checked_interval_family_capture() {
     struct Capture {
         output: std::path::PathBuf,
+        name: &'static str,
     }
     impl rustc_driver::Callbacks for Capture {
         fn after_analysis<'tcx>(
@@ -17,10 +18,46 @@ fn compiler_checked_interval_family_capture() {
                 .copied()
                 .find(|id| {
                     tcx.def_kind(id.to_def_id()) == DefKind::Fn
-                        && tcx.item_name(id.to_def_id()).as_str() == "selected"
+                        && tcx.item_name(id.to_def_id()).as_str() == self.name
                 })
                 .unwrap();
-            check_inactive_lifecycle(tcx, root.to_def_id());
+            let original = match self.name {
+                "selected" => tcx.types.u16,
+                "selected_i32" => tcx.types.i32,
+                "selected_usize" => tcx.types.usize,
+                _ => panic!("selected type"),
+            };
+            check_active_lifecycle(tcx, root.to_def_id(), original);
+            assert!(
+                templates::integer_wrapper_element(
+                    tcx,
+                    ty::Instance::new_raw(root.to_def_id(), tcx.mk_args(&[])),
+                )
+                .is_none()
+            );
+            let closure_root = tcx
+                .mir_keys(())
+                .iter()
+                .copied()
+                .find(|id| {
+                    tcx.def_kind(id.to_def_id()) == DefKind::Fn
+                        && tcx.item_name(id.to_def_id()).as_str() == "closure_root"
+                })
+                .unwrap();
+            let closure_body = tcx.optimized_mir(closure_root.to_def_id());
+            let closure = closure_body
+                .local_decls
+                .iter()
+                .find_map(|declaration| {
+                    if let ty::Closure(id, args) = declaration.ty.kind() {
+                        Some(ty::Instance::new_raw(*id, args))
+                    } else {
+                        None
+                    }
+                })
+                .unwrap();
+            assert_eq!(tcx.def_kind(closure.def_id()), DefKind::Closure);
+            assert!(templates::integer_wrapper_element(tcx, closure).is_none());
             let body = tcx.optimized_mir(root.to_def_id());
             std::fs::write(self.output.join("caller.txt"), format!("{body:#?}")).unwrap();
             let mut pending = Vec::new();
@@ -54,10 +91,52 @@ fn compiler_checked_interval_family_capture() {
                 let available = tcx.is_mir_available(instance.def_id());
                 inventory.push(format!("{key} {instance:?} available={available}"));
                 if !available {
+                    let error = templates::available_integer_body(tcx, instance).unwrap_err();
+                    assert_eq!(error.category, UnknownCategory::MissingCompilerEvidence);
+                    assert_eq!(
+                        error.reason,
+                        "interval integer selected compiler body is unavailable",
+                    );
                     continue;
                 }
-                if key == "DefId(core::slice::index::{impl#1}::index_mut)" {
+                if key == "DefId(core::slice::index::{impl#1}::index_mut)"
+                    && self.name == "selected"
+                {
                     templates::certify_u16_guarded_family(tcx, instance).unwrap();
+                } else if key == "DefId(core::slice::index::{impl#1}::index_mut)" {
+                    const { assert!(INTEGER_ISSUANCE_ENABLED) };
+                    let element = templates::integer_wrapper_element(tcx, instance).unwrap();
+                    templates::certify_integer_guarded_family(tcx, instance, element).unwrap();
+                    let mut wrong = element;
+                    wrong.original = tcx.types.u32;
+                    assert!(
+                        templates::certify_integer_guarded_family(tcx, instance, wrong).is_err()
+                    );
+                    let mut wrong = element;
+                    wrong.bytes += 1;
+                    assert!(
+                        templates::certify_integer_guarded_family(tcx, instance, wrong).is_err()
+                    );
+                    let mut wrong = element;
+                    wrong.alignment *= 2;
+                    assert!(
+                        templates::certify_integer_guarded_family(tcx, instance, wrong).is_err()
+                    );
+                    let mut wrong = element;
+                    wrong.bits += 1;
+                    assert!(
+                        templates::certify_integer_guarded_family(tcx, instance, wrong).is_err()
+                    );
+                    let mut wrong = element;
+                    wrong.original = tcx.types.u64;
+                    assert!(
+                        templates::certify_integer_guarded_family(tcx, instance, wrong).is_err()
+                    );
+                    let mut wrong = element;
+                    wrong.signed = !element.signed;
+                    assert!(
+                        templates::certify_integer_guarded_family(tcx, instance, wrong).is_err()
+                    );
                 }
                 let generic = tcx.instance_mir(instance.def);
                 let mono = instance
@@ -81,6 +160,13 @@ fn compiler_checked_interval_family_capture() {
                     pure_comparison_templates::encode_byte_copy_template(tcx, template_body, core)
                         .unwrap();
                 let index = seen.len();
+                let instantiated =
+                    pure_comparison_templates::encode_byte_copy_template(tcx, &mono, core).unwrap();
+                std::fs::write(
+                    self.output.join(format!("{index}-instantiated.mir")),
+                    instantiated,
+                )
+                .unwrap();
                 std::fs::write(self.output.join(format!("{index}-key.txt")), &key).unwrap();
                 std::fs::write(self.output.join(format!("{index}-generic.mir")), encoded).unwrap();
                 std::fs::write(
@@ -109,43 +195,53 @@ fn compiler_checked_interval_family_capture() {
             rustc_driver::Compilation::Stop
         }
     }
-    let root = std::path::PathBuf::from("/tmp/miren-stage196-prototype/compiler-lifecycle");
+    let root = std::path::PathBuf::from("/tmp/miren-stage205-parent203/compiler-lifecycle");
     std::fs::create_dir_all(&root).unwrap();
     let source = root.join("fixture.rs");
     std::fs::write(
         &source,
         concat!(
-            "#![no_std]\npub fn selected(v:&mut[u16],a:usize,b:usize) {\n",
+            "#![no_std]\n#![forbid(unsafe_code)]\n",
+            "pub fn closure_root(value:u32)->u32 { let f=|word:u32| word; f(value) }\n",
+            "pub fn selected(v:&mut[u16],a:usize,b:usize) {\n",
             "if a<b && b<=v.len() { update(&mut v[a..b]); }\n}\n",
             "#[inline(never)] fn update(v:&mut[u16]) { if v.len()>0 { v[0]=19; } }\n",
+            "pub fn selected_i32(v:&mut[i32],a:usize,b:usize) {\n",
+            "if a<b && b<=v.len() { update_i32(&mut v[a..b]); } }\n",
+            "#[inline(never)] fn update_i32(v:&mut[i32]) { if v.len()>0 { v[0]=19; } }\n",
+            "pub fn selected_usize(v:&mut[usize],a:usize,b:usize) {\n",
+            "if a<b && b<=v.len() { update_usize(&mut v[a..b]); } }\n",
+            "#[inline(never)] fn update_usize(v:&mut[usize]) { if v.len()>0 { v[0]=19; } }\n",
         ),
     )
     .unwrap();
     for (target, tag) in [(None, "host"), (Some("thumbv7em-none-eabihf"), "arm")] {
         for opt in [0, 2] {
-            let output = root.join(format!("{tag}-o{opt}"));
-            std::fs::create_dir_all(&output).unwrap();
-            let mut args = vec![
-                "rustc".into(),
-                "--crate-type=lib".into(),
-                "--edition=2024".into(),
-                source.display().to_string(),
-                "--out-dir".into(),
-                output.display().to_string(),
-                "-Zmir-opt-level=0".into(),
-                "-Cpanic=abort".into(),
-                format!("-Copt-level={opt}"),
-            ];
-            if let Some(target) = target {
-                args.extend(["--target".into(), target.into()]);
+            for name in ["selected", "selected_i32", "selected_usize"] {
+                let output = root.join(format!("{tag}-o{opt}-{name}"));
+                std::fs::create_dir_all(&output).unwrap();
+                let mut args = vec![
+                    "rustc".into(),
+                    "--crate-type=lib".into(),
+                    "--edition=2024".into(),
+                    source.display().to_string(),
+                    "--out-dir".into(),
+                    output.display().to_string(),
+                    "-Zmir-opt-level=0".into(),
+                    "-Cpanic=abort".into(),
+                    format!("-Copt-level={opt}"),
+                ];
+                if let Some(target) = target {
+                    args.extend(["--target".into(), target.into()]);
+                }
+                std::fs::write(output.join("command.txt"), args.join("\n")).unwrap();
+                rustc_driver::run_compiler(&args, &mut Capture { output, name });
             }
-            std::fs::write(output.join("command.txt"), args.join("\n")).unwrap();
-            rustc_driver::run_compiler(&args, &mut Capture { output });
         }
     }
 }
 
-fn check_inactive_lifecycle<'tcx>(tcx: TyCtxt<'tcx>, root: DefId) {
+fn check_active_lifecycle<'tcx>(tcx: TyCtxt<'tcx>, root: DefId, original_type: Ty<'tcx>) {
     let config = miren::ContractConfig::default();
     let limits = miren::AnalysisLimits::default();
     let all_failures = false;
@@ -225,6 +321,33 @@ fn check_inactive_lifecycle<'tcx>(tcx: TyCtxt<'tcx>, root: DefId) {
         .resolve_function_item(root, tcx.mk_args(&[]))
         .unwrap();
     let body = engine.instantiated_body(instance).unwrap();
+    let range_local = body
+        .local_decls
+        .iter_enumerated()
+        .find_map(|(local, declaration)| {
+            matches!(declaration.ty.kind(), ty::Adt(def, arguments)
+            if tcx.lang_items().get(LangItem::Range) == Some(def.did())
+                && arguments.type_at(0) == tcx.types.usize)
+            .then_some(local)
+        })
+        .unwrap();
+    let field = |recorded| Place {
+        local: range_local,
+        projection: tcx.mk_place_elems(&[ProjectionElem::Field(
+            rustc_abi::FieldIdx::from_usize(0),
+            recorded,
+        )]),
+    };
+    assert!(
+        engine
+            .owned_field_footprint(&body, field(tcx.types.usize))
+            .is_ok()
+    );
+    assert!(
+        engine
+            .owned_field_footprint(&body, field(tcx.types.u32))
+            .is_err()
+    );
     let (block, args, destination, target, selected) = body
         .basic_blocks
         .iter_enumerated()
@@ -256,7 +379,7 @@ fn check_inactive_lifecycle<'tcx>(tcx: TyCtxt<'tcx>, root: DefId) {
     let mut memory = Memory::default();
     let mut conditions = Vec::new();
     let root_value = engine
-        .mutable_u16_input(tcx.types.u16, &mut memory, &mut conditions)
+        .mutable_u16_input(original_type, &mut memory, &mut conditions)
         .unwrap();
     let bits = u32::from(tcx.sess.target.pointer_width);
     let end = symbolic::integer(&engine.terms, 3, bits, false);
@@ -334,6 +457,80 @@ fn check_inactive_lifecycle<'tcx>(tcx: TyCtxt<'tcx>, root: DefId) {
     engine
         .validate_mutable_interval(0, &issued.memory.mutable_u16[0])
         .unwrap();
+    if original_type != tcx.types.u16 {
+        let wrong = if original_type == tcx.types.i32 {
+            tcx.types.u32
+        } else {
+            match u32::from(tcx.sess.target.pointer_width) {
+                32 => tcx.types.u32,
+                64 => tcx.types.u64,
+                _ => panic!("pointer width"),
+            }
+        };
+        let mut wrong_memory = Memory::default();
+        engine
+            .mutable_u16_input(wrong, &mut wrong_memory, &mut Vec::new())
+            .unwrap();
+        let wrong_certificate = wrong_memory.mutable_u16[0].certificate;
+        let mut wrong_state = state.clone();
+        std::rc::Rc::make_mut(&mut wrong_state.memory.mutable_u16)[0].certificate =
+            wrong_certificate;
+        assert!(
+            engine
+                .mutable_interval_issuer(&wrong_state, call())
+                .is_err()
+        );
+        let mut wrong_view = issued.clone();
+        let backing = &mut std::rc::Rc::make_mut(&mut wrong_view.memory.mutable_u16)[0];
+        backing.certificate = wrong_certificate;
+        std::rc::Rc::make_mut(&mut backing.interval.as_mut().unwrap().issue).certificate =
+            wrong_certificate;
+        assert!(engine.validate_mutable_interval(0, backing).is_err());
+    }
+    let foreign_data_context = Context::default();
+    let mut malformed_data = Vec::new();
+    for context in [&engine.terms, &foreign_data_context] {
+        let element_sort = if std::ptr::eq(context, &engine.terms) {
+            Sort::Bool
+        } else {
+            match issued.memory.mutable_u16[0].data.sort() {
+                Sort::Array(_, element) => element.as_ref().clone(),
+                _ => panic!("array backing"),
+            }
+        };
+        malformed_data.push(
+            context
+                .symbol(
+                    777,
+                    Sort::Array(Box::new(Sort::BitVec(bits)), Box::new(element_sort)),
+                )
+                .unwrap(),
+        );
+    }
+    for data in malformed_data {
+        let mut malformed = state.clone();
+        std::rc::Rc::make_mut(&mut malformed.memory.mutable_u16)[0].data = data;
+        assert!(engine.mutable_interval_issuer(&malformed, call()).is_err());
+    }
+    let mut masked_memory = state.clone();
+    let allocation = masked_memory.memory.mutable_u16[0].allocation;
+    masked_memory
+        .memory
+        .missing_places
+        .consume(allocation, Vec::new())
+        .unwrap();
+    assert!(
+        engine
+            .mutable_interval_issuer(&masked_memory, call())
+            .is_err()
+    );
+    let mut missing_backing = state.clone();
+    missing_backing.memory[allocation] = None;
+    assert!(
+        engine
+            .mutable_interval_issuer(&missing_backing, call())
+            .is_err()
+    );
     let mut changed = issued.clone();
     let current = &mut std::rc::Rc::make_mut(&mut changed.memory.mutable_u16)[0];
     current.interval.as_mut().unwrap().offset = symbolic::integer(&engine.terms, 2, bits, false);

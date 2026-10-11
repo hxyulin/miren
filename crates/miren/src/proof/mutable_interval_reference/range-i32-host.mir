@@ -1,0 +1,108 @@
+args=2 spread=None
+local _0 Mut &'{erased} mut [i32] user=None
+local _1 Not core::ops::Range<usize> user=None
+local _2 Not &'{erased} mut [i32] user=None
+local _3 Mut core::option::Option<usize> user=None
+local _4 Mut usize user=None
+local _5 Mut usize user=None
+local _6 Not usize user=None
+local _7 Mut bool user=None
+local _8 Mut usize user=None
+local _9 Mut *mut [i32] user=None
+local _10 Mut *mut [i32] user=None
+local _11 Mut ! user=None
+local _12 Mut usize user=None
+local _13 Mut bool user=None
+local _14 Mut usize user=None
+local _15 Mut *mut i32 user=None
+local _16 Not *mut i32 user=None
+block bb0 cleanup=false
+StorageLive(_3)
+assign local=_4 path=[]
+use Yes
+copy _1/[Field(1, usize)]
+assign local=_5 path=[]
+use Yes
+copy _1/[Field(0, usize)]
+StorageLive(_13)
+assign local=_13 path=[]
+binary Lt
+copy _4/[]
+copy _5/[]
+switch SwitchTargets { values: [Pu128(0)], targets: [bb5, bb4] }
+move _13/[]
+block bb1 cleanup=false
+StorageDead(_8)
+StorageLive(_9)
+StorageLive(_10)
+assign local=_10 path=[]
+raw Mut local=_2 path=[Deref]
+StorageLive(_15)
+assign local=_15 path=[]
+cast PtrToPtr target=*mut i32
+copy _10/[]
+StorageLive(_16)
+assign local=_16 path=[]
+binary Offset
+copy _15/[]
+copy _5/[]
+assign local=_9 path=[]
+aggregate RawPtr([i32], Mut)
+copy _16/[]
+copy _6/[]
+StorageDead(_16)
+StorageDead(_15)
+StorageDead(_10)
+assign local=_0 path=[]
+ref '{erased} Mut { kind: Default } local=_9 path=[Deref]
+StorageDead(_9)
+StorageDead(_6)
+StorageDead(_3)
+StorageDead(_7)
+return
+block bb2 cleanup=false
+StorageDead(_8)
+StorageDead(_6)
+goto -> bb3
+block bb3 cleanup=false
+StorageDead(_3)
+StorageLive(_12)
+assign local=_12 path=[]
+unary PtrMetadata
+copy _2/[]
+call core::slice::index::slice_index_fail destination=_11/[] target=None unwind=Continue source=
+  | Normal
+const-value ZeroSized FnDef(DefId(core::slice::index::slice_index_fail), Binder { value: [], bou
+  | nd_vars: [] })
+move _5/[]
+move _4/[]
+move _12/[]
+block bb4 cleanup=false
+StorageDead(_13)
+goto -> bb3
+block bb5 cleanup=false
+StorageLive(_14)
+assign local=_14 path=[]
+binary SubUnchecked
+copy _4/[]
+copy _5/[]
+assign local=_3 path=[]
+aggregate Adt(DefId(core::option::Option), 1, [usize], None, None)
+move _14/[]
+StorageDead(_14)
+StorageDead(_13)
+StorageLive(_6)
+assign local=_6 path=[]
+use Yes
+copy _3/[Downcast(Some("Some"), 1), Field(0, usize)]
+StorageLive(_7)
+StorageLive(_8)
+assign local=_8 path=[]
+unary PtrMetadata
+copy _2/[]
+assign local=_7 path=[]
+binary Le
+copy _4/[]
+move _8/[]
+switch SwitchTargets { values: [Pu128(0)], targets: [bb2, bb1] }
+move _7/[]
