@@ -6,6 +6,7 @@ const ISSUANCE_ENABLED: bool = true;
 const INTEGER_HIERARCHY_ENABLED: bool = true;
 const BOOL_HIERARCHY_ENABLED: bool = true;
 const CHAR_HIERARCHY_ENABLED: bool = true;
+const FLOAT_HIERARCHY_ENABLED: bool = true;
 const DORMANT_CALLS_ENABLED: bool = true;
 
 fn integer_hierarchy_enabled() -> bool {
@@ -94,6 +95,36 @@ impl TestCharHierarchy {
 impl Drop for TestCharHierarchy {
     fn drop(&mut self) {
         TEST_CHAR_HIERARCHY.with(|value| value.set(self.0));
+    }
+}
+
+fn float_hierarchy_enabled() -> bool {
+    #[cfg(test)]
+    if TEST_FLOAT_HIERARCHY.with(std::cell::Cell::get) {
+        return true;
+    }
+    FLOAT_HIERARCHY_ENABLED
+}
+
+#[cfg(test)]
+std::thread_local! {
+    static TEST_FLOAT_HIERARCHY: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+#[cfg(test)]
+struct TestFloatHierarchy(bool);
+
+#[cfg(test)]
+impl TestFloatHierarchy {
+    fn enable() -> Self {
+        Self(TEST_FLOAT_HIERARCHY.with(|value| value.replace(true)))
+    }
+}
+
+#[cfg(test)]
+impl Drop for TestFloatHierarchy {
+    fn drop(&mut self) {
+        TEST_FLOAT_HIERARCHY.with(|value| value.set(self.0));
     }
 }
 
@@ -456,6 +487,7 @@ impl<'tcx> Engine<'tcx> {
             return Ok(None);
         }
         let data = backing.data.clone();
+        let float_original = self.mutable_hierarchy_float_backing(id, &state.memory)?;
         if call.args.len() > MAX_INPUT_VALUES {
             return Err(self.categorized_error(
                 UnknownCategory::ResourceLimit,
@@ -481,9 +513,9 @@ impl<'tcx> Engine<'tcx> {
             || signature
                 .inputs()
                 .iter()
-                .any(|t| !self.mutable_hierarchy_primitive(*t))
+                .any(|t| !self.mutable_hierarchy_primitive_for(*t, float_original))
             || !(signature.output().is_unit()
-                || self.mutable_hierarchy_primitive(signature.output()))
+                || self.mutable_hierarchy_primitive_for(signature.output(), float_original))
         {
             return Ok(None);
         }
@@ -533,7 +565,13 @@ impl<'tcx> Engine<'tcx> {
                 return Err("dormant hierarchy primitive original operand type differs".into());
             }
             if let Operand::Copy(place) | Operand::Move(place) = &operand.node {
-                self.mutable_hierarchy_dormant_operand(call.body, state, *place, *original)?;
+                self.mutable_hierarchy_dormant_operand(
+                    call.body,
+                    state,
+                    *place,
+                    *original,
+                    float_original,
+                )?;
             }
         }
         // Body availability/schema precede existing builtin priority. No new summary is issued.
@@ -566,7 +604,12 @@ impl<'tcx> Engine<'tcx> {
         let mut values = Vec::with_capacity(args.len());
         for (arg, original) in args.iter().zip(signature.inputs()) {
             let value = self.evaluate_operand(call.site.0, call.body, state, &arg.node)?;
-            self.mutable_hierarchy_primitive_value(*original, &value, &state.conditions)?;
+            self.mutable_hierarchy_primitive_value_for(
+                *original,
+                &value,
+                &state.conditions,
+                float_original,
+            )?;
             values.push(value);
         }
         let results = if let Some(value) =
@@ -588,10 +631,13 @@ impl<'tcx> Engine<'tcx> {
             )?
         };
         for result in &results {
-            self.mutable_hierarchy_primitive_value(
+            #[cfg(test)]
+            self.test_float_return(TestFloatReturnBoundary::Dormant, state, result)?;
+            self.mutable_hierarchy_primitive_value_for(
                 signature.output(),
                 &result.value,
                 &result.conditions,
+                self.mutable_hierarchy_float_backing(id, &result.memory)?,
             )?;
             self.mutable_hierarchy_dormant_return(id, &before, &data, &result.memory)?;
         }
@@ -604,10 +650,16 @@ impl<'tcx> Engine<'tcx> {
         state: &State,
         place: Place<'tcx>,
         original: Ty<'tcx>,
+        float_original: Option<Ty<'tcx>>,
     ) -> Result<(), String> {
         self.owned_field_footprint(body, place)?;
         let value = self.place(state, place)?;
-        self.mutable_hierarchy_primitive_value(original, &value, &state.conditions)
+        self.mutable_hierarchy_primitive_value_for(
+            original,
+            &value,
+            &state.conditions,
+            float_original,
+        )
     }
 
     fn mutable_hierarchy_primitive_value(
@@ -773,17 +825,26 @@ impl<'tcx> Engine<'tcx> {
         {
             return Ok(false);
         }
-        let Some(signature) =
-            self.mutable_hierarchy_routing_signature(call.instance, args.len())?
+        let Some(signature) = self.mutable_hierarchy_routing_signature(
+            call.instance,
+            args.len(),
+            self.mutable_hierarchy_float_reference_element(
+                args[position].node.ty(&call.body.local_decls, self.tcx),
+            ),
+        )?
         else {
             return Ok(false);
         };
         if !self.mutable_hierarchy_reference(signature.inputs()[position])
-            || signature
-                .inputs()
-                .iter()
-                .enumerate()
-                .any(|(i, t)| i != position && !self.mutable_hierarchy_primitive(*t))
+            || signature.inputs().iter().enumerate().any(|(i, t)| {
+                i != position
+                    && !self.mutable_hierarchy_primitive_for(
+                        *t,
+                        self.mutable_hierarchy_float_reference_element(
+                            signature.inputs()[position],
+                        ),
+                    )
+            })
             || destination.ty(&call.body.local_decls, self.tcx).ty != signature.output()
             || self.specification(call.instance)?.is_some()
         {
@@ -800,6 +861,7 @@ impl<'tcx> Engine<'tcx> {
                 && original != self.tcx.types.u8)
             || (bool_hierarchy_enabled() && original == self.tcx.types.bool)
             || (char_hierarchy_enabled() && original == self.tcx.types.char)
+            || (float_hierarchy_enabled() && self.float_type(original).is_some())
     }
 
     fn mutable_hierarchy_reference(&self, original: Ty<'tcx>) -> bool {
@@ -812,6 +874,7 @@ impl<'tcx> Engine<'tcx> {
         &self,
         instance: ty::Instance<'tcx>,
         count: usize,
+        float_original: Option<Ty<'tcx>>,
     ) -> Result<Option<ty::FnSig<'tcx>>, String> {
         if !matches!(instance.def, ty::InstanceKind::Item(_))
             || self.tcx.def_kind(instance.def_id()) != DefKind::Fn
@@ -826,7 +889,7 @@ impl<'tcx> Engine<'tcx> {
             || signature.c_variadic()
             || signature.inputs().len() != count
             || !(signature.output().is_unit()
-                || self.mutable_hierarchy_primitive(signature.output()))
+                || self.mutable_hierarchy_primitive_for(signature.output(), float_original))
         {
             return Ok(None);
         }
@@ -887,12 +950,14 @@ impl<'tcx> Engine<'tcx> {
         let signature = self
             .tcx
             .instantiate_bound_regions_with_erased(self.call_poly_signature(instance)?);
+        let float_original =
+            self.mutable_hierarchy_float_call_element(&signature, &state.memory)?;
         if signature.safety() != rustc_hir::Safety::Safe
             || signature.abi() != rustc_abi::ExternAbi::Rust
             || signature.c_variadic()
             || signature.inputs().len() != args.len()
             || !(signature.output().is_unit()
-                || self.mutable_hierarchy_primitive(signature.output()))
+                || self.mutable_hierarchy_primitive_for(signature.output(), float_original))
             || destination.ty(&body.local_decls, self.tcx).ty != signature.output()
         {
             return Err("hierarchy requires synchronous primitive-return Rust Item".into());
@@ -967,7 +1032,7 @@ impl<'tcx> Engine<'tcx> {
             if signature
                 .inputs()
                 .iter()
-                .any(|t| !self.mutable_hierarchy_primitive(*t))
+                .any(|t| !self.mutable_hierarchy_primitive_for(*t, float_original))
             {
                 return Err("hierarchy scalar frame has nonprimitive argument".into());
             }
@@ -986,15 +1051,11 @@ impl<'tcx> Engine<'tcx> {
                 },
             );
         };
-        if signature
-            .inputs()
-            .iter()
-            .enumerate()
-            .any(|(i, t)| i != position && !self.mutable_hierarchy_primitive(*t))
-            || !self.mutable_hierarchy_element(
-                self.mutable_interval_element(state.memory.mutable_u16[id].certificate)?,
-            )
-        {
+        if signature.inputs().iter().enumerate().any(|(i, t)| {
+            i != position && !self.mutable_hierarchy_primitive_for(*t, float_original)
+        }) || !self.mutable_hierarchy_element(
+            self.mutable_interval_element(state.memory.mutable_u16[id].certificate)?,
+        ) {
             return Err("hierarchy source is not original whole u16".into());
         }
         if matches!(role, MutableU16Role::Root) && matches!(args[position].node, Operand::Move(_)) {
@@ -1101,12 +1162,21 @@ impl<'tcx> Engine<'tcx> {
                     role: MutableU16Role::HierarchyChild { lease },
                 });
             } else {
+                self.mutable_hierarchy_float_operand(body, &arg.node, signature.inputs()[i])?;
                 values.push(self.evaluate_operand(site.0, body, state, &arg.node)?);
             }
         }
         for (original, value) in signature.inputs().iter().zip(&values) {
             if *original == self.tcx.types.char {
                 self.prove_char_value(value, &state.conditions)?;
+            } else if self.float_type(*original).is_some() {
+                let current = self.mutable_hierarchy_float_backing(id, &state.memory)?;
+                self.mutable_hierarchy_primitive_value_for(
+                    *original,
+                    value,
+                    &state.conditions,
+                    current,
+                )?;
             }
         }
         let backing = &mut Rc::make_mut(&mut state.memory.mutable_u16)[id];
@@ -1124,6 +1194,16 @@ impl<'tcx> Engine<'tcx> {
         for result in &mut results {
             if signature.output() == self.tcx.types.char {
                 self.prove_char_value(&result.value, &result.conditions)?;
+            } else if self.float_type(signature.output()).is_some() {
+                #[cfg(test)]
+                self.test_float_return(TestFloatReturnBoundary::WholeChild, state, result)?;
+                let current = self.mutable_hierarchy_float_backing(id, &result.memory)?;
+                self.mutable_hierarchy_primitive_value_for(
+                    signature.output(),
+                    &result.value,
+                    &result.conditions,
+                    current,
+                )?;
             }
             if result.memory.mutable_hierarchy != Some(id) {
                 return Err("returned hierarchy mode disappeared or changed owner".into());
@@ -1149,6 +1229,100 @@ impl<'tcx> Engine<'tcx> {
         )
     }
 
+    fn mutable_hierarchy_float_reference_element(&self, original: Ty<'tcx>) -> Option<Ty<'tcx>> {
+        if !float_hierarchy_enabled() {
+            return None;
+        }
+        match original.kind() {
+            ty::Ref(_, pointee, rustc_hir::Mutability::Mut) => match pointee.kind() {
+                ty::Slice(element) if self.float_type(*element).is_some() => Some(*element),
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+
+    fn mutable_hierarchy_float_backing(
+        &self,
+        id: usize,
+        memory: &Memory,
+    ) -> Result<Option<Ty<'tcx>>, String> {
+        if !float_hierarchy_enabled() {
+            return Ok(None);
+        }
+        let backing = self.mutable_u16_backing(id, memory)?;
+        let original = self.mutable_interval_element(backing.certificate)?;
+        Ok(self.float_type(original).map(|_| original))
+    }
+
+    fn mutable_hierarchy_float_call_element(
+        &self,
+        signature: &ty::FnSig<'tcx>,
+        memory: &Memory,
+    ) -> Result<Option<Ty<'tcx>>, String> {
+        if !float_hierarchy_enabled() {
+            return Ok(None);
+        }
+        if let Some(id) = memory.mutable_hierarchy {
+            return self.mutable_hierarchy_float_backing(id, memory);
+        }
+        // Routing types select a candidate only. Actual source/backing checks still precede grant.
+        let mut element = None;
+        for original in signature.inputs() {
+            if let Some(found) = self.mutable_hierarchy_float_reference_element(*original)
+                && element.replace(found).is_some()
+            {
+                return Ok(None);
+            }
+        }
+        Ok(element)
+    }
+
+    fn mutable_hierarchy_primitive_for(
+        &self,
+        original: Ty<'tcx>,
+        float_original: Option<Ty<'tcx>>,
+    ) -> bool {
+        self.mutable_hierarchy_primitive(original)
+            || (float_hierarchy_enabled()
+                && float_original == Some(original)
+                && self.float_type(original).is_some())
+    }
+
+    fn mutable_hierarchy_float_operand(
+        &self,
+        body: &Body<'tcx>,
+        operand: &Operand<'tcx>,
+        original: Ty<'tcx>,
+    ) -> Result<(), String> {
+        if self.float_type(original).is_none() {
+            return Ok(());
+        }
+        if !float_hierarchy_enabled() || operand.ty(&body.local_decls, self.tcx) != original {
+            return Err("hierarchy Float operand original type differs".into());
+        }
+        if let Operand::Copy(place) | Operand::Move(place) = operand {
+            self.owned_field_footprint(body, *place)?;
+        }
+        Ok(())
+    }
+
+    fn mutable_hierarchy_primitive_value_for(
+        &self,
+        original: Ty<'tcx>,
+        value: &Value,
+        conditions: &[Term],
+        float_original: Option<Ty<'tcx>>,
+    ) -> Result<(), String> {
+        if self.float_type(original).is_none() {
+            return self.mutable_hierarchy_primitive_value(original, value, conditions);
+        }
+        if !self.mutable_hierarchy_primitive_for(original, float_original) {
+            return Err("hierarchy Float scalar differs from current original backing".into());
+        }
+        self.prove_float_pair(value, self.float_type(original).unwrap(), conditions)
+    }
+
     fn mutable_hierarchy_selector(
         &self,
         selected: &Body<'tcx>,
@@ -1165,6 +1339,8 @@ impl<'tcx> Engine<'tcx> {
         {
             return Ok(false);
         }
+        let float_original =
+            self.mutable_hierarchy_float_reference_element(selected.local_decls[root].ty);
         for block in selected.basic_blocks.iter() {
             let mut lineage = std::collections::BTreeSet::from([root]);
             for statement in &block.statements {
@@ -1208,7 +1384,8 @@ impl<'tcx> Engine<'tcx> {
                 continue;
             };
             let instance = self.resolve_function_item(*definition, generic.skip_binder())?;
-            let Some(signature) = self.mutable_hierarchy_routing_signature(instance, args.len())?
+            let Some(signature) =
+                self.mutable_hierarchy_routing_signature(instance, args.len(), float_original)?
             else {
                 continue;
             };
@@ -1225,7 +1402,7 @@ impl<'tcx> Engine<'tcx> {
                     if !follows || receiver.replace(position).is_some() {
                         eligible = false;
                     }
-                } else if !self.mutable_hierarchy_primitive(*original) {
+                } else if !self.mutable_hierarchy_primitive_for(*original, float_original) {
                     eligible = false;
                 }
             }
@@ -1506,6 +1683,7 @@ impl<'tcx> Engine<'tcx> {
             return Ok(None);
         };
         let backing = self.mutable_u16_backing(id, &state.memory)?;
+        let float_original = self.mutable_hierarchy_float_backing(id, &state.memory)?;
         let before = backing
             .hierarchy
             .as_ref()
@@ -1531,12 +1709,20 @@ impl<'tcx> Engine<'tcx> {
         entered.owners.last_mut().unwrap().frames.push(frame);
         self.mutable_hierarchy_charge(state, id, &entered)?;
         let mut values = Vec::with_capacity(args.len());
-        for arg in args {
+        for (arg, local) in args.iter().zip(selected.args_iter()) {
+            self.mutable_hierarchy_float_operand(body, &arg.node, selected.local_decls[local].ty)?;
             values.push(self.evaluate_operand(site.0, body, state, &arg.node)?);
         }
         for (local, value) in selected.args_iter().zip(&values) {
             if selected.local_decls[local].ty == self.tcx.types.char {
                 self.prove_char_value(value, &state.conditions)?;
+            } else if self.float_type(selected.local_decls[local].ty).is_some() {
+                self.mutable_hierarchy_primitive_value_for(
+                    selected.local_decls[local].ty,
+                    value,
+                    &state.conditions,
+                    float_original,
+                )?;
             }
         }
         Rc::make_mut(&mut state.memory.mutable_u16)[id].hierarchy = Some(entered.clone());
@@ -1551,6 +1737,16 @@ impl<'tcx> Engine<'tcx> {
         for result in &mut results {
             if selected.return_ty() == self.tcx.types.char {
                 self.prove_char_value(&result.value, &result.conditions)?;
+            } else if self.float_type(selected.return_ty()).is_some() {
+                #[cfg(test)]
+                self.test_float_return(TestFloatReturnBoundary::ActiveScalar, state, result)?;
+                let current = self.mutable_hierarchy_float_backing(id, &result.memory)?;
+                self.mutable_hierarchy_primitive_value_for(
+                    selected.return_ty(),
+                    &result.value,
+                    &result.conditions,
+                    current,
+                )?;
             }
             if result.memory.mutable_hierarchy != Some(id) {
                 return Err("scalar returned hierarchy mode differs".into());
@@ -1713,6 +1909,7 @@ pub(super) fn compiler_element_boundary_probe<'tcx>(
             engine.mutable_hierarchy_element(excluded),
             (bool_hierarchy_enabled() && excluded == engine.tcx.types.bool)
                 || (char_hierarchy_enabled() && excluded == engine.tcx.types.char)
+                || (float_hierarchy_enabled() && engine.float_type(excluded).is_some())
         );
     }
     let selected = engine.instantiated_body(instance).unwrap();
@@ -2130,9 +2327,18 @@ fn compiler_char_scalar_probe<'tcx>(engine: &mut Engine<'tcx>, result: &Return) 
                 engine.tcx.types.char,
             )]),
         };
-        assert_eq!(engine.mutable_hierarchy_dormant_operand(
-            &pair, &pair_state, place, engine.tcx.types.char,
-        ).is_ok(), valid);
+        assert_eq!(
+            engine
+                .mutable_hierarchy_dormant_operand(
+                    &pair,
+                    &pair_state,
+                    place,
+                    engine.tcx.types.char,
+                    None,
+                )
+                .is_ok(),
+            valid
+        );
     }
     let frame = engine.mutable_u16_register_frame(&body).unwrap();
     let foreign = Context::default();
@@ -2474,7 +2680,13 @@ fn compiler_dormant_probe<'tcx>(engine: &mut Engine<'tcx>, memory: &Memory, cond
         )]),
     };
     engine
-        .mutable_hierarchy_dormant_operand(&pair, &pair_state, valid_field, engine.tcx.types.u16)
+        .mutable_hierarchy_dormant_operand(
+            &pair,
+            &pair_state,
+            valid_field,
+            engine.tcx.types.u16,
+            None,
+        )
         .unwrap();
     let forged_field = Place {
         local: pair_local,
@@ -2489,7 +2701,8 @@ fn compiler_dormant_probe<'tcx>(engine: &mut Engine<'tcx>, memory: &Memory, cond
                 &pair,
                 &pair_state,
                 forged_field,
-                engine.tcx.types.u16
+                engine.tcx.types.u16,
+                None,
             )
             .is_err()
     );
@@ -2794,6 +3007,724 @@ impl Hierarchy {
         self.epoch = epoch;
         Ok(())
     }
+}
+
+#[cfg(test)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum TestFloatReturnBoundary {
+    ActiveScalar,
+    WholeChild,
+    Dormant,
+}
+
+#[cfg(test)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum TestFloatReturnFault {
+    WrongWidth,
+    MissingRaw,
+    SwappedRaw,
+    ChangedBinding,
+}
+
+#[cfg(test)]
+std::thread_local! {
+    static TEST_FLOAT_RETURN:
+        std::cell::Cell<Option<(TestFloatReturnBoundary, TestFloatReturnFault)>> =
+        const { std::cell::Cell::new(None) };
+    static TEST_FLOAT_RETURN_BINDING_VALUE: std::cell::RefCell<Option<Value>> =
+        const { std::cell::RefCell::new(None) };
+    static TEST_FLOAT_RETURN_OBSERVED: std::cell::RefCell<Vec<TestFloatReturnObserved>> =
+        const { std::cell::RefCell::new(Vec::new()) };
+}
+
+#[cfg(test)]
+struct TestFloatReturnObserved {
+    label: String,
+    caller: String,
+    returned_data_changed: bool,
+}
+
+#[cfg(test)]
+struct TestFloatReturn {
+    previous: Option<(TestFloatReturnBoundary, TestFloatReturnFault)>,
+    previous_value: Option<Value>,
+}
+
+#[cfg(test)]
+impl TestFloatReturn {
+    fn enter(
+        boundary: TestFloatReturnBoundary,
+        fault: TestFloatReturnFault,
+        issued: &Value,
+    ) -> Self {
+        Self {
+            previous: TEST_FLOAT_RETURN.with(|value| value.replace(Some((boundary, fault)))),
+            previous_value: TEST_FLOAT_RETURN_BINDING_VALUE
+                .with(|value| value.replace(Some(issued.clone()))),
+        }
+    }
+}
+
+#[cfg(test)]
+impl Drop for TestFloatReturn {
+    fn drop(&mut self) {
+        TEST_FLOAT_RETURN.with(|value| value.set(self.previous));
+        TEST_FLOAT_RETURN_BINDING_VALUE.with(|value| {
+            value.replace(self.previous_value.take());
+        });
+    }
+}
+
+#[cfg(test)]
+fn test_float_return_state(state: &State) -> String {
+    format!(
+        "{:?}",
+        (
+            &state.locals,
+            &state.addresses,
+            &state.missing_places,
+            &state.conditions,
+            &*state.memory,
+            &state.memory.mutable_u16,
+            state.memory.mutable_hierarchy,
+            &state.memory.missing_places,
+        )
+    )
+}
+
+#[cfg(test)]
+impl Engine<'_> {
+    fn test_float_return(
+        &mut self,
+        boundary: TestFloatReturnBoundary,
+        caller: &State,
+        result: &Return,
+    ) -> Result<(), String> {
+        let Some((selected, fault)) = TEST_FLOAT_RETURN.with(std::cell::Cell::get) else {
+            return Ok(());
+        };
+        if selected != boundary {
+            return Ok(());
+        }
+        let Value::Float { bits, .. } = &result.value else {
+            return Ok(());
+        };
+        let id = result.memory.mutable_hierarchy.unwrap();
+        if boundary == TestFloatReturnBoundary::WholeChild
+            && caller.memory.mutable_u16[id].data == result.memory.mutable_u16[id].data
+        {
+            // Target an actual returned branch with a completed valid callee Store.
+            return Ok(());
+        }
+        let before = test_float_return_state(caller);
+        let returned_before = format!(
+            "{:?}",
+            (
+                &result.value,
+                &result.conditions,
+                &*result.memory,
+                &result.memory.mutable_u16,
+                result.memory.mutable_hierarchy,
+                &result.memory.missing_places,
+            )
+        );
+        let bindings_before = self.float_encodings.clone();
+        let mut injected = result.value.clone();
+        let mut binding_restore = None;
+        match fault {
+            TestFloatReturnFault::WrongWidth => {
+                injected = symbolic::float_from_bits(
+                    &self.terms,
+                    self.terms
+                        .bit_vector(0, if *bits == 32 { 64 } else { 32 })
+                        .unwrap(),
+                    if *bits == 32 { 64 } else { 32 },
+                );
+            }
+            TestFloatReturnFault::MissingRaw => {
+                let Value::Float { raw_bits, .. } = &mut injected else {
+                    unreachable!()
+                };
+                *raw_bits = None;
+            }
+            TestFloatReturnFault::SwappedRaw => {
+                let Value::Float { raw_bits, .. } = &mut injected else {
+                    unreachable!()
+                };
+                // A valid copied NaN with a different payload is not the copied pair.
+                *raw_bits = Some(
+                    self.terms
+                        .bit_vector(
+                            if *bits == 32 {
+                                0x7fc0_0456
+                            } else {
+                                0x7ff8_0000_0000_0456
+                            },
+                            *bits,
+                        )
+                        .unwrap(),
+                );
+            }
+            TestFloatReturnFault::ChangedBinding => {
+                injected = TEST_FLOAT_RETURN_BINDING_VALUE
+                    .with(|value| value.borrow().as_ref().unwrap().clone());
+                let Value::Float {
+                    raw_bits: Some(raw),
+                    ..
+                } = &injected
+                else {
+                    unreachable!()
+                };
+                let symbol = raw.symbol_index().unwrap();
+                let issued = self.float_encodings.remove(&symbol).unwrap();
+                self.float_encodings
+                    .insert(symbol, self.terms.boolean(false));
+                binding_restore = Some((symbol, issued));
+            }
+        }
+        let original = self
+            .mutable_hierarchy_float_backing(id, &result.memory)?
+            .unwrap();
+        let refused = self.mutable_hierarchy_primitive_value_for(
+            original,
+            &injected,
+            &result.conditions,
+            Some(original),
+        );
+        // Restore the issuer binding explicitly, then the complete pre-fault map.
+        if let Some((symbol, issued)) = binding_restore {
+            self.float_encodings.insert(symbol, issued);
+        }
+        self.float_encodings = bindings_before;
+        assert!(
+            refused.is_err(),
+            "actual {boundary:?} {fault:?} must refuse"
+        );
+        assert_eq!(test_float_return_state(caller), before);
+        assert_eq!(
+            format!(
+                "{:?}",
+                (
+                    &result.value,
+                    &result.conditions,
+                    &*result.memory,
+                    &result.memory.mutable_u16,
+                    result.memory.mutable_hierarchy,
+                    &result.memory.missing_places,
+                )
+            ),
+            returned_before
+        );
+        TEST_FLOAT_RETURN_OBSERVED.with(|observed| {
+            observed.borrow_mut().push(TestFloatReturnObserved {
+                label: format!("{boundary:?}/{fault:?}/{bits}"),
+                caller: before,
+                returned_data_changed: caller.memory.mutable_u16[id].data
+                    != result.memory.mutable_u16[id].data,
+            });
+        });
+        Err(format!(
+            "test-only actual Float Return refusal: {boundary:?}/{fault:?}"
+        ))
+    }
+}
+
+#[cfg(test)]
+pub(super) fn compiler_float_boundary_probe<'tcx>(
+    engine: &mut Engine<'tcx>,
+    root: &Rc<Body<'tcx>>,
+    element: Ty<'tcx>,
+) {
+    let (block, data) = root
+        .basic_blocks
+        .iter_enumerated()
+        .find(|(_, b)| matches!(b.terminator().kind, TerminatorKind::Call { .. }))
+        .unwrap();
+    let TerminatorKind::Call {
+        func,
+        args,
+        destination,
+        target,
+        ..
+    } = &data.terminator().kind
+    else {
+        unreachable!()
+    };
+    let ty::FnDef(definition, generic) = func.ty(&root.local_decls, engine.tcx).kind() else {
+        unreachable!()
+    };
+    let instance = engine
+        .resolve_function_item(*definition, generic.skip_binder())
+        .unwrap();
+    let mut memory = Memory::default();
+    let mut conditions = Vec::new();
+    let value = engine
+        .mutable_u16_input(element, &mut memory, &mut conditions)
+        .unwrap();
+    let mut state = State {
+        locals: vec![None; root.local_decls.len()],
+        addresses: vec![None; root.local_decls.len()],
+        missing_places: Default::default(),
+        conditions,
+        memory,
+    };
+    state.locals[1] = Some(value);
+    for statement in &data.statements {
+        if let StatementKind::Assign(a) = &statement.kind
+            && matches!(a.1, Rvalue::Ref(_, BorrowKind::Mut { .. }, _))
+        {
+            assert!(
+                engine
+                    .mutable_u16_stage(root, &mut state, a.0, &a.1, &statement.kind)
+                    .unwrap()
+            );
+        }
+    }
+    let call = || super::mutable_u16_children::ChildCall {
+        body: root,
+        block,
+        instance,
+        args,
+        destination: *destination,
+        target: *target,
+        stack: &[],
+        site: (root.source.def_id(), data.terminator().source_info.span),
+    };
+    assert!(!TEST_FLOAT_HIERARCHY.with(std::cell::Cell::get));
+    assert_eq!(float_hierarchy_enabled(), FLOAT_HIERARCHY_ENABLED);
+    assert_eq!(
+        engine.mutable_hierarchy_route(&state, &call()).unwrap(),
+        FLOAT_HIERARCHY_ENABLED,
+    );
+    {
+        let _scope = TestFloatHierarchy::enable();
+        assert!(float_hierarchy_enabled());
+        assert!(TEST_FLOAT_HIERARCHY.with(std::cell::Cell::get));
+        {
+            let _nested = TestFloatHierarchy::enable();
+            assert!(float_hierarchy_enabled());
+            assert!(TEST_FLOAT_HIERARCHY.with(std::cell::Cell::get));
+        }
+        assert!(float_hierarchy_enabled());
+        assert!(TEST_FLOAT_HIERARCHY.with(std::cell::Cell::get));
+        let panicked = std::panic::catch_unwind(|| {
+            let _nested = TestFloatHierarchy::enable();
+            panic!("Float hierarchy restoration probe");
+        });
+        assert!(panicked.is_err());
+        assert!(float_hierarchy_enabled());
+        assert!(TEST_FLOAT_HIERARCHY.with(std::cell::Cell::get));
+        assert!(engine.mutable_hierarchy_route(&state, &call()).unwrap());
+        let width = engine.float_type(element).unwrap();
+        let mut forged_body = (**root).clone();
+        let wrong_integer = if width == 32 {
+            engine.tcx.types.u32
+        } else {
+            engine.tcx.types.u64
+        };
+        let raw_local = rustc_middle::mir::Local::from_usize(1);
+        forged_body.local_decls[raw_local].ty = Ty::new_tup(engine.tcx, &[wrong_integer]);
+        let forged_field = Place {
+            local: raw_local,
+            projection: engine.tcx.mk_place_elems(&[ProjectionElem::Field(
+                rustc_abi::FieldIdx::from_usize(0),
+                element,
+            )]),
+        };
+        assert!(
+            engine
+                .mutable_hierarchy_float_operand(
+                    &forged_body,
+                    &Operand::Copy(forged_field),
+                    element
+                )
+                .is_err()
+        );
+        let mut wrong_memory = Memory::default();
+        let mut wrong_conditions = Vec::new();
+        let wrong_role = engine
+            .mutable_u16_input(wrong_integer, &mut wrong_memory, &mut wrong_conditions)
+            .unwrap();
+        let mut wrong_state = state.clone();
+        wrong_state.memory = wrong_memory;
+        wrong_state.conditions = wrong_conditions;
+        let source = match args[0].node {
+            Operand::Copy(p) | Operand::Move(p) => p.local.as_usize(),
+            Operand::Constant(_) | Operand::RuntimeChecks(_) => unreachable!(),
+        };
+        wrong_state.locals[source] = Some(wrong_role);
+        assert!(
+            !engine
+                .mutable_hierarchy_route(&wrong_state, &call())
+                .unwrap()
+        );
+
+        let nan = if width == 32 {
+            0x7fc0_0123
+        } else {
+            0x7ff8_0000_0000_0123
+        };
+        let valid = symbolic::float_from_bits(
+            &engine.terms,
+            engine.terms.bit_vector(nan, width).unwrap(),
+            width,
+        );
+        engine
+            .mutable_hierarchy_primitive_value_for(
+                element,
+                &valid,
+                &state.conditions,
+                Some(element),
+            )
+            .unwrap();
+        let mut swapped = valid.clone();
+        if let Value::Float { raw_bits, .. } = &mut swapped {
+            *raw_bits = Some(engine.terms.bit_vector(nan + 1, width).unwrap());
+        }
+        let mut absent = valid.clone();
+        if let Value::Float { raw_bits, .. } = &mut absent {
+            *raw_bits = None;
+        }
+        let foreign = Context::default();
+        let other_width = if width == 32 { 64 } else { 32 };
+        for bad in [
+            swapped,
+            absent,
+            symbolic::float_from_bits(&foreign, foreign.bit_vector(nan, width).unwrap(), width),
+            symbolic::float_from_bits(
+                &engine.terms,
+                engine.terms.bit_vector(0, other_width).unwrap(),
+                other_width,
+            ),
+        ] {
+            let before = state.memory.mutable_u16[0].clone();
+            assert!(
+                engine
+                    .mutable_hierarchy_primitive_value_for(
+                        element,
+                        &bad,
+                        &state.conditions,
+                        Some(element)
+                    )
+                    .is_err()
+            );
+            let after = &state.memory.mutable_u16[0];
+            assert_eq!(before.data, after.data);
+            assert_eq!(before.phase, after.phase);
+            assert_eq!(before.generation, after.generation);
+        }
+        assert!(
+            engine
+                .mutable_hierarchy_primitive_value_for(
+                    element,
+                    &valid,
+                    &state.conditions,
+                    Some(engine.tcx.types.u32)
+                )
+                .is_err()
+        );
+        let Value::Float { expression, .. } = &valid else {
+            unreachable!()
+        };
+        let produced = engine.materialize_float(Value::Float {
+            expression: engine
+                .terms
+                .apply(Op::FpNeg, std::slice::from_ref(expression))
+                .unwrap(),
+            bits: width,
+            raw_bits: None,
+        });
+        engine
+            .mutable_hierarchy_primitive_value_for(
+                element,
+                &produced,
+                &state.conditions,
+                Some(element),
+            )
+            .unwrap();
+        let Value::Float {
+            raw_bits: Some(raw),
+            ..
+        } = &produced
+        else {
+            unreachable!()
+        };
+        let symbol = raw.symbol_index().unwrap();
+        let binding = engine.float_encodings.remove(&symbol).unwrap();
+        assert!(
+            engine
+                .mutable_hierarchy_primitive_value_for(
+                    element,
+                    &produced,
+                    &state.conditions,
+                    Some(element)
+                )
+                .is_err()
+        );
+        engine.float_encodings.insert(symbol, binding);
+        let mut deep = valid.clone();
+        let alternative = symbolic::float_from_bits(
+            &engine.terms,
+            engine.terms.bit_vector(0, width).unwrap(),
+            width,
+        );
+        for _ in 0..17 {
+            let condition = engine.fresh(Sort::Bool);
+            deep = engine
+                .float_pairs
+                .selected(&engine.terms, &condition, &deep, &alternative)
+                .unwrap();
+        }
+        assert!(
+            engine
+                .mutable_hierarchy_primitive_value_for(
+                    element,
+                    &deep,
+                    &state.conditions,
+                    Some(element)
+                )
+                .is_err()
+        );
+        assert!(TEST_FLOAT_RETURN.with(std::cell::Cell::get).is_none());
+        for boundary in [
+            TestFloatReturnBoundary::ActiveScalar,
+            TestFloatReturnBoundary::WholeChild,
+        ] {
+            for fault in [
+                TestFloatReturnFault::WrongWidth,
+                TestFloatReturnFault::MissingRaw,
+                TestFloatReturnFault::SwappedRaw,
+                TestFloatReturnFault::ChangedBinding,
+            ] {
+                TEST_FLOAT_RETURN_OBSERVED.with(|v| v.borrow_mut().clear());
+                let bindings = engine.float_encodings.clone();
+                {
+                    let _fault = TestFloatReturn::enter(boundary, fault, &produced);
+                    {
+                        let _nested = TestFloatReturn::enter(
+                            TestFloatReturnBoundary::Dormant,
+                            TestFloatReturnFault::MissingRaw,
+                            &produced,
+                        );
+                    }
+                    assert_eq!(
+                        TEST_FLOAT_RETURN.with(std::cell::Cell::get),
+                        Some((boundary, fault))
+                    );
+                    let panicked = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                        let _nested = TestFloatReturn::enter(
+                            TestFloatReturnBoundary::Dormant,
+                            TestFloatReturnFault::WrongWidth,
+                            &produced,
+                        );
+                        panic!("Float Return fault restoration probe");
+                    }));
+                    assert!(panicked.is_err());
+                    assert_eq!(
+                        TEST_FLOAT_RETURN.with(std::cell::Cell::get),
+                        Some((boundary, fault))
+                    );
+                    let error = engine
+                        .mutable_hierarchy_call(&mut state.clone(), call())
+                        .err()
+                        .expect("actual Float Return boundary must refuse");
+                    assert!(
+                        error.contains("test-only actual Float Return refusal"),
+                        "{error}"
+                    );
+                }
+                assert!(TEST_FLOAT_RETURN.with(std::cell::Cell::get).is_none());
+                // Normal callee execution may issue bindings; the injected binding itself
+                // is restored.
+                for (symbol, binding) in bindings {
+                    assert_eq!(engine.float_encodings.get(&symbol), Some(&binding));
+                }
+                TEST_FLOAT_RETURN_OBSERVED.with(|observed| {
+                    let observed = observed.borrow();
+                    assert_eq!(observed.len(), 1);
+                    assert_eq!(observed[0].label, format!("{boundary:?}/{fault:?}/{width}"));
+                    if boundary == TestFloatReturnBoundary::WholeChild {
+                        assert!(observed[0].returned_data_changed);
+                    }
+                    eprintln!(
+                        "Stage211 actual Return transactional: {} returned-data-changed={}",
+                        observed[0].label, observed[0].returned_data_changed,
+                    );
+                });
+            }
+        }
+        let results = engine
+            .mutable_hierarchy_call(&mut state.clone(), call())
+            .unwrap()
+            .unwrap();
+        // Use the actual leaf's scalar Call in a valid returned dormant namespace.
+        let outer = engine.instantiated_body(instance).unwrap();
+        let leaf_instance = outer
+            .basic_blocks
+            .iter()
+            .find_map(|b| {
+                let TerminatorKind::Call { func, .. } = &b.terminator().kind else {
+                    return None;
+                };
+                let ty::FnDef(d, a) = func.ty(&outer.local_decls, engine.tcx).kind() else {
+                    return None;
+                };
+                engine.resolve_function_item(*d, a.skip_binder()).ok()
+            })
+            .unwrap();
+        let leaf = engine.instantiated_body(leaf_instance).unwrap();
+        let (scalar_block, scalar_data) = leaf
+            .basic_blocks
+            .iter_enumerated()
+            .find(|(_, b)| {
+                let TerminatorKind::Call { func, .. } = &b.terminator().kind else {
+                    return false;
+                };
+                let ty::FnDef(d, a) = func.ty(&leaf.local_decls, engine.tcx).kind() else {
+                    return false;
+                };
+                let selected = engine.resolve_function_item(*d, a.skip_binder()).unwrap();
+                let signature = engine.call_signature(selected).unwrap();
+                signature.inputs() == [element] && signature.output() == element
+            })
+            .unwrap();
+        let TerminatorKind::Call {
+            func,
+            args,
+            destination,
+            target,
+            ..
+        } = &scalar_data.terminator().kind
+        else {
+            unreachable!()
+        };
+        let ty::FnDef(d, a) = func.ty(&leaf.local_decls, engine.tcx).kind() else {
+            unreachable!()
+        };
+        let scalar_instance = engine.resolve_function_item(*d, a.skip_binder()).unwrap();
+        let mut dormant = State {
+            locals: vec![None; leaf.local_decls.len()],
+            addresses: vec![None; leaf.local_decls.len()],
+            missing_places: Default::default(),
+            conditions: results[0].conditions.clone(),
+            memory: results[0].memory.clone(),
+        };
+        let (Operand::Copy(source) | Operand::Move(source)) = args[0].node else {
+            unreachable!()
+        };
+        assert!(source.projection.is_empty());
+        dormant.locals[source.local.as_usize()] = Some(valid.clone());
+        let dormant_call = || super::mutable_u16_children::ChildCall {
+            body: &leaf,
+            block: scalar_block,
+            instance: scalar_instance,
+            args,
+            destination: *destination,
+            target: *target,
+            stack: &[],
+            site: (
+                leaf.source.def_id(),
+                scalar_data.terminator().source_info.span,
+            ),
+        };
+        assert!(
+            engine
+                .mutable_hierarchy_call(&mut dormant.clone(), dormant_call())
+                .unwrap()
+                .is_some()
+        );
+        for fault in [
+            TestFloatReturnFault::WrongWidth,
+            TestFloatReturnFault::MissingRaw,
+            TestFloatReturnFault::SwappedRaw,
+            TestFloatReturnFault::ChangedBinding,
+        ] {
+            let mut caller = dormant.clone();
+            TEST_FLOAT_RETURN_OBSERVED.with(|v| v.borrow_mut().clear());
+            {
+                let _fault =
+                    TestFloatReturn::enter(TestFloatReturnBoundary::Dormant, fault, &produced);
+                let error = engine
+                    .mutable_hierarchy_call(&mut caller, dormant_call())
+                    .err()
+                    .expect("actual dormant Float Return must refuse");
+                assert!(
+                    error.contains("test-only actual Float Return refusal"),
+                    "{error}"
+                );
+            }
+            assert!(TEST_FLOAT_RETURN.with(std::cell::Cell::get).is_none());
+            TEST_FLOAT_RETURN_OBSERVED.with(|observed| {
+                let observed = observed.borrow();
+                assert_eq!(observed.len(), 1);
+                assert_eq!(observed[0].label, format!("Dormant/{fault:?}/{width}"));
+                // Argument Move consumption precedes this boundary and is not rolled back.
+                assert_eq!(test_float_return_state(&caller), observed[0].caller);
+                eprintln!(
+                    "Stage211 actual Return transactional: {} returned-data-changed={}",
+                    observed[0].label, observed[0].returned_data_changed,
+                );
+            });
+        }
+        assert!(!results.is_empty());
+        for result in &results {
+            let current = engine
+                .mutable_hierarchy_float_backing(0, &result.memory)
+                .unwrap();
+            engine
+                .mutable_hierarchy_primitive_value_for(
+                    element,
+                    &result.value,
+                    &result.conditions,
+                    current,
+                )
+                .unwrap();
+            let backing = engine.mutable_u16_backing(0, &result.memory).unwrap();
+            let hierarchy = backing.hierarchy.as_ref().unwrap();
+            assert!(hierarchy.owners.is_empty() && hierarchy.pending.is_none());
+            let mut changed = result.memory.clone();
+            Rc::make_mut(&mut changed.mutable_u16)[0].data =
+                engine.fresh(backing.data.sort().clone());
+            assert!(
+                engine
+                    .mutable_hierarchy_dormant_return(0, hierarchy, &backing.data, &changed)
+                    .is_err()
+            );
+            let mut foreign_data = result.memory.clone();
+            Rc::make_mut(&mut foreign_data.mutable_u16)[0].data =
+                foreign.symbol(0, backing.data.sort().clone()).unwrap();
+            assert!(
+                engine
+                    .mutable_hierarchy_float_backing(0, &foreign_data)
+                    .is_err()
+            );
+            let mut stale = result.memory.clone();
+            Rc::make_mut(&mut stale.mutable_u16)[0].generation = hierarchy.issued + 1;
+            assert!(engine.mutable_hierarchy_float_backing(0, &stale).is_err());
+            let mut masked = result.memory.clone();
+            masked
+                .missing_places
+                .consume(backing.allocation, Vec::new())
+                .unwrap();
+            assert!(engine.mutable_hierarchy_float_backing(0, &masked).is_err());
+            let mut wrong = result.memory.clone();
+            wrong.mutable_hierarchy = Some(usize::MAX);
+            assert!(engine.mutable_hierarchy_namespace(&wrong).is_err());
+            let mut rollback = hierarchy.clone();
+            let tip = Tip {
+                frame: engine.mutable_u16_register_frame(root).unwrap(),
+                statement: 1,
+                local: 1,
+            };
+            let slots = result.memory.storage_slots();
+            rollback.issue(0, tip.clone(), slots).unwrap();
+            let ticket = rollback.enter(&tip, tip.frame, slots).unwrap();
+            rollback.epoch = ticket.epoch_floor - 1;
+            assert!(rollback.release(&ticket).is_err());
+        }
+    }
+    assert!(!TEST_FLOAT_HIERARCHY.with(std::cell::Cell::get));
+    assert_eq!(float_hierarchy_enabled(), FLOAT_HIERARCHY_ENABLED);
 }
 
 #[cfg(test)]

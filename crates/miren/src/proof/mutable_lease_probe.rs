@@ -880,6 +880,18 @@ fn compiler_cases<'tcx>(tcx: TyCtxt<'tcx>, output: &std::path::Path) {
         )
         .unwrap();
     }
+    for (name, original) in [("root_f32", tcx.types.f32), ("root_f64", tcx.types.f64)] {
+        let instance = engine
+            .resolve_function_item(find(name), tcx.mk_args(&[]))
+            .unwrap();
+        let body = engine.instantiated_body(instance).unwrap();
+        super::mutable_hierarchy::compiler_float_boundary_probe(&mut engine, &body, original);
+        std::fs::write(
+            output.join(format!("float-{name}.mir")),
+            format!("{body:#?}"),
+        )
+        .unwrap();
+    }
     std::fs::write(
         output.join("direct-adapter-trace.json"),
         serde_json::to_string_pretty(&engine.proof).unwrap(),
@@ -1363,14 +1375,14 @@ fn compiler_nested_whole_u16_inactive_lifecycle() {
         .unwrap()
         .as_nanos();
     let root = std::env::temp_dir().join(format!(
-        "miren-stage209-parent208-compiler-{}-{nonce}",
+        "miren-stage211-parent210-upkeep-compiler-{}-{nonce}",
         std::process::id()
     ));
     eprintln!(
-        "Stage209 actual208 unique compiler scratch: {}",
+        "Stage211 actual210 upkeep unique compiler scratch: {}",
         root.display()
     );
-    std::fs::create_dir_all(&root).unwrap();
+    std::fs::create_dir(&root).unwrap();
     let source = root.join("fixture.rs");
     std::fs::write(
         &source,
@@ -1405,7 +1417,17 @@ fn compiler_nested_whole_u16_inactive_lifecycle() {
             "pub fn root_char(v:&mut[char]) { outer_char(v); }\n",
             "pub fn root_scalar_char(word:char)->char { scalar_char(word) }\n",
             "pub fn root_pair_char(pair:(u32,char))->char { scalar_char(pair.1) }\n",
-            "pub fn char_store(v:&mut[char],index:usize,word:char) { v[index]=word; }\n"
+            "pub fn char_store(v:&mut[char],index:usize,word:char) { v[index]=word; }\n",
+            "#[inline(never)] fn scalar_f32(x:f32)->f32 { x }\n",
+            "#[inline(never)] fn leaf_f32(v:&mut[f32])->f32 { if v.len()>0 { ",
+            "let x=scalar_f32(v[0]); v[0]=x; x } else { -0.0 } }\n",
+            "#[inline(never)] fn outer_f32(v:&mut[f32])->f32 { leaf_f32(&mut *(&mut *v)) }\n",
+            "pub fn root_f32(v:&mut[f32])->f32 { outer_f32(v) }\n",
+            "#[inline(never)] fn scalar_f64(x:f64)->f64 { x }\n",
+            "#[inline(never)] fn leaf_f64(v:&mut[f64])->f64 { if v.len()>0 { ",
+            "let x=scalar_f64(v[0]); v[0]=x; x } else { -0.0 } }\n",
+            "#[inline(never)] fn outer_f64(v:&mut[f64])->f64 { leaf_f64(&mut *(&mut *v)) }\n",
+            "pub fn root_f64(v:&mut[f64])->f64 { outer_f64(v) }\n"
         ),
     )
     .unwrap();

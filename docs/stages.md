@@ -6115,3 +6115,34 @@ no symbolic input bound. Final evidence is under `/tmp/miren-stage210-root-full-
 `/tmp/miren-stage210-root-survey`, `/tmp/miren-stage210-root-replay` and
 `/tmp/miren-stage210-root-native`. Final factual docs closure preserves all 921 other tested
 source files. Capability counts describe selected cases, not full Rust parity or fleet coverage.
+
+## Stage211: nested calls on mutable floating-point slices
+
+Exact original f32/f64 backing, layout and producer-pair checks now support bounded nested
+whole-child calls, scalar returns and typed stores. NaN payloads and signed-zero bits retain
+correlated raw and numeric values. Actual helper mutations refute unchanged caller assertions.
+Missing selected bodies, including empty callers, and deeper nesting remain UNKNOWN.
+
+The unchanged old nested Float claim now proves. Three new controls extend the preserved
+227-case source prefix. Four host/ARM O0/O2 profiles measure 230 cases across 78 families:
+95 PROVED, 80 REFUTED and 55 UNKNOWN each, with no new assumptions. All 22 ROOT checks pass,
+including 843 Rust workspace tests, 68 Python tests, release builds, dependency checks,
+documentation, examples and manual hooks.
+
+The initial full run caught a missing test-only std import in the no_std fixture. That failure
+and its earlier captures remain historical. The corrected phase adds only the cfg(test) import;
+all analyzed functions and assertions remain unchanged. Eight fresh ROOT native runs pass for
+originals and fail for actual helper mutants: dedicated runs execute one test, global runs two.
+Finite native cases impose no bound on symbolic inputs.
+
+Fresh same-ROOT-source comparisons bind the actual210 parent against debug and release builds.
+Each compares 5,948 proof objects, records 148 named changes, preserves all 10,420 baseline
+queries/models and records 10,696 current queries. Complete unchanged objects and partial UNKNOWN
+query prefixes are checked without normalization. Query-free fold deadline contexts are separate;
+the extra debug stopping-frame difference is accepted only for its exact reviewed raw pair.
+The general timeout rule remains unchanged.
+
+Evidence is under /tmp/miren-stage211-root-corrected-full-checks,
+/tmp/miren-stage211-root-corrected-survey, /tmp/miren-stage211-root-corrected-replay and
+/tmp/miren-stage211-root-corrected-native. A final docs-only closure preserves all 923 other
+validated source files. These are capability cases, not full Rust parity or firmware coverage.

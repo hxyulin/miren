@@ -3335,3 +3335,77 @@ mod native_issued_scalar_metadata {
         super::issued_scalar_metadata(&mut [false; 129]);
     }
 }
+
+#[inline(never)]
+fn float_hierarchy_word(value: f32) -> f32 {
+    value
+}
+
+#[inline(never)]
+fn float_hierarchy_leaf(values: &mut [f32], value: f32) {
+    let copied = float_hierarchy_word(value);
+    if values.len() > 0 {
+        values[0] = copied;
+    }
+}
+
+#[inline(never)]
+fn float_hierarchy_outer(values: &mut [f32], value: f32) {
+    float_hierarchy_leaf(&mut *(&mut *values), value);
+}
+
+#[inline(never)]
+fn float_hierarchy_deeper(values: &mut [f32], value: f32) {
+    float_hierarchy_outer(values, value);
+}
+
+pub fn float_hierarchy_selected(values: &mut [f32], value: f32) {
+    if values.len() > 0 {
+        float_hierarchy_outer(values, value);
+        assert!(values[0].to_bits() == value.to_bits());
+    }
+}
+
+pub fn float_hierarchy_wrong_claim(values: &mut [f32], value: f32) {
+    if values.len() > 0 {
+        float_hierarchy_outer(values, value);
+        assert!(values[0].to_bits() != value.to_bits());
+    }
+}
+
+pub fn float_hierarchy_deeper_unknown(values: &mut [f32], value: f32) {
+    if values.len() > 0 {
+        float_hierarchy_deeper(values, value);
+        assert!(values[0].to_bits() == value.to_bits());
+    }
+}
+
+#[cfg(test)]
+mod float_hierarchy_native {
+    extern crate std;
+
+    const VALUES: [u32; 8] = [
+        0,
+        0x8000_0000,
+        1,
+        0x7f7f_ffff,
+        0x7f80_0000,
+        0xff80_0000,
+        0x7fc0_1234,
+        0xffc0_4321,
+    ];
+
+    #[test]
+    fn finite_lengths_and_bits() {
+        for length in 0..=129 {
+            for bits in VALUES {
+                super::float_hierarchy_selected(&mut std::vec![0.0; length], f32::from_bits(bits));
+            }
+        }
+    }
+
+    #[test]
+    fn mutation_guard() {
+        super::float_hierarchy_selected(&mut [0.0; 129], f32::from_bits(0x7fc0_1234));
+    }
+}

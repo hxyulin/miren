@@ -1188,12 +1188,27 @@ Retained O0 Char helpers support selected and empty callers. Omitted bodies rema
 MissingCompilerEvidence UNKNOWN even when empty. Optimized retained selected callers currently
 reach an unsupported ConstantIndex observation; this is separate from Unicode validity.
 
-Stage209 actual208 candidate upkeep preserves the committed Bool, metadata and interval foundation.
-The original actual203 plus pending208 disabled history remains separate. Production changes are
-limited to the reviewed Char selector flag; required full ROOT validation and commit are pending.
+Stage209 actual208 upkeep preserved the committed Bool, metadata and interval foundation. The
+original actual203 plus pending208 disabled history remains separate. Production changes were
+limited
+to the reviewed Char selector flag. Full ROOT validation completed before the actual209 commit.
 
 Issued non-u8 integer, Bool and Char backings support metadata-only `is_empty` after the complete
 selected core body, original receiver and current type/layout/codec/context checks. Existing u16
 metadata behavior and element/alias/return/retained permissions are unchanged. Float and bytes are
 excluded from this scalar metadata route. Actual209 disabled and sole-flag checkpoints are kept
-separately; the active upkeep checkpoint still requires fresh full ROOT validation and commit.
+separately; full ROOT validation completed before the actual210 scalar-metadata commit.
+
+The separately archived actual210 disabled Float prototype and sole-flag diagnostic remain
+historical.
+Exact f32/f64 whole-child hierarchy now uses authenticated current backing and existing
+producer-pair
+validators for scalar arguments, Return values and typed stores. Copied NaN payloads and signed-zero
+bits retain their issued raw/numeric pair; no numeric equality shortcut grants bit identity.
+Selected and sibling readback, scalar return and sequential calls support actual nested bodies.
+Wrong claims and actual identity-to-negation helper mutations refute; deeper nesting stays UNKNOWN.
+Genuine omitted selected bodies remain MissingCompilerEvidence UNKNOWN, including guarded empty
+callers. Compiler-only malformed Return clones preserve refusal before frame release or continuation
+publication, rather than claiming whole-call rollback.
+Corrected ROOT validation passes all 22 required checks, including 843 workspace tests.
+Fresh native and debug/release comparisons preserve strict unknown and missing-body boundaries.

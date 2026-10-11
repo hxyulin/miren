@@ -156,4 +156,10 @@ Available under either the [MIT license](LICENSE-MIT) or [Apache License 2.0](LI
 Stage210's actual209 owner enables exact issued scalar `is_empty` metadata for existing non-u8
 integers, Bool and Char. Original u16 behavior, element permissions and all other source claims
 are preserved. Actual disabled and sole-flag captures are archived separately; fresh active
-source/data and full ROOT validation remain pending. Float and byte metadata routes are excluded.
+source/data and full ROOT validation completed before actual210 commit. Float and byte metadata
+routes remain excluded.
+
+Nested whole-slice helpers now support exact f32/f64 backing and scalar returns, preserving
+NaN payloads and signed-zero bits. Wrong claims and actual helper mutations refute; missing bodies
+and deeper nesting remain UNKNOWN. The validated capability suite covers 230 cases across
+78 families. See [coverage and evidence](docs/rust-capabilities.md).

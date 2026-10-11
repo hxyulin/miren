@@ -169,7 +169,7 @@ fn exact_float_storage_and_actual_child_bodies_cover_four_profiles() {
         ("retained", U),
         ("raw", U),
         ("competing", U),
-        ("nested", U),
+        ("nested", P),
         ("escape", U),
     ];
     for target in [None, Some("thumbv7em-none-eabihf")] {
@@ -181,7 +181,6 @@ fn exact_float_storage_and_actual_child_bodies_cover_four_profiles() {
                     "one original borrow and owned primitive inputs",
                 ),
                 ("escape", "mutable u16 staging needs a private whole tip"),
-                ("nested", "mutable float staging needs a pending child"),
                 ("raw", "mutable u16 child needs direct abort-only Rust body"),
                 (
                     "retained",
