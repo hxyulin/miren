@@ -254,7 +254,7 @@ fn associated_outer_requires_available_foreign_body_even_when_empty() {
                     compiler.args(["--target", target]);
                 }
                 assert!(compiler.status().unwrap().success());
-                let selected = if retained && !optimized {
+                let selected = if retained {
                     ProofStatus::Proved
                 } else {
                     ProofStatus::Unknown
@@ -293,13 +293,6 @@ fn associated_outer_requires_available_foreign_body_even_when_empty() {
                                 .iter()
                                 .any(|entry| entry.function == "local_associated_dependency::leaf")
                         );
-                        if optimized && function.name == "selected" {
-                            assert!(proof.obligations.iter().any(|obligation| {
-                                obligation
-                                    .detail
-                                    .contains("mutable u16 store requires direct whole element")
-                            }));
-                        }
                     }
                 }
             }

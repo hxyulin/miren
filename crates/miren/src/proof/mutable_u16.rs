@@ -3,6 +3,74 @@
 use super::*;
 use symbolic::MutableU16Role;
 
+#[cfg(test)]
+#[path = "typed_constant_index_probe.rs"]
+mod constant_index_probe;
+
+const CONSTANT_INDEX_ENABLED: bool = true;
+
+fn constant_index_enabled() -> bool {
+    #[cfg(test)]
+    if CONSTANT_INDEX_TEST_ENABLED.with(std::cell::Cell::get) {
+        return true;
+    }
+    CONSTANT_INDEX_ENABLED
+}
+
+#[cfg(test)]
+std::thread_local! {
+    static CONSTANT_INDEX_TEST_ENABLED: std::cell::Cell<bool> =
+        const { std::cell::Cell::new(false) };
+}
+
+#[cfg(test)]
+struct ConstantIndexTestEnabled(bool);
+
+#[cfg(test)]
+impl ConstantIndexTestEnabled {
+    fn enable() -> Self {
+        Self(CONSTANT_INDEX_TEST_ENABLED.with(|value| value.replace(true)))
+    }
+}
+
+#[cfg(test)]
+impl Drop for ConstantIndexTestEnabled {
+    fn drop(&mut self) {
+        CONSTANT_INDEX_TEST_ENABLED.with(|value| value.set(self.0));
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+enum TypedElementProjection {
+    Local(rustc_middle::mir::Local),
+    Constant {
+        offset: u64,
+        minimum: u64,
+        from_end: bool,
+    },
+}
+
+fn typed_element_projection(place: Place<'_>) -> Option<TypedElementProjection> {
+    match place.projection.as_ref() {
+        [ProjectionElem::Deref, ProjectionElem::Index(index)] => {
+            Some(TypedElementProjection::Local(*index))
+        }
+        [
+            ProjectionElem::Deref,
+            ProjectionElem::ConstantIndex {
+                offset,
+                min_length,
+                from_end,
+            },
+        ] if constant_index_enabled() => Some(TypedElementProjection::Constant {
+            offset: *offset,
+            minimum: *min_length,
+            from_end: *from_end,
+        }),
+        _ => None,
+    }
+}
+
 #[derive(Clone, Debug)]
 pub(super) struct IntegerCertificate<'tcx> {
     original: Ty<'tcx>,
@@ -381,13 +449,13 @@ impl<'tcx> Engine<'tcx> {
         ) {
             return Err(self.mutable_u16_error("mutable u16 metadata cannot observe data"));
         }
-        let [ProjectionElem::Deref, ProjectionElem::Index(index)] = place.projection.as_ref()
-        else {
+        let Some(projection) = typed_element_projection(place) else {
             return Err(self.mutable_u16_error("mutable u16 root needs direct element observation"));
         };
         let body = body.ok_or("mutable u16 data observation needs original compiler Body")?;
         if !self.mutable_u16_matches(body.local_decls[place.local].ty, id, &state.memory, true)?
-            || body.local_decls[*index].ty != self.tcx.types.usize
+            || matches!(projection, TypedElementProjection::Local(index)
+                if body.local_decls[index].ty != self.tcx.types.usize)
             || place.ty(&body.local_decls, self.tcx).ty
                 != self
                     .mutable_integer_certificate(backing.certificate)?
@@ -395,7 +463,21 @@ impl<'tcx> Engine<'tcx> {
         {
             return Err("mutable u16 element differs from original compiler type".into());
         }
-        let index = self.local(state, index.as_usize())?;
+        let index = match projection {
+            TypedElementProjection::Local(index) => self.local(state, index.as_usize())?,
+            TypedElementProjection::Constant {
+                offset,
+                minimum,
+                from_end,
+            } => self.mutable_constant_index(
+                id,
+                backing,
+                offset,
+                minimum,
+                from_end,
+                &state.conditions,
+            )?,
+        };
         let index = self.mutable_interval_index(id, backing, index, &state.conditions)?;
         Ok(Some(super::scalar_slices::decode_scalar_element(
             &self.terms,
@@ -406,6 +488,74 @@ impl<'tcx> Engine<'tcx> {
                 &[backing.data.clone(), index.integer()?.0.clone()],
             )?,
         )?))
+    }
+
+    fn mutable_constant_index(
+        &self,
+        id: usize,
+        backing: &Backing,
+        offset: u64,
+        minimum: u64,
+        from_end: bool,
+        conditions: &[Term],
+    ) -> Result<Value, String> {
+        let bits = u32::from(self.tcx.sess.target.pointer_width);
+        let maximum = match bits {
+            32 => u64::from(u32::MAX),
+            64 => u64::MAX,
+            _ => {
+                return Err(self.mutable_u16_error(
+                    "typed constant index needs original 32/64-bit target usize",
+                ));
+            }
+        };
+        if offset > maximum || minimum > maximum {
+            return Err(self
+                .mutable_u16_error("typed constant index metadata exceeds original target usize"));
+        }
+        if (!from_end && offset >= minimum) || (from_end && (offset == 0 || offset > minimum)) {
+            return Err(self.mutable_u16_error(
+                "typed constant index metadata is outside its compiler relation",
+            ));
+        }
+        self.validate_mutable_interval(id, backing)?;
+        let length = backing
+            .interval
+            .as_ref()
+            .map_or(&backing.length, |view| view.length());
+        let (term, width, signed) = length.integer()?;
+        if width != bits
+            || signed
+            || term.sort() != &Sort::BitVec(bits)
+            || !term.belongs_to(&self.terms)
+        {
+            return Err(self.mutable_u16_error(
+                "typed constant index extent needs original target usize context",
+            ));
+        }
+        let minimum = symbolic::integer(&self.terms, u128::from(minimum), bits, false);
+        let enough = symbolic::binary(&self.terms, "le", minimum, length.clone())?.boolean()?;
+        let mut denied = conditions.to_vec();
+        denied.push(symbolic::not(&enough));
+        if self.feasible(&denied)? {
+            return Err(self.mutable_u16_error(
+                "typed constant index minimum is not established for current view",
+            ));
+        }
+        let offset = symbolic::integer(&self.terms, u128::from(offset), bits, false);
+        if !from_end {
+            return Ok(offset);
+        }
+        let inside =
+            symbolic::binary(&self.terms, "le", offset.clone(), length.clone())?.boolean()?;
+        let mut denied = conditions.to_vec();
+        denied.push(symbolic::not(&inside));
+        if self.feasible(&denied)? {
+            return Err(
+                self.mutable_u16_error("typed constant index reverse offset exceeds current view")
+            );
+        }
+        symbolic::binary(&self.terms, "sub", length.clone(), offset)
     }
 
     pub(super) fn mutable_u16_index(
@@ -473,13 +623,13 @@ impl<'tcx> Engine<'tcx> {
         }
         self.check_local_initialization(state, place.local.as_usize(), &[])?;
         self.mutable_u16_role_live(id, &role, &state.memory)?;
-        let [ProjectionElem::Deref, ProjectionElem::Index(index)] = place.projection.as_ref()
-        else {
+        let Some(projection) = typed_element_projection(place) else {
             return Err(self.mutable_u16_error("mutable u16 store requires direct whole element"));
         };
         let backing = self.mutable_u16_backing(id, &state.memory)?;
         if !self.mutable_u16_matches(body.local_decls[place.local].ty, id, &state.memory, true)?
-            || body.local_decls[*index].ty != self.tcx.types.usize
+            || matches!(projection, TypedElementProjection::Local(index)
+                if body.local_decls[index].ty != self.tcx.types.usize)
             || place.ty(&body.local_decls, self.tcx).ty
                 != self
                     .mutable_integer_certificate(backing.certificate)?
@@ -488,7 +638,21 @@ impl<'tcx> Engine<'tcx> {
             return Err("mutable u16 store differs from original compiler type".into());
         }
         let backing = self.mutable_u16_backing(id, &state.memory)?;
-        let index = self.local(state, index.as_usize())?;
+        let index = match projection {
+            TypedElementProjection::Local(index) => self.local(state, index.as_usize())?,
+            TypedElementProjection::Constant {
+                offset,
+                minimum,
+                from_end,
+            } => self.mutable_constant_index(
+                id,
+                backing,
+                offset,
+                minimum,
+                from_end,
+                &state.conditions,
+            )?,
+        };
         let index = self.mutable_interval_index(id, backing, index, &state.conditions)?;
         let certificate = self.mutable_integer_certificate(backing.certificate)?;
         let term = self.mutable_scalar_replacement(certificate, replacement)?;

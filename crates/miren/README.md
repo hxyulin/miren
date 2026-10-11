@@ -1227,3 +1227,15 @@ static calls. Wrong claims and actual scalar-body mutations refute. Deeper and r
 boundaries remain unknown. Genuine omitted dependency bodies also remain unknown for empty callers;
 optimized retained element stores keep their direct-element frontier. The append-only three-case
 global upkeep and broad compatibility captures precede independent ROOT validation.
+
+Stage213 accepts exact compiler `ConstantIndex` read and Store projections on already issued
+scalar backing. Original element, codec, current Memory and typed Char/Float validity checks
+remain required. Target `usize` representability, minimum view length and forward/reverse bounds
+are proved before index construction. No new backing, alias, hierarchy or allocation authority
+is issued. The fresh committed Stage212 checkpoint preserves all original guest claims and
+advances retained optimized Char, integer interval and local associated dependency callers.
+Omitted selected bodies remain unknown, including empty incoming-slice callers. The original
+empty array control retains its earlier unsupported boundary. Compiler mutation, transactional
+negative and finite native controls remain required. Broad compatibility and full validation
+are separate from the completed targeted checkpoint; the earlier Stage211 preparation is retained
+as historical evidence.

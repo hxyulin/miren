@@ -293,7 +293,7 @@ pub fn empty(v: &mut [char]) {
                     &[
                         (
                             "selected",
-                            if retained && !optimized {
+                            if retained {
                                 ProofStatus::Proved
                             } else {
                                 ProofStatus::Unknown
@@ -331,12 +331,6 @@ pub fn empty(v: &mut [char]) {
                                 .iter()
                                 .any(|e| e.function == "char_dependency::outer")
                         );
-                        if optimized && name == "selected" {
-                            assert!(proof.obligations.iter().any(|o| o.status
-                                == ProofStatus::Unknown
-                                && o.unknown_category == Some(miren::UnknownCategory::Semantics)
-                                && o.detail.contains("direct element observation")));
-                        }
                     } else {
                         assert!(
                             proof

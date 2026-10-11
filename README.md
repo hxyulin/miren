@@ -51,6 +51,11 @@ lifetime and resource checks remain required; pointer niches, mutable niches and
 comparison are separate unsupported domains. See the [capability
 evidence](docs/rust-capabilities.md).
 
+Mutable scalar slices support bounded whole-child helpers, scalar returns, local static
+associated calls and original constant-index reads and stores. Exact f32/f64 backing
+preserves NaN payloads and signed-zero bits. Deeper nesting and the dedicated proper-reborrow
+caller remain UNKNOWN. The validated capability survey covers 233 cases across 79 families.
+
 ## Install
 
 The toolchain file installs the matching nightly, compiler development components and ARM target.
@@ -152,18 +157,3 @@ experimental loop induction and trusted boundaries require explicit settings. Ra
 ## License
 
 Available under either the [MIT license](LICENSE-MIT) or [Apache License 2.0](LICENSE-APACHE).
-
-Stage210's actual209 owner enables exact issued scalar `is_empty` metadata for existing non-u8
-integers, Bool and Char. Original u16 behavior, element permissions and all other source claims
-are preserved. Actual disabled and sole-flag captures are archived separately; fresh active
-source/data and full ROOT validation completed before actual210 commit. Float and byte metadata
-routes remain excluded.
-
-Nested whole-slice helpers now support exact f32/f64 backing and scalar returns, preserving
-NaN payloads and signed-zero bits. Wrong claims and actual helper mutations refute; missing bodies
-and deeper nesting remain UNKNOWN. The validated capability suite covers 230 cases across
-78 families. See [coverage and evidence](docs/rust-capabilities.md).
-
-Stage212's isolated local static associated hierarchy checkpoint preserves the committed Stage211
-baseline and appends three measured controls. Its proposed 233-case/79-family manifest remains
-pending full surveys and ROOT validation; scoped evidence is recorded in the capability documents.

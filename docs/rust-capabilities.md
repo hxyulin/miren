@@ -11,9 +11,11 @@ execution at O0 and O2, positive/refuted/unknown controls, a source mutation tha
 structured UNKNOWN reporting, and passing repository checks. Completion establishes a repeatable
 baseline. It does not establish full Rust support or a completed memory-model refactor.
 
-The Stage211 manifest contains 230 cases across 78 families. Validated host/ARM O0/O2 surveys
-measure 95 PROVED, 80 REFUTED and 55 UNKNOWN each. Required ROOT checks pass; details and
-limitations are recorded in the Stage211 section below.
+The current manifest contains 233 cases across 79 families. Stage213 host/ARM O0/O2 surveys
+measure 96 PROVED, 81 REFUTED and 56 UNKNOWN each. Required ROOT checks pass; details and
+limitations are recorded in the Stage213 section below. The manifest is unchanged from
+committed Stage212. The historical committed Stage211 survey measured 230 cases across
+78 families: 95 PROVED, 80 REFUTED and 55 UNKNOWN per profile.
 The historical committed Stage210 survey measured227 cases across77 families:93 PROVED,79 REFUTED
 and55 UNKNOWN per profile. The committed Stage209 survey measured224 cases across76 families, with
 91 PROVED,78 REFUTED and55 UNKNOWN each.
@@ -2114,3 +2116,54 @@ Evidence is under /tmp/miren-stage212-root-full-checks, /tmp/miren-stage212-root
 /tmp/miren-stage212-root-final-data. Final documentation closure changes only these three coverage
 records, preserving the other 929 validated source files and historical captures. These are
 capability cases, not full Rust parity or firmware coverage.
+
+## Stage213: typed constant-index reads and stores
+
+Original MIR ConstantIndex projections now use the existing mutable scalar slice machinery.
+Forward and reverse metadata must fit the target's 32/64-bit usize and satisfy the compiler's
+index relation. The actual current view must establish the required minimum length; reverse
+subtraction must not underflow. Existing interval translation, root bounds, original element
+types, liveness, Char validity and Float raw/numeric correlation remain required before access
+or publication. Local Index projections retain their previous route.
+
+The dedicated unchanged 12-root fixture measures eight PROVED, two REFUTED and two UNKNOWN in
+all host/ARM O0/O2 profiles. An actual xor-zero to xor-one helper mutation measures four PROVED,
+six REFUTED and two UNKNOWN with unchanged assertions. The dedicated proper-reborrow caller and
+composite mutable elements retain their separate unsupported boundaries. This stage adds no input,
+borrowing, returned-reference, hardware or assumption grant.
+
+Fresh retained/omitted dependency measurements cover both targets and optimization profiles.
+Previously unsupported optimized retained stores now complete, including nested Bool calls;
+omitted selected and empty bodies remain MissingCompilerEvidence UNKNOWN. The inherited Bool
+harness expectation was changed only after fresh raw recovery confirmed the actual body chain
+and preserved every baseline queried obligation. The stopped initial check remains historical.
+
+The committed 233-case/79-family manifest is unchanged. All four fresh surveys measure
+96 PROVED, 81 REFUTED and 56 UNKNOWN each. All 22 required ROOT checks pass, including 851 Rust
+tests across 195 outer Cargo target summaries, 68 Python tests, lint, release builds, dependency
+policy, examples and manual hooks. Four fresh ROOT native executions run one test each:
+originals pass and unchanged-assertion helper mutants fail at O0/O2. Native samples impose no
+bound on symbolic inputs.
+
+Fresh ROOT parent-to-debug and debug-to-release comparisons each contain 7,152 proof pairs.
+The parent comparison preserves 7,122 literal complete objects, records 26 named
+changes and 4 separately checked deadline contexts, preserves all 12,800 baseline queried
+obligations/models and records 12,832 current ones. Changed roots retain all 38
+baseline queried obligations exactly. Debug/release preserves 7,148 literal complete
+objects and all 12,832 queried obligations/models, with 4 deadline contexts. Numeric
+CLI exits are checked against raw statuses before comparison; build exits also agree exactly.
+
+Separate owner-to-ROOT associations map only explicitly byte-equivalent typed source-file and
+replay-working-directory fields. Each preserves 7,148 complete objects after those associations;
+12 proof objects also match literally. All 12,832 queried obligations/models remain exact.
+The existing query-free 30-second fold detail/root-or-root-plus-closure rule remains unchanged.
+One parent-to-debug pair and a distinct owner-to-ROOT pair stop in an additional wrapping_add
+frame. Each has its own fresh, independently reviewed exception bound to the exact raw hashes.
+No general UNKNOWN exemption is introduced.
+
+Evidence is under /tmp/miren-stage213-parent212, /tmp/miren-stage213-root-full-checks,
+/tmp/miren-stage213-root-survey, /tmp/miren-stage213-root-replay,
+/tmp/miren-stage213-root-owner-association and /tmp/miren-stage213-root-final-data.
+Final factual documentation closure changes four files and preserves the other 933 validated
+source files. These measurements describe selected capability cases, not full Rust parity or
+firmware coverage.

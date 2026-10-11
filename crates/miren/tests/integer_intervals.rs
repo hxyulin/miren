@@ -108,14 +108,9 @@ fn integer_interval_external_children_require_actual_available_bodies() {
                 } else {
                     ProofStatus::Unknown
                 };
-                let store_status = if retained && optimized {
-                    ProofStatus::Unknown
-                } else {
-                    status
-                };
                 let entries = [
-                    ("selected_i32", store_status),
-                    ("selected_usize", store_status),
+                    ("selected_i32", status),
+                    ("selected_usize", status),
                     ("empty_i32", status),
                     ("empty_usize", status),
                 ];
@@ -133,16 +128,9 @@ fn integer_interval_external_children_require_actual_available_bodies() {
                     let Some(proof) = &function.proof else {
                         continue;
                     };
-                    if retained && (!optimized || function.name.starts_with("empty_")) {
+                    if retained {
                         assert!(proof.body_entries.iter().any(|entry| entry.function
                             == format!("stage205_dependency::{}", function.name)));
-                    } else if retained {
-                        assert!(proof.obligations.iter().any(|obligation| {
-                            obligation.unknown_category == Some(UnknownCategory::Semantics)
-                                && obligation
-                                    .detail
-                                    .contains("mutable u16 store requires direct whole element")
-                        }));
                     } else {
                         assert!(proof.obligations.iter().any(|obligation| {
                             obligation.unknown_category

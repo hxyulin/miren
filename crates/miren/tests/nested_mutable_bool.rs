@@ -281,7 +281,7 @@ fn genuine_nested_bool_dependency_availability_precedes_empty_shortcuts() {
                         &[
                             (
                                 "selected",
-                                if retained && !library_optimized {
+                                if retained {
                                     ProofStatus::Proved
                                 } else {
                                     ProofStatus::Unknown
