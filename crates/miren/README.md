@@ -271,15 +271,17 @@ unsafe callbacks and Waker table fields. Unused or copied fields do not choose a
 Calls, address casts, pointer comparisons and native replay of these inputs remain UNKNOWN.
 Concrete function-item pointers continue executing their actual bodies and effects.
 
-Symbolic indexing into initialized owned arrays of known safe Rust `fn(T) -> T` pointers
-supports all twelve original signed, unsigned and pointer-sized integer types. Exact Rust type
-identity is required even when two types have the same width and sign. Selection preserves the
-index-to-target relation and executes each feasible target's actual MIR body, including generic
-and associated functions. Fixed owned fields, duplicate targets and repeated calls retain the
-existing sixteen array-element and shared analysis budgets. Calls consume operands once and carry
-their own returned memory; checked arithmetic keeps its overflow obligations. Missing feasible
-bodies, opaque targets, shared input tables, Bool/Char/Float/NonZero and other signatures remain
-UNKNOWN. Infeasible targets are pruned only after solver checking.
+Symbolic indexing into initialized owned arrays of known safe Rust `fn(A) -> R` pointers
+supports independently chosen primitive signed, unsigned and pointer-sized integer arguments and
+results. Both original compiler types retain their own width and sign certificates, even when two
+types have the same SMT sort. Selection preserves the index-to-target relation and executes each
+feasible target's actual MIR body, including generic and associated functions. Actual casts and
+checked arithmetic retain their own semantics and overflow obligations. Fixed owned fields,
+duplicate targets and repeated calls retain the existing sixteen array-element and shared analysis
+budgets. Calls consume operands once, validate actual returned integers against the original result
+type and carry their current returned memory. Missing feasible bodies, opaque targets, shared input
+tables, Bool/Char/Float/NonZero, unsupported ABIs and arities remain UNKNOWN. Infeasible targets are
+pruned only after solver checking.
 
 Owned non-byte arrays share immutable host payloads and detach changed paths on writes. Rust copies
 retain independent storage. Evaluated constants check every occurrence before reusing exact typed

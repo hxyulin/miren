@@ -2999,3 +2999,39 @@ mod native_readonly_nonzero_niche {
         }
     }
 }
+#[inline(never)]
+pub fn integer_pair_narrow_first(word: i128) -> u8 {
+    word as u8
+}
+
+#[inline(never)]
+pub fn integer_pair_narrow_second(word: i128) -> u8 {
+    (word ^ 1) as u8
+}
+
+pub fn integer_function_table_pair(index: usize, word: i128) {
+    let table: [fn(i128) -> u8; 2] = [integer_pair_narrow_first, integer_pair_narrow_second];
+    if index < 2 {
+        let actual = table[index](word);
+        let expected = if index == 0 {
+            word as u8
+        } else {
+            (word ^ 1) as u8
+        };
+        assert!(actual == expected);
+    }
+}
+
+pub fn integer_function_table_pair_wrong(index: usize, word: i128) {
+    let table: [fn(i128) -> u8; 2] = [integer_pair_narrow_first, integer_pair_narrow_second];
+    if index < 2 {
+        assert!(table[index](word) == word as u8);
+    }
+}
+
+pub fn integer_function_table_pair_opaque(index: usize, word: i128, other: fn(i128) -> u8) {
+    let table: [fn(i128) -> u8; 2] = [integer_pair_narrow_first, other];
+    if index < 2 {
+        assert!(table[index](word) == word as u8);
+    }
+}

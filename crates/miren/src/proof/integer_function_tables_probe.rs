@@ -127,21 +127,22 @@ fn check_integer_calls(tcx: TyCtxt<'_>) {
             .unwrap();
         let callable = func.ty(&body.local_decls, tcx);
         let certificate = engine.integer_table_signature(callable).unwrap();
+        assert!(certificate.argument == certificate.result);
         assert!(matches!(
-            certificate.original.kind(),
+            certificate.argument.original.kind(),
             ty::Int(_) | ty::Uint(_)
         ));
         assert_eq!(
-            certificate.original,
+            certificate.argument.original,
             args[0].node.ty(&body.local_decls, tcx)
         );
         assert_eq!(
-            certificate.original,
+            certificate.argument.original,
             destination.ty(&body.local_decls, tcx).ty
         );
         assert_eq!(
             engine.table_signature(callable),
-            certificate.original == tcx.types.u16 || ENABLE_INTEGER_FUNCTION_TABLES
+            certificate.argument.original == tcx.types.u16 || ENABLE_INTEGER_FUNCTION_TABLES
         );
         let mut pointers = Vec::new();
         for helper in ["first", "second"] {
@@ -207,7 +208,7 @@ fn check_integer_calls(tcx: TyCtxt<'_>) {
                 }),
             )
             .unwrap();
-        if certificate.original == tcx.types.u16 || ENABLE_INTEGER_FUNCTION_TABLES {
+        if certificate.argument.original == tcx.types.u16 || ENABLE_INTEGER_FUNCTION_TABLES {
             assert!(factory.is_some());
         } else {
             assert!(factory.is_none());
@@ -231,16 +232,16 @@ fn check_integer_calls(tcx: TyCtxt<'_>) {
             memory: Default::default(),
         };
         state.locals[callback.local.as_usize()] = Some(pointer);
-        let raw_word = if certificate.signed {
-            1_u128 << (certificate.bits - 1)
+        let raw_word = if certificate.argument.signed {
+            1_u128 << (certificate.argument.bits - 1)
         } else {
-            u128::MAX >> (128 - certificate.bits)
+            u128::MAX >> (128 - certificate.argument.bits)
         };
         state.locals[word.local.as_usize()] = Some(symbolic::integer(
             &engine.terms,
             raw_word,
-            certificate.bits,
-            certificate.signed,
+            certificate.argument.bits,
+            certificate.argument.signed,
         ));
         let stack = [moved];
         let call = || TableCall {
@@ -266,7 +267,10 @@ fn check_integer_calls(tcx: TyCtxt<'_>) {
                     .is_err()
             );
             let (term, bits, signed) = result.value.integer().unwrap();
-            assert_eq!((bits, signed), (certificate.bits, certificate.signed));
+            assert_eq!(
+                (bits, signed),
+                (certificate.argument.bits, certificate.argument.signed)
+            );
             let expected = if position == 0 {
                 raw_word
             } else {
@@ -310,8 +314,8 @@ fn check_integer_calls(tcx: TyCtxt<'_>) {
         wrong_sign.locals[word.local.as_usize()] = Some(symbolic::integer(
             &engine.terms,
             raw_word,
-            certificate.bits,
-            !certificate.signed,
+            certificate.argument.bits,
+            !certificate.argument.signed,
         ));
         assert!(
             engine
@@ -319,12 +323,16 @@ fn check_integer_calls(tcx: TyCtxt<'_>) {
                 .is_err()
         );
         let mut wrong_bits = state.clone();
-        let bits = if certificate.bits == 128 { 64 } else { 128 };
+        let bits = if certificate.argument.bits == 128 {
+            64
+        } else {
+            128
+        };
         wrong_bits.locals[word.local.as_usize()] = Some(symbolic::integer(
             &engine.terms,
             1,
             bits,
-            certificate.signed,
+            certificate.argument.signed,
         ));
         assert!(
             engine
@@ -335,8 +343,8 @@ fn check_integer_calls(tcx: TyCtxt<'_>) {
         foreign.locals[word.local.as_usize()] = Some(symbolic::integer(
             &Context::default(),
             1,
-            certificate.bits,
-            certificate.signed,
+            certificate.argument.bits,
+            certificate.argument.signed,
         ));
         assert!(
             engine
@@ -373,9 +381,9 @@ fn check_integer_calls(tcx: TyCtxt<'_>) {
         if let Some(alternate) = alternate {
             assert_eq!(
                 engine.integer_type(alternate),
-                Some((certificate.bits, certificate.signed))
+                Some((certificate.argument.bits, certificate.argument.signed))
             );
-            assert_ne!(alternate, certificate.original);
+            assert_ne!(alternate, certificate.argument.original);
             let mut forged = (*body).clone();
             forged.local_decls[word.local].ty = alternate;
             let term = forged.basic_blocks[block].terminator();

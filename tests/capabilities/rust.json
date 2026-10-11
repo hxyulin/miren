@@ -1100,9 +1100,7 @@
     {
       "entry": "integer_function_table_signature_unknown",
       "family": "integer_function_table",
-      "expected": "unknown",
-      "unknown_reason": "non-scalar array index is not uniquely determined on this path",
-      "unknown_category": "unclassified"
+      "expected": "refuted"
     },
     {
       "entry": "nested_whole_child_call",
@@ -1136,6 +1134,23 @@
       "family": "readonly_nonzero_niche",
       "expected": "unknown",
       "unknown_reason": "whole composite slice membership is unsupported",
+      "unknown_category": "semantics"
+    },
+    {
+      "entry": "integer_function_table_pair",
+      "family": "integer_function_table_pairs",
+      "expected": "proved"
+    },
+    {
+      "entry": "integer_function_table_pair_wrong",
+      "family": "integer_function_table_pairs",
+      "expected": "refuted"
+    },
+    {
+      "entry": "integer_function_table_pair_opaque",
+      "family": "integer_function_table_pairs",
+      "expected": "unknown",
+      "unknown_reason": "function table cannot contain opaque or nested choices",
       "unknown_category": "semantics"
     }
   ]

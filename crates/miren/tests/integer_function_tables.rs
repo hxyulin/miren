@@ -45,12 +45,12 @@ fn original_integer_signatures_execute_bodies_and_preserve_overflow_obligations(
         "char_unknown",
         "float_unknown",
         "nz_unknown",
-        "result_unknown",
         "arity_unknown",
         "abi_unknown",
     ] {
         names.push((name.into(), U));
     }
+    names.push(("result_unknown".into(), R));
     names.extend([("associated".into(), P), ("wrong_associated".into(), R)]);
     let entries: Vec<_> = names
         .iter()
@@ -95,6 +95,17 @@ fn actual_integer_helper_and_order_mutations_fail_all_original_claims() {
         .collect();
     for optimized in [false, true] {
         native(&fixture(), optimized, false);
+    }
+    // Keep the original mixed-return assertion: its second body changes the low bit.
+    let witness = directory.0.join("original_result_counterexample.rs");
+    let mut witness_source = source.clone();
+    witness_source.push_str(
+        "\n#[cfg(test)] mod original_result_counterexample {\n\
+         #[test] fn unchanged_assertion_fails() { super::result_unknown(1, 0); }\n}\n",
+    );
+    std::fs::write(&witness, witness_source).unwrap();
+    for optimized in [false, true] {
+        native(&witness, optimized, true);
     }
     for (name, old, new) in [
         ("helper", "word ^ 1", "word ^ 3"),

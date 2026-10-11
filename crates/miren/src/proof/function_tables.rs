@@ -5,12 +5,19 @@ use super::*;
 
 const ENABLE_FUNCTION_TABLES: bool = true;
 const ENABLE_INTEGER_FUNCTION_TABLES: bool = true;
+const ENABLE_INTEGER_FUNCTION_TABLE_PAIRS: bool = true;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 struct IntegerSignature<'tcx> {
     original: Ty<'tcx>,
     bits: u32,
     signed: bool,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+struct IntegerCallSignature<'tcx> {
+    argument: IntegerSignature<'tcx>,
+    result: IntegerSignature<'tcx>,
 }
 
 #[derive(Clone, PartialEq)]
@@ -54,35 +61,64 @@ pub(super) struct TableSource<'a, 'tcx> {
 }
 
 impl<'tcx> Engine<'tcx> {
-    fn integer_table_signature(&self, callable: Ty<'tcx>) -> Option<IntegerSignature<'tcx>> {
+    fn original_integer_signature(&self, original: Ty<'tcx>) -> Option<IntegerSignature<'tcx>> {
+        if !matches!(original.kind(), ty::Int(_) | ty::Uint(_)) {
+            return None;
+        }
+        let (bits, signed) = self.integer_type(original)?;
+        Some(IntegerSignature {
+            original,
+            bits,
+            signed,
+        })
+    }
+
+    fn integer_table_signature(&self, callable: Ty<'tcx>) -> Option<IntegerCallSignature<'tcx>> {
         let ty::FnPtr(..) = callable.kind() else {
             return None;
         };
         let signature = callable.fn_sig(self.tcx).skip_binder();
-        let [original] = signature.inputs() else {
+        let [argument] = signature.inputs() else {
             return None;
         };
         if signature.safety() != rustc_hir::Safety::Safe
             || signature.abi() != rustc_abi::ExternAbi::Rust
             || signature.c_variadic()
-            || signature.output() != *original
-            || !matches!(original.kind(), ty::Int(_) | ty::Uint(_))
         {
             return None;
         }
-        let (bits, signed) = self.integer_type(*original)?;
-        Some(IntegerSignature {
-            original: *original,
-            bits,
-            signed,
+        Some(IntegerCallSignature {
+            argument: self.original_integer_signature(*argument)?,
+            result: self.original_integer_signature(signature.output())?,
         })
     }
 
     fn table_signature(&self, callable: Ty<'tcx>) -> bool {
         self.integer_table_signature(callable)
             .is_some_and(|signature| {
-                signature.original == self.tcx.types.u16 || ENABLE_INTEGER_FUNCTION_TABLES
+                if signature.argument.original != signature.result.original {
+                    ENABLE_INTEGER_FUNCTION_TABLE_PAIRS
+                } else {
+                    signature.argument.original == self.tcx.types.u16
+                        || ENABLE_INTEGER_FUNCTION_TABLES
+                }
             })
+    }
+
+    fn validate_table_result(
+        &self,
+        value: &Value,
+        signature: IntegerSignature<'tcx>,
+    ) -> Result<(), String> {
+        let (term, bits, signed) = value.integer()?;
+        if bits != signature.bits
+            || signed != signature.signed
+            || term.sort() != &Sort::BitVec(signature.bits)
+            || !term.belongs_to(&self.terms)
+        {
+            return Err("function table result differs from original integer type".into());
+        }
+        Ok(())
     }
 
     pub(super) fn function_table_choice(
@@ -301,8 +337,8 @@ impl<'tcx> Engine<'tcx> {
             || !choice.index.belongs_to(&self.terms)
             || choice.index.sort() != &Sort::BitVec(u32::from(self.tcx.sess.target.pointer_width))
             || call.args.len() != 1
-            || call.args[0].node.ty(&call.body.local_decls, self.tcx) != integer.original
-            || call.destination.ty(&call.body.local_decls, self.tcx).ty != integer.original
+            || call.args[0].node.ty(&call.body.local_decls, self.tcx) != integer.argument.original
+            || call.destination.ty(&call.body.local_decls, self.tcx).ty != integer.result.original
             || call.target.is_none()
             || !state.memory.mutable_u16.is_empty()
             || !state.memory.owned_regions.is_empty()
@@ -355,12 +391,12 @@ impl<'tcx> Engine<'tcx> {
         let value =
             self.evaluate_operand(call.site.0, call.body, &mut consumed, &call.args[0].node)?;
         let (term, bits, signed) = value.integer()?;
-        if bits != integer.bits
-            || signed != integer.signed
-            || term.sort() != &Sort::BitVec(integer.bits)
+        if bits != integer.argument.bits
+            || signed != integer.argument.signed
+            || term.sort() != &Sort::BitVec(integer.argument.bits)
             || !term.belongs_to(&self.terms)
         {
-            return Err(if integer.original == self.tcx.types.u16 {
+            return Err(if integer.argument.original == self.tcx.types.u16 {
                 "function table argument differs from original u16".into()
             } else {
                 "function table argument differs from original integer type".into()
@@ -398,6 +434,7 @@ impl<'tcx> Engine<'tcx> {
                 call.stack,
                 call.site,
             )? {
+                self.validate_table_result(&result.value, integer.result)?;
                 returns.push((branch.clone(), result));
             }
         }
@@ -412,3 +449,7 @@ mod tests;
 #[cfg(test)]
 #[path = "integer_function_tables_probe.rs"]
 mod integer_tests;
+
+#[cfg(test)]
+#[path = "integer_function_table_pairs_probe.rs"]
+mod integer_pair_tests;

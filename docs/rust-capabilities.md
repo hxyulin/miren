@@ -11,10 +11,12 @@ execution at O0 and O2, positive/refuted/unknown controls, a source mutation tha
 structured UNKNOWN reporting, and passing repository checks. Completion establishes a repeatable
 baseline. It does not establish full Rust support or a completed memory-model refactor.
 
-The manifest contains 206 cases across 70 families. Each build configuration expects 82 PROVED,
-71 REFUTED and 53 UNKNOWN results. The historical actual Stage 201 commit
+The combined manifest contains 209 cases across 71 families. Each configuration measures
+83 PROVED, 73 REFUTED and 53 UNKNOWN results in fresh host/ARM O0/O2 surveys.
+The historical actual Stage 201 commit
 `c0d47e17238cdbf8a269d83a34838c303fbe36a2` had 200 cases across 68 families, with
-79 PROVED, 69 REFUTED and 52 UNKNOWN per profile. Stage 133 originally had 23 cases with 10 PROVED, 9 REFUTED
+79 PROVED, 69 REFUTED and 52 UNKNOWN per profile. Stage 133 originally had 23 cases with
+10 PROVED, 9 REFUTED
 and 4 UNKNOWN; stage 134 closed its retained-prefix projection gap. Stage 136 adds raw-pointer
 metadata P/R controls and a safe core reference-array grant that remains UNKNOWN without a
 temporal permission certificate. Stage 137 adds tuple-array P/R and unsupported symbolic-write
@@ -1626,3 +1628,53 @@ Eight fresh safe native controls retain original exit 0 and helper-mutant exit 1
 Root integration and fresh-main validation remain separate readiness gates.
 The successful actual201 validation and release captures above retain their historical
 source, binary, native and solver scopes. They are not relabeled as actual198 validation.
+
+
+## Stage 202: independently typed integer function tables
+
+Known owned tables admit safe Rust `fn(A) -> R` targets when both original compiler types are
+primitive integers. All twelve input types combine with all twelve output types, including signed
+casts, narrowing and pointer-width conversions. Argument and result certificates retain their
+independent original type, width and signedness; equal SMT sorts do not make Rust types
+interchangeable. The actual available target body performs the conversion and produces its result.
+
+Calls authenticate the original full function signature, actual MIR call and operand/destination
+fields before execution. They consume a moved argument once, check each actual returned integer
+against the result certificate, and retain the current returned memory. Existing ownership,
+initialization, index correlation and table size/registry bounds still apply. No result is inferred
+from the function signature, and no new assumption or trusted call is added.
+
+The dedicated compiler fixture checks all 144 pairs on host and ARM at O0 and O2, with correct,
+incorrect and opaque-target assertions. Actual helper and table-order mutations refute the
+unchanged correct assertions. Native boundary controls pass for originals and fail for mutations.
+Genuine dependency archives test retained and omitted MIR: feasible missing bodies remain UNKNOWN,
+while an infeasible missing target does not block execution of an available local target.
+
+Two unchanged earlier mismatched-return assertions now produce counterexamples: the global
+`integer_function_table_signature_unknown` and dedicated `result_unknown` both select a second
+body that changes the result's low bit. Native witnesses also fail those original assertions.
+Their names and assertions remain unchanged. Boolean, character, floating, refinement/reference
+and aggregate signatures, unsupported ABIs and arities remain outside this integer-table extension.
+
+The independent Stage 202 owner on actual Stage 198 `e4ffe01` passes 817 Rust tests,
+68 Python tests and all 21 required checks, including the twelve current example checks.
+Its fresh debug/release comparison checks 8,044 proof pairs: 8,041 full objects and all
+11,546 emitted queries match exactly. Three recorded query-free, 30-second ResourceLimit
+fold contexts differ; all other fields match. Twelve native controls retain their expected
+exits and test counts. These owner results retain their actual parent and source scope.
+
+Stage 202 is composed onto committed Stage 199 `74c0c1b`, preserving its NonZero behavior and
+complete 206-case prefix. Fresh combined host/ARM O0/O2 surveys measure 209 cases in 71 families,
+with 83 PROVED, 73 REFUTED and 53 UNKNOWN per profile. Combined validation passes 821 Rust tests,
+68 Python tests and all 22 checks, including debug/release builds and twelve example checks.
+Fresh native controls rebuild twenty executables: eight exit 0 and twelve expected mutants or
+unchanged false assertions exit 101, with exact test counts and ten-second limits.
+
+The combined-parent debug comparison checks 8,836 pairs: 8,815 full objects and all 11,466
+unchanged queries match. Twenty specific proof changes record the four-profile global controls
+and the unchanged earlier mismatched-return counterexamples. One named query-free ResourceLimit
+fold context differs, with all other fields exact. Fresh combined debug/release comparison checks
+8,836 pairs: 8,834 full objects and all 11,498 emitted queries match.
+2 recorded query-free, 30-second ResourceLimit fold context differences retain all other
+fields exactly. Raw contexts remain recorded without normalization, assumptions or budget changes.
+Earlier actual Stage 201 and Stage 198 captures retain their historical source and binary scopes.
