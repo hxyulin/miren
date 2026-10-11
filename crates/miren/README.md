@@ -1281,3 +1281,8 @@ zero construction makes no selected-body availability claim. Helper identity and
 order mutations refute unchanged assertions and fail natively. Opaque targets and pointer-bearing
 product repeats remain unsupported. Current validation and comparison evidence are in Stage217
 of the stage history; these measurements do not establish full Rust parity.
+
+Float numeric/storage correspondence uses a checked decoding relation for exact f32/f64 terms.
+The relation preserves SMT equality, NaN storage payloads and signed zero. Mutable float validation
+still authenticates the issued producer pair before constructing or proving that relation; this
+refactor adds no scalar-call permissions or producer certificates.

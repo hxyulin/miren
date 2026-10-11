@@ -256,7 +256,48 @@ fn same_pair(left: &Value, right: &Value) -> bool {
     ) if bits == other && a == b && raw == other_raw)
 }
 
+fn float_decoding_relation(
+    context: &Context,
+    expression: &Term,
+    raw: &Term,
+    width: u32,
+) -> Result<Term, String> {
+    let (exponent, significand) = match width {
+        32 => (8, 24),
+        64 => (11, 53),
+        _ => return Err("float decoding relation requires an exact primitive float width".into()),
+    };
+    if expression.sort()
+        != &(Sort::Float {
+            exponent,
+            significand,
+        })
+        || !expression.belongs_to(context)
+        || raw.sort() != &Sort::BitVec(width)
+        || !raw.belongs_to(context)
+    {
+        return Err("float decoding relation has inconsistent numeric/storage metadata".into());
+    }
+    let Value::Float {
+        expression: decoded,
+        ..
+    } = symbolic::float_from_bits(context, raw.clone(), width)
+    else {
+        unreachable!("float decoding returns a float")
+    };
+    context.apply(Op::Equal, &[decoded, expression.clone()])
+}
+
 impl<'tcx> Engine<'tcx> {
+    fn checked_float_decoding_relation(
+        &self,
+        expression: &Term,
+        raw: &Term,
+        width: u32,
+    ) -> Result<Term, String> {
+        float_decoding_relation(&self.terms, expression, raw, width)
+    }
+
     pub(super) fn validate_float_pair(&self, value: &Value, width: u32) -> Result<(), String> {
         if self
             .float_pairs
@@ -299,16 +340,7 @@ impl<'tcx> Engine<'tcx> {
         else {
             return Err("mutable float requires tracked raw encoding".into());
         };
-        let Value::Float {
-            expression: decoded,
-            ..
-        } = symbolic::float_from_bits(&self.terms, raw.clone(), width)
-        else {
-            unreachable!("float decoding returns a float")
-        };
-        let equal = self
-            .terms
-            .apply(Op::Equal, &[decoded, expression.clone()])?;
+        let equal = self.checked_float_decoding_relation(expression, raw, width)?;
         let mut invalid = conditions.to_vec();
         invalid.push(symbolic::not(&equal));
         if self.feasible(&invalid)? {
@@ -324,6 +356,75 @@ impl<'tcx> Engine<'tcx> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn checked_decoding_relation_preserves_nan_payloads_and_signed_zero() {
+        for (width, encodings) in [
+            (32, [0, 0x80000000, 0x7fc00017, 0x7fc00018]),
+            (
+                64,
+                [
+                    0,
+                    0x8000000000000000,
+                    0x7ff8000000000017,
+                    0x7ff8000000000018,
+                ],
+            ),
+        ] {
+            let context = Context::default();
+            for encoding in encodings {
+                let raw = context.bit_vector(encoding, width).unwrap();
+                let Value::Float { expression, .. } =
+                    symbolic::float_from_bits(&context, raw.clone(), width)
+                else {
+                    unreachable!()
+                };
+                let expected = context
+                    .apply(Op::Equal, &[expression.clone(), expression.clone()])
+                    .unwrap();
+                assert_eq!(
+                    float_decoding_relation(&context, &expression, &raw, width).unwrap(),
+                    expected
+                );
+                let numeric = context.symbol(99, expression.sort().clone()).unwrap();
+                let expected = context
+                    .apply(Op::Equal, &[expression.clone(), numeric.clone()])
+                    .unwrap();
+                assert_eq!(
+                    float_decoding_relation(&context, &numeric, &raw, width).unwrap(),
+                    expected
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn checked_decoding_relation_refuses_metadata_before_allocating_terms() {
+        let context = Context::default();
+        let foreign = Context::default();
+        let raw = context.symbol(0, Sort::BitVec(32)).unwrap();
+        let wrong_raw = context.symbol(1, Sort::BitVec(64)).unwrap();
+        let boolean = context.symbol(2, Sort::Bool).unwrap();
+        let Value::Float { expression, .. } = symbolic::float_from_bits(&context, raw.clone(), 32)
+        else {
+            unreachable!()
+        };
+        let foreign_raw = foreign.symbol(0, Sort::BitVec(32)).unwrap();
+        let foreign_numeric = foreign.symbol(1, expression.sort().clone()).unwrap();
+        let marker = context.symbol(3, Sort::Bool).unwrap();
+        for (numeric, storage, width) in [
+            (&expression, &raw, 16),
+            (&expression, &raw, 64),
+            (&expression, &wrong_raw, 32),
+            (&boolean, &raw, 32),
+            (&expression, &boolean, 32),
+            (&foreign_numeric, &raw, 32),
+            (&expression, &foreign_raw, 32),
+        ] {
+            assert!(float_decoding_relation(&context, numeric, storage, width).is_err());
+        }
+        assert_eq!(context.symbol(4, Sort::Bool).unwrap().id(), marker.id() + 1);
+    }
 
     #[test]
     fn readonly_namespace_metadata_does_not_allocate_context_nodes() {
