@@ -26,6 +26,62 @@ fn two_argument_tables_enabled() -> bool {
     ENABLE_TWO_ARGUMENT_INTEGER_FUNCTION_TABLES
 }
 
+#[cfg(test)]
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum FloatTableReturnFault {
+    None,
+    WrongWidth,
+    MissingRaw,
+    ForeignContext,
+    InconsistentRaw,
+}
+
+#[cfg(test)]
+thread_local! {
+    static FLOAT_TABLE_RETURN_FAULT: std::cell::Cell<FloatTableReturnFault> = const {
+        std::cell::Cell::new(FloatTableReturnFault::None)
+    };
+    static FLOAT_TABLE_RETURN_OBSERVATIONS: std::cell::Cell<usize> = const {
+        std::cell::Cell::new(0)
+    };
+}
+
+#[cfg(test)]
+fn observed_float_table_return(engine: &Engine<'_>, value: &Value) -> Value {
+    let fault = FLOAT_TABLE_RETURN_FAULT.with(std::cell::Cell::get);
+    if fault == FloatTableReturnFault::None {
+        return value.clone();
+    }
+    FLOAT_TABLE_RETURN_OBSERVATIONS.with(|count| count.set(count.get() + 1));
+    let Value::Float {
+        expression,
+        bits,
+        raw_bits,
+    } = value
+    else {
+        return value.clone();
+    };
+    match fault {
+        FloatTableReturnFault::None => value.clone(),
+        FloatTableReturnFault::WrongWidth => Value::Float {
+            expression: expression.clone(),
+            bits: if *bits == 32 { 64 } else { 32 },
+            raw_bits: raw_bits.clone(),
+        },
+        FloatTableReturnFault::MissingRaw => Value::Float {
+            expression: expression.clone(),
+            bits: *bits,
+            raw_bits: None,
+        },
+        FloatTableReturnFault::ForeignContext => symbolic::float(&Context::default(), 0, *bits),
+        FloatTableReturnFault::InconsistentRaw => Value::Float {
+            expression: expression.clone(),
+            bits: *bits,
+            raw_bits: Some(engine.terms.bit_vector(1, *bits).unwrap()),
+        },
+    }
+}
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 struct IntegerSignature<'tcx> {
     original: Ty<'tcx>,
@@ -47,7 +103,7 @@ struct TwoArgumentIntegerSignature<'tcx> {
 }
 
 // Values are already evaluated and consumed before this private dispatch carrier is built.
-enum EvaluatedIntegerArguments {
+enum EvaluatedTableArguments {
     One(Value),
     Two(Vec<Value>),
 }
@@ -56,12 +112,17 @@ enum EvaluatedIntegerArguments {
 enum PrimitiveSignature<'tcx> {
     Bool(Ty<'tcx>),
     Char(Ty<'tcx>),
+    Float32(Ty<'tcx>),
+    Float64(Ty<'tcx>),
 }
 
 impl<'tcx> PrimitiveSignature<'tcx> {
     fn original(self) -> Ty<'tcx> {
         match self {
-            Self::Bool(original) | Self::Char(original) => original,
+            Self::Bool(original)
+            | Self::Char(original)
+            | Self::Float32(original)
+            | Self::Float64(original) => original,
         }
     }
 }
@@ -72,9 +133,27 @@ enum TableResultSignature<'tcx> {
     Primitive(PrimitiveSignature<'tcx>),
 }
 
+#[derive(Clone, Copy)]
+enum PrimitiveBodyDomain {
+    BoolChar,
+    Float32,
+    Float64,
+}
+
+impl PrimitiveSignature<'_> {
+    fn body_domain(self) -> PrimitiveBodyDomain {
+        match self {
+            Self::Bool(_) | Self::Char(_) => PrimitiveBodyDomain::BoolChar,
+            Self::Float32(_) => PrimitiveBodyDomain::Float32,
+            Self::Float64(_) => PrimitiveBodyDomain::Float64,
+        }
+    }
+}
+
 // New primitive admission alone scans this borrowed grammar before selected Body cloning.
 struct PrimitiveBodyWork<'a, 'tcx> {
     engine: &'a Engine<'tcx>,
+    domain: PrimitiveBodyDomain,
     used: usize,
     error: Option<String>,
     locals: usize,
@@ -108,6 +187,8 @@ impl<'tcx> PrimitiveBodyWork<'_, 'tcx> {
         }
         match original.kind() {
             ty::Bool | ty::Char | ty::Int(_) | ty::Uint(_) | ty::Never => {}
+            ty::Float(ty::FloatTy::F32) if matches!(self.domain, PrimitiveBodyDomain::Float32) => {}
+            ty::Float(ty::FloatTy::F64) if matches!(self.domain, PrimitiveBodyDomain::Float64) => {}
             ty::Tuple(fields) => {
                 self.charge(fields.len());
                 if self.error.is_some() {
@@ -428,6 +509,8 @@ impl<'tcx> Engine<'tcx> {
         match argument.kind() {
             ty::Bool => Some(PrimitiveSignature::Bool(*argument)),
             ty::Char => Some(PrimitiveSignature::Char(*argument)),
+            ty::Float(ty::FloatTy::F32) => Some(PrimitiveSignature::Float32(*argument)),
+            ty::Float(ty::FloatTy::F64) => Some(PrimitiveSignature::Float64(*argument)),
             _ => None,
         }
     }
@@ -449,6 +532,8 @@ impl<'tcx> Engine<'tcx> {
                 Ok(())
             }
             PrimitiveSignature::Char(_) => self.prove_char_value(value, conditions),
+            PrimitiveSignature::Float32(_) => self.prove_scalar_float(value, 32, conditions),
+            PrimitiveSignature::Float64(_) => self.prove_scalar_float(value, 64, conditions),
         }
     }
 
@@ -707,6 +792,10 @@ impl<'tcx> Engine<'tcx> {
         let mut targets = Vec::with_capacity(elements.len());
         let mut primitive_work = PrimitiveBodyWork {
             engine: self,
+            domain: self.primitive_table_signature(signature).map_or(
+                PrimitiveBodyDomain::BoolChar,
+                PrimitiveSignature::body_domain,
+            ),
             used: 0,
             error: None,
             locals: 0,
@@ -853,6 +942,10 @@ impl<'tcx> Engine<'tcx> {
                 }
                 let mut work = PrimitiveBodyWork {
                     engine: self,
+                    domain: self
+                        .primitive_table_signature(choice.signature)
+                        .ok_or("primitive table routing signature is unavailable")?
+                        .body_domain(),
                     used: 0,
                     error: None,
                     locals: call.body.local_decls.len(),
@@ -991,12 +1084,12 @@ impl<'tcx> Engine<'tcx> {
             });
         }
         self.validate_owned_call_arguments(std::slice::from_ref(&value), &consumed.memory)?;
-        self.dispatch_evaluated_integer_table(
+        self.dispatch_evaluated_table(
             &consumed,
             call,
             &choice,
             instances,
-            EvaluatedIntegerArguments::One(value),
+            EvaluatedTableArguments::One(value),
             TableResultSignature::Integer(integer.result),
         )
         .map(Some)
@@ -1038,6 +1131,7 @@ impl<'tcx> Engine<'tcx> {
         self.owned_field_footprint(call.body, call.destination)?;
         let mut work = PrimitiveBodyWork {
             engine: self,
+            domain: primitive.body_domain(),
             used: 0,
             error: None,
             locals: 0,
@@ -1095,12 +1189,12 @@ impl<'tcx> Engine<'tcx> {
             self.evaluate_operand(call.site.0, call.body, &mut consumed, &call.args[0].node)?;
         self.validate_primitive_table_value(&value, primitive, &consumed.conditions)?;
         self.validate_owned_call_arguments(std::slice::from_ref(&value), &consumed.memory)?;
-        self.dispatch_evaluated_integer_table(
+        self.dispatch_evaluated_table(
             &consumed,
             call,
             choice,
             instances,
-            EvaluatedIntegerArguments::One(value),
+            EvaluatedTableArguments::One(value),
             TableResultSignature::Primitive(primitive),
         )
         .map(Some)
@@ -1190,24 +1284,24 @@ impl<'tcx> Engine<'tcx> {
         self.validate_table_result(&second, integer.second)?;
         let values = vec![first, second];
         self.validate_owned_call_arguments(&values, &consumed.memory)?;
-        self.dispatch_evaluated_integer_table(
+        self.dispatch_evaluated_table(
             &consumed,
             call,
             choice,
             instances,
-            EvaluatedIntegerArguments::Two(values),
+            EvaluatedTableArguments::Two(values),
             TableResultSignature::Integer(integer.result),
         )
         .map(Some)
     }
 
-    fn dispatch_evaluated_integer_table(
+    fn dispatch_evaluated_table(
         &mut self,
         consumed: &State,
         call: TableCall<'_, 'tcx>,
         choice: &Choice<'tcx>,
         instances: Vec<ty::Instance<'tcx>>,
-        arguments: EvaluatedIntegerArguments,
+        arguments: EvaluatedTableArguments,
         result_signature: TableResultSignature<'tcx>,
     ) -> Result<Vec<(State, Return)>, String> {
         let bits = u32::from(self.tcx.sess.target.pointer_width);
@@ -1232,8 +1326,8 @@ impl<'tcx> Engine<'tcx> {
             let mut branch = consumed.clone();
             self.byte_copy_call_eligibility(instance, true, &mut branch);
             let values = match &arguments {
-                EvaluatedIntegerArguments::One(value) => vec![value.clone()],
-                EvaluatedIntegerArguments::Two(values) => values.clone(),
+                EvaluatedTableArguments::One(value) => vec![value.clone()],
+                EvaluatedTableArguments::Two(values) => values.clone(),
             };
             for result in self.call_instance(
                 instance,
@@ -1247,12 +1341,24 @@ impl<'tcx> Engine<'tcx> {
                     TableResultSignature::Integer(signature) => {
                         self.validate_table_result(&result.value, signature)?
                     }
-                    TableResultSignature::Primitive(signature) => self
-                        .validate_primitive_table_value(
-                            &result.value,
-                            signature,
-                            &result.conditions,
-                        )?,
+                    TableResultSignature::Primitive(signature) => {
+                        // Test faults observe a clone at this actual Return boundary. They do
+                        // not mutate the callee Return, its Memory, or production transport.
+                        #[cfg(test)]
+                        let observed = match signature {
+                            PrimitiveSignature::Float32(_) | PrimitiveSignature::Float64(_) => {
+                                observed_float_table_return(self, &result.value)
+                            }
+                            PrimitiveSignature::Bool(_) | PrimitiveSignature::Char(_) => {
+                                result.value.clone()
+                            }
+                        };
+                        #[cfg(test)]
+                        let value = &observed;
+                        #[cfg(not(test))]
+                        let value = &result.value;
+                        self.validate_primitive_table_value(value, signature, &result.conditions)?;
+                    }
                 }
                 returns.push((branch.clone(), result));
             }

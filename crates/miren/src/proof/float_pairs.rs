@@ -298,6 +298,37 @@ impl<'tcx> Engine<'tcx> {
         float_decoding_relation(&self.terms, expression, raw, width)
     }
 
+    // Scalar transport proves representation consistency without issuing mutable pair authority.
+    // SMT decoding equality does not authenticate the payload or sign of an arbitrary NaN carrier.
+    pub(super) fn prove_scalar_float(
+        &self,
+        value: &Value,
+        width: u32,
+        conditions: &[Term],
+    ) -> Result<(), String> {
+        let Value::Float {
+            expression,
+            bits,
+            raw_bits: Some(raw),
+        } = value
+        else {
+            return Err("scalar float table requires tracked raw encoding".into());
+        };
+        if *bits != width {
+            return Err("scalar float table value has a different original width".into());
+        }
+        let equal = self.checked_float_decoding_relation(expression, raw, width)?;
+        let mut invalid = conditions.to_vec();
+        invalid.push(symbolic::not(&equal));
+        if self.feasible(&invalid)? {
+            return Err(self.categorized_error(
+                UnknownCategory::Semantics,
+                "scalar float table requires proven numeric/storage correspondence".into(),
+            ));
+        }
+        Ok(())
+    }
+
     pub(super) fn validate_float_pair(&self, value: &Value, width: u32) -> Result<(), String> {
         if self
             .float_pairs

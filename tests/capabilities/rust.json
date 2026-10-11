@@ -1346,6 +1346,54 @@
       "expected": "unknown",
       "unknown_reason": "function table cannot contain opaque or nested choices",
       "unknown_category": "semantics"
+    },
+    {
+      "entry": "float_table_selected32",
+      "family": "float_function_tables_f32",
+      "expected": "proved"
+    },
+    {
+      "entry": "float_table_wrong32",
+      "family": "float_function_tables_f32",
+      "expected": "refuted"
+    },
+    {
+      "entry": "float_table_opaque32",
+      "family": "float_function_tables_f32",
+      "expected": "unknown",
+      "unknown_reason": "function table cannot contain opaque or nested choices",
+      "unknown_category": "semantics"
+    },
+    {
+      "entry": "float_table_repeat32",
+      "family": "float_function_tables_f32",
+      "expected": "unknown",
+      "unknown_reason": "known Repeat signature needs exact original integer types",
+      "unknown_category": "unclassified"
+    },
+    {
+      "entry": "float_table_selected64",
+      "family": "float_function_tables_f64",
+      "expected": "proved"
+    },
+    {
+      "entry": "float_table_wrong64",
+      "family": "float_function_tables_f64",
+      "expected": "refuted"
+    },
+    {
+      "entry": "float_table_opaque64",
+      "family": "float_function_tables_f64",
+      "expected": "unknown",
+      "unknown_reason": "function table cannot contain opaque or nested choices",
+      "unknown_category": "semantics"
+    },
+    {
+      "entry": "float_table_repeat64",
+      "family": "float_function_tables_f64",
+      "expected": "unknown",
+      "unknown_reason": "known Repeat signature needs exact original integer types",
+      "unknown_category": "unclassified"
     }
   ]
 }

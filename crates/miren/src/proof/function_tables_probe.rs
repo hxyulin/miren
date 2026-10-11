@@ -1978,6 +1978,7 @@ fn compiler_primitive_table_borrowed_body_and_values() {
                 let instance = engine.resolve_function_item(id, tcx.mk_args(&[])).unwrap();
                 let mut work = PrimitiveBodyWork {
                     engine: &engine,
+                    domain: PrimitiveBodyDomain::BoolChar,
                     used: 0,
                     error: None,
                     locals: 0,
@@ -1989,6 +1990,7 @@ fn compiler_primitive_table_borrowed_body_and_values() {
                 forged_return.local_decls[rustc_middle::mir::RETURN_PLACE].ty = tcx.types.u32;
                 let mut forged_work = PrimitiveBodyWork {
                     engine: &engine,
+                    domain: PrimitiveBodyDomain::BoolChar,
                     used: 0,
                     error: None,
                     locals: 0,
@@ -2023,6 +2025,7 @@ fn compiler_primitive_table_borrowed_body_and_values() {
                 wrong.spread_arg = Some(rustc_middle::mir::Local::from_usize(1));
                 let mut bounded = PrimitiveBodyWork {
                     engine: &engine,
+                    domain: PrimitiveBodyDomain::BoolChar,
                     used: 0,
                     error: None,
                     locals: 0,
@@ -2034,6 +2037,7 @@ fn compiler_primitive_table_borrowed_body_and_values() {
                 );
                 let mut exhausted = PrimitiveBodyWork {
                     engine: &engine,
+                    domain: PrimitiveBodyDomain::BoolChar,
                     used: MAX_INPUT_VALUES,
                     error: None,
                     locals: 0,
@@ -2046,6 +2050,7 @@ fn compiler_primitive_table_borrowed_body_and_values() {
                 let before = engine.bodies.borrow().len();
                 let mut unsupported = PrimitiveBodyWork {
                     engine: &engine,
+                    domain: PrimitiveBodyDomain::BoolChar,
                     used: 0,
                     error: None,
                     locals: body.local_decls.len(),
@@ -2063,6 +2068,7 @@ fn compiler_primitive_table_borrowed_body_and_values() {
                 assert_eq!(engine.bodies.borrow().len(), before);
                 let mut too_deep = PrimitiveBodyWork {
                     engine: &engine,
+                    domain: PrimitiveBodyDomain::BoolChar,
                     used: 0,
                     error: None,
                     locals: 0,
@@ -2114,8 +2120,20 @@ fn compiler_primitive_table_borrowed_body_and_values() {
                     );
                 }
             }
-            check_primitive_move_call(tcx, "moved_bool", "bool_first", "bool_second", false);
-            check_primitive_move_call(tcx, "moved_char", "char_first", "char_second", true);
+            check_primitive_move_call(
+                tcx,
+                "moved_bool",
+                "bool_first",
+                "bool_second",
+                PrimitiveProbeValue::Bool,
+            );
+            check_primitive_move_call(
+                tcx,
+                "moved_char",
+                "char_first",
+                "char_second",
+                PrimitiveProbeValue::Char,
+            );
             rustc_driver::Compilation::Stop
         }
     }
@@ -2183,13 +2201,21 @@ pub fn moved_char(callback: fn(char)->char, value: char) -> char {
     eprintln!("primitive compiler assets: {}", root.display());
 }
 
+#[derive(Clone, Copy)]
+enum PrimitiveProbeValue {
+    Bool,
+    Char,
+    Float32,
+    Float64,
+}
+
 // Separate generated custom-MIR boundary controls, not ordinary application lowering claims.
 fn check_primitive_move_call<'tcx>(
     tcx: TyCtxt<'tcx>,
     caller: &str,
     first: &str,
     second: &str,
-    character: bool,
+    kind: PrimitiveProbeValue,
 ) {
     let mut engine = test_engine(tcx);
     let find = |name: &str| {
@@ -2289,10 +2315,11 @@ fn check_primitive_move_call<'tcx>(
         memory: Default::default(),
     };
     state.locals[function.local.as_usize()] = Some(pointer);
-    state.locals[argument.local.as_usize()] = Some(if character {
-        symbolic::integer(&engine.terms, 65, 32, false)
-    } else {
-        Value::Bool(engine.terms.boolean(true))
+    state.locals[argument.local.as_usize()] = Some(match kind {
+        PrimitiveProbeValue::Bool => Value::Bool(engine.terms.boolean(true)),
+        PrimitiveProbeValue::Char => symbolic::integer(&engine.terms, 65, 32, false),
+        PrimitiveProbeValue::Float32 => symbolic::float(&engine.terms, 0x7fc1_2345, 32),
+        PrimitiveProbeValue::Float64 => symbolic::float(&engine.terms, 0x7ff8_1234_5678_9abc, 64),
     });
     let stack = [caller_id];
     let call = || TableCall {
@@ -2325,6 +2352,74 @@ fn check_primitive_move_call<'tcx>(
     assert!(engine.function_table_call(&state, call()).is_err());
     assert_eq!(engine.steps, steps_before);
     engine.function_pointers.borrow_mut()[choice_id] = saved_choice;
+    if matches!(
+        kind,
+        PrimitiveProbeValue::Float32 | PrimitiveProbeValue::Float64
+    ) {
+        struct Restore(FloatTableReturnFault);
+        impl Drop for Restore {
+            fn drop(&mut self) {
+                FLOAT_TABLE_RETURN_FAULT.with(|fault| fault.set(self.0));
+            }
+        }
+        let before = format!(
+            "{:?}/{:?}/{:?}/{:?}/{:?}",
+            state.locals,
+            state.missing_places,
+            state.conditions,
+            state.addresses,
+            state.memory.as_slice()
+        );
+        for fault in [
+            FloatTableReturnFault::WrongWidth,
+            FloatTableReturnFault::MissingRaw,
+            FloatTableReturnFault::ForeignContext,
+            FloatTableReturnFault::InconsistentRaw,
+        ] {
+            let prior = FLOAT_TABLE_RETURN_FAULT.with(|cell| cell.replace(fault));
+            let restore = Restore(prior);
+            let observed = FLOAT_TABLE_RETURN_OBSERVATIONS.with(std::cell::Cell::get);
+            assert!(engine.function_table_call(&state, call()).is_err());
+            assert!(FLOAT_TABLE_RETURN_OBSERVATIONS.with(std::cell::Cell::get) > observed);
+            assert_eq!(
+                format!(
+                    "{:?}/{:?}/{:?}/{:?}/{:?}",
+                    state.locals,
+                    state.missing_places,
+                    state.conditions,
+                    state.addresses,
+                    state.memory.as_slice()
+                ),
+                before
+            );
+            assert!(engine.read_place(&state, destination, Some(&body)).is_err());
+            assert!(!state.memory.byte_copy_opaque);
+            assert!(state.memory.incoming_byte_roots.is_empty());
+            assert!(state.memory.mutable_u16.is_empty());
+            assert!(state.memory.mutable_hierarchy.is_none());
+            assert!(state.memory.owned_regions.is_empty());
+            assert!(state.memory.startup_values.is_empty());
+            assert!(!state.memory.startup_invalidated);
+            assert!(state.memory.isolated_static_types.is_empty());
+            assert!(state.memory.startup_overwritten.is_empty());
+            assert!(state.memory.static_uninitialized.is_empty());
+
+            // Valid entry/callee effects may already have happened. Refusal prevents caller
+            // continuation/result publication; this does not claim whole-call rollback.
+            drop(restore);
+            assert!(
+                FLOAT_TABLE_RETURN_FAULT.with(std::cell::Cell::get) == FloatTableReturnFault::None
+            );
+        }
+        let caught = std::panic::catch_unwind(|| {
+            let prior = FLOAT_TABLE_RETURN_FAULT
+                .with(|cell| cell.replace(FloatTableReturnFault::WrongWidth));
+            let _restore = Restore(prior);
+            panic!("scoped Float Return fault restoration");
+        });
+        assert!(caught.is_err());
+        assert!(FLOAT_TABLE_RETURN_FAULT.with(std::cell::Cell::get) == FloatTableReturnFault::None);
+    }
     let returns = engine.function_table_call(&state, call()).unwrap().unwrap();
     assert_eq!(returns.len(), 2);
     let mut joined = returns[0].1.conditions.clone();
@@ -2413,4 +2508,251 @@ fn check_primitive_move_call<'tcx>(
             .operand(caller_id, &body, &state, &args[0].node)
             .is_ok()
     );
+}
+
+#[test]
+fn compiler_float_table_original_body_and_representation() {
+    struct Capture;
+    impl rustc_driver::Callbacks for Capture {
+        fn after_analysis<'tcx>(
+            &mut self,
+            _: &rustc_interface::interface::Compiler,
+            tcx: TyCtxt<'tcx>,
+        ) -> rustc_driver::Compilation {
+            let mut engine = test_engine(tcx);
+            for (name, width, original, signature) in [
+                (
+                    "first32",
+                    32,
+                    tcx.types.f32,
+                    PrimitiveSignature::Float32(tcx.types.f32),
+                ),
+                (
+                    "second32",
+                    32,
+                    tcx.types.f32,
+                    PrimitiveSignature::Float32(tcx.types.f32),
+                ),
+                (
+                    "first64",
+                    64,
+                    tcx.types.f64,
+                    PrimitiveSignature::Float64(tcx.types.f64),
+                ),
+                (
+                    "second64",
+                    64,
+                    tcx.types.f64,
+                    PrimitiveSignature::Float64(tcx.types.f64),
+                ),
+            ] {
+                let id = tcx
+                    .mir_keys(())
+                    .iter()
+                    .copied()
+                    .find(|id| {
+                        tcx.def_kind(id.to_def_id()) == DefKind::Fn
+                            && tcx.item_name(id.to_def_id()).as_str() == name
+                    })
+                    .unwrap()
+                    .to_def_id();
+                let instance = engine.resolve_function_item(id, tcx.mk_args(&[])).unwrap();
+                let callable = Ty::new_fn_ptr(tcx, engine.call_poly_signature(instance).unwrap());
+                assert!(engine.primitive_table_signature(callable) == Some(signature));
+                let body = tcx.optimized_mir(id);
+                let mut work = PrimitiveBodyWork {
+                    engine: &engine,
+                    domain: signature.body_domain(),
+                    used: 0,
+                    error: None,
+                    locals: 0,
+                };
+                assert!(
+                    engine
+                        .primitive_table_body_work(instance, body, &mut work)
+                        .is_ok()
+                );
+                let mut old_domain = PrimitiveBodyWork {
+                    engine: &engine,
+                    domain: PrimitiveBodyDomain::BoolChar,
+                    used: 0,
+                    error: None,
+                    locals: 0,
+                };
+                assert!(
+                    engine
+                        .primitive_table_body_work(instance, body, &mut old_domain)
+                        .is_err()
+                );
+                let mut forged = body.clone();
+                forged.local_decls[rustc_middle::mir::RETURN_PLACE].ty = tcx.types.u32;
+                let mut work = PrimitiveBodyWork {
+                    engine: &engine,
+                    domain: signature.body_domain(),
+                    used: 0,
+                    error: None,
+                    locals: 0,
+                };
+                assert!(
+                    engine
+                        .primitive_table_body_work(instance, &forged, &mut work)
+                        .is_err()
+                );
+                assert!(signature.original() == original);
+                let valid = symbolic::float(&engine.terms, 0, width);
+                assert!(
+                    engine
+                        .validate_primitive_table_value(&valid, signature, &[])
+                        .is_ok()
+                );
+                let wrong = symbolic::float(&engine.terms, 0, if width == 32 { 64 } else { 32 });
+                assert!(
+                    engine
+                        .validate_primitive_table_value(&wrong, signature, &[])
+                        .is_err()
+                );
+                let other = Context::default();
+                let foreign = symbolic::float(&other, 0, width);
+                assert!(
+                    engine
+                        .validate_primitive_table_value(&foreign, signature, &[])
+                        .is_err()
+                );
+                let Value::Float {
+                    expression, bits, ..
+                } = valid
+                else {
+                    unreachable!()
+                };
+                let absent = Value::Float {
+                    expression: expression.clone(),
+                    bits,
+                    raw_bits: None,
+                };
+                assert!(
+                    engine
+                        .validate_primitive_table_value(&absent, signature, &[])
+                        .is_err()
+                );
+                let wrong_raw = Value::Float {
+                    expression: expression.clone(),
+                    bits,
+                    raw_bits: Some(engine.terms.bit_vector(1, width).unwrap()),
+                };
+                assert!(
+                    engine
+                        .validate_primitive_table_value(&wrong_raw, signature, &[])
+                        .is_err()
+                );
+                let arithmetic = Value::Float {
+                    expression,
+                    bits,
+                    raw_bits: None,
+                };
+                let tracked = engine.materialize_float(arithmetic);
+                assert!(
+                    engine
+                        .validate_primitive_table_value(&tracked, signature, &[])
+                        .is_ok()
+                );
+                let saved = engine.float_encodings.clone();
+                engine.float_encodings.clear();
+                assert!(
+                    engine
+                        .validate_primitive_table_value(&tracked, signature, &[])
+                        .is_err()
+                );
+                engine.float_encodings = saved;
+                // Copied NaNs are transported by actual Values. Decoding alone cannot certify
+                // the payload provenance of an arbitrary numerically consistent NaN carrier.
+                let nan = symbolic::float(
+                    &engine.terms,
+                    if width == 32 {
+                        0x7fc1_2345
+                    } else {
+                        0x7ff8_1234_5678_9abc
+                    },
+                    width,
+                );
+                assert!(
+                    engine
+                        .validate_primitive_table_value(&nan, signature, &[])
+                        .is_ok()
+                );
+            }
+            check_primitive_move_call(
+                tcx,
+                "moved32",
+                "first32",
+                "second32",
+                PrimitiveProbeValue::Float32,
+            );
+            check_primitive_move_call(
+                tcx,
+                "moved64",
+                "first64",
+                "second64",
+                PrimitiveProbeValue::Float64,
+            );
+            rustc_driver::Compilation::Stop
+        }
+    }
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let root =
+        std::env::temp_dir().join(format!("miren-float-table-{}-{nonce}", std::process::id()));
+    std::fs::create_dir(&root).unwrap();
+    let source = root.join("fixture.rs");
+    let original = std::fs::read_to_string(
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../tests/fixtures/float_function_tables.rs"),
+    )
+    .unwrap();
+    std::fs::write(
+        &source,
+        format!(
+            "#![feature(custom_mir, core_intrinsics)]\n{original}\n{}",
+            r#"
+use core::intrinsics::mir::*;
+#[custom_mir(dialect = "runtime", phase = "optimized")]
+pub fn moved32(callback: fn(f32)->f32, value: f32) -> f32 {
+    mir! {
+        { Call(RET = Move(callback)(Move(value)), ReturnTo(done), UnwindUnreachable()) }
+        done = { Return() }
+    }
+}
+#[custom_mir(dialect = "runtime", phase = "optimized")]
+pub fn moved64(callback: fn(f64)->f64, value: f64) -> f64 {
+    mir! {
+        { Call(RET = Move(callback)(Move(value)), ReturnTo(done), UnwindUnreachable()) }
+        done = { Return() }
+    }
+}
+"#
+        ),
+    )
+    .unwrap();
+    for target in [None, Some("thumbv7em-none-eabihf")] {
+        for level in [0, 2] {
+            let output = root.join(format!("{}-o{level}", target.unwrap_or("host")));
+            std::fs::create_dir(&output).unwrap();
+            let mut args = vec![
+                "rustc".into(),
+                "--crate-type=lib".into(),
+                "--edition=2024".into(),
+                source.display().to_string(),
+                "--out-dir".into(),
+                output.display().to_string(),
+                "-Cpanic=abort".into(),
+                format!("-Copt-level={level}"),
+            ];
+            if let Some(target) = target {
+                args.extend(["--target".into(), target.into()]);
+            }
+            rustc_driver::run_compiler(&args, &mut Capture);
+        }
+    }
+    eprintln!("Float table compiler assets: {}", root.display());
 }

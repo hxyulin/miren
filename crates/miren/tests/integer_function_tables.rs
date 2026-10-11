@@ -40,9 +40,10 @@ fn original_integer_signatures_execute_bodies_and_preserve_overflow_obligations(
             names.push((format!("{module}::{entry}"), status));
         }
     }
-    for name in ["float_unknown", "nz_unknown", "abi_unknown"] {
+    for name in ["nz_unknown", "abi_unknown"] {
         names.push((name.into(), U));
     }
+    names.push(("float_unknown".into(), R));
     names.push(("bool_unknown".into(), R));
     names.push(("char_unknown".into(), R));
     names.push(("result_unknown".into(), R));
@@ -55,6 +56,28 @@ fn original_integer_signatures_execute_bodies_and_preserve_overflow_obligations(
     for target in [None, Some("thumbv7em-none-eabihf")] {
         for optimized in [false, true] {
             let report = verify(&fixture(), &entries, target, optimized, &[]);
+            let float = report
+                .functions
+                .iter()
+                .find(|function| function.name == "float_unknown")
+                .unwrap()
+                .proof
+                .as_ref()
+                .unwrap();
+            assert!(
+                float
+                    .body_entries
+                    .iter()
+                    .any(|entry| entry.function == "float_second")
+            );
+            assert!(
+                float
+                    .obligations
+                    .iter()
+                    .any(|obligation| obligation.status == R
+                        && obligation.query.is_some()
+                        && obligation.model.is_some())
+            );
             let arity = report
                 .functions
                 .iter()

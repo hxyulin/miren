@@ -6509,3 +6509,55 @@ it does not claim that the feature author independently reviewed their own imple
 ROOT evidence: /tmp/miren-stage222-root-full-checks, /tmp/miren-stage222-root-survey and
 /tmp/miren-stage222-root-release-comparison. Final closure/index records preserve the pre-prose
 947-source capture freeze and separately authenticate the resulting source and staged bytes.
+
+## Stage223: unary Float function tables
+
+Known nongeneric safe Rust `fn(f32) -> f32` and `fn(f64) -> f64` tables preserve exact
+compiler signatures and execute actual available selected bodies. Callable and argument
+evaluation occur once before dispatch. Arguments and returns require the original width,
+term context and a proven numeric/raw decoding relation under actual path conditions.
+Shared dispatch now uses domain-neutral names; integer and Bool/Char behavior is retained.
+
+Identity and negation preserve actual copied raw bits, including NaN payloads and signed zero.
+Arithmetic NaNs retain existing payload/sign nondeterminism. Scalar decoding equality does
+not authenticate an arbitrarily substituted NaN payload, issue mutable Float pair authority,
+or admit Float Repeat, mixed widths, two arguments or opaque function bodies.
+
+Eight cases append to the unchanged 245-case inventory and literal guest prefix.
+All four owner profiles measure 253 cases across 85 families:
+103 PROVED, 87 REFUTED and 63 UNKNOWN. The existing `float_unknown` assertion now refutes
+through its actual identity helper: floating-point NaN is unequal to itself. Exact host
+counterexample encodings are 0x7f800100; ARM captures use 0x7f800010. These are signaling
+NaNs, not positive infinity. Both encodings fail the unchanged claim in native host tests.
+Executing ARM model bits on the host does not establish native ARM execution.
+
+The separately reviewed owner dataset contains 76 groups and 1,868 Proof pairs:
+1,771 literal FULL, 96 exact named changes and one closed query-free Resource context.
+All 3,164 baseline queried obligations/models are exact prefixes of 3,196 current ones,
+including UNKNOWN partials. Named changes include supported outcomes and later unsupported
+frontiers; a changed UNKNOWN frontier is not a successful proof. Eight fresh dependency
+archives preserve retained-body and omitted-body controls. Eight native runs include two
+passing originals and six failing helper mutations with unchanged assertions.
+Four additional host runs reject the exact signaling-NaN counterexample patterns at O0/O2.
+Actual Return controls cover 32 faults and eight restoration observations across four profiles.
+
+Owner source/control and data reviews precede ROOT adoption. All 24 required ROOT commands
+pass: formatting, lint, workspace/Python tests, release builds, dependency policy, documentation,
+three examples including ARM releases, manual hooks and the capability survey.
+Actual logs contain 878 workspace and 9 example Rust tests, totaling 887 outer Rust tests,
+plus 91 Python tests. One nested native ticket test is excluded from the outer total.
+Four fresh ROOT surveys each measure 253 cases across 85 families: 103 P, 87 R and 63 U.
+
+Fresh ROOT release captures cover 76 groups and 1,868 whole Proof objects:
+1867 literal FULL and 1 closed query-free Resource contexts.
+All 3,196 rich queried obligations/models match, including UNKNOWN partials. No ROOT debug CLI
+capture or replay of the owner's compiler/native controls is claimed. The unchanged generic
+resource predicate remains limited to the recorded unbounded scalar fold; no broad waiver applies.
+
+The 949-source adoption preserves 940 committed parent paths. Final documentation closure updates
+five prose files, yielding 13 owned paths and 936 unchanged parent paths. Pre-prose captures keep
+their immutable original association; final source/index records authenticate the prose delta.
+Owner independent implementation/data review remains separate from ROOT consistency validation.
+
+Evidence: /tmp/miren-float-tables-parent222, /tmp/miren-stage223-root-full-checks,
+/tmp/miren-stage223-root-survey and /tmp/miren-stage223-root-release-comparison-ready.

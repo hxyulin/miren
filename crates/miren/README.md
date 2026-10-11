@@ -1303,4 +1303,13 @@ Bool values require their original sort/context; Char arguments and results requ
 scalar validity under actual conditions. Primitive caller grammar and all-target body preflight use
 separate bounded 512-work/depth-16 passes before the new route's normalization and cloning.
 Unsupported grammar, opaque targets and missing bodies refuse. Integer unary/binary and integer
-Repeat admission are unchanged. Float tables and reference or mixed-signature rights stay excluded.
+Repeat admission are unchanged. Reference and mixed-signature rights stay excluded.
+
+Known safe Rust unary `fn(f32) -> f32` and `fn(f64) -> f64` tables execute actual selected
+available bodies, preserving exact original signatures and checked scalar numeric/raw consistency.
+Identity and negation preserve copied raw bits; arithmetic NaNs retain existing payload/sign
+nondeterminism. Decoding equality cannot authenticate arbitrary substituted NaN payloads. Scalar
+transport does not issue mutable Float pair authority or extend Float Repeat, mixed widths or
+two-argument signatures. Compiler Return faults, genuine helper mutations and dependency omission
+controls are validated. Completed ROOT checks and the four-profile 253-case survey are recorded in
+[Stage223](../../docs/stages.md#stage223-unary-float-function-tables).

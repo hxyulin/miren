@@ -3563,3 +3563,15 @@ opaque target grants remain outside this family. Retained controls prove; omitte
 Six new P/R/U controls preserve all 239 existing case objects and original source assertions.
 Completed owner and ROOT checks, mutations and comparison limits are recorded in
 [Stage222 in the stage history](stages.md#stage222-unary-bool-and-char-function-tables).
+
+## Unary Float function tables
+
+Known nongeneric safe Rust unary f32/f64 tables execute actual available selected bodies.
+Exact original widths, current term context, evaluation once and returned Memory remain required.
+Scalar numeric/raw decoding consistency is proved under actual path conditions. Actual identity
+and negation preserve copied raw bits; arithmetic NaNs retain existing payload/sign nondeterminism.
+Decoding equality cannot authenticate an arbitrarily substituted NaN payload or grant mutable
+Float pair authority. Float Repeat, mixed signatures and opaque body grants remain unsupported.
+Eight new cases preserve the original 245-case objects and literal guest source prefix.
+Actual helper mutations, omitted-body controls, Return faults and completed ROOT checks are
+recorded in [Stage223 in the stage history](stages.md#stage223-unary-float-function-tables).

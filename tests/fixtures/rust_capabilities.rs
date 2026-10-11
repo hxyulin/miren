@@ -3638,3 +3638,56 @@ pub fn primitive_table_char_opaque(index: usize, value: char, callback: fn(char)
         assert!(table[index](value) == value);
     }
 }
+
+
+#[inline(never)]
+pub fn float_table_first32(value: f32) -> f32 { value }
+#[inline(never)]
+pub fn float_table_second32(value: f32) -> f32 { -value }
+#[inline(never)]
+pub fn float_table_first64(value: f64) -> f64 { value }
+#[inline(never)]
+pub fn float_table_second64(value: f64) -> f64 { -value }
+
+pub fn float_table_selected32(index: usize, value: f32) {
+    let table: [fn(f32) -> f32; 2] = [float_table_first32, float_table_second32];
+    if index < 2 {
+        let actual = table[index](value);
+        let expected = value.to_bits() ^ if index == 0 { 0 } else { 0x8000_0000 };
+        assert!(actual.to_bits() == expected);
+    }
+}
+pub fn float_table_wrong32(index: usize, value: f32) {
+    let table: [fn(f32) -> f32; 2] = [float_table_first32, float_table_second32];
+    if index < 2 { assert!(table[index](value).to_bits() == value.to_bits()); }
+}
+pub fn float_table_opaque32(index: usize, value: f32, callback: fn(f32) -> f32) {
+    let table: [fn(f32) -> f32; 2] = [float_table_first32, callback];
+    if index < 2 { assert!(table[index](value).to_bits() == value.to_bits()); }
+}
+pub fn float_table_repeat32(index: usize, value: f32) {
+    let callback: fn(f32) -> f32 = float_table_first32;
+    let table = [callback; 2];
+    if index < 2 { assert!(table[index](value).to_bits() == value.to_bits()); }
+}
+pub fn float_table_selected64(index: usize, value: f64) {
+    let table: [fn(f64) -> f64; 2] = [float_table_first64, float_table_second64];
+    if index < 2 {
+        let actual = table[index](value);
+        let expected = value.to_bits() ^ if index == 0 { 0 } else { 0x8000_0000_0000_0000 };
+        assert!(actual.to_bits() == expected);
+    }
+}
+pub fn float_table_wrong64(index: usize, value: f64) {
+    let table: [fn(f64) -> f64; 2] = [float_table_first64, float_table_second64];
+    if index < 2 { assert!(table[index](value).to_bits() == value.to_bits()); }
+}
+pub fn float_table_opaque64(index: usize, value: f64, callback: fn(f64) -> f64) {
+    let table: [fn(f64) -> f64; 2] = [float_table_first64, callback];
+    if index < 2 { assert!(table[index](value).to_bits() == value.to_bits()); }
+}
+pub fn float_table_repeat64(index: usize, value: f64) {
+    let callback: fn(f64) -> f64 = float_table_first64;
+    let table = [callback; 2];
+    if index < 2 { assert!(table[index](value).to_bits() == value.to_bits()); }
+}
