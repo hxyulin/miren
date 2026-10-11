@@ -3147,3 +3147,44 @@ mod stage205_interval_native {
         }
     }
 }
+
+#[inline(never)]
+pub fn stage207_metadata_word(value: u16) -> u16 {
+    value ^ 0
+}
+
+#[inline(never)]
+pub fn stage207_metadata_child(values: &mut [u16], value: u16) {
+    if !values.is_empty() {
+        values[0] = stage207_metadata_word(value);
+    }
+}
+
+pub fn issued_metadata_is_empty(values: &mut [u16], value: u16) {
+    assert!(values.is_empty() == (values.len() == 0));
+    if values.len() > 0 {
+        stage207_metadata_child(values, value);
+        assert!(values[0] == value);
+    }
+}
+
+pub fn issued_metadata_wrong_claim(values: &mut [u16]) {
+    assert!(values.is_empty() != (values.len() == 0));
+}
+
+pub fn issued_metadata_other_element_unknown(values: &mut [i32]) {
+    assert!(values.is_empty() == (values.len() == 0));
+}
+
+#[cfg(test)]
+mod stage207_metadata_native {
+    extern crate std;
+    #[test]
+    fn mutation_guard() {
+        for length in 0..=129 {
+            for value in [0, 1, u16::MAX] {
+                super::issued_metadata_is_empty(&mut std::vec![23; length], value);
+            }
+        }
+    }
+}

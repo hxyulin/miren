@@ -1184,6 +1184,23 @@
       "expected": "unknown",
       "unknown_category": "semantics",
       "unknown_reason": "stage205_interval_outer bb0: mutable integer staging needs a pending child"
+    },
+    {
+      "entry": "issued_metadata_is_empty",
+      "family": "issued_metadata",
+      "expected": "proved"
+    },
+    {
+      "entry": "issued_metadata_wrong_claim",
+      "family": "issued_metadata",
+      "expected": "refuted"
+    },
+    {
+      "entry": "issued_metadata_other_element_unknown",
+      "family": "issued_metadata",
+      "expected": "unknown",
+      "unknown_category": "semantics",
+      "unknown_reason": "mutable u16 roles require selected metadata-only operation"
     }
   ]
 }

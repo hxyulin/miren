@@ -115,6 +115,9 @@ impl<'tcx> Engine<'tcx> {
             self.record_model(callee, "nonzero integer value");
             return Ok(Some(value));
         }
+        if let Some(value) = self.mutable_slice_is_empty(instance, raw_values, state)? {
+            return Ok(Some(value));
+        }
         if self.tcx.lang_items().get(LangItem::SliceLen) == Some(callee) {
             let [receiver] = values else {
                 return Err("slice len receiver is not modeled".to_owned());

@@ -836,7 +836,7 @@ impl<'tcx> Engine<'tcx> {
             };
         };
         // Certified SliceLen and actual panic obligations retain their original distinct paths.
-        if self.tcx.lang_items().get(LangItem::SliceLen) == Some(instance.def_id())
+        if self.mutable_metadata_operation(instance)
             || super::super::identity::is_panic_call(self.tcx, instance.def_id())
             || self.is_core_panic_helper(instance.def_id())
         {

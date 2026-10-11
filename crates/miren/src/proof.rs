@@ -72,6 +72,7 @@ mod mutable_hierarchy;
 mod mutable_interval;
 #[cfg(test)]
 mod mutable_lease_probe;
+mod mutable_metadata;
 mod mutable_slice_ranges;
 mod mutable_u16;
 mod mutable_u16_children;

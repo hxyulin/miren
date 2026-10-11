@@ -366,7 +366,7 @@ impl<'tcx> Engine<'tcx> {
         {
             return Ok(None);
         }
-        if self.tcx.lang_items().get(LangItem::SliceLen) == Some(call.instance.def_id())
+        if self.mutable_metadata_operation(call.instance)
             || super::super::identity::is_panic_call(self.tcx, call.instance.def_id())
             || self.is_core_panic_helper(call.instance.def_id())
         {
@@ -1529,7 +1529,8 @@ pub(super) fn compiler_probe<'tcx>(
     base: &State,
 ) -> String {
     tests::run(engine, root, outer, leaf, base);
-    tests::production_call(engine, root, base, false).unwrap()
+    tests::production_call(engine, root, base);
+    "original is_empty uses its certified metadata relation".into()
 }
 
 #[cfg(test)]
@@ -1686,7 +1687,7 @@ pub(super) fn compiler_production_probe<'tcx>(
     root: &Rc<Body<'tcx>>,
     base: &State,
 ) {
-    assert!(tests::production_call(engine, root, base, true).is_none());
+    tests::production_call(engine, root, base);
 }
 
 #[cfg(test)]
@@ -2254,8 +2255,7 @@ mod tests {
         engine: &mut Engine<'tcx>,
         root: &Rc<Body<'tcx>>,
         base: &State,
-        expected: bool,
-    ) -> Option<String> {
+    ) {
         assert!(!TEST_ISSUANCE.with(std::cell::Cell::get));
         let (block, call) = root
             .basic_blocks
@@ -2459,13 +2459,6 @@ mod tests {
                 .is_none()
         );
         let outcome = engine.mutable_hierarchy_call(&mut state, call());
-        if !expected {
-            return Some(
-                outcome
-                    .err()
-                    .expect("original is_empty must remain unsupported"),
-            );
-        }
         let results = outcome.unwrap().unwrap();
         assert!(!results.is_empty());
         let mut observed_current_store = false;
@@ -2555,7 +2548,6 @@ mod tests {
                 .iter()
                 .any(|entry| entry.function.contains("leaf"))
         );
-        None
     }
 
     pub(super) fn run<'tcx>(

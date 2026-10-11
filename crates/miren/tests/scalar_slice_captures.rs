@@ -124,7 +124,7 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
                 ),
                 "mutable_root" => (
                     UnknownCategory::Semantics,
-                    "mutable u16 roles require selected metadata-only operation",
+                    "mutable u16 roles cannot enter aggregate storage",
                 ),
                 "analyzer_only::dead_capture_storage" => (
                     UnknownCategory::Unclassified,

@@ -1163,3 +1163,11 @@ Empty intervals still require selected child compiler evidence. Retained interva
 splits and returned ordinary references receive no additional permission. Integer interval
 certification preserves typed missing-body and resource refusals; no allocator or input premise
 is added.
+
+Stage 207 admits metadata-only `is_empty` for original issued u16 mutable slice roles. The selected
+available core body, exact shared receiver and Boolean signature are certified before evaluating
+the current view length. The relation grants no data, alias, retained-reference or split rights;
+other primitive elements remain outside this bounded certificate. Existing `len` paths remain
+unchanged. Diagnostic host/ARM O0/O2 captures prove root, whole child and proper empty/nonempty
+views, refute wrong claims and actual scalar-helper mutations, and retain genuine missing-child
+body refusal. Full ROOT validation, release replay and commit remain pending.

@@ -5857,3 +5857,37 @@ debug/release replay and native evidence are separately recorded in
 `/tmp/miren-stage205-root-debug-fidelity`, `/tmp/miren-stage205-root-release-fidelity` and
 `/tmp/miren-stage205-root-combined-native`. Historical actual202 owner evidence keeps its original
 source, binary and counts; earlier stage histories remain intact.
+
+Stage 207 admits metadata-only `is_empty` for original issued u16 mutable slice roles. The selected
+available core body, exact shared receiver and Boolean signature are certified before evaluating
+the current view length. The relation grants no data, alias, retained-reference or split rights;
+other primitive elements remain outside this bounded certificate. Existing `len` paths remain
+unchanged. Diagnostic host/ARM O0/O2 captures prove root, whole child and proper empty/nonempty
+views, refute wrong claims and actual scalar-helper mutations, and retain genuine missing-child
+body refusal. The exact 215-case Stage 205 prefix is retained and three metadata cases append:
+218 cases across 74 families. Four fresh release profiles match 87 PROVED, 76 REFUTED and
+55 UNKNOWN with no errors or new assumptions.
+
+ROOT validation passes all 22 required checks, including 831 Rust workspace tests, 68 Python
+tests, formatting, lint, debug/release builds, dependency checks, documentation, twelve example
+checks and manual hooks. Two historical test expectations required independently reviewed upkeep:
+original issued u16 is_empty now succeeds; a mutable closure capture remains Semantics UNKNOWN
+at aggregate storage. The latter preserves all 272 queries and 100 of 104 paired proof objects;
+only four query/model-free UNKNOWN diagnostic frontiers advance.
+
+Owner-to-ROOT debug replay records 1,130 fully identical objects out of 1,132 pairs
+and all 2,260 queries identical. Final ROOT debug-to-release replay records 1,131
+fully identical objects out of 1,132 pairs and all 2,260 queries identical. Precisely named
+unbounded-fold deadline context differences retain complete raw pairs, query/model-free
+ResourceLimit, the same 30-second budget and every residual field. No result normalization is
+used. Debug evidence is explicitly adopted across the one test-harness literal change; the
+final debug artifact is byte-identical. The initial failed full-run debug binary was overwritten;
+its hash and failed logs remain, but its binary bytes are unavailable. No equivalence is claimed.
+
+Eight fresh ROOT native executions select one actual test each: four originals pass and four
+actual helper mutants fail with exit 101 under ten-second limits. This native evidence is also
+explicitly adopted across that test-only literal change; finite native tests do not bound symbolic
+inputs. Earlier failed full runs, owner checkpoints and actual-parent evidence remain separately
+recorded. Final evidence is under `/tmp/miren-stage207-root-final-full-checks`,
+`/tmp/miren-stage207-root-final-survey`, `/tmp/miren-stage207-root-replay` and
+`/tmp/miren-stage207-root-native`. These counts describe Rust capability cases, not fleet coverage.

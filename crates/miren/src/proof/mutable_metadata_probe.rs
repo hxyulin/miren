@@ -1,0 +1,492 @@
+use super::*;
+
+#[test]
+fn metadata_override_restores_nested_and_panicking_scopes() {
+    assert!(!TEST_ENABLED.with(std::cell::Cell::get));
+    assert_eq!(enabled(), IS_EMPTY_ENABLED);
+    {
+        let _outer = TestEnabled::enable();
+        assert!(enabled());
+        assert!(TEST_ENABLED.with(std::cell::Cell::get));
+        {
+            let _inner = TestEnabled::enable();
+            assert!(enabled());
+            assert!(TEST_ENABLED.with(std::cell::Cell::get));
+        }
+        assert!(enabled());
+        assert!(TEST_ENABLED.with(std::cell::Cell::get));
+        let _ = std::panic::catch_unwind(|| {
+            let _inner = TestEnabled::enable();
+            panic!("test");
+        });
+        assert!(enabled());
+        assert!(TEST_ENABLED.with(std::cell::Cell::get));
+    }
+    assert!(!TEST_ENABLED.with(std::cell::Cell::get));
+    assert_eq!(enabled(), IS_EMPTY_ENABLED);
+}
+
+#[test]
+fn compiler_issued_is_empty_requires_exact_metadata_body_and_live_original_role() {
+    struct Capture;
+    impl rustc_driver::Callbacks for Capture {
+        fn after_analysis<'tcx>(
+            &mut self,
+            _: &rustc_interface::interface::Compiler,
+            tcx: TyCtxt<'tcx>,
+        ) -> rustc_driver::Compilation {
+            let mut engine = test_engine(tcx);
+            let id = tcx
+                .mir_keys(())
+                .iter()
+                .find(|id| {
+                    tcx.def_kind(id.to_def_id()) == DefKind::Fn
+                        && tcx.item_name(id.to_def_id()).as_str() == "root"
+                })
+                .unwrap()
+                .to_def_id();
+            let caller = engine
+                .instantiated_body(ty::Instance::mono(tcx, id))
+                .unwrap();
+            let selected = caller
+                .basic_blocks
+                .iter()
+                .find_map(|block| {
+                    if let TerminatorKind::Call { func, .. } = &block.terminator().kind
+                        && let ty::FnDef(id, args) = func.ty(&caller.local_decls, tcx).kind()
+                        && tcx.def_kind(*id) == DefKind::AssocFn
+                        && tcx.item_name(*id).as_str() == "is_empty"
+                    {
+                        return Some(
+                            engine
+                                .resolve_function_item(*id, args.skip_binder())
+                                .unwrap(),
+                        );
+                    }
+                    None
+                })
+                .unwrap();
+            assert_eq!(
+                engine.mutable_metadata_operation(selected),
+                IS_EMPTY_ENABLED
+            );
+            let _enabled = TestEnabled::enable();
+            for element in [tcx.types.bool, tcx.types.char, tcx.types.f32, tcx.types.u8] {
+                let other = engine
+                    .resolve_function_item(selected.def_id(), tcx.mk_args(&[element.into()]))
+                    .unwrap();
+                assert!(!engine.issued_is_empty_candidate(other));
+                assert!(!engine.mutable_metadata_operation(other));
+            }
+            assert!(!engine.issued_is_empty_candidate(ty::Instance::mono(tcx, id)));
+            let closure_body = tcx
+                .mir_keys(())
+                .iter()
+                .find(|id| tcx.def_kind(id.to_def_id()) == DefKind::Closure)
+                .unwrap()
+                .to_def_id();
+            let closure = ty::Instance::new_raw(
+                closure_body,
+                ty::GenericArgs::identity_for_item(tcx, closure_body),
+            );
+            assert!(!engine.issued_is_empty_candidate(closure));
+            engine.certify_issued_is_empty(selected).unwrap();
+            let original = engine.instantiated_body(selected).unwrap();
+            for mutation in [
+                "source",
+                "coroutine",
+                "return",
+                "receiver",
+                "temporary",
+                "op",
+                "operand",
+                "effect",
+                "zero",
+                "cleanup",
+                "control",
+            ] {
+                let mut changed = (*original).clone();
+                match mutation {
+                    "source" => {
+                        changed.source.instance = ty::InstanceKind::Virtual(selected.def_id(), 0)
+                    }
+                    "coroutine" => {
+                        changed.coroutine =
+                            Some(Box::new(rustc_middle::mir::CoroutineInfo::initial(
+                                rustc_hir::CoroutineKind::Coroutine(rustc_hir::Movability::Movable),
+                                tcx.types.unit,
+                                tcx.types.unit,
+                            )))
+                    }
+                    "return" => {
+                        changed.local_decls[rustc_middle::mir::RETURN_PLACE].ty = tcx.types.usize
+                    }
+                    "receiver" => {
+                        changed.local_decls[rustc_middle::mir::Local::from_usize(1)].ty =
+                            Ty::new_imm_ref(
+                                tcx,
+                                tcx.lifetimes.re_erased,
+                                Ty::new_slice(tcx, tcx.types.i16),
+                            )
+                    }
+                    "temporary" => {
+                        changed.local_decls[rustc_middle::mir::Local::from_usize(2)].ty =
+                            tcx.types.u16
+                    }
+                    "effect" => {
+                        let statement = changed.basic_blocks[START_BLOCK].statements[0].clone();
+                        changed.basic_blocks.as_mut()[START_BLOCK]
+                            .statements
+                            .push(statement);
+                    }
+                    "cleanup" => changed.basic_blocks.as_mut()[START_BLOCK].is_cleanup = true,
+                    "control" => {
+                        changed.basic_blocks.as_mut()[START_BLOCK]
+                            .terminator_mut()
+                            .kind = TerminatorKind::Unreachable
+                    }
+                    "op" | "operand" | "zero" => {
+                        let StatementKind::Assign(assignment) =
+                            &mut changed.basic_blocks.as_mut()[START_BLOCK].statements[2].kind
+                        else {
+                            panic!("equality")
+                        };
+                        if mutation == "op" {
+                            let Rvalue::BinaryOp(op, _) = &mut assignment.1 else {
+                                panic!("op")
+                            };
+                            *op = BinOp::Ne;
+                        } else {
+                            let Rvalue::BinaryOp(_, operands) = &mut assignment.1 else {
+                                panic!("operand")
+                            };
+                            if mutation == "zero" {
+                                let Operand::Constant(constant) = &mut operands.1 else {
+                                    panic!("constant")
+                                };
+                                constant.const_ = rustc_middle::mir::Const::Val(
+                                    rustc_middle::mir::ConstValue::Scalar(
+                                        rustc_middle::mir::interpret::Scalar::from_target_usize(
+                                            1, &tcx,
+                                        ),
+                                    ),
+                                    tcx.types.usize,
+                                );
+                            } else {
+                                operands.0 = Operand::Move(Place::from(
+                                    rustc_middle::mir::Local::from_usize(1),
+                                ));
+                            }
+                        }
+                    }
+                    _ => panic!("mutation"),
+                }
+                engine
+                    .bodies
+                    .borrow_mut()
+                    .insert(selected, std::rc::Rc::new(changed));
+                assert!(
+                    engine.certify_issued_is_empty(selected).is_err(),
+                    "{mutation}"
+                );
+                engine
+                    .bodies
+                    .borrow_mut()
+                    .insert(selected, original.clone());
+            }
+            let mut memory = Memory::default();
+            let mut conditions = Vec::new();
+            engine
+                .mutable_u16_input(tcx.types.u16, &mut memory, &mut conditions)
+                .unwrap();
+            let metadata = Value::MutableU16 {
+                id: 0,
+                role: MutableU16Role::Metadata { generation: 0 },
+            };
+            let state = State {
+                locals: vec![],
+                addresses: vec![],
+                missing_places: Default::default(),
+                conditions,
+                memory,
+            };
+            assert!(
+                engine
+                    .mutable_slice_is_empty(selected, std::slice::from_ref(&metadata), &state)
+                    .unwrap()
+                    .is_some()
+            );
+            let mut dead = state.clone();
+            let allocation = dead.memory.mutable_u16[0].allocation;
+            dead.memory[allocation] = None;
+            assert!(
+                engine
+                    .mutable_slice_is_empty(selected, std::slice::from_ref(&metadata), &dead)
+                    .is_err()
+            );
+            let mut masked = state.clone();
+            masked
+                .memory
+                .missing_places
+                .consume(allocation, vec![])
+                .unwrap();
+            assert!(
+                engine
+                    .mutable_slice_is_empty(selected, std::slice::from_ref(&metadata), &masked)
+                    .is_err()
+            );
+            let mut foreign_context = state.clone();
+            std::rc::Rc::make_mut(&mut foreign_context.memory.mutable_u16)[0].length = Value::Int {
+                expression: Context::default()
+                    .bit_vector(0, u32::from(tcx.sess.target.pointer_width))
+                    .unwrap(),
+                bits: u32::from(tcx.sess.target.pointer_width),
+                signed: false,
+            };
+            assert!(
+                engine
+                    .mutable_slice_is_empty(
+                        selected,
+                        std::slice::from_ref(&metadata),
+                        &foreign_context
+                    )
+                    .is_err()
+            );
+            let mut other_memory = Memory::default();
+            engine
+                .mutable_u16_input(tcx.types.i16, &mut other_memory, &mut Vec::new())
+                .unwrap();
+            let mut wrong_type = state.clone();
+            std::rc::Rc::make_mut(&mut wrong_type.memory.mutable_u16)[0].certificate =
+                other_memory.mutable_u16[0].certificate;
+            assert!(
+                engine
+                    .mutable_slice_is_empty(selected, std::slice::from_ref(&metadata), &wrong_type)
+                    .is_err()
+            );
+            let stale = Value::MutableU16 {
+                id: 0,
+                role: MutableU16Role::Metadata { generation: 1 },
+            };
+            assert!(
+                engine
+                    .mutable_slice_is_empty(selected, &[stale], &state)
+                    .is_err()
+            );
+            let ghost = engine
+                .mutable_u16_snapshot(
+                    &Value::MutableU16 {
+                        id: 0,
+                        role: MutableU16Role::Root,
+                    },
+                    &state.memory,
+                )
+                .unwrap();
+            assert!(
+                engine
+                    .mutable_slice_is_empty(selected, std::slice::from_ref(&ghost), &state)
+                    .is_err()
+            );
+            // The public call boundary must reject a Ghost and a consumed source handle.
+            let mut boundary = (*original).clone();
+            let local = rustc_middle::mir::Local::from_usize(1);
+            let mut boundary_state = state.clone();
+            boundary_state.locals = vec![Some(Value::Uninitialized), Some(ghost)];
+            boundary_state.addresses = vec![None; 2];
+            let args = [rustc_span::Spanned {
+                node: Operand::Copy(Place::from(local)),
+                span: rustc_span::DUMMY_SP,
+            }];
+            assert!(
+                engine
+                    .mutable_u16_call_allowed(&boundary, &boundary_state, selected, &args)
+                    .is_err()
+            );
+            boundary_state.locals[1] = Some(metadata.clone());
+            boundary_state.missing_places.consume(1, vec![]).unwrap();
+            assert!(
+                engine
+                    .mutable_u16_call_allowed(&boundary, &boundary_state, selected, &args)
+                    .is_err()
+            );
+            boundary_state.missing_places = Default::default();
+            boundary.local_decls[local].ty = Ty::new_imm_ref(
+                tcx,
+                tcx.lifetimes.re_erased,
+                Ty::new_slice(tcx, tcx.types.i16),
+            );
+            assert!(
+                engine
+                    .mutable_u16_call_allowed(&boundary, &boundary_state, selected, &args)
+                    .is_err()
+            );
+            for name in [
+                "root",
+                "whole",
+                "proper",
+                "proper_empty",
+                "len_anchor",
+                "nested",
+            ] {
+                let mut engine = test_engine(tcx);
+                let id = tcx
+                    .mir_keys(())
+                    .iter()
+                    .find(|id| {
+                        tcx.def_kind(id.to_def_id()) == DefKind::Fn
+                            && tcx.item_name(id.to_def_id()).as_str() == name
+                    })
+                    .unwrap()
+                    .to_def_id();
+                let instance = ty::Instance::mono(tcx, id);
+                let body = engine.instantiated_body(instance).unwrap();
+                let mut memory = Memory::default();
+                let mut conditions = Vec::new();
+                let mut values = Vec::new();
+                for local in body.args_iter() {
+                    let original = body.local_decls[local].ty;
+                    if matches!(original.kind(), ty::Ref(..)) {
+                        values.push(
+                            engine
+                                .mutable_u16_input(tcx.types.u16, &mut memory, &mut conditions)
+                                .unwrap(),
+                        );
+                    } else {
+                        let (bits, signed) = engine.integer_type(original).unwrap();
+                        values.push(Value::Int {
+                            expression: engine.fresh(Sort::BitVec(bits)),
+                            bits,
+                            signed,
+                        });
+                    }
+                }
+                engine
+                    .execute_body(instance, values, conditions, memory, &[])
+                    .unwrap();
+                assert_eq!(engine.proof.status, ProofStatus::Proved, "{name}");
+            }
+            println!(
+                "actual issued is_empty profile {} passed",
+                tcx.sess.target.llvm_target
+            );
+            rustc_driver::Compilation::Stop
+        }
+    }
+    let directory = std::path::PathBuf::from("/tmp/miren-stage207-parent205/compiler-lifecycle");
+    std::fs::create_dir_all(&directory).unwrap();
+    let source = directory.join("fixture.rs");
+    std::fs::write(
+        &source,
+        format!(
+            concat!(
+                "{}\n",
+                "pub fn closure_guard(value:u16)->u16 {{",
+                " let callback=|word:u16|word; callback(value) }}\n",
+                "#[inline(never)] pub fn intermediate(values: &mut [u16], value: u16) {{",
+                " child(values, value); }}\n",
+                "pub fn nested(values: &mut [u16], value: u16) {{ if values.len() > 0 {{",
+                " intermediate(values, value); assert!(values[0] == value); }} }}\n",
+            ),
+            include_str!("../../../../tests/fixtures/issued_is_empty.rs"),
+        ),
+    )
+    .unwrap();
+    for target in [None, Some("thumbv7em-none-eabihf")] {
+        for level in [0, 2] {
+            let out = directory.join(format!("{}-{level}", target.unwrap_or("host")));
+            std::fs::create_dir_all(&out).unwrap();
+            let mut args = vec![
+                "rustc".into(),
+                "--crate-type=lib".into(),
+                "--edition=2024".into(),
+                source.display().to_string(),
+                "--out-dir".into(),
+                out.display().to_string(),
+                "-Cpanic=abort".into(),
+                format!("-Copt-level={level}"),
+                "-Zmir-opt-level=0".into(),
+            ];
+            if let Some(target) = target {
+                args.extend(["--target".into(), target.into()]);
+            }
+            rustc_driver::run_compiler(&args, &mut Capture);
+        }
+    }
+}
+
+fn test_engine(tcx: TyCtxt<'_>) -> Engine<'_> {
+    let config = miren::ContractConfig::default();
+    let limits = miren::AnalysisLimits::default();
+    let all_failures = false;
+    let induction = false;
+    let startup = false;
+    let isolated_startup = false;
+    let async_entry = false;
+    Engine {
+        tcx,
+        terms: Context::default(),
+        next_symbol: std::cell::Cell::new(0),
+        float_encodings: BTreeMap::new(),
+        float_pairs: float_pairs::Registry::default(),
+        abstraction_symbols: std::cell::RefCell::new(BTreeMap::new()),
+        static_views: std::cell::RefCell::new(Vec::new()),
+        static_origins: Default::default(),
+        static_epoch: None,
+        static_roots: None,
+        function_pointers: std::cell::RefCell::new(Vec::new()),
+        static_addresses: std::collections::HashMap::new(),
+        tracked_addresses: Vec::new(),
+        maybe_uninit_types: Vec::new(),
+        scalar_slice_types: Vec::new(),
+        composite_slice_types: Vec::new(),
+        steps: 0,
+        call_chain: Vec::new(),
+        failed_call_chain: None,
+        trait_objects: Vec::new(),
+        input_depth: 0,
+        input_values: 0,
+        input_reservations: Vec::new(),
+        owned_projection_certificates: Vec::new(),
+        input_shapes: std::collections::HashMap::new(),
+        zero_sized_inputs: std::collections::HashMap::new(),
+        zero_sized_input_nodes: 0,
+        prefer_lazy_inputs: false,
+        building_mutable_input: false,
+        unknown_causes: std::cell::RefCell::new(BTreeMap::new()),
+        started: std::time::Instant::now(),
+        config: config.clone(),
+        all_failures,
+        induction,
+        startup,
+        isolated_startup,
+        limits,
+        resolved_contracts: BTreeMap::new(),
+        solver: std::cell::RefCell::new(Solver::with_limits(limits)),
+        mutable_u16_frames: Default::default(),
+        mutable_integer_types: Vec::new(),
+        mutable_u16_staging: Default::default(),
+        coroutine_places: Default::default(),
+        owned_box_types: Vec::new(),
+        next_owned_region: 0,
+        owned_box_constructors: Vec::new(),
+        bodies: std::cell::RefCell::new(std::collections::HashMap::new()),
+        call_signatures: std::cell::RefCell::new(std::collections::HashMap::new()),
+        proof: Proof {
+            status: ProofStatus::Proved,
+            async_entry,
+            assumptions: Vec::new(),
+            entry_assumptions: Vec::new(),
+            inputs: BTreeMap::new(),
+            models: Vec::new(),
+            invariants: Vec::new(),
+            analyzed_bodies: Vec::new(),
+            body_entries: Vec::new(),
+            body_entries_truncated: false,
+            obligations: Vec::new(),
+            trusted_calls: Vec::new(),
+            matched_contracts: Vec::new(),
+            stopped_after_counterexample: false,
+            replay_inputs: None,
+        },
+    }
+}

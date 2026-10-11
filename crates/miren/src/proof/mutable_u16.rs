@@ -728,7 +728,7 @@ impl<'tcx> Engine<'tcx> {
                                 | MutableU16Role::ChildMetadata { .. }
                                 | MutableU16Role::HierarchyMetadata { .. }
                         )
-                        || self.tcx.lang_items().get(LangItem::SliceLen) != Some(instance.def_id())
+                        || !self.mutable_metadata_operation(instance)
                         || !self.mutable_u16_matches(
                             body.local_decls[place.local].ty,
                             id,
