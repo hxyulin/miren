@@ -346,3 +346,13 @@ diagnostic. Legacy cases without that optional field retain diagnostic-only matc
 does not execute counterexamples; valid native/mutation controls live in the Cargo integration test.
 
 See [the capability roadmap](../docs/rust-capabilities.md) for scope and extension boundaries.
+
+Strict Proof validation and comparison are shared in `proof_compare.py`. Capability surveys
+validate the complete selected set, required DTO fields, empty premises, obligation status
+priority and the actual numeric analyzer exit before checking manifest outcomes. Contradictory
+PROVED reports, malformed fields and unrecognized UNKNOWN categories fail validation. No fields
+are supplied or normalized; diagnostics for malformed reports may differ from older versions.
+Fleet's conditional-result reader and summary diff retain their separate policies. The pure
+comparison helper preserves whole Proofs and every queried obligation, including UNKNOWN
+partials, and distinguishes JSON value types. Its narrow scalar-fold allowance is opt-in and
+is never used by capability surveys.

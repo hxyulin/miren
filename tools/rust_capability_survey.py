@@ -9,6 +9,7 @@ from pathlib import Path
 import sys
 
 from fleet_survey import digest, execute, freeze_analyzer, revision, save
+from proof_compare import selected_proofs
 
 
 STATUSES = {"proved", "refuted", "unknown"}
@@ -53,46 +54,23 @@ def load_manifest(path, repository):
     return manifest, fixture
 
 
-def check_report(report, cases):
-    """Demand actual proofs, exact roots, strict premises and retained failure evidence."""
+def check_report(report, cases, numeric_exit):
+    """Validate strict Proof DTOs, then check the declared capability frontiers."""
+    try:
+        proofs = selected_proofs(report, [case["entry"] for case in cases], numeric_exit)
+    except ValueError as error:
+        return [], [str(error)]
     errors = []
     results = []
-    if not isinstance(report, dict) or not isinstance(report.get("functions"), list):
-        return [], ["invalid report shape"]
-    functions = report.get("functions", [])
-    if any(not isinstance(f, dict) or not isinstance(f.get("name"), str) for f in functions):
-        return [], ["invalid function shape"]
     for case in cases:
-        matches = [f for f in functions if f.get("name") == case["entry"]]
-        if len(matches) != 1 or not isinstance(matches[0].get("proof"), dict):
-            errors.append(case["entry"] + ": missing or duplicate verified root")
-            continue
-        proof = matches[0]["proof"]
-        status = proof.get("status")
-        if not isinstance(status, str) or status not in STATUSES:
-            errors.append(case["entry"] + ": invalid proof status")
-            continue
-        obligations = proof.get("obligations")
-        if (not isinstance(obligations, list)
-                or any(not isinstance(o, dict) or not isinstance(o.get("detail"), str)
-                       for o in obligations)):
-            errors.append(case["entry"] + ": invalid obligation shape")
-            continue
+        proof = proofs[case["entry"]]
+        status = proof["status"]
+        obligations = proof["obligations"]
         if status != case["expected"]:
             errors.append(f"{case['entry']}: expected {case['expected']}, got {status}")
-        # entry_assumptions is explicitly omitted by the DTO when empty.
-        if (any(proof.get(field) != [] for field in ["assumptions", "trusted_calls"])
-                or proof.get("entry_assumptions", []) != []):
-            errors.append(case["entry"] + ": strict capability needs explicit empty premises")
-        if status == "refuted" and not any(
-                o.get("status") == "refuted"
-                and isinstance(o.get("query"), str) and o["query"]
-                and isinstance(o.get("model"), str) and o["model"]
-                for o in obligations):
-            errors.append(case["entry"] + ": missing counterexample query/model")
         if status == "unknown" and not any(
-                o.get("status") == "unknown"
-                and case.get("unknown_reason", "") in o.get("detail", "")
+                o["status"] == "unknown"
+                and case.get("unknown_reason", "") in o["detail"]
                 and ("unknown_category" not in case
                      or o.get("unknown_category") == case["unknown_category"])
                 for o in obligations):
@@ -100,11 +78,8 @@ def check_report(report, cases):
         results.append({"entry": case["entry"], "family": case["family"],
                         "expected": case["expected"], "actual": status,
                         "gaps": [{"category": o.get("unknown_category", "unclassified"),
-                                  "detail": o.get("detail")}
-                                 for o in obligations if o.get("status") == "unknown"]})
-    selected = [f.get("name") for f in functions if f.get("proof") is not None]
-    if sorted(selected) != sorted(c["entry"] for c in cases):
-        errors.append("selected root set differs from capability manifest")
+                                  "detail": o["detail"]}
+                                 for o in obligations if o["status"] == "unknown"]})
     return results, errors
 
 
@@ -169,12 +144,7 @@ def run(args):
                 if report.get("contract_config") is not None:
                     raise ValueError("unexpected contract configuration")
                 check_configuration(report, arguments, target or host, version[0])
-                results, errors = check_report(report, manifest["cases"])
-                # REFUTED/UNKNOWN selected roots intentionally produce a nonzero CLI exit.
-                expected_exit = 0 if all(c["expected"] == "proved"
-                                         for c in manifest["cases"]) else 1
-                if record["returncode"] != expected_exit:
-                    errors.append(f"unexpected analyzer exit: {record['returncode']}")
+                results, errors = check_report(report, manifest["cases"], record["returncode"])
             except (ValueError, TypeError, KeyError) as error:
                 results, errors = [], [str(error)]
             summary["runs"].append({"configuration": name, "results": results,
