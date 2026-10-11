@@ -6,6 +6,22 @@ use super::*;
 const ENABLE_FUNCTION_TABLES: bool = true;
 const ENABLE_INTEGER_FUNCTION_TABLES: bool = true;
 const ENABLE_INTEGER_FUNCTION_TABLE_PAIRS: bool = true;
+const ENABLE_TWO_ARGUMENT_INTEGER_FUNCTION_TABLES: bool = true;
+
+#[cfg(test)]
+thread_local! {
+    static TWO_ARGUMENT_TABLE_OVERRIDE: std::cell::Cell<bool> = const {
+        std::cell::Cell::new(false)
+    };
+}
+
+fn two_argument_tables_enabled() -> bool {
+    #[cfg(test)]
+    if TWO_ARGUMENT_TABLE_OVERRIDE.with(std::cell::Cell::get) {
+        return true;
+    }
+    ENABLE_TWO_ARGUMENT_INTEGER_FUNCTION_TABLES
+}
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 struct IntegerSignature<'tcx> {
@@ -17,6 +33,13 @@ struct IntegerSignature<'tcx> {
 #[derive(Clone, Copy, PartialEq, Eq)]
 struct IntegerCallSignature<'tcx> {
     argument: IntegerSignature<'tcx>,
+    result: IntegerSignature<'tcx>,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+struct TwoArgumentIntegerSignature<'tcx> {
+    first: IntegerSignature<'tcx>,
+    second: IntegerSignature<'tcx>,
     result: IntegerSignature<'tcx>,
 }
 
@@ -93,6 +116,30 @@ impl<'tcx> Engine<'tcx> {
         })
     }
 
+    fn two_argument_integer_signature(
+        &self,
+        callable: Ty<'tcx>,
+    ) -> Option<TwoArgumentIntegerSignature<'tcx>> {
+        let ty::FnPtr(..) = callable.kind() else {
+            return None;
+        };
+        let signature = callable.fn_sig(self.tcx).skip_binder();
+        let [first, second] = signature.inputs() else {
+            return None;
+        };
+        if signature.safety() != rustc_hir::Safety::Safe
+            || signature.abi() != rustc_abi::ExternAbi::Rust
+            || signature.c_variadic()
+        {
+            return None;
+        }
+        Some(TwoArgumentIntegerSignature {
+            first: self.original_integer_signature(*first)?,
+            second: self.original_integer_signature(*second)?,
+            result: self.original_integer_signature(signature.output())?,
+        })
+    }
+
     fn table_signature(&self, callable: Ty<'tcx>) -> bool {
         self.integer_table_signature(callable)
             .is_some_and(|signature| {
@@ -103,6 +150,8 @@ impl<'tcx> Engine<'tcx> {
                         || ENABLE_INTEGER_FUNCTION_TABLES
                 }
             })
+            || (two_argument_tables_enabled()
+                && self.two_argument_integer_signature(callable).is_some())
     }
 
     fn validate_table_result(
@@ -179,7 +228,9 @@ impl<'tcx> Engine<'tcx> {
         let ty::Array(element, count) = original.kind() else {
             return Ok(None);
         };
-        if self.integer_table_signature(*element).is_none() {
+        if self.integer_table_signature(*element).is_none()
+            && self.two_argument_integer_signature(*element).is_none()
+        {
             return Ok(None);
         }
         if elements.is_empty()
@@ -248,7 +299,8 @@ impl<'tcx> Engine<'tcx> {
             ));
         };
         if signature != expected
-            || self.integer_table_signature(signature).is_none()
+            || (self.integer_table_signature(signature).is_none()
+                && self.two_argument_integer_signature(signature).is_none())
             || !matches!(instance.def, ty::InstanceKind::Item(_))
             || !matches!(
                 self.tcx.def_kind(instance.def_id()),
@@ -327,6 +379,13 @@ impl<'tcx> Engine<'tcx> {
             return Err("function table choice lost its original array type".into());
         };
         let Some(integer) = self.integer_table_signature(callable) else {
+            if two_argument_tables_enabled()
+                && let Some(integer) = self.two_argument_integer_signature(callable)
+            {
+                return self.prepared_two_argument_table_call(
+                    state, call, &choice, *id, callable, integer,
+                );
+            }
             return Err("function table call requires an original integer signature".into());
         };
         if callable != choice.signature
@@ -429,6 +488,125 @@ impl<'tcx> Engine<'tcx> {
             for result in self.call_instance(
                 instance,
                 vec![value.clone()],
+                conditions,
+                branch.memory.clone(),
+                call.stack,
+                call.site,
+            )? {
+                self.validate_table_result(&result.value, integer.result)?;
+                returns.push((branch.clone(), result));
+            }
+        }
+        Ok(Some(returns))
+    }
+
+    fn prepared_two_argument_table_call(
+        &mut self,
+        state: &State,
+        call: TableCall<'_, 'tcx>,
+        choice: &Choice<'tcx>,
+        id: usize,
+        callable: Ty<'tcx>,
+        integer: TwoArgumentIntegerSignature<'tcx>,
+    ) -> Result<Option<Vec<(State, Return)>>, String> {
+        let ty::Array(element, count) = choice.original.kind() else {
+            return Err("two-argument table lost its original array type".into());
+        };
+        if callable != choice.signature
+            || self.tcx.erase_and_anonymize_regions(*element) != callable
+            || count.try_to_target_usize(self.tcx) != Some(choice.targets.len() as u64)
+            || choice.targets.is_empty()
+            || choice.targets.len() > MAX_ARRAY_ELEMENTS
+            || !choice.index.belongs_to(&self.terms)
+            || choice.index.sort() != &Sort::BitVec(u32::from(self.tcx.sess.target.pointer_width))
+            || call.args.len() != 2
+            || call.target.is_none()
+            || !state.memory.mutable_u16.is_empty()
+            || !state.memory.owned_regions.is_empty()
+        {
+            return Err("two-argument table exceeds its primitive prepared-call domain".into());
+        }
+        for operand in call.args {
+            if let Operand::Copy(place) | Operand::Move(place) = operand.node {
+                self.owned_field_footprint(call.body, place)?;
+            }
+        }
+        self.owned_field_footprint(call.body, call.destination)?;
+        if call.args[0].node.ty(&call.body.local_decls, self.tcx) != integer.first.original
+            || call.args[1].node.ty(&call.body.local_decls, self.tcx) != integer.second.original
+            || call.destination.ty(&call.body.local_decls, self.tcx).ty != integer.result.original
+        {
+            return Err("two-argument table operands differ from original A/B/R types".into());
+        }
+        // Preserve the old all-target validation policy before feasibility or operand reads.
+        let instances = choice
+            .targets
+            .iter()
+            .map(|id| self.validate_table_target(*id, callable))
+            .collect::<Result<Vec<_>, _>>()?;
+        let bits = u32::from(self.tcx.sess.target.pointer_width);
+        let outside = self.terms.apply(
+            Op::Not,
+            &[self.terms.apply(
+                Op::BvUnsignedLt,
+                &[
+                    choice.index.clone(),
+                    self.terms.bit_vector(choice.targets.len() as u128, bits)?,
+                ],
+            )?],
+        )?;
+        let mut uncovered = state.conditions.clone();
+        uncovered.push(outside);
+        if self.feasible(&uncovered)? {
+            return Err("two-argument table lost its covered index domain".into());
+        }
+        let next = self
+            .steps
+            .checked_add(instances.len())
+            .ok_or("function table step overflow")?;
+        if next > self.limits.max_steps {
+            return Err(self.categorized_error(
+                UnknownCategory::ResourceLimit,
+                "function table expansion exceeds execution step budget".into(),
+            ));
+        }
+        self.steps = next;
+        let mut consumed = state.clone();
+        let actual = self.evaluate_operand(call.site.0, call.body, &mut consumed, call.func)?;
+        if !matches!(actual, Value::FunctionPointer { id: actual } if actual == id) {
+            return Err("two-argument table callable differs from its routing hint".into());
+        }
+        let first =
+            self.evaluate_operand(call.site.0, call.body, &mut consumed, &call.args[0].node)?;
+        self.validate_table_result(&first, integer.first)?;
+        let second =
+            self.evaluate_operand(call.site.0, call.body, &mut consumed, &call.args[1].node)?;
+        self.validate_table_result(&second, integer.second)?;
+        let values = vec![first, second];
+        self.validate_owned_call_arguments(&values, &consumed.memory)?;
+        let mut returns = Vec::new();
+        for (position, instance) in instances.into_iter().enumerate() {
+            let mut conditions = consumed.conditions.clone();
+            conditions.push(self.terms.apply(
+                Op::Equal,
+                &[
+                    choice.index.clone(),
+                    self.terms.bit_vector(position as u128, bits)?,
+                ],
+            )?);
+            if !self.feasible(&conditions)? {
+                continue;
+            }
+            if self.specification(instance)?.is_some() {
+                return Err(
+                    "function table configured target is outside the initial domain".into(),
+                );
+            }
+            let mut branch = consumed.clone();
+            self.byte_copy_call_eligibility(instance, true, &mut branch);
+            for result in self.call_instance(
+                instance,
+                values.clone(),
                 conditions,
                 branch.memory.clone(),
                 call.stack,

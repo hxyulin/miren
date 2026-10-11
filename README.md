@@ -56,7 +56,11 @@ associated calls and original constant-index reads and stores. Exact f32/f64 bac
 preserves NaN payloads and signed-zero bits. Deeper nesting and the dedicated proper-reborrow
 caller remain UNKNOWN. Bounded owned u16 products also support writes through multiple symbolic
 suffix indices, preserving compiler types and current Memory. The validated capability survey
-covers 236 cases across 80 families.
+covers 239 cases across 81 families.
+
+Known local integer function tables support one or two integer arguments, preserving exact
+compiler signatures and executing selected helper bodies. Repeat-produced pointers remain
+unsupported. See the [capability evidence](docs/rust-capabilities.md) for scope and limits.
 
 ## Install
 

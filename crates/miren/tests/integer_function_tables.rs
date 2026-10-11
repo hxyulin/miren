@@ -45,12 +45,12 @@ fn original_integer_signatures_execute_bodies_and_preserve_overflow_obligations(
         "char_unknown",
         "float_unknown",
         "nz_unknown",
-        "arity_unknown",
         "abi_unknown",
     ] {
         names.push((name.into(), U));
     }
     names.push(("result_unknown".into(), R));
+    names.push(("arity_unknown".into(), R));
     names.extend([("associated".into(), P), ("wrong_associated".into(), R)]);
     let entries: Vec<_> = names
         .iter()
@@ -59,6 +59,29 @@ fn original_integer_signatures_execute_bodies_and_preserve_overflow_obligations(
     for target in [None, Some("thumbv7em-none-eabihf")] {
         for optimized in [false, true] {
             let report = verify(&fixture(), &entries, target, optimized, &[]);
+            let arity = report
+                .functions
+                .iter()
+                .find(|f| f.name == "arity_unknown")
+                .unwrap()
+                .proof
+                .as_ref()
+                .unwrap();
+            assert!(
+                arity
+                    .body_entries
+                    .iter()
+                    .any(|entry| entry.function == "pair_second")
+            );
+            assert!(arity.obligations.iter().any(|obligation| {
+                obligation.status == R
+                    && obligation.query.is_some()
+                    && obligation.model.as_ref().is_some_and(|model| {
+                        let compact = model.split_whitespace().collect::<Vec<_>>().join(" ");
+                        compact.contains("(define-fun v0 () (_ BitVec 32) (_ bv1 32))")
+                            || compact.contains("(define-fun v0 () (_ BitVec 64) (_ bv1 64))")
+                    })
+            }));
             for module in MODULES {
                 let proof = report
                     .functions

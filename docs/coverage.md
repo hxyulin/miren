@@ -3521,3 +3521,17 @@ Evidence is under /tmp/miren-stage215-parent214, /tmp/miren-stage215-parent214-c
 /tmp/miren-stage215-root-survey, /tmp/miren-stage215-root-release-integration and
 /tmp/miren-stage215-root-final-data. These measurements describe selected Rust capabilities,
 not full Rust parity or firmware coverage.
+
+## Stage216: known two-argument integer function tables
+
+Known local tables support two independently typed integer arguments and an integer result.
+Exact compiler signatures, all-target validation, evaluation once in argument order and actual
+selected helper bodies remain required. Current returned Memory is preserved. Arbitrary pointer
+inputs, unsupported signatures and Repeat-produced pointers remain UNKNOWN; table limits and
+unary behavior stay unchanged.
+
+All 22 required ROOT checks pass, including 864 Rust tests and 68 Python tests. Four surveys
+cover 239 cases across 81 families with 98 PROVED, 83 REFUTED and 58 UNKNOWN each. Actual helper
+and order mutations fail native execution; omitted dependency bodies remain UNKNOWN. Fresh
+release compatibility preserves all 5,228 rich queried obligations/models on frozen owner inputs.
+See Stage216 in [the stage history](stages.md) for complete evidence and comparison boundaries.

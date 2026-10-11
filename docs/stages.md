@@ -6338,3 +6338,53 @@ Evidence is under /tmp/miren-stage215-parent214, /tmp/miren-stage215-parent214-c
 /tmp/miren-stage215-root-survey, /tmp/miren-stage215-root-release-integration and
 /tmp/miren-stage215-root-final-data. These measurements describe selected Rust capabilities,
 not full Rust parity or firmware coverage.
+
+## Stage216: known two-argument integer function tables
+
+Known function tables support two independently typed integer arguments and an integer result.
+The compiler's exact A/B/R types, safe nonvariadic Rust signature and full selected Instance
+remain required. All targets are authenticated before feasibility; operands are evaluated once
+in function/A/B order before branch cloning. Selected calls execute their actual bodies and
+retain current returned Memory. Unary table behavior, construction and dispatch limits stay
+unchanged. Arbitrary pointer inputs, unsupported signatures and Repeat-produced pointers stay
+UNKNOWN. This adds no hardware model, trusted call or input assumption.
+
+The focused checks pass 15 selected tests across ten commands, retaining 41 compiler assets in
+four host/ARM O0/O2 profiles. Original helper assertions pass natively; actual helper and order
+mutations fail. Ten fresh native controls execute one test each, with four original exits zero
+and six mutation exits 101. Genuine retained dependency bodies prove; omitted bodies stay UNKNOWN,
+including the literal constant-return helper whose actual body is required.
+
+The proportional parent-release to owner-debug comparison covers 40 groups and 3,396 complete
+proof pairs. It preserves 3,065 literal complete objects. There are 328 named changes: 320
+status changes and eight omitted-body UNKNOWN results with a later MissingCompilerEvidence
+frontier. Every baseline rich queried obligation/model remains an exact prefix, including
+partial UNKNOWN queries: 4,980 baseline obligations become 5,228 current obligations. Three
+query-free fold timeout differences satisfy the strict existing comparison predicate. The old
+arity and selected global helper controls bind index one to the same refuted query/model and
+record the actual selected helper body.
+
+The fresh ROOT release executes the same 40 groups on frozen owner input paths and working
+directories. It preserves 3,393 literal complete Proof objects and all 5,228 rich queried
+obligations/models. Three differences satisfy the existing query-free fold timeout predicate;
+every residual Proof field remains exact. Outcomes and numeric CLI exits remain unchanged.
+No source-path rewriting, inherited extra-frame exception or UNKNOWN promotion is used.
+ROOT debug is built and exercised by workspace tests; no separate debug CLI equality is claimed.
+
+All 22 required ROOT checks pass, including 864 Rust tests across 197 outer Cargo target
+summaries and 68 Python tests. Formatting, lint, release builds, dependency policy, examples,
+documentation and manual hooks pass. Four fresh surveys cover 239 cases across 81 families,
+each with 98 PROVED, 83 REFUTED and 58 UNKNOWN. The 236 parent entries remain intact. The new
+Repeat control remains UNKNOWN with an Unclassified diagnostic; its expected category was
+corrected without changing production code, assertions or the candidate analyzer.
+
+The failed initial diagnostic check and stale foreign-caller capture remain separate historical
+evidence. A fresh full check run validates the category correction; a guarded continuation
+adopts 24 completed groups and freshly executes the remaining 16 with the intended caller.
+No failed empty-output call is counted as a proof, and no old/new caller equivalence is claimed.
+
+Evidence is under /tmp/miren-two-args-parent215, /tmp/miren-stage216-root-repeat-category,
+/tmp/miren-stage216-root-full-checks-repeat-category,
+/tmp/miren-stage216-root-repeat-category-survey and
+/tmp/miren-stage216-root-release-integration. These are selected Rust capability measurements,
+not full Rust parity or firmware coverage.

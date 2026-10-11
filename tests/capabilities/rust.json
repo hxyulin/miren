@@ -1297,6 +1297,24 @@
       "unknown_category": "resource_limit",
       "unknown_reason":
         "owned_suffix_budget_unknown bb7: owned symbolic suffix exceeds its shared node or depth budget"
+    },
+    {
+      "entry": "integer_table_two_args_selected",
+      "family": "integer_function_tables_two_args",
+      "expected": "proved"
+    },
+    {
+      "entry": "integer_table_two_args_wrong",
+      "family": "integer_function_tables_two_args",
+      "expected": "refuted"
+    },
+    {
+      "entry": "integer_table_two_args_repeat_unknown",
+      "family": "integer_function_tables_two_args",
+      "expected": "unknown",
+      "unknown_category": "unclassified",
+      "unknown_reason":
+        "integer_table_two_args_repeat_unknown bb0: repeat operand needs a small owned value"
     }
   ]
 }

@@ -3519,3 +3519,50 @@ mod owned_suffix_native {
         }
     }
 }
+
+#[inline(never)]
+fn integer_table_two_args_first(a: u16, b: i32) -> i64 {
+    (a as i64).wrapping_add(b as i64)
+}
+#[inline(never)]
+fn integer_table_two_args_second(a: u16, b: i32) -> i64 {
+    (a as i64).wrapping_add(b as i64) ^ 1
+}
+pub fn integer_table_two_args_selected(index: usize, a: u16, b: i32) {
+    let table: [fn(u16, i32) -> i64; 2] =
+        [integer_table_two_args_first, integer_table_two_args_second];
+    if index < 2 {
+        let actual = table[index](a, b);
+        let expected = (a as i64).wrapping_add(b as i64);
+        assert!(actual == if index == 0 { expected } else { expected ^ 1 });
+    }
+}
+pub fn integer_table_two_args_wrong(index: usize, a: u16, b: i32) {
+    let table: [fn(u16, i32) -> i64; 2] =
+        [integer_table_two_args_first, integer_table_two_args_second];
+    if index < 2 {
+        let actual = table[index](a, b);
+        let expected = (a as i64).wrapping_add(b as i64);
+        assert!(actual != if index == 0 { expected } else { expected ^ 1 });
+    }
+}
+pub fn integer_table_two_args_repeat_unknown(index: usize, a: u16, b: i32) {
+    let table: [fn(u16, i32) -> i64; 2] = [integer_table_two_args_first; 2];
+    if index < 2 {
+        assert!(table[index](a, b) == (a as i64).wrapping_add(b as i64));
+    }
+}
+#[cfg(test)]
+mod integer_table_two_args_native {
+    extern crate std;
+    #[test]
+    fn mutation_guard() {
+        for index in [0, 1] {
+            for a in [0, 1, 129, u16::MAX] {
+                for b in [i32::MIN, -1, 0, 129, i32::MAX] {
+                    super::integer_table_two_args_selected(index, a, b);
+                }
+            }
+        }
+    }
+}

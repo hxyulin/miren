@@ -1258,3 +1258,12 @@ unchanged. All 22 ROOT checks pass, including 859 Rust tests and 68 Python tests
 retain 236 cases across 80 families. Fresh release compatibility preserves all 4,644 rich
 queried obligations/models on frozen owner inputs. Exact query-free fold timeout differences
 remain UNKNOWN under separately recorded comparison rules. See the Stage215 capability evidence.
+
+Stage216 supports known two-argument integer function tables with exact compiler A/B/R types,
+safe Rust signatures, all-target validation and actual selected bodies. Argument evaluation
+occurs once in order before branch cloning; current returned Memory is preserved. Repeat-produced
+pointers remain UNKNOWN. All 22 ROOT checks pass, including 864 Rust tests and 68 Python tests;
+four surveys cover 239 cases across 81 families. Fresh release compatibility preserves all
+5,228 rich queried obligations/models on frozen owner inputs. Actual helper/order mutations
+refute unchanged assertions and fail natively; omitted bodies remain UNKNOWN. See Stage216 in
+the stage history for complete evidence. Historical actual213/214 preparations keep their scope.

@@ -884,3 +884,426 @@ pub(super) fn test_engine(tcx: TyCtxt<'_>) -> Engine<'_> {
         },
     }
 }
+
+struct TwoArgumentOverride(bool);
+impl TwoArgumentOverride {
+    fn new() -> Self {
+        Self(TWO_ARGUMENT_TABLE_OVERRIDE.with(|flag| flag.replace(true)))
+    }
+}
+impl Drop for TwoArgumentOverride {
+    fn drop(&mut self) {
+        TWO_ARGUMENT_TABLE_OVERRIDE.with(|flag| flag.set(self.0));
+    }
+}
+
+#[test]
+fn two_argument_override_restores_actual_cell() {
+    assert!(!TWO_ARGUMENT_TABLE_OVERRIDE.with(std::cell::Cell::get));
+    {
+        let _outer = TwoArgumentOverride::new();
+        assert!(TWO_ARGUMENT_TABLE_OVERRIDE.with(std::cell::Cell::get));
+        {
+            let _inner = TwoArgumentOverride::new();
+            assert!(two_argument_tables_enabled());
+        }
+        assert!(TWO_ARGUMENT_TABLE_OVERRIDE.with(std::cell::Cell::get));
+    }
+    assert!(!TWO_ARGUMENT_TABLE_OVERRIDE.with(std::cell::Cell::get));
+    let panic = std::panic::catch_unwind(|| {
+        let _scope = TwoArgumentOverride::new();
+        panic!("restore override");
+    });
+    assert!(panic.is_err());
+    assert!(!TWO_ARGUMENT_TABLE_OVERRIDE.with(std::cell::Cell::get));
+}
+
+#[test]
+fn compiler_two_argument_integer_prepared_calls() {
+    struct Capture(std::path::PathBuf);
+    impl rustc_driver::Callbacks for Capture {
+        fn after_analysis<'tcx>(
+            &mut self,
+            _: &rustc_interface::interface::Compiler,
+            tcx: TyCtxt<'tcx>,
+        ) -> rustc_driver::Compilation {
+            check_two_argument_calls(tcx, &self.0);
+            rustc_driver::Compilation::Stop
+        }
+    }
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!(
+        "miren-two-argument-tcx-{}-{nonce}",
+        std::process::id()
+    ));
+    std::fs::create_dir_all(&root).unwrap();
+    eprintln!("two-argument compiler assets: {}", root.display());
+    let source = root.join("fixture.rs");
+    std::fs::write(
+        &source,
+        r#"#![no_std]
+#![forbid(unsafe_code)]
+#![feature(custom_mir, core_intrinsics)]
+use core::intrinsics::mir::*;
+extern crate alloc;
+#[inline(never)] pub fn first(a: u16, b: i32) -> i64 { (a as i64) + (b as i64) }
+#[inline(never)] pub fn second(a: u16, b: i32) -> i64 { (a as i64) - (b as i64) }
+#[inline(never)] pub fn allocated(a: u16, b: i32) -> i64 {
+    let owned = alloc::boxed::Box::new(());
+    core::mem::drop(owned);
+    (a as i64) + (b as i64)
+}
+#[inline(never)] pub fn wrong_a(a: i16, b: i32) -> i64 { (a as i64) + (b as i64) }
+#[inline(never)] pub fn wrong_b(a: u16, b: u32) -> i64 { (a as i64) + (b as i64) }
+#[inline(never)] pub fn wrong_r(a: u16, b: i32) -> u64 { (a as u64) + (b as u64) }
+#[custom_mir(dialect = "runtime", phase = "optimized")]
+pub fn moved(callback: fn(u16, i32)->i64, a: u16, b: i32) -> i64 {
+    mir! {
+        { Call(RET = Move(callback)(Move(a), Move(b)), ReturnTo(done), UnwindUnreachable()) }
+        done = { Return() }
+    }
+}
+#[custom_mir(dialect = "runtime", phase = "optimized")]
+pub fn copied(callback: fn(u16, i32)->i64, record: (u16, i32)) -> i64 {
+    mir! {
+        { Call(RET = Move(callback)(record.0, record.1), ReturnTo(done), UnwindUnreachable()) }
+        done = { Return() }
+    }
+}
+"#,
+    )
+    .unwrap();
+    for target in [None, Some("thumbv7em-none-eabihf")] {
+        for level in [0, 2] {
+            let output = root.join(format!("{}-o{level}", target.unwrap_or("host")));
+            std::fs::create_dir_all(&output).unwrap();
+            let mut args = vec![
+                "rustc".into(),
+                "--crate-type=lib".into(),
+                "--edition=2024".into(),
+                source.display().to_string(),
+                "--out-dir".into(),
+                output.display().to_string(),
+                "-Cpanic=abort".into(),
+                format!("-Copt-level={level}"),
+            ];
+            if let Some(target) = target {
+                args.extend(["--target".into(), target.into()]);
+            }
+            rustc_driver::run_compiler(&args, &mut Capture(output));
+        }
+    }
+}
+
+fn check_two_argument_calls<'tcx>(tcx: TyCtxt<'tcx>, output: &std::path::Path) {
+    let mut engine = test_engine(tcx);
+    let find = |name: &str| {
+        tcx.mir_keys(())
+            .iter()
+            .map(|id| id.to_def_id())
+            .find(|id| tcx.def_kind(*id) == DefKind::Fn && tcx.item_name(*id).as_str() == name)
+            .unwrap()
+    };
+    for name in [
+        "first",
+        "second",
+        "allocated",
+        "wrong_a",
+        "wrong_b",
+        "wrong_r",
+        "moved",
+        "copied",
+    ] {
+        let body = tcx.optimized_mir(find(name).expect_local());
+        std::fs::write(output.join(format!("{name}.mir.txt")), format!("{body:#?}")).unwrap();
+    }
+    for name in ["moved", "copied"] {
+        let instance = engine
+            .resolve_function_item(find(name), tcx.mk_args(&[]))
+            .unwrap();
+        let body = engine.instantiated_body(instance).unwrap();
+        let (block, data) = body
+            .basic_blocks
+            .iter_enumerated()
+            .find(|(_, data)| matches!(data.terminator().kind, TerminatorKind::Call { .. }))
+            .unwrap();
+        let TerminatorKind::Call {
+            func,
+            args,
+            destination,
+            target,
+            ..
+        } = &data.terminator().kind
+        else {
+            panic!("missing actual Call");
+        };
+        let signature = func.ty(&body.local_decls, tcx);
+        let integer = engine.two_argument_integer_signature(signature).unwrap();
+        assert_eq!(integer.first.original, tcx.types.u16);
+        assert_eq!(integer.second.original, tcx.types.i32);
+        assert_eq!(integer.result.original, tcx.types.i64);
+        assert_eq!(
+            engine.table_signature(signature),
+            ENABLE_TWO_ARGUMENT_INTEGER_FUNCTION_TABLES
+        );
+        let _scope = TwoArgumentOverride::new();
+        assert!(engine.table_signature(signature));
+        let mut pointers = Vec::new();
+        for helper in ["first", "second"] {
+            let instance = engine
+                .resolve_function_item(find(helper), tcx.mk_args(&[]))
+                .unwrap();
+            let id = engine
+                .register_function_pointer(Target::Known {
+                    instance,
+                    signature,
+                })
+                .unwrap();
+            pointers.push(Value::FunctionPointer { id });
+        }
+        for helper in ["wrong_a", "wrong_b", "wrong_r"] {
+            let instance = engine
+                .resolve_function_item(find(helper), tcx.mk_args(&[]))
+                .unwrap();
+            let id = engine
+                .register_function_pointer(Target::Known {
+                    instance,
+                    signature,
+                })
+                .unwrap();
+            assert!(engine.validate_table_target(id, signature).is_err());
+        }
+        let bits = u32::from(tcx.sess.target.pointer_width);
+        let raw = engine.fresh(Sort::BitVec(bits));
+        let index = Value::Int {
+            expression: raw.clone(),
+            bits,
+            signed: false,
+        };
+        let condition = engine
+            .terms
+            .apply(
+                Op::BvUnsignedLt,
+                &[raw, engine.terms.bit_vector(2, bits).unwrap()],
+            )
+            .unwrap();
+        let conditions = vec![condition];
+        let original = Ty::new_array(tcx, signature, 2);
+        let pointer = engine
+            .capture_function_table(original, &pointers, &index, &conditions)
+            .unwrap()
+            .unwrap();
+        let Operand::Move(function) = func else {
+            panic!("Move func");
+        };
+        let mut state = State {
+            locals: vec![None; body.local_decls.len()],
+            addresses: vec![None; body.local_decls.len()],
+            missing_places: Default::default(),
+            memory: Default::default(),
+            conditions,
+        };
+        state.locals[function.local.as_usize()] = Some(pointer);
+        let first = symbolic::integer(&engine.terms, 129, 16, false);
+        let second = symbolic::integer(&engine.terms, 7, 32, true);
+        if name == "moved" {
+            for (arg, value) in args.iter().zip([first, second]) {
+                let Operand::Move(place) = arg.node else {
+                    panic!("Move arg");
+                };
+                state.locals[place.local.as_usize()] = Some(value);
+            }
+        } else {
+            let Operand::Copy(place) = args[0].node else {
+                panic!("Copy field");
+            };
+            state.locals[place.local.as_usize()] = Some(Value::Tuple(vec![first, second]));
+        }
+        let make_call = || TableCall {
+            body: &body,
+            block,
+            func,
+            args,
+            destination: *destination,
+            target: *target,
+            stack: &[],
+            site: (body.source.def_id(), data.terminator().source_info.span),
+        };
+        let returns = engine
+            .prepared_function_table_call(&state, make_call())
+            .unwrap()
+            .unwrap();
+        assert_eq!(returns.len(), 2);
+        for (position, (consumed, result)) in returns.iter().enumerate() {
+            assert!(
+                engine
+                    .operand(body.source.def_id(), &body, consumed, func)
+                    .is_err()
+            );
+            let expected = symbolic::integer(
+                &engine.terms,
+                if position == 0 { 136 } else { 122 },
+                64,
+                true,
+            );
+            let wrong = symbolic::binary(&engine.terms, "ne", result.value.clone(), expected)
+                .unwrap()
+                .boolean()
+                .unwrap();
+            let mut conditions = result.conditions.clone();
+            conditions.push(wrong);
+            assert!(!engine.feasible(&conditions).unwrap());
+            if name == "moved" {
+                for arg in args.iter() {
+                    let Operand::Move(place) = arg.node else {
+                        panic!("Move arg");
+                    };
+                    assert!(
+                        engine
+                            .operand(body.source.def_id(), &body, consumed, &arg.node)
+                            .is_err()
+                    );
+                    assert!(state.locals[place.local.as_usize()].is_some());
+                }
+            }
+        }
+        let allocated_instance = engine
+            .resolve_function_item(find("allocated"), tcx.mk_args(&[]))
+            .unwrap();
+        let allocated_id = engine
+            .register_function_pointer(Target::Known {
+                instance: allocated_instance,
+                signature,
+            })
+            .unwrap();
+        let allocated_choice = engine
+            .capture_function_table(
+                original,
+                &[
+                    Value::FunctionPointer { id: allocated_id },
+                    pointers[1].clone(),
+                ],
+                &index,
+                &state.conditions,
+            )
+            .unwrap()
+            .unwrap();
+        let mut allocation_state = state.clone();
+        allocation_state.locals[function.local.as_usize()] = Some(allocated_choice);
+        let allocation_returns = engine
+            .function_table_call(&allocation_state, make_call())
+            .unwrap()
+            .unwrap();
+        assert!(!allocation_returns[0].1.memory.owned_regions.is_empty());
+        assert!(
+            allocation_returns[0]
+                .1
+                .memory
+                .owned_regions
+                .iter()
+                .all(|region| !region.live)
+        );
+        assert!(allocation_returns[1].1.memory.owned_regions.is_empty());
+        assert!(allocation_state.memory.owned_regions.is_empty());
+        std::fs::write(
+            output.join(format!("{name}-body-entries.txt")),
+            format!("{:#?}", engine.proof.body_entries),
+        )
+        .unwrap();
+        let foreign = Context::default();
+        for bad in [
+            symbolic::integer(&engine.terms, 1, 32, false),
+            symbolic::integer(&engine.terms, 1, 16, true),
+            Value::Int {
+                expression: foreign.bit_vector(1, 16).unwrap(),
+                bits: 16,
+                signed: false,
+            },
+            Value::Unit,
+        ] {
+            let mut invalid = state.clone();
+            let (Operand::Copy(place) | Operand::Move(place)) = args[0].node else {
+                panic!("place argument");
+            };
+            if name == "moved" {
+                invalid.locals[place.local.as_usize()] = Some(bad);
+            } else {
+                invalid.locals[place.local.as_usize()] = Some(Value::Tuple(vec![
+                    bad,
+                    symbolic::integer(&engine.terms, 7, 32, true),
+                ]));
+            }
+            assert!(engine.function_table_call(&invalid, make_call()).is_err());
+            assert!(
+                engine
+                    .operand(body.source.def_id(), &body, &state, func)
+                    .is_ok()
+            );
+        }
+        for bad in [
+            symbolic::integer(&engine.terms, 1, 32, true),
+            symbolic::integer(&engine.terms, 1, 64, false),
+            Value::Int {
+                expression: foreign.bit_vector(1, 64).unwrap(),
+                bits: 64,
+                signed: true,
+            },
+            Value::Unit,
+        ] {
+            assert!(engine.validate_table_result(&bad, integer.result).is_err());
+        }
+        let mut missing = state.clone();
+        let (Operand::Copy(place) | Operand::Move(place)) = args[0].node else {
+            panic!("place arg");
+        };
+        missing.locals[place.local.as_usize()] = None;
+        assert!(
+            engine
+                .prepared_function_table_call(&missing, make_call())
+                .is_err()
+        );
+        let mut forged = body.as_ref().clone();
+        let local = match args[1].node {
+            Operand::Copy(p) | Operand::Move(p) => p.local,
+            _ => panic!("place arg"),
+        };
+        if name == "moved" {
+            forged.local_decls[local].ty = tcx.types.u32;
+        } else {
+            forged.local_decls[local].ty = Ty::new_tup(tcx, &[tcx.types.u16, tcx.types.u32]);
+        }
+        let TerminatorKind::Call {
+            func,
+            args,
+            destination,
+            target,
+            ..
+        } = &forged.basic_blocks[block].terminator().kind
+        else {
+            panic!("Call");
+        };
+        assert!(
+            engine
+                .prepared_function_table_call(
+                    &state,
+                    TableCall {
+                        body: &forged,
+                        block,
+                        func,
+                        args,
+                        destination: *destination,
+                        target: *target,
+                        stack: &[],
+                        site: (
+                            forged.source.def_id(),
+                            forged.basic_blocks[block].terminator().source_info.span
+                        ),
+                    }
+                )
+                .is_err()
+        );
+    }
+}

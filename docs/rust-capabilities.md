@@ -11,9 +11,10 @@ execution at O0 and O2, positive/refuted/unknown controls, a source mutation tha
 structured UNKNOWN reporting, and passing repository checks. Completion establishes a repeatable
 baseline. It does not establish full Rust support or a completed memory-model refactor.
 
-The current manifest contains 236 cases across 80 families. Stage215 host/ARM O0/O2 surveys
-measure 97 PROVED, 82 REFUTED and 57 UNKNOWN each. Required ROOT checks pass; details and
-limitations are recorded in the Stage215 section below. All 236 parent entries remain intact.
+The current manifest contains 239 cases across 81 families. Stage216 host/ARM O0/O2 surveys
+measure 98 PROVED, 83 REFUTED and 58 UNKNOWN each. Required ROOT checks pass; details and
+limitations are recorded in Stage216 in [the stage history](stages.md).
+All 236 parent entries remain intact.
 The historical Stage213 surveys measured 96 PROVED, 81 REFUTED and 56 UNKNOWN per profile
 across 79 families. The historical committed Stage211 survey measured 230 cases across
 78 families: 95 PROVED, 80 REFUTED and 55 UNKNOWN per profile.
@@ -2263,3 +2264,14 @@ Evidence is under /tmp/miren-stage215-parent214, /tmp/miren-stage215-parent214-c
 /tmp/miren-stage215-root-survey, /tmp/miren-stage215-root-release-integration and
 /tmp/miren-stage215-root-final-data. These measurements describe selected Rust capabilities,
 not full Rust parity or firmware coverage.
+
+## Stage216: known two-argument integer function tables
+
+The new family records a guarded selected call that proves, an intentionally wrong assertion
+that refutes, and a Repeat-produced table that stays UNKNOWN. The Repeat diagnostic expectation
+is Unclassified; correcting that metadata did not change code, assertions or the candidate.
+Original compiler A/B/R types, safe Rust signatures and actual selected bodies remain required.
+Real helper and order mutations refute unchanged assertions and fail natively. Genuine retained
+and omitted dependency controls preserve the body-availability boundary. No assumptions or
+trusted calls are added. Full validation and raw comparison scope are in
+[the stage history](stages.md).
