@@ -1953,3 +1953,464 @@ fn check_known_repeats<'tcx>(tcx: TyCtxt<'tcx>, output: &std::path::Path) {
     observations.push("Choice/full registry/checked-cost fault; no natural cost exhaustion".into());
     std::fs::write(output.join("controls.txt"), observations.join("\n")).unwrap();
 }
+
+#[test]
+fn compiler_primitive_table_borrowed_body_and_values() {
+    struct Capture;
+    impl rustc_driver::Callbacks for Capture {
+        fn after_analysis<'tcx>(
+            &mut self,
+            _: &rustc_interface::interface::Compiler,
+            tcx: TyCtxt<'tcx>,
+        ) -> rustc_driver::Compilation {
+            let engine = test_engine(tcx);
+            for name in ["bool_first", "bool_second", "char_first", "char_second"] {
+                let id = tcx
+                    .mir_keys(())
+                    .iter()
+                    .copied()
+                    .find(|id| {
+                        tcx.def_kind(id.to_def_id()) == DefKind::Fn
+                            && tcx.item_name(id.to_def_id()).as_str() == name
+                    })
+                    .unwrap()
+                    .to_def_id();
+                let instance = engine.resolve_function_item(id, tcx.mk_args(&[])).unwrap();
+                let mut work = PrimitiveBodyWork {
+                    engine: &engine,
+                    used: 0,
+                    error: None,
+                    locals: 0,
+                };
+                let body = tcx.optimized_mir(id);
+                let result = engine.primitive_table_body_work(instance, body, &mut work);
+                assert!(result.is_ok(), "{name}: {result:?}");
+                let mut forged_return = body.clone();
+                forged_return.local_decls[rustc_middle::mir::RETURN_PLACE].ty = tcx.types.u32;
+                let mut forged_work = PrimitiveBodyWork {
+                    engine: &engine,
+                    used: 0,
+                    error: None,
+                    locals: 0,
+                };
+                assert!(
+                    engine
+                        .primitive_table_body_work(instance, &forged_return, &mut forged_work)
+                        .is_err()
+                );
+                let other = Context::default();
+                let foreign_bool = Value::Bool(other.boolean(true));
+                assert!(
+                    engine
+                        .validate_primitive_table_value(
+                            &foreign_bool,
+                            PrimitiveSignature::Bool(tcx.types.bool),
+                            &[]
+                        )
+                        .is_err()
+                );
+                let foreign_char = symbolic::integer(&other, 65, 32, false);
+                assert!(
+                    engine
+                        .validate_primitive_table_value(
+                            &foreign_char,
+                            PrimitiveSignature::Char(tcx.types.char),
+                            &[]
+                        )
+                        .is_err()
+                );
+                let mut wrong = body.clone();
+                wrong.spread_arg = Some(rustc_middle::mir::Local::from_usize(1));
+                let mut bounded = PrimitiveBodyWork {
+                    engine: &engine,
+                    used: 0,
+                    error: None,
+                    locals: 0,
+                };
+                assert!(
+                    engine
+                        .primitive_table_body_work(instance, &wrong, &mut bounded)
+                        .is_err()
+                );
+                let mut exhausted = PrimitiveBodyWork {
+                    engine: &engine,
+                    used: MAX_INPUT_VALUES,
+                    error: None,
+                    locals: 0,
+                };
+                assert!(
+                    engine
+                        .primitive_table_body_work(instance, body, &mut exhausted)
+                        .is_err()
+                );
+                let before = engine.bodies.borrow().len();
+                let mut unsupported = PrimitiveBodyWork {
+                    engine: &engine,
+                    used: 0,
+                    error: None,
+                    locals: body.local_decls.len(),
+                };
+                unsupported.original_type(
+                    Ty::new_ref(
+                        tcx,
+                        tcx.lifetimes.re_erased,
+                        tcx.types.char,
+                        rustc_hir::Mutability::Not,
+                    ),
+                    0,
+                );
+                assert!(unsupported.error.is_some());
+                assert_eq!(engine.bodies.borrow().len(), before);
+                let mut too_deep = PrimitiveBodyWork {
+                    engine: &engine,
+                    used: 0,
+                    error: None,
+                    locals: 0,
+                };
+                too_deep.original_type(tcx.types.char, MAX_INPUT_DEPTH);
+                assert!(too_deep.error.is_some());
+                let bool_value = Value::Bool(engine.terms.boolean(true));
+                assert!(
+                    engine
+                        .validate_primitive_table_value(
+                            &bool_value,
+                            PrimitiveSignature::Bool(tcx.types.bool),
+                            &[]
+                        )
+                        .is_ok()
+                );
+                let wrong_bool = symbolic::integer(&engine.terms, 1, 1, false);
+                assert!(
+                    engine
+                        .validate_primitive_table_value(
+                            &wrong_bool,
+                            PrimitiveSignature::Bool(tcx.types.bool),
+                            &[]
+                        )
+                        .is_err()
+                );
+                for raw in [0, 0xd7ff, 0xe000, 0x10ffff] {
+                    let value = symbolic::integer(&engine.terms, raw, 32, false);
+                    assert!(
+                        engine
+                            .validate_primitive_table_value(
+                                &value,
+                                PrimitiveSignature::Char(tcx.types.char),
+                                &[]
+                            )
+                            .is_ok()
+                    );
+                }
+                for raw in [0xd800, 0xdfff, 0x110000] {
+                    let value = symbolic::integer(&engine.terms, raw, 32, false);
+                    assert!(
+                        engine
+                            .validate_primitive_table_value(
+                                &value,
+                                PrimitiveSignature::Char(tcx.types.char),
+                                &[]
+                            )
+                            .is_err()
+                    );
+                }
+            }
+            check_primitive_move_call(tcx, "moved_bool", "bool_first", "bool_second", false);
+            check_primitive_move_call(tcx, "moved_char", "char_first", "char_second", true);
+            rustc_driver::Compilation::Stop
+        }
+    }
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!(
+        "miren-primitive-table-{}-{nonce}",
+        std::process::id()
+    ));
+    std::fs::create_dir_all(&root).unwrap();
+    let source = root.join("fixture.rs");
+    std::fs::copy(
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../tests/fixtures/primitive_function_tables.rs"),
+        &source,
+    )
+    .unwrap();
+    let original = std::fs::read_to_string(&source).unwrap();
+    std::fs::write(
+        &source,
+        format!(
+            "#![feature(custom_mir, core_intrinsics)]\n{original}\n{}",
+            r#"
+use core::intrinsics::mir::*;
+#[custom_mir(dialect = "runtime", phase = "optimized")]
+pub fn moved_bool(callback: fn(bool)->bool, value: bool) -> bool {
+    mir! {
+        { Call(RET = Move(callback)(Move(value)), ReturnTo(done), UnwindUnreachable()) }
+        done = { Return() }
+    }
+}
+#[custom_mir(dialect = "runtime", phase = "optimized")]
+pub fn moved_char(callback: fn(char)->char, value: char) -> char {
+    mir! {
+        { Call(RET = Move(callback)(Move(value)), ReturnTo(done), UnwindUnreachable()) }
+        done = { Return() }
+    }
+}
+"#
+        ),
+    )
+    .unwrap();
+    for target in [None, Some("thumbv7em-none-eabihf")] {
+        for level in [0, 2] {
+            let output = root.join(format!("{}-o{level}", target.unwrap_or("host")));
+            std::fs::create_dir_all(&output).unwrap();
+            let mut args = vec![
+                "rustc".into(),
+                "--crate-type=lib".into(),
+                "--edition=2024".into(),
+                source.display().to_string(),
+                "--out-dir".into(),
+                output.display().to_string(),
+                "-Cpanic=abort".into(),
+                format!("-Copt-level={level}"),
+            ];
+            if let Some(target) = target {
+                args.extend(["--target".into(), target.into()]);
+            }
+            rustc_driver::run_compiler(&args, &mut Capture);
+        }
+    }
+    eprintln!("primitive compiler assets: {}", root.display());
+}
+
+// Separate generated custom-MIR boundary controls, not ordinary application lowering claims.
+fn check_primitive_move_call<'tcx>(
+    tcx: TyCtxt<'tcx>,
+    caller: &str,
+    first: &str,
+    second: &str,
+    character: bool,
+) {
+    let mut engine = test_engine(tcx);
+    let find = |name: &str| {
+        tcx.mir_keys(())
+            .iter()
+            .copied()
+            .find(|id| {
+                tcx.def_kind(id.to_def_id()) == DefKind::Fn
+                    && tcx.item_name(id.to_def_id()).as_str() == name
+            })
+            .unwrap()
+            .to_def_id()
+    };
+    let caller_id = find(caller);
+    let instance = engine
+        .resolve_function_item(caller_id, tcx.mk_args(&[]))
+        .unwrap();
+    let body = engine.instantiated_body(instance).unwrap();
+    let (block, func, args, destination, target, span) = body
+        .basic_blocks
+        .iter_enumerated()
+        .find_map(|(block, data)| {
+            let terminator = data.terminator();
+            let TerminatorKind::Call {
+                func,
+                args,
+                destination,
+                target,
+                ..
+            } = &terminator.kind
+            else {
+                return None;
+            };
+            Some((
+                block,
+                func,
+                args.as_ref(),
+                *destination,
+                *target,
+                terminator.source_info.span,
+            ))
+        })
+        .unwrap();
+    let mut elements = Vec::new();
+    let mut signature = None;
+    for name in [first, second] {
+        let instance = engine
+            .resolve_function_item(find(name), tcx.mk_args(&[]))
+            .unwrap();
+        let original = Ty::new_fn_ptr(tcx, engine.call_poly_signature(instance).unwrap());
+        signature = Some(original);
+        let token = engine
+            .register_function_pointer(Target::Known {
+                instance,
+                signature: original,
+            })
+            .unwrap();
+        elements.push(Value::FunctionPointer { id: token });
+    }
+    let signature = signature.unwrap();
+    assert!(engine.primitive_table_signature(signature).is_some());
+    let bits = u32::from(tcx.sess.target.pointer_width);
+    let raw_index = engine.fresh(Sort::BitVec(bits));
+    let index = Value::Int {
+        expression: raw_index.clone(),
+        bits,
+        signed: false,
+    };
+    let bound = engine
+        .terms
+        .apply(
+            Op::BvUnsignedLt,
+            &[raw_index, engine.terms.bit_vector(2, bits).unwrap()],
+        )
+        .unwrap();
+    let conditions = vec![bound];
+    let pointer = engine
+        .capture_function_table(
+            Ty::new_array(tcx, signature, 2),
+            &elements,
+            &index,
+            &conditions,
+        )
+        .unwrap()
+        .unwrap();
+    let Operand::Move(function) = func else {
+        panic!("callable Move absent");
+    };
+    let Operand::Move(argument) = &args[0].node else {
+        panic!("argument Move absent");
+    };
+    let mut state = State {
+        locals: vec![None; body.local_decls.len()],
+        missing_places: Default::default(),
+        addresses: vec![None; body.local_decls.len()],
+        conditions,
+        memory: Default::default(),
+    };
+    state.locals[function.local.as_usize()] = Some(pointer);
+    state.locals[argument.local.as_usize()] = Some(if character {
+        symbolic::integer(&engine.terms, 65, 32, false)
+    } else {
+        Value::Bool(engine.terms.boolean(true))
+    });
+    let stack = [caller_id];
+    let call = || TableCall {
+        body: &body,
+        block,
+        func,
+        args,
+        destination,
+        target,
+        stack: &stack,
+        site: (caller_id, span),
+    };
+    let captured = engine
+        .capture_call_destination(&body, &state, destination)
+        .unwrap();
+    let Some(Value::FunctionPointer { id: choice_id }) = &state.locals[function.local.as_usize()]
+    else {
+        unreachable!();
+    };
+    let choice_id = *choice_id;
+    let saved_choice = engine.function_pointers.borrow()[choice_id].clone();
+    let Target::Choice(valid_choice) = &saved_choice else {
+        unreachable!();
+    };
+    let mut wrong_signature = valid_choice.clone();
+    // An original array mismatch must refuse before the Choice vector is cloned.
+    wrong_signature.original = tcx.types.u32;
+    engine.function_pointers.borrow_mut()[choice_id] = Target::Choice(wrong_signature);
+    let steps_before = engine.steps;
+    assert!(engine.function_table_call(&state, call()).is_err());
+    assert_eq!(engine.steps, steps_before);
+    engine.function_pointers.borrow_mut()[choice_id] = saved_choice;
+    let returns = engine.function_table_call(&state, call()).unwrap().unwrap();
+    assert_eq!(returns.len(), 2);
+    let mut joined = returns[0].1.conditions.clone();
+    joined.extend(returns[1].1.conditions.iter().cloned());
+    assert!(!engine.feasible(&joined).unwrap());
+    for (consumed, result) in &returns {
+        assert!(engine.operand(caller_id, &body, consumed, func).is_err());
+        assert!(
+            engine
+                .operand(caller_id, &body, consumed, &args[0].node)
+                .is_err()
+        );
+        assert!(result.memory.byte_copy_opaque);
+        let mut continuation =
+            consumed.continuation(result.conditions.clone(), result.memory.clone());
+        engine
+            .store_call_result(
+                &body,
+                &mut continuation,
+                destination,
+                captured.as_ref(),
+                result.value.clone(),
+            )
+            .unwrap();
+        assert!(continuation.memory.byte_copy_opaque);
+        assert!(
+            engine
+                .read_place(&continuation, destination, Some(&body))
+                .is_ok()
+        );
+    }
+    assert!(!state.memory.byte_copy_opaque);
+    assert!(engine.operand(caller_id, &body, &state, func).is_ok());
+    assert!(
+        engine
+            .operand(caller_id, &body, &state, &args[0].node)
+            .is_ok()
+    );
+    let Value::FunctionPointer { id: first_token } = elements[0] else {
+        unreachable!();
+    };
+    let first_instance = match &engine.function_pointers.borrow()[first_token] {
+        Target::Known { instance, .. } => *instance,
+        Target::Opaque { .. } | Target::Choice(_) => unreachable!(),
+    };
+    let saved_body = engine.bodies.borrow().get(&first_instance).unwrap().clone();
+    let mut oversized = saved_body.as_ref().clone();
+    let declaration = oversized.local_decls[rustc_middle::mir::RETURN_PLACE].clone();
+    for _ in 0..MAX_INPUT_VALUES {
+        oversized.local_decls.push(declaration.clone());
+    }
+    engine
+        .bodies
+        .borrow_mut()
+        .insert(first_instance, std::rc::Rc::new(oversized));
+    let steps = engine.steps;
+    assert!(engine.function_table_call(&state, call()).is_err());
+    assert_eq!(engine.steps, steps);
+    assert!(engine.operand(caller_id, &body, &state, func).is_ok());
+    engine
+        .bodies
+        .borrow_mut()
+        .insert(first_instance, saved_body.clone());
+    let mut wrong_return = saved_body.as_ref().clone();
+    wrong_return.local_decls[rustc_middle::mir::RETURN_PLACE].ty = tcx.types.u32;
+    engine
+        .bodies
+        .borrow_mut()
+        .insert(first_instance, std::rc::Rc::new(wrong_return));
+    assert!(engine.function_table_call(&state, call()).is_err());
+    assert_eq!(engine.steps, steps);
+    engine
+        .bodies
+        .borrow_mut()
+        .insert(first_instance, saved_body);
+    let before = engine.bodies.borrow().len();
+    let mut masked = state.clone();
+    masked
+        .missing_places
+        .consume(argument.local.as_usize(), Vec::new())
+        .unwrap();
+    assert!(engine.function_table_call(&masked, call()).is_err());
+    assert_eq!(engine.bodies.borrow().len(), before);
+    assert!(
+        engine
+            .operand(caller_id, &body, &state, &args[0].node)
+            .is_ok()
+    );
+}

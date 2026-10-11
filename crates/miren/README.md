@@ -1296,3 +1296,11 @@ The compiler lease probe combines two actual symbolic helper Returns with caller
 captured-index publication, consumed-place masks and independent branch memory updates. The
 projected destination is a direct typed boundary control; this test adds no hierarchy depth rights
 or persistent activation-history carrier.
+
+Unary Bool-to-Bool and Char-to-Char tables execute actual known nongeneric safe Rust bodies.
+The route preserves exact compiler signatures, argument evaluation once and current returned Memory.
+Bool values require their original sort/context; Char arguments and results require proven Unicode
+scalar validity under actual conditions. Primitive caller grammar and all-target body preflight use
+separate bounded 512-work/depth-16 passes before the new route's normalization and cloning.
+Unsupported grammar, opaque targets and missing bodies refuse. Integer unary/binary and integer
+Repeat admission are unchanged. Float tables and reference or mixed-signature rights stay excluded.

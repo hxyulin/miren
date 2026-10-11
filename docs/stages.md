@@ -6447,3 +6447,65 @@ Evidence is under /tmp/miren-known-repeat-parent216, /tmp/miren-stage217-root-fu
 /tmp/miren-stage217-root-release-comparison. Provisional parallel Float and integer-driver
 refactors are not
 part of this stage. Their later actual-parent reassociation and validation remain separate.
+
+## Stage222: unary Bool and Char function tables
+
+Known nongeneric safe Rust unary Bool-to-Bool and Char-to-Char tables preserve original compiler
+signatures and execute actual available helper bodies. Callable and argument evaluation occur once
+before branch dispatch. Exact result context, Unicode scalar validity and current returned Memory
+remain required. Caller grammar and all-target body scans use separate 512-work/depth-16 bounds;
+this is not a total whole-engine admission budget. Integer unary/binary and Repeat support is
+unchanged. Float tables, references, mixed signatures and opaque target grants are excluded.
+
+The original 239 capability cases and source prefix are unchanged; six new controls append P/R/U
+for each primitive domain. All four owner profiles measure 245 cases across 83 families:
+101 PROVED, 85 REFUTED and 59 UNKNOWN. The original dedicated Bool/Char assertions refute through
+actual second-helper counterexamples; only their harness expectations change.
+
+Six scoped commands pass with 19 actual tests. The separately sealed dataset has 48 groups and
+1,656 Proof pairs: 1,570 literal FULL, 84 exact named changes and two query-free Resource contexts.
+All 2,812 baseline queried obligations/models are exact prefixes of 2,848 current obligations,
+including UNKNOWN partials. One extra wrapping_add frame belongs only to a fresh hash-bound host-O0
+pair; the generic predicate stays strict. Its failed writer, 26 preserved groups and adopted pair
+remain distinct from 21 fresh tail groups. Post-call guards precede numeric call-record persistence;
+all recorded guards pass, and complete Proof comparison never injects or rewrites fields.
+
+Eight genuine dependency archives compile with numeric exit0. Retained bodies prove and omitted
+bodies reach MissingCompilerEvidence. Eight native runs each execute one test under timeout10:
+originals pass at O0/O2; Bool/Char helper and table-order mutations fail unchanged claims.
+
+Evidence is under /tmp/miren-primitive-tables-provisional and the independent source/data review
+/tmp/miren-primitive-final-source-data-independent-review.md. Those measurements retain their
+provisional Repeat/Float/driver association. /tmp/miren-primitive-parent221 records the separate
+source-only composition onto committed Stage221, preserving helper tools and transport controls.
+That owner checkpoint makes no current-parent analyzer or ROOT full-check claim.
+The completed ROOT evidence is recorded separately below.
+
+### Completed ROOT validation on committed Stage221
+
+All 24 required commands pass. Actual logs contain 874 workspace Rust tests and
+9 example Rust tests (883 outer Rust tests in total), plus 91 Python tests.
+Four fresh ROOT surveys each measure 245 cases across 83 families:
+101 PROVED, 85 REFUTED and 59 UNKNOWN.
+The exact 947-source composition preserves both helper files, Float/driver behavior and transport
+controls from its committed Stage221 parent. Documentation closure changes only four prose files.
+
+Fresh ROOT release comparison covers 48 groups and 1,656 whole Proof objects, with
+1,652 literal FULL and
+4 precise query-free Resource contexts.
+All 2,848 rich queried obligations/models match, including UNKNOWN partials. These are actual
+ROOT release captures on frozen owner inputs; no separate ROOT debug CLI capture is claimed.
+Exact resource-context reviews distinguish the owner's 30-second execution-budget trigger from
+the ROOT symbolic step-limit trigger where observed. Both remain UNKNOWN with no query or model.
+Recorded call-chain differences are reviewed with the precise reason fields and all other fields.
+Each classification binds its fresh raw pair; no inherited or general resource waiver applies.
+The eight owner dependency builds/native runs retain their original guarded association; ROOT
+release comparison does not describe those rustc controls as freshly rerun native tests.
+
+Owner source/data was independently reviewed before actual-parent composition. This stage's
+source/index readiness combines that qualified review with explicit parent byte/prefix association;
+it does not claim that the feature author independently reviewed their own implementation.
+
+ROOT evidence: /tmp/miren-stage222-root-full-checks, /tmp/miren-stage222-root-survey and
+/tmp/miren-stage222-root-release-comparison. Final closure/index records preserve the pre-prose
+947-source capture freeze and separately authenticate the resulting source and staged bytes.

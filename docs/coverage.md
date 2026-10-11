@@ -3552,3 +3552,14 @@ with 3,390 literal FULL objects, 80 exact named changes and two narrow query-fre
 All 5,228 baseline rich queried obligations/models remain exact; current ALL is 5,368, including
 UNKNOWN partials. Fresh ROOT release compatibility and required checks are recorded separately
 in Stage217 in [the stage history](stages.md). These are selected capability measurements.
+
+## Unary Bool and Char function tables
+
+Known nongeneric safe Rust Bool-to-Bool and Char-to-Char tables execute actual available bodies.
+Exact signatures, evaluation once, Unicode validity and current returned Memory remain required.
+Caller grammar and all-target body preflight have separate 512-work/depth-16 bounds. Integer
+unary/binary and Repeat admission are unchanged. Float tables, references, mixed signatures and
+opaque target grants remain outside this family. Retained controls prove; omitted bodies refuse.
+Six new P/R/U controls preserve all 239 existing case objects and original source assertions.
+Completed owner and ROOT checks, mutations and comparison limits are recorded in
+[Stage222 in the stage history](stages.md#stage222-unary-bool-and-char-function-tables).

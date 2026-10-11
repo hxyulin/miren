@@ -11,7 +11,14 @@ execution at O0 and O2, positive/refuted/unknown controls, a source mutation tha
 structured UNKNOWN reporting, and passing repository checks. Completion establishes a repeatable
 baseline. It does not establish full Rust support or a completed memory-model refactor.
 
-The current manifest contains 239 cases across 81 families. Stage217 host/ARM O0/O2 surveys
+The current manifest contains 245 cases across 83 families.
+Completed ROOT host/ARM O0/O2
+surveys each measure 101 PROVED, 85 REFUTED and 59 UNKNOWN. Six Bool/Char cases append to the
+unchanged 239-case source and manifest prefix. Required checks and fresh release comparison are
+recorded in [Stage222 in the stage history](stages.md#stage222-unary-bool-and-char-function-tables).
+These are selected capabilities, not a Rust parity percentage.
+
+Historical Stage217 host/ARM O0/O2 surveys
 measure 99 PROVED, 83 REFUTED and 57 UNKNOWN each
 after fresh validation.
 Required ROOT check results and limitations are recorded in Stage217 in
@@ -2289,3 +2296,14 @@ prove, while omitted helpers reach MissingCompilerEvidence UNKNOWN. Zero constru
 an availability proof. Helper identity and binary argument-order mutations preserve assertions
 and produce actual counterexamples and native failures. Complete validation and strict raw
 comparison scope are recorded in [the stage history](stages.md).
+
+## Unary Bool and Char function tables
+
+Known nongeneric safe Rust Bool-to-Bool and Char-to-Char tables execute actual available bodies.
+Exact signatures, evaluation once, Unicode validity and current returned Memory remain required.
+Caller grammar and all-target body preflight have separate 512-work/depth-16 bounds. Integer
+unary/binary and Repeat admission are unchanged. Float tables, references, mixed signatures and
+opaque target grants remain outside this family. Retained controls prove; omitted bodies refuse.
+Six new P/R/U controls preserve all 239 existing case objects and original source assertions.
+Completed owner and ROOT checks, mutations and comparison limits are recorded in
+[Stage222 in the stage history](stages.md#stage222-unary-bool-and-char-function-tables).

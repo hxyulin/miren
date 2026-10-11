@@ -3566,3 +3566,75 @@ mod integer_table_two_args_native {
         }
     }
 }
+mod primitive_unary_bool {
+    #[inline(never)]
+    pub fn identity(value: bool) -> bool {
+        value ^ false
+    }
+    #[inline(never)]
+    pub fn flip(value: bool) -> bool {
+        !value
+    }
+}
+
+pub fn primitive_table_bool_selected(index: usize, value: bool) {
+    let table: [fn(bool) -> bool; 2] = [primitive_unary_bool::identity, primitive_unary_bool::flip];
+    if index < 2 {
+        let actual = table[index](value);
+        assert!(actual == if index == 0 { value } else { !value });
+    }
+}
+
+pub fn primitive_table_bool_wrong(index: usize, value: bool) {
+    let table: [fn(bool) -> bool; 2] = [primitive_unary_bool::identity, primitive_unary_bool::flip];
+    if index < 2 {
+        assert!(table[index](value) == value);
+    }
+}
+
+pub fn primitive_table_bool_opaque(index: usize, value: bool, callback: fn(bool) -> bool) {
+    let table: [fn(bool) -> bool; 2] = [primitive_unary_bool::identity, callback];
+    if index < 2 {
+        assert!(table[index](value) == value);
+    }
+}
+
+mod primitive_unary_char {
+    #[inline(never)]
+    pub fn identity(value: char) -> char {
+        value
+    }
+    #[inline(never)]
+    pub fn next(value: char) -> char {
+        if value == 'A' { 'B' } else { 'A' }
+    }
+}
+
+pub fn primitive_table_char_selected(index: usize, value: char) {
+    let table: [fn(char) -> char; 2] = [primitive_unary_char::identity, primitive_unary_char::next];
+    if index < 2 {
+        let actual = table[index](value);
+        let expected = if index == 0 {
+            value
+        } else if value == 'A' {
+            'B'
+        } else {
+            'A'
+        };
+        assert!(actual == expected);
+    }
+}
+
+pub fn primitive_table_char_wrong(index: usize, value: char) {
+    let table: [fn(char) -> char; 2] = [primitive_unary_char::identity, primitive_unary_char::next];
+    if index < 2 {
+        assert!(table[index](value) == value);
+    }
+}
+
+pub fn primitive_table_char_opaque(index: usize, value: char, callback: fn(char) -> char) {
+    let table: [fn(char) -> char; 2] = [primitive_unary_char::identity, callback];
+    if index < 2 {
+        assert!(table[index](value) == value);
+    }
+}

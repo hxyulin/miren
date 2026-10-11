@@ -40,15 +40,11 @@ fn original_integer_signatures_execute_bodies_and_preserve_overflow_obligations(
             names.push((format!("{module}::{entry}"), status));
         }
     }
-    for name in [
-        "bool_unknown",
-        "char_unknown",
-        "float_unknown",
-        "nz_unknown",
-        "abi_unknown",
-    ] {
+    for name in ["float_unknown", "nz_unknown", "abi_unknown"] {
         names.push((name.into(), U));
     }
+    names.push(("bool_unknown".into(), R));
+    names.push(("char_unknown".into(), R));
     names.push(("result_unknown".into(), R));
     names.push(("arity_unknown".into(), R));
     names.extend([("associated".into(), P), ("wrong_associated".into(), R)]);
@@ -82,6 +78,39 @@ fn original_integer_signatures_execute_bodies_and_preserve_overflow_obligations(
                             || compact.contains("(define-fun v0 () (_ BitVec 64) (_ bv1 64))")
                     })
             }));
+            for (name, helper) in [
+                ("bool_unknown", "bool_second"),
+                ("char_unknown", "char_second"),
+            ] {
+                let proof = report
+                    .functions
+                    .iter()
+                    .find(|function| function.name == name)
+                    .unwrap()
+                    .proof
+                    .as_ref()
+                    .unwrap();
+                assert!(
+                    proof
+                        .body_entries
+                        .iter()
+                        .any(|entry| entry.function == helper)
+                );
+                assert!(
+                    proof
+                        .obligations
+                        .iter()
+                        .any(|obligation| obligation.status == R
+                            && obligation.query.is_some()
+                            && obligation.model.as_ref().is_some_and(|model| {
+                                let compact =
+                                    model.split_whitespace().collect::<Vec<_>>().join(" ");
+                                compact.contains("(define-fun v0 () (_ BitVec 32) (_ bv1 32))")
+                                    || compact
+                                        .contains("(define-fun v0 () (_ BitVec 64) (_ bv1 64))")
+                            }))
+                );
+            }
             for module in MODULES {
                 let proof = report
                     .functions

@@ -1312,6 +1312,40 @@
       "entry": "integer_table_two_args_repeat_unknown",
       "family": "integer_function_tables_two_args",
       "expected": "proved"
+    },
+    {
+      "entry": "primitive_table_bool_selected",
+      "family": "primitive_function_tables_bool",
+      "expected": "proved"
+    },
+    {
+      "entry": "primitive_table_bool_wrong",
+      "family": "primitive_function_tables_bool",
+      "expected": "refuted"
+    },
+    {
+      "entry": "primitive_table_bool_opaque",
+      "family": "primitive_function_tables_bool",
+      "expected": "unknown",
+      "unknown_reason": "function table cannot contain opaque or nested choices",
+      "unknown_category": "semantics"
+    },
+    {
+      "entry": "primitive_table_char_selected",
+      "family": "primitive_function_tables_char",
+      "expected": "proved"
+    },
+    {
+      "entry": "primitive_table_char_wrong",
+      "family": "primitive_function_tables_char",
+      "expected": "refuted"
+    },
+    {
+      "entry": "primitive_table_char_opaque",
+      "family": "primitive_function_tables_char",
+      "expected": "unknown",
+      "unknown_reason": "function table cannot contain opaque or nested choices",
+      "unknown_category": "semantics"
     }
   ]
 }

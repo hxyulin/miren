@@ -2,6 +2,9 @@
 use super::aggregates::MAX_ARRAY_ELEMENTS;
 use super::function_pointers::Target;
 use super::*;
+use rustc_middle::mir::visit::Visitor;
+
+const ENABLE_PRIMITIVE_FUNCTION_TABLES: bool = true;
 
 const ENABLE_FUNCTION_TABLES: bool = true;
 const ENABLE_INTEGER_FUNCTION_TABLES: bool = true;
@@ -47,6 +50,202 @@ struct TwoArgumentIntegerSignature<'tcx> {
 enum EvaluatedIntegerArguments {
     One(Value),
     Two(Vec<Value>),
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum PrimitiveSignature<'tcx> {
+    Bool(Ty<'tcx>),
+    Char(Ty<'tcx>),
+}
+
+impl<'tcx> PrimitiveSignature<'tcx> {
+    fn original(self) -> Ty<'tcx> {
+        match self {
+            Self::Bool(original) | Self::Char(original) => original,
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+enum TableResultSignature<'tcx> {
+    Integer(IntegerSignature<'tcx>),
+    Primitive(PrimitiveSignature<'tcx>),
+}
+
+// New primitive admission alone scans this borrowed grammar before selected Body cloning.
+struct PrimitiveBodyWork<'a, 'tcx> {
+    engine: &'a Engine<'tcx>,
+    used: usize,
+    error: Option<String>,
+    locals: usize,
+}
+
+impl<'tcx> PrimitiveBodyWork<'_, 'tcx> {
+    fn charge(&mut self, count: usize) {
+        if self.error.is_some() {
+            return;
+        }
+        self.used = self.used.saturating_add(count);
+        if self.used > MAX_INPUT_VALUES {
+            self.error = Some(self.engine.categorized_error(
+                UnknownCategory::ResourceLimit,
+                "primitive table borrowed admission exceeds 512 work units".into(),
+            ));
+        }
+    }
+
+    fn original_type(&mut self, original: Ty<'tcx>, depth: usize) {
+        self.charge(1);
+        if self.error.is_some() {
+            return;
+        }
+        if depth >= MAX_INPUT_DEPTH {
+            self.error = Some(self.engine.categorized_error(
+                UnknownCategory::ResourceLimit,
+                "primitive table original type exceeds depth16".into(),
+            ));
+            return;
+        }
+        match original.kind() {
+            ty::Bool | ty::Char | ty::Int(_) | ty::Uint(_) | ty::Never => {}
+            ty::Tuple(fields) => {
+                self.charge(fields.len());
+                if self.error.is_some() {
+                    return;
+                }
+                for field in fields.iter() {
+                    self.original_type(field, depth + 1);
+                }
+            }
+            ty::FnDef(_, args) if args.skip_binder().is_empty() => {}
+            _ => self.error = Some("primitive table borrowed type grammar is unsupported".into()),
+        }
+    }
+    fn operand_place(&mut self, body: &Body<'tcx>, place: Place<'tcx>) -> Result<(), String> {
+        let declaration = body
+            .local_decls
+            .get(place.local)
+            .ok_or("primitive table operand local is unavailable")?;
+        self.original_type(declaration.ty, 0);
+        self.visit_place(
+            &place,
+            rustc_middle::mir::visit::PlaceContext::NonMutatingUse(
+                rustc_middle::mir::visit::NonMutatingUseContext::Inspect,
+            ),
+            rustc_middle::mir::Location::START,
+        );
+        self.error.take().map_or(Ok(()), Err)
+    }
+}
+
+impl<'tcx> Visitor<'tcx> for PrimitiveBodyWork<'_, 'tcx> {
+    fn visit_ty(&mut self, original: Ty<'tcx>, _: rustc_middle::mir::visit::TyContext) {
+        self.original_type(original, 0);
+    }
+
+    fn visit_place(
+        &mut self,
+        place: &Place<'tcx>,
+        _: rustc_middle::mir::visit::PlaceContext,
+        _: rustc_middle::mir::Location,
+    ) {
+        self.charge(place.projection.len());
+        if place.local.as_usize() >= self.locals || place.projection.len() >= MAX_INPUT_DEPTH {
+            if self.error.is_none() {
+                self.error = Some("primitive table borrowed place is unsupported".into());
+            }
+            return;
+        }
+        for projection in place.projection {
+            match projection {
+                ProjectionElem::Field(_, original) => self.original_type(original, 0),
+                ProjectionElem::Deref
+                | ProjectionElem::Index(_)
+                | ProjectionElem::ConstantIndex { .. }
+                | ProjectionElem::Subslice { .. }
+                | ProjectionElem::Downcast(_, _)
+                | ProjectionElem::OpaqueCast(_)
+                | ProjectionElem::UnwrapUnsafeBinder(_)
+                | ProjectionElem::PhantomDeref => {
+                    if self.error.is_none() {
+                        self.error =
+                            Some("primitive table borrowed projection is unsupported".into());
+                    }
+                }
+            }
+        }
+    }
+
+    fn visit_user_type_projection(&mut self, projection: &rustc_middle::mir::UserTypeProjection) {
+        self.charge(projection.projs.len());
+        if self.error.is_none() {
+            self.error = Some("primitive table user projection is unsupported".into());
+        }
+    }
+
+    fn visit_ty_const(&mut self, _: ty::Const<'tcx>, _: rustc_middle::mir::Location) {
+        if self.error.is_none() {
+            self.error = Some("primitive table type constant is unsupported".into());
+        }
+    }
+
+    fn visit_operand(&mut self, operand: &Operand<'tcx>, location: rustc_middle::mir::Location) {
+        self.charge(1);
+        if self.error.is_none() {
+            self.super_operand(operand, location);
+        }
+    }
+
+    fn visit_const_operand(
+        &mut self,
+        constant: &rustc_middle::mir::ConstOperand<'tcx>,
+        _: rustc_middle::mir::Location,
+    ) {
+        match constant.const_ {
+            rustc_middle::mir::Const::Val(
+                rustc_middle::mir::ConstValue::Scalar(_) | rustc_middle::mir::ConstValue::ZeroSized,
+                original,
+            ) => self.original_type(original, 0),
+            _ if self.error.is_none() => {
+                self.error = Some("primitive table borrowed constant is unsupported".into());
+            }
+            _ => {}
+        }
+    }
+
+    fn visit_rvalue(&mut self, value: &Rvalue<'tcx>, location: rustc_middle::mir::Location) {
+        if let Rvalue::Aggregate(kind, operands) = value {
+            self.charge(operands.len());
+            if self.error.is_none() && !matches!(**kind, rustc_middle::mir::AggregateKind::Tuple) {
+                self.error = Some("primitive table borrowed aggregate is unsupported".into());
+            }
+        }
+        if self.error.is_none() {
+            self.super_rvalue(value, location);
+        }
+    }
+
+    fn visit_terminator(
+        &mut self,
+        terminator: &rustc_middle::mir::Terminator<'tcx>,
+        location: rustc_middle::mir::Location,
+    ) {
+        match &terminator.kind {
+            TerminatorKind::Call { args, .. } | TerminatorKind::TailCall { args, .. } => {
+                self.charge(args.len());
+            }
+            TerminatorKind::SwitchInt { targets, .. } => {
+                self.charge(targets.all_targets().len().saturating_mul(2))
+            }
+            TerminatorKind::InlineAsm { .. } if self.error.is_none() => {
+                self.error = Some("primitive table inline assembly is unsupported".into());
+            }
+            _ => {}
+        }
+        if self.error.is_none() {
+            self.super_terminator(terminator, location);
+        }
+    }
 }
 
 #[derive(Clone, PartialEq)]
@@ -207,16 +406,194 @@ impl<'tcx> Engine<'tcx> {
         })
     }
 
-    fn table_signature(&self, callable: Ty<'tcx>) -> bool {
-        self.integer_table_signature(callable)
-            .is_some_and(|signature| {
-                if signature.argument.original != signature.result.original {
-                    ENABLE_INTEGER_FUNCTION_TABLE_PAIRS
-                } else {
-                    signature.argument.original == self.tcx.types.u16
-                        || ENABLE_INTEGER_FUNCTION_TABLES
+    fn primitive_table_signature(&self, callable: Ty<'tcx>) -> Option<PrimitiveSignature<'tcx>> {
+        if !ENABLE_PRIMITIVE_FUNCTION_TABLES || !matches!(callable.kind(), ty::FnPtr(..)) {
+            return None;
+        }
+        let poly = callable.fn_sig(self.tcx);
+        if !poly.bound_vars().is_empty() {
+            return None;
+        }
+        let signature = poly.skip_binder();
+        let [argument] = signature.inputs() else {
+            return None;
+        };
+        if *argument != signature.output()
+            || signature.safety() != rustc_hir::Safety::Safe
+            || signature.abi() != rustc_abi::ExternAbi::Rust
+            || signature.c_variadic()
+        {
+            return None;
+        }
+        match argument.kind() {
+            ty::Bool => Some(PrimitiveSignature::Bool(*argument)),
+            ty::Char => Some(PrimitiveSignature::Char(*argument)),
+            _ => None,
+        }
+    }
+
+    fn validate_primitive_table_value(
+        &self,
+        value: &Value,
+        signature: PrimitiveSignature<'tcx>,
+        conditions: &[Term],
+    ) -> Result<(), String> {
+        match signature {
+            PrimitiveSignature::Bool(_) => {
+                let term = value.boolean()?;
+                if term.sort() != &Sort::Bool || !term.belongs_to(&self.terms) {
+                    return Err(
+                        "primitive table Bool value has inconsistent context or sort".into(),
+                    );
                 }
+                Ok(())
+            }
+            PrimitiveSignature::Char(_) => self.prove_char_value(value, conditions),
+        }
+    }
+
+    fn primitive_table_body_work(
+        &self,
+        instance: ty::Instance<'tcx>,
+        body: &Body<'tcx>,
+        work: &mut PrimitiveBodyWork<'_, 'tcx>,
+    ) -> Result<(), String> {
+        if !matches!(instance.def, ty::InstanceKind::Item(_))
+            || !matches!(
+                self.tcx.def_kind(instance.def_id()),
+                DefKind::Fn | DefKind::AssocFn
+            )
+            || !instance.args.is_empty()
+        {
+            return Err(
+                "primitive table borrowed Body needs an exact nongeneric named Item".into(),
+            );
+        }
+        let raw = self
+            .tcx
+            .fn_sig(instance.def_id())
+            .instantiate_identity()
+            .skip_norm_wip();
+        if !raw.bound_vars().is_empty() || !instance.args.is_empty() {
+            return Err(
+                "primitive table selected Body has unsupported signature parameters".into(),
+            );
+        }
+        let signature = raw.skip_binder();
+        if body.arg_count != signature.inputs().len()
+            || body
+                .local_decls
+                .get(rustc_middle::mir::RETURN_PLACE)
+                .is_none_or(|local| local.ty != signature.output())
+            || body
+                .args_iter()
+                .zip(signature.inputs())
+                .any(|(local, original)| body.local_decls[local].ty != *original)
+        {
+            return Err("primitive table selected Body argument/Return types differ".into());
+        }
+        work.charge(body.local_decls.len());
+        work.charge(body.basic_blocks.len());
+        work.charge(body.source_scopes.len());
+        work.charge(body.var_debug_info.len());
+        if let Some(error) = work.error.take() {
+            return Err(error);
+        }
+        if body.source.instance != instance.def
+            || body.source.promoted.is_some()
+            || body.coroutine.is_some()
+            || body.tainted_by_errors.is_some()
+            || body.spread_arg.is_some()
+            || !body.user_type_annotations.is_empty()
+            || body.coverage_early_info.is_some()
+            || body.coverage_mir_info.is_some()
+            || body.required_consts.as_ref().is_some_and(|v| !v.is_empty())
+            || body.mentioned_items.as_ref().is_some_and(|v| !v.is_empty())
+            || body
+                .var_debug_info
+                .iter()
+                .any(|info| info.composite.is_some())
+            || body.local_decls.iter().any(|local| {
+                local.user_ty.is_some()
+                    || matches!(local.local_info, rustc_middle::mir::ClearCrossCrate::Set(_))
             })
+            || body
+                .source_scopes
+                .iter()
+                .any(|scope| scope.inlined.is_some())
+        {
+            return Err("primitive table selected Body has unsupported metadata".into());
+        }
+        work.locals = body.local_decls.len();
+        for block in body.basic_blocks.iter() {
+            work.charge(block.statements.len().saturating_add(1));
+            if work.error.is_some() {
+                break;
+            }
+        }
+        if work.error.is_none() {
+            work.visit_body(body);
+        }
+        work.error.take().map_or(Ok(()), Err)
+    }
+
+    fn primitive_table_target_work(
+        &self,
+        instance: ty::Instance<'tcx>,
+        signature: Ty<'tcx>,
+        work: &mut PrimitiveBodyWork<'_, 'tcx>,
+    ) -> Result<(), String> {
+        if self.primitive_table_signature(signature).is_none()
+            || !matches!(instance.def, ty::InstanceKind::Item(_))
+            || !matches!(
+                self.tcx.def_kind(instance.def_id()),
+                DefKind::Fn | DefKind::AssocFn
+            )
+            || !instance.args.is_empty()
+        {
+            return Err("primitive table target needs a nongeneric named actual Item".into());
+        }
+        work.charge(
+            signature
+                .fn_sig(self.tcx)
+                .skip_binder()
+                .inputs()
+                .len()
+                .saturating_add(1),
+        );
+        let raw = self
+            .tcx
+            .fn_sig(instance.def_id())
+            .instantiate_identity()
+            .skip_norm_wip();
+        if raw != signature.fn_sig(self.tcx) {
+            return Err("primitive table raw target signature differs".into());
+        }
+        if !self.tcx.is_mir_available(instance.def_id()) {
+            return Err(self.categorized_error(
+                UnknownCategory::MissingCompilerEvidence,
+                "primitive table selected actual body is unavailable".into(),
+            ));
+        }
+        self.primitive_table_body_work(instance, self.tcx.optimized_mir(instance.def_id()), work)?;
+        if let Some(body) = self.bodies.borrow().get(&instance) {
+            self.primitive_table_body_work(instance, body, work)?;
+        }
+        Ok(())
+    }
+
+    fn table_signature(&self, callable: Ty<'tcx>) -> bool {
+        self.primitive_table_signature(callable).is_some()
+            || self
+                .integer_table_signature(callable)
+                .is_some_and(|signature| {
+                    if signature.argument.original != signature.result.original {
+                        ENABLE_INTEGER_FUNCTION_TABLE_PAIRS
+                    } else {
+                        signature.argument.original == self.tcx.types.u16
+                            || ENABLE_INTEGER_FUNCTION_TABLES
+                    }
+                })
             || (two_argument_tables_enabled()
                 && self.two_argument_integer_signature(callable).is_some())
     }
@@ -257,6 +634,17 @@ impl<'tcx> Engine<'tcx> {
         let Some(source) = source else {
             return Ok(None);
         };
+        if self.primitive_table_signature(*element).is_some() {
+            let ty::Array(_, count) = original.kind() else {
+                unreachable!();
+            };
+            if elements.is_empty()
+                || elements.len() > MAX_ARRAY_ELEMENTS
+                || count.try_to_target_usize(self.tcx) != Some(elements.len() as u64)
+            {
+                return Err("primitive table source exceeds its bounded original array".into());
+            }
+        }
         self.owned_field_footprint(source.body, source.prefix)?;
         if source.prefix.ty(&source.body.local_decls, self.tcx).ty != original
             || source.body.local_decls[source.index].ty != self.tcx.types.usize
@@ -297,6 +685,7 @@ impl<'tcx> Engine<'tcx> {
         };
         if self.integer_table_signature(*element).is_none()
             && self.two_argument_integer_signature(*element).is_none()
+            && self.primitive_table_signature(*element).is_none()
         {
             return Ok(None);
         }
@@ -316,10 +705,29 @@ impl<'tcx> Engine<'tcx> {
         }
         let signature = self.tcx.erase_and_anonymize_regions(*element);
         let mut targets = Vec::with_capacity(elements.len());
+        let mut primitive_work = PrimitiveBodyWork {
+            engine: self,
+            used: 0,
+            error: None,
+            locals: 0,
+        };
+        if self.primitive_table_signature(signature).is_some() {
+            primitive_work.charge(elements.len());
+        }
         for value in elements {
             let Value::FunctionPointer { id } = value else {
                 return Err("function table requires initialized known pointer elements".into());
             };
+            if self.primitive_table_signature(signature).is_some() {
+                let pointers = self.function_pointers.borrow();
+                if let Some(Target::Known {
+                    instance,
+                    signature,
+                }) = pointers.get(*id)
+                {
+                    self.primitive_table_target_work(*instance, *signature, &mut primitive_work)?;
+                }
+            }
             self.validate_table_target(*id, signature)?;
             targets.push(*id);
         }
@@ -367,7 +775,8 @@ impl<'tcx> Engine<'tcx> {
         };
         if signature != expected
             || (self.integer_table_signature(signature).is_none()
-                && self.two_argument_integer_signature(signature).is_none())
+                && self.two_argument_integer_signature(signature).is_none()
+                && self.primitive_table_signature(signature).is_none())
             || !matches!(instance.def, ty::InstanceKind::Item(_))
             || !matches!(
                 self.tcx.def_kind(instance.def_id()),
@@ -410,6 +819,55 @@ impl<'tcx> Engine<'tcx> {
         let Some(Value::FunctionPointer { id }) = &state.locals[place.local.as_usize()] else {
             return Ok(None);
         };
+        {
+            let pointers = self.function_pointers.borrow();
+            if let Some(Target::Choice(choice)) = pointers.get(*id)
+                && (self.primitive_table_signature(choice.signature).is_some()
+                    || call
+                        .body
+                        .local_decls
+                        .get(place.local)
+                        .is_some_and(|local| self.primitive_table_signature(local.ty).is_some()))
+            {
+                let original_matches = match choice.original.kind() {
+                    ty::Array(element, count) => {
+                        *element == choice.signature
+                            && count.try_to_target_usize(self.tcx)
+                                == Some(choice.targets.len() as u64)
+                    }
+                    _ => false,
+                };
+                if !original_matches
+                    || choice.targets.is_empty()
+                    || choice.targets.len() > MAX_ARRAY_ELEMENTS
+                    || call
+                        .body
+                        .local_decls
+                        .get(place.local)
+                        .is_none_or(|local| local.ty != choice.signature)
+                    || call.args.len() != 1
+                {
+                    return Err(
+                        "primitive table routing Choice differs from bounded actual call".into(),
+                    );
+                }
+                let mut work = PrimitiveBodyWork {
+                    engine: self,
+                    used: 0,
+                    error: None,
+                    locals: call.body.local_decls.len(),
+                };
+                if let Operand::Copy(argument) | Operand::Move(argument) = &call.args[0].node {
+                    work.operand_place(call.body, *argument)?;
+                } else if let Operand::Constant(constant) = &call.args[0].node {
+                    work.visit_const_operand(constant, rustc_middle::mir::Location::START);
+                    if let Some(error) = work.error.take() {
+                        return Err(error);
+                    }
+                }
+                work.operand_place(call.body, call.destination)?;
+            }
+        }
         let Some(Target::Choice(choice)) = self.function_pointers.borrow().get(*id).cloned() else {
             return Ok(None);
         };
@@ -445,6 +903,10 @@ impl<'tcx> Engine<'tcx> {
         let ty::Array(element, count) = choice.original.kind() else {
             return Err("function table choice lost its original array type".into());
         };
+        if let Some(primitive) = self.primitive_table_signature(callable) {
+            return self
+                .prepared_primitive_table_call(state, call, &choice, *id, callable, primitive);
+        }
         let Some(integer) = self.integer_table_signature(callable) else {
             if two_argument_tables_enabled()
                 && let Some(integer) = self.two_argument_integer_signature(callable)
@@ -535,7 +997,111 @@ impl<'tcx> Engine<'tcx> {
             &choice,
             instances,
             EvaluatedIntegerArguments::One(value),
-            integer.result,
+            TableResultSignature::Integer(integer.result),
+        )
+        .map(Some)
+    }
+
+    fn prepared_primitive_table_call(
+        &mut self,
+        state: &State,
+        call: TableCall<'_, 'tcx>,
+        choice: &Choice<'tcx>,
+        id: usize,
+        callable: Ty<'tcx>,
+        primitive: PrimitiveSignature<'tcx>,
+    ) -> Result<Option<Vec<(State, Return)>>, String> {
+        let ty::Array(element, count) = choice.original.kind() else {
+            return Err("primitive table lost its original fixed array".into());
+        };
+        if callable != choice.signature
+            || self.tcx.erase_and_anonymize_regions(*element) != callable
+            || count.try_to_target_usize(self.tcx) != Some(choice.targets.len() as u64)
+            || choice.targets.is_empty()
+            || choice.targets.len() > MAX_ARRAY_ELEMENTS
+            || !choice.index.belongs_to(&self.terms)
+            || choice.index.sort() != &Sort::BitVec(u32::from(self.tcx.sess.target.pointer_width))
+            || call.args.len() != 1
+            || call.args[0].node.ty(&call.body.local_decls, self.tcx) != primitive.original()
+            || call.destination.ty(&call.body.local_decls, self.tcx).ty != primitive.original()
+            || call.target.is_none()
+            || !state.memory.mutable_u16.is_empty()
+            || !state.memory.owned_regions.is_empty()
+        {
+            return Err("function table call exceeds its primitive prepared-call domain".into());
+        }
+        // Copy must authenticate recorded FieldTy just as Move consumption already does.
+        // The initial protocol admits direct locals and fixed original owned field paths.
+        if let Operand::Copy(place) | Operand::Move(place) = &call.args[0].node {
+            self.owned_field_footprint(call.body, *place)?;
+        }
+        self.owned_field_footprint(call.body, call.destination)?;
+        let mut work = PrimitiveBodyWork {
+            engine: self,
+            used: 0,
+            error: None,
+            locals: 0,
+        };
+        work.charge(choice.targets.len());
+        for target in &choice.targets {
+            let pointers = self.function_pointers.borrow();
+            let Some(Target::Known {
+                instance,
+                signature,
+            }) = pointers.get(*target)
+            else {
+                return Err("primitive table target is not known".into());
+            };
+            self.primitive_table_target_work(*instance, *signature, &mut work)?;
+        }
+        let instances = choice
+            .targets
+            .iter()
+            .map(|id| self.validate_table_target(*id, callable))
+            .collect::<Result<Vec<_>, _>>()?;
+        let bits = u32::from(self.tcx.sess.target.pointer_width);
+        let outside = self.terms.apply(
+            Op::Not,
+            &[self.terms.apply(
+                Op::BvUnsignedLt,
+                &[
+                    choice.index.clone(),
+                    self.terms.bit_vector(choice.targets.len() as u128, bits)?,
+                ],
+            )?],
+        )?;
+        let mut uncovered = state.conditions.clone();
+        uncovered.push(outside);
+        if self.feasible(&uncovered)? {
+            return Err("function table call lost its covered index domain".into());
+        }
+        let next = self
+            .steps
+            .checked_add(instances.len())
+            .ok_or("function table step overflow")?;
+        if next > self.limits.max_steps {
+            return Err(self.categorized_error(
+                UnknownCategory::ResourceLimit,
+                "function table expansion exceeds execution step budget".into(),
+            ));
+        }
+        self.steps = next;
+        let mut consumed = state.clone();
+        let actual = self.evaluate_operand(call.site.0, call.body, &mut consumed, call.func)?;
+        if !matches!(actual, Value::FunctionPointer { id: actual } if actual == id) {
+            return Err("function table actual callable differs from its routing hint".into());
+        }
+        let value =
+            self.evaluate_operand(call.site.0, call.body, &mut consumed, &call.args[0].node)?;
+        self.validate_primitive_table_value(&value, primitive, &consumed.conditions)?;
+        self.validate_owned_call_arguments(std::slice::from_ref(&value), &consumed.memory)?;
+        self.dispatch_evaluated_integer_table(
+            &consumed,
+            call,
+            choice,
+            instances,
+            EvaluatedIntegerArguments::One(value),
+            TableResultSignature::Primitive(primitive),
         )
         .map(Some)
     }
@@ -630,7 +1196,7 @@ impl<'tcx> Engine<'tcx> {
             choice,
             instances,
             EvaluatedIntegerArguments::Two(values),
-            integer.result,
+            TableResultSignature::Integer(integer.result),
         )
         .map(Some)
     }
@@ -642,7 +1208,7 @@ impl<'tcx> Engine<'tcx> {
         choice: &Choice<'tcx>,
         instances: Vec<ty::Instance<'tcx>>,
         arguments: EvaluatedIntegerArguments,
-        result_signature: IntegerSignature<'tcx>,
+        result_signature: TableResultSignature<'tcx>,
     ) -> Result<Vec<(State, Return)>, String> {
         let bits = u32::from(self.tcx.sess.target.pointer_width);
         let mut returns = Vec::new();
@@ -677,7 +1243,17 @@ impl<'tcx> Engine<'tcx> {
                 call.stack,
                 call.site,
             )? {
-                self.validate_table_result(&result.value, result_signature)?;
+                match result_signature {
+                    TableResultSignature::Integer(signature) => {
+                        self.validate_table_result(&result.value, signature)?
+                    }
+                    TableResultSignature::Primitive(signature) => self
+                        .validate_primitive_table_value(
+                            &result.value,
+                            signature,
+                            &result.conditions,
+                        )?,
+                }
                 returns.push((branch.clone(), result));
             }
         }
