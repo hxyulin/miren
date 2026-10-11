@@ -4081,6 +4081,161 @@ pub(super) fn compiler_production_probe<'tcx>(
 }
 
 #[cfg(test)]
+pub(super) fn compiler_return_transport_probe<'tcx>(
+    engine: &mut Engine<'tcx>,
+    root: &Rc<Body<'tcx>>,
+    base: &State,
+) {
+    let (block, data) = root
+        .basic_blocks
+        .iter_enumerated()
+        .find(|(_, data)| matches!(data.terminator().kind, TerminatorKind::Call { .. }))
+        .unwrap();
+    let TerminatorKind::Call {
+        func,
+        args,
+        destination,
+        target,
+        ..
+    } = &data.terminator().kind
+    else {
+        unreachable!()
+    };
+    let ty::FnDef(definition, generic) = func.ty(&root.local_decls, engine.tcx).kind() else {
+        unreachable!()
+    };
+    let instance = engine
+        .resolve_function_item(*definition, generic.skip_binder())
+        .unwrap();
+    let mut state = base.clone();
+    let untouched = symbolic::integer(&engine.terms, 43, 16, false);
+    let replacement = symbolic::integer(&engine.terms, 61, 16, false);
+    state.locals[2] = Some(Value::Elements(
+        vec![
+            symbolic::integer(&engine.terms, 41, 16, false),
+            untouched.clone(),
+        ]
+        .into(),
+    ));
+    let bits = u32::from(engine.tcx.sess.target.pointer_width);
+    state.locals[3] = Some(symbolic::integer(&engine.terms, 0, bits, false));
+    // Rust lowers this Call through a temporary. This projected publication is a direct
+    // typed boundary control, not a claim about ordinary projected Call lowering.
+    let projected = Place {
+        local: rustc_middle::mir::Local::from_usize(2),
+        projection: engine.tcx.mk_place_elems(&[ProjectionElem::Index(
+            rustc_middle::mir::Local::from_usize(3),
+        )]),
+    };
+    let captured = engine
+        .capture_call_destination(root, &state, projected)
+        .unwrap();
+    assert!(captured.is_some());
+    for statement in &data.statements {
+        if let StatementKind::Assign(a) = &statement.kind
+            && matches!(a.1, Rvalue::Ref(_, BorrowKind::Mut { .. }, _))
+        {
+            assert!(
+                engine
+                    .mutable_u16_stage(root, &mut state, a.0, &a.1, &statement.kind)
+                    .unwrap()
+            );
+        }
+    }
+    let before = state.memory.mutable_u16[0].data.clone();
+    let _scope = TestIssuance::enable();
+    let results = engine
+        .mutable_hierarchy_call(
+            &mut state,
+            super::mutable_u16_children::ChildCall {
+                body: root,
+                block,
+                instance,
+                args,
+                destination: *destination,
+                target: *target,
+                stack: &[],
+                site: (root.source.def_id(), data.terminator().source_info.span),
+            },
+        )
+        .unwrap()
+        .unwrap();
+    assert_eq!(results.len(), 2, "two actual symbolic Returns required");
+    // The index changes after capture; a consumed unrelated place must remain consumed.
+    state.locals[3] = Some(symbolic::integer(&engine.terms, 1, bits, false));
+    state.missing_places.consume(0, Vec::new()).unwrap();
+    let origin = results[0].memory.mutable_u16[0]
+        .hierarchy
+        .as_ref()
+        .unwrap()
+        .origin
+        .clone();
+    let mut continuations = Vec::new();
+    for returned in results {
+        let backing = &returned.memory.mutable_u16[0];
+        let hierarchy = backing.hierarchy.as_ref().unwrap();
+        assert!(hierarchy.owners.is_empty() && hierarchy.pending.is_none());
+        assert!(hierarchy.role_valid(&symbolic::MutableU16Role::Root, true));
+        assert!(Rc::ptr_eq(&origin, &hierarchy.origin));
+        let mut forged = hierarchy.clone();
+        forged.origin = Rc::new((*origin).clone());
+        assert!(!Rc::ptr_eq(&origin, &forged.origin));
+        let conditions = returned.conditions.clone();
+        let current = backing.data.clone();
+        let mut next = state.continuation(returned.conditions, returned.memory);
+        assert_eq!(next.conditions, conditions);
+        assert_eq!(next.memory.mutable_u16[0].data, current);
+        if current != before {
+            let substituted = state.continuation(next.conditions.clone(), base.memory.clone());
+            assert_ne!(substituted.memory.mutable_u16[0].data, current);
+        }
+        assert!(next.missing_places.check(0, &[]).is_err());
+        engine
+            .store_call_result(
+                root,
+                &mut next,
+                projected,
+                captured.as_ref(),
+                returned.value.clone(),
+            )
+            .unwrap();
+        let Value::Elements(out) = next.locals[2].as_ref().unwrap() else {
+            unreachable!()
+        };
+        assert_eq!(out[0].integer().unwrap(), returned.value.integer().unwrap());
+        assert_eq!(out[1].integer().unwrap(), untouched.integer().unwrap());
+        assert!(next.missing_places.check(0, &[]).is_err());
+        continuations.push(next);
+    }
+    assert_ne!(continuations[0].conditions, continuations[1].conditions);
+    assert!(
+        continuations
+            .iter()
+            .any(|s| s.memory.mutable_u16[0].data != before)
+    );
+    let sibling_data = continuations[1].memory.mutable_u16[0].data.clone();
+    let sibling_out = continuations[1].locals[2].clone().unwrap();
+    Rc::make_mut(&mut continuations[0].memory.mutable_u16)[0].data = before.clone();
+    engine
+        .store_call_result(
+            root,
+            &mut continuations[0],
+            projected,
+            captured.as_ref(),
+            replacement,
+        )
+        .unwrap();
+    assert_eq!(continuations[1].memory.mutable_u16[0].data, sibling_data);
+    let Value::Elements(out) = continuations[1].locals[2].as_ref().unwrap() else {
+        unreachable!()
+    };
+    let Value::Elements(original) = sibling_out else {
+        unreachable!()
+    };
+    assert_eq!(out[0].integer().unwrap(), original[0].integer().unwrap());
+}
+
+#[cfg(test)]
 pub(super) fn compiler_non_candidate_probe<'tcx>(
     engine: &mut Engine<'tcx>,
     root: &Rc<Body<'tcx>>,

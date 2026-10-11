@@ -1291,3 +1291,8 @@ Known integer table calls share one private dispatch loop after callable and arg
 Unary and binary preparation retain validation and Move order; target branches preserve actual
 returned Memory and existing result certificates. This refactor adds no callable family, Repeat
 permission or execution budget.
+
+The compiler lease probe combines two actual symbolic helper Returns with caller continuation,
+captured-index publication, consumed-place masks and independent branch memory updates. The
+projected destination is a direct typed boundary control; this test adds no hierarchy depth rights
+or persistent activation-history carrier.

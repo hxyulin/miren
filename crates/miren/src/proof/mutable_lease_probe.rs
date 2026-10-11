@@ -691,7 +691,7 @@ impl<'tcx> Ledger<'tcx> {
     }
 }
 
-fn compiler_cases<'tcx>(tcx: TyCtxt<'tcx>, output: &std::path::Path) {
+fn compiler_cases<'tcx>(tcx: TyCtxt<'tcx>, output: &std::path::Path, transport_only: bool) {
     let limits = miren::AnalysisLimits::default();
     let mut engine = Engine {
         tcx,
@@ -771,6 +771,41 @@ fn compiler_cases<'tcx>(tcx: TyCtxt<'tcx>, output: &std::path::Path) {
             .unwrap()
             .to_def_id()
     };
+    if transport_only {
+        let instance = engine
+            .resolve_function_item(find("root_transport"), tcx.mk_args(&[]))
+            .unwrap();
+        let body = engine.instantiated_body(instance).unwrap();
+        let mut memory = Memory::default();
+        let mut conditions = Vec::new();
+        let value = engine
+            .mutable_u16_input(tcx.types.u16, &mut memory, &mut conditions)
+            .unwrap();
+        let mut base = State {
+            locals: vec![None; body.local_decls.len()],
+            addresses: vec![None; body.local_decls.len()],
+            missing_places: Default::default(),
+            conditions,
+            memory,
+        };
+        base.locals[1] = Some(value);
+        super::mutable_hierarchy::compiler_return_transport_probe(&mut engine, &body, &base);
+        std::fs::write(output.join("return-transport.mir"), format!("{body:#?}")).unwrap();
+        assert!(engine.proof.assumptions.is_empty());
+        assert!(engine.proof.entry_assumptions.is_empty());
+        assert!(engine.proof.trusted_calls.is_empty());
+        std::fs::write(
+            output.join("return-transport-proof.json"),
+            serde_json::to_string_pretty(&engine.proof).unwrap(),
+        )
+        .unwrap();
+        std::fs::write(
+            output.join("return-transport-controls.txt"),
+            "two actual Returns; continuation/captured index/masks/branch COW passed\n",
+        )
+        .unwrap();
+        return;
+    }
     let root_instance = engine
         .resolve_function_item(find("root"), tcx.mk_args(&[]))
         .unwrap();
@@ -1378,6 +1413,7 @@ fn stage_block<'tcx>(
 fn compiler_nested_whole_u16_inactive_lifecycle() {
     struct Capture {
         output: std::path::PathBuf,
+        transport_only: bool,
     }
     impl rustc_driver::Callbacks for Capture {
         fn after_analysis<'tcx>(
@@ -1385,7 +1421,7 @@ fn compiler_nested_whole_u16_inactive_lifecycle() {
             _: &rustc_interface::interface::Compiler,
             tcx: TyCtxt<'tcx>,
         ) -> rustc_driver::Compilation {
-            compiler_cases(tcx, &self.output);
+            compiler_cases(tcx, &self.output, self.transport_only);
             rustc_driver::Compilation::Stop
         }
     }
@@ -1522,7 +1558,40 @@ fn compiler_nested_whole_u16_inactive_lifecycle() {
                 args.extend(["--target".into(), target.into()]);
             }
             std::fs::write(output.join("command.txt"), args.join("\n")).unwrap();
-            rustc_driver::run_compiler(&args, &mut Capture { output });
+            rustc_driver::run_compiler(
+                &args,
+                &mut Capture {
+                    output: output.clone(),
+                    transport_only: false,
+                },
+            );
+            let transport_source = root.join("transport.rs");
+            std::fs::write(
+                &transport_source,
+                concat!(
+                    "#![no_std]\n#![forbid(unsafe_code)]\n",
+                    "#[inline(never)] fn scalar(word:u16)->u16 { word ^ 0 }\n",
+                    "#[inline(never)] fn leaf_transport(v:&mut[u16])->u16 { if v.len()>0 { ",
+                    "v[0]=scalar(17); 17 } else { 23 } }\n",
+                    "#[inline(never)] fn outer_transport(v:&mut[u16])->u16 { ",
+                    "leaf_transport(&mut *v) }\n",
+                    "pub fn root_transport(v:&mut[u16],mut out:[u16;2],index:usize)->[u16;2] { ",
+                    "out[index]=outer_transport(v); out }\n",
+                ),
+            )
+            .unwrap();
+            let transport_output = output.join("transport");
+            std::fs::create_dir(&transport_output).unwrap();
+            args[3] = transport_source.display().to_string();
+            args[5] = transport_output.display().to_string();
+            std::fs::write(transport_output.join("command.txt"), args.join("\n")).unwrap();
+            rustc_driver::run_compiler(
+                &args,
+                &mut Capture {
+                    output: transport_output,
+                    transport_only: true,
+                },
+            );
         }
     }
 }
