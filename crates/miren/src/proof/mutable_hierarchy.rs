@@ -246,6 +246,65 @@ const FLOAT_HIERARCHY_ENABLED: bool = true;
 const DORMANT_CALLS_ENABLED: bool = true;
 const ASSOCIATED_HIERARCHY_ENABLED: bool = true;
 
+#[cfg(test)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum TestHierarchyFlag {
+    Associated,
+    Integer,
+    Bool,
+    Char,
+    Float,
+    Issuance,
+}
+
+#[cfg(test)]
+impl TestHierarchyFlag {
+    fn replace(self, value: bool) -> bool {
+        match self {
+            Self::Associated => TEST_ASSOCIATED_HIERARCHY.with(|cell| cell.replace(value)),
+            Self::Integer => TEST_INTEGER_HIERARCHY.with(|cell| cell.replace(value)),
+            Self::Bool => TEST_BOOL_HIERARCHY.with(|cell| cell.replace(value)),
+            Self::Char => TEST_CHAR_HIERARCHY.with(|cell| cell.replace(value)),
+            Self::Float => TEST_FLOAT_HIERARCHY.with(|cell| cell.replace(value)),
+            Self::Issuance => TEST_ISSUANCE.with(|cell| cell.replace(value)),
+        }
+    }
+
+    fn get(self) -> bool {
+        match self {
+            Self::Associated => TEST_ASSOCIATED_HIERARCHY.with(std::cell::Cell::get),
+            Self::Integer => TEST_INTEGER_HIERARCHY.with(std::cell::Cell::get),
+            Self::Bool => TEST_BOOL_HIERARCHY.with(std::cell::Cell::get),
+            Self::Char => TEST_CHAR_HIERARCHY.with(std::cell::Cell::get),
+            Self::Float => TEST_FLOAT_HIERARCHY.with(std::cell::Cell::get),
+            Self::Issuance => TEST_ISSUANCE.with(std::cell::Cell::get),
+        }
+    }
+}
+
+#[cfg(test)]
+struct TestHierarchyOverride {
+    flag: TestHierarchyFlag,
+    previous: bool,
+}
+
+#[cfg(test)]
+impl TestHierarchyOverride {
+    fn enable(flag: TestHierarchyFlag) -> Self {
+        Self {
+            flag,
+            previous: flag.replace(true),
+        }
+    }
+}
+
+#[cfg(test)]
+impl Drop for TestHierarchyOverride {
+    fn drop(&mut self) {
+        self.flag.replace(self.previous);
+    }
+}
+
 fn associated_hierarchy_enabled() -> bool {
     #[cfg(test)]
     if TEST_ASSOCIATED_HIERARCHY.with(std::cell::Cell::get) {
@@ -261,19 +320,16 @@ std::thread_local! {
 }
 
 #[cfg(test)]
-struct TestAssociatedHierarchy(bool);
+struct TestAssociatedHierarchy {
+    _scope: TestHierarchyOverride,
+}
 
 #[cfg(test)]
 impl TestAssociatedHierarchy {
     fn enable() -> Self {
-        Self(TEST_ASSOCIATED_HIERARCHY.with(|value| value.replace(true)))
-    }
-}
-
-#[cfg(test)]
-impl Drop for TestAssociatedHierarchy {
-    fn drop(&mut self) {
-        TEST_ASSOCIATED_HIERARCHY.with(|value| value.set(self.0));
+        Self {
+            _scope: TestHierarchyOverride::enable(TestHierarchyFlag::Associated),
+        }
     }
 }
 
@@ -291,19 +347,16 @@ std::thread_local! {
 }
 
 #[cfg(test)]
-struct TestIntegerHierarchy(bool);
+struct TestIntegerHierarchy {
+    _scope: TestHierarchyOverride,
+}
 
 #[cfg(test)]
 impl TestIntegerHierarchy {
     fn enable() -> Self {
-        Self(TEST_INTEGER_HIERARCHY.with(|value| value.replace(true)))
-    }
-}
-
-#[cfg(test)]
-impl Drop for TestIntegerHierarchy {
-    fn drop(&mut self) {
-        TEST_INTEGER_HIERARCHY.with(|value| value.set(self.0));
+        Self {
+            _scope: TestHierarchyOverride::enable(TestHierarchyFlag::Integer),
+        }
     }
 }
 
@@ -321,19 +374,16 @@ std::thread_local! {
 }
 
 #[cfg(test)]
-struct TestBoolHierarchy(bool);
+struct TestBoolHierarchy {
+    _scope: TestHierarchyOverride,
+}
 
 #[cfg(test)]
 impl TestBoolHierarchy {
     fn enable() -> Self {
-        Self(TEST_BOOL_HIERARCHY.with(|value| value.replace(true)))
-    }
-}
-
-#[cfg(test)]
-impl Drop for TestBoolHierarchy {
-    fn drop(&mut self) {
-        TEST_BOOL_HIERARCHY.with(|value| value.set(self.0));
+        Self {
+            _scope: TestHierarchyOverride::enable(TestHierarchyFlag::Bool),
+        }
     }
 }
 fn char_hierarchy_enabled() -> bool {
@@ -350,19 +400,16 @@ std::thread_local! {
 }
 
 #[cfg(test)]
-struct TestCharHierarchy(bool);
+struct TestCharHierarchy {
+    _scope: TestHierarchyOverride,
+}
 
 #[cfg(test)]
 impl TestCharHierarchy {
     fn enable() -> Self {
-        Self(TEST_CHAR_HIERARCHY.with(|value| value.replace(true)))
-    }
-}
-
-#[cfg(test)]
-impl Drop for TestCharHierarchy {
-    fn drop(&mut self) {
-        TEST_CHAR_HIERARCHY.with(|value| value.set(self.0));
+        Self {
+            _scope: TestHierarchyOverride::enable(TestHierarchyFlag::Char),
+        }
     }
 }
 
@@ -380,19 +427,16 @@ std::thread_local! {
 }
 
 #[cfg(test)]
-struct TestFloatHierarchy(bool);
+struct TestFloatHierarchy {
+    _scope: TestHierarchyOverride,
+}
 
 #[cfg(test)]
 impl TestFloatHierarchy {
     fn enable() -> Self {
-        Self(TEST_FLOAT_HIERARCHY.with(|value| value.replace(true)))
-    }
-}
-
-#[cfg(test)]
-impl Drop for TestFloatHierarchy {
-    fn drop(&mut self) {
-        TEST_FLOAT_HIERARCHY.with(|value| value.set(self.0));
+        Self {
+            _scope: TestHierarchyOverride::enable(TestHierarchyFlag::Float),
+        }
     }
 }
 
@@ -410,19 +454,16 @@ std::thread_local! {
 }
 
 #[cfg(test)]
-struct TestIssuance(bool);
+struct TestIssuance {
+    _scope: TestHierarchyOverride,
+}
 
 #[cfg(test)]
 impl TestIssuance {
     fn enable() -> Self {
-        Self(TEST_ISSUANCE.with(|value| value.replace(true)))
-    }
-}
-
-#[cfg(test)]
-impl Drop for TestIssuance {
-    fn drop(&mut self) {
-        TEST_ISSUANCE.with(|value| value.set(self.0));
+        Self {
+            _scope: TestHierarchyOverride::enable(TestHierarchyFlag::Issuance),
+        }
     }
 }
 
@@ -5273,6 +5314,172 @@ pub(super) fn compiler_float_boundary_probe<'tcx>(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    const HIERARCHY_FLAGS: [TestHierarchyFlag; 6] = [
+        TestHierarchyFlag::Associated,
+        TestHierarchyFlag::Integer,
+        TestHierarchyFlag::Bool,
+        TestHierarchyFlag::Char,
+        TestHierarchyFlag::Float,
+        TestHierarchyFlag::Issuance,
+    ];
+
+    fn hierarchy_overrides() -> [bool; 6] {
+        HIERARCHY_FLAGS.map(TestHierarchyFlag::get)
+    }
+
+    #[test]
+    fn all_hierarchy_overrides_restore_previous_true_after_nested_panic() {
+        assert_eq!(hierarchy_overrides(), [false; 6]);
+        for flag in HIERARCHY_FLAGS {
+            {
+                let _outer = TestHierarchyOverride::enable(flag);
+                assert!(flag.get());
+                {
+                    let _inner = TestHierarchyOverride::enable(flag);
+                    assert!(flag.get());
+                }
+                assert!(flag.get());
+                assert!(
+                    std::panic::catch_unwind(|| {
+                        let _inner = TestHierarchyOverride::enable(flag);
+                        assert!(flag.get());
+                        panic!("nested hierarchy override restoration");
+                    })
+                    .is_err()
+                );
+                assert!(flag.get());
+            }
+            assert_eq!(hierarchy_overrides(), [false; 6]);
+            assert!(
+                std::panic::catch_unwind(|| {
+                    let _scope = TestHierarchyOverride::enable(flag);
+                    assert!(flag.get());
+                    panic!("outer hierarchy override restoration");
+                })
+                .is_err()
+            );
+            assert_eq!(hierarchy_overrides(), [false; 6]);
+        }
+    }
+
+    #[test]
+    fn hierarchy_overrides_restore_each_cross_domain_independently() {
+        for (outer_index, outer) in HIERARCHY_FLAGS.into_iter().enumerate() {
+            for (inner_index, inner) in HIERARCHY_FLAGS.into_iter().enumerate() {
+                if outer == inner {
+                    continue;
+                }
+                assert_eq!(hierarchy_overrides(), [false; 6]);
+                {
+                    let _outer = TestHierarchyOverride::enable(outer);
+                    let mut expected = [false; 6];
+                    expected[outer_index] = true;
+                    assert_eq!(hierarchy_overrides(), expected);
+                    assert!(
+                        std::panic::catch_unwind(|| {
+                            let _inner = TestHierarchyOverride::enable(inner);
+                            let mut nested = expected;
+                            nested[inner_index] = true;
+                            assert_eq!(hierarchy_overrides(), nested);
+                            panic!("cross-domain hierarchy restoration");
+                        })
+                        .is_err()
+                    );
+                    assert_eq!(hierarchy_overrides(), expected);
+                }
+                assert_eq!(hierarchy_overrides(), [false; 6]);
+            }
+        }
+    }
+
+    #[test]
+    fn hierarchy_overrides_are_isolated_between_two_worker_threads() {
+        assert_eq!(hierarchy_overrides(), [false; 6]);
+        let observations;
+        let main_enabled;
+        let main_after_workers;
+        {
+            let _main_scope = TestFloatHierarchy::enable();
+            main_enabled = hierarchy_overrides();
+            let (ready, ready_receiver) = std::sync::mpsc::channel();
+            let mut releases = Vec::new();
+            let workers: Vec<_> = [0, 5]
+                .into_iter()
+                .map(|index| {
+                    let ready = ready.clone();
+                    let (release, release_receiver) = std::sync::mpsc::channel();
+                    releases.push(release);
+                    std::thread::spawn(move || {
+                        let initial = hierarchy_overrides();
+                        let enabled;
+                        let after_panic;
+                        let released;
+                        let panicked;
+                        {
+                            let flag = HIERARCHY_FLAGS[index];
+                            let _outer = TestHierarchyOverride::enable(flag);
+                            enabled = hierarchy_overrides();
+                            let _ = ready.send((index, enabled));
+                            released = release_receiver
+                                .recv_timeout(std::time::Duration::from_secs(5))
+                                .is_ok();
+                            panicked = std::panic::catch_unwind(|| {
+                                let _inner = TestHierarchyOverride::enable(flag);
+                                panic!("worker hierarchy restoration");
+                            })
+                            .is_err();
+                            after_panic = hierarchy_overrides();
+                        }
+                        (
+                            index,
+                            initial,
+                            enabled,
+                            after_panic,
+                            hierarchy_overrides(),
+                            released,
+                            panicked,
+                        )
+                    })
+                })
+                .collect();
+            drop(ready);
+            let ready_results: Vec<_> = (0..2)
+                .map(|_| ready_receiver.recv_timeout(std::time::Duration::from_secs(5)))
+                .collect();
+            let release_results: Vec<_> = releases.iter().map(|release| release.send(())).collect();
+            let worker_results: Vec<_> = workers.into_iter().map(|worker| worker.join()).collect();
+            main_after_workers = hierarchy_overrides();
+            observations = (ready_results, release_results, worker_results);
+        }
+        assert_eq!(hierarchy_overrides(), [false; 6]);
+        let mut main_expected = [false; 6];
+        main_expected[4] = true;
+        assert_eq!(main_enabled, main_expected);
+        assert_eq!(main_after_workers, main_expected);
+        let (ready_results, release_results, worker_results) = observations;
+        for result in ready_results {
+            let (index, observed) = result.unwrap();
+            let mut expected = [false; 6];
+            expected[index] = true;
+            assert_eq!(observed, expected);
+        }
+        assert!(release_results.iter().all(Result::is_ok));
+        for result in worker_results {
+            let (index, initial, enabled, after_panic, final_state, released, panicked) =
+                result.unwrap();
+            let mut expected = [false; 6];
+            expected[index] = true;
+            assert_eq!(initial, [false; 6]);
+            assert_eq!(enabled, expected);
+            assert_eq!(after_panic, expected);
+            assert_eq!(final_state, [false; 6]);
+            assert!(released && panicked);
+        }
+        std::thread::spawn(|| assert_eq!(hierarchy_overrides(), [false; 6]))
+            .join()
+            .unwrap();
+    }
 
     #[test]
     fn scoped_public_issuance_restores_nested_and_panicking_tests() {

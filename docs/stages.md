@@ -6300,3 +6300,41 @@ Evidence is under /tmp/miren-stage214-parent213, /tmp/miren-stage214-root-full-c
 Final factual documentation closure changes five files and preserves the other 934 tested and
 captured source files. These are selected capability measurements, not full Rust parity or
 firmware coverage.
+
+## Stage215: scoped hierarchy test flags
+
+The six test-only hierarchy overrides share one concrete guard that restores the previous
+thread-local value on Drop. Nested scopes preserve an already enabled value; panic unwinding
+restores it, and bounded worker-thread controls check isolation when each guard is created
+and dropped within its thread. The separate Float Return fault protocol stays unchanged.
+The six production enable functions and seven production constants are byte-identical.
+This refactor adds no Rust semantic permissions or hardware assumptions.
+
+The current compiler lifecycle test retains 144 Float Return observations across host/ARM
+O0/O2, with 145 sealed compiler assets. Nine selected tests pass in the focused owner checks,
+including three new restoration controls. All 22 required ROOT checks pass, including 859
+Rust tests across 196 outer Cargo target summaries and 68 Python tests. Formatting, lint,
+release builds, dependency policy, examples and manual hooks pass. Four fresh capability
+surveys retain 236 cases across 80 families, each with 97 PROVED, 82 REFUTED and 57 UNKNOWN.
+
+The proportional parent-release to owner-debug pass contains 56 groups and 2,164 complete
+proof pairs. It preserves 2,160 literal complete objects and all 4,644 rich queried
+obligations/models, including UNKNOWN partial queries. Three differences satisfy the existing
+query-free fold timeout rule. A fourth stops in an additional wrapping_add frame and has
+its own independently reviewed exception bound to that exact pair's raw hashes. Every other
+complete Proof field remains exact. No general timeout or UNKNOWN exemption is introduced.
+
+The fresh ROOT release executes the same 56 groups on exact frozen owner input paths and
+working directories. It preserves 2,161 literal complete objects and all 4,644 rich queried
+obligations/models. Two differences satisfy the existing fold timeout rule; a third has a
+fresh, independently reviewed ROOT exception for its exact extra-frame pair. It does not
+inherit the owner's exception. The stopped datasets are preserved; separate continuations
+adopt only their exact reviewed raw pairs and execute previously unrun groups. Both comparisons
+preserve all outcomes without assumptions, trusted calls or source-path transformations.
+ROOT debug is built and exercised by workspace tests; no separate debug CLI equality is claimed.
+
+Evidence is under /tmp/miren-stage215-parent214, /tmp/miren-stage215-parent214-cli,
+/tmp/miren-stage215-cli-arm-o0-continuation, /tmp/miren-stage215-root-full-checks,
+/tmp/miren-stage215-root-survey, /tmp/miren-stage215-root-release-integration and
+/tmp/miren-stage215-root-final-data. These measurements describe selected Rust capabilities,
+not full Rust parity or firmware coverage.

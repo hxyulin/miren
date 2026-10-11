@@ -1250,3 +1250,11 @@ four surveys cover 236 cases across 80 families with 97 proved, 82 refuted and 5
 Fresh ROOT debug/release comparisons preserve all queried obligations/models on frozen owner
 inputs. References, other scalar domains, from-end paths and input or return rights gain no
 permissions. See the Stage214 capability evidence for scope and limitations.
+
+Stage215 unifies six test-only hierarchy flag guards while retaining the previous thread-local
+value across nested scopes and panic unwinding. Thread controls create and drop guards within
+each thread. Production enable functions, constants and Float Return fault handling remain
+unchanged. All 22 ROOT checks pass, including 859 Rust tests and 68 Python tests; four surveys
+retain 236 cases across 80 families. Fresh release compatibility preserves all 4,644 rich
+queried obligations/models on frozen owner inputs. Exact query-free fold timeout differences
+remain UNKNOWN under separately recorded comparison rules. See the Stage215 capability evidence.
