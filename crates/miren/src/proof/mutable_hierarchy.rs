@@ -732,8 +732,8 @@ impl<'tcx> Engine<'tcx> {
             || hierarchy.origin.allocation != backing.allocation
             || hierarchy.origin.capacity.integer()? != backing.length.integer()?
             || !hierarchy.origin.data_context.belongs_to(&self.terms)
-            || !backing.data.belongs_to(&self.terms)
-            || hierarchy.origin.data_context.sort() != backing.data.sort()
+            || !backing.data.scalar()?.belongs_to(&self.terms)
+            || hierarchy.origin.data_context.sort() != backing.data.scalar()?.sort()
         {
             return Err("activation backing no longer matches its issued origin".into());
         }
@@ -906,8 +906,8 @@ impl<'tcx> Engine<'tcx> {
             || hierarchy.origin.allocation != backing.allocation
             || hierarchy.origin.capacity.integer()? != backing.length.integer()?
             || !hierarchy.origin.data_context.belongs_to(&self.terms)
-            || !backing.data.belongs_to(&self.terms)
-            || hierarchy.origin.data_context.sort() != backing.data.sort()
+            || !backing.data.scalar()?.belongs_to(&self.terms)
+            || hierarchy.origin.data_context.sort() != backing.data.scalar()?.sort()
             || !self.mutable_hierarchy_element(self.mutable_interval_element(backing.certificate)?)
             || hierarchy.issued < backing.generation
         {
@@ -1122,7 +1122,7 @@ impl<'tcx> Engine<'tcx> {
         }
         state.flow.require_unarmed()?;
         let before = borrowed.clone();
-        let data = backing.data.clone();
+        let data = backing.data.scalar()?.clone();
         let float_original = self.mutable_hierarchy_float_backing(id, &state.memory)?;
         if call.args.len() > MAX_INPUT_VALUES {
             return Err(self.categorized_error(
@@ -1349,7 +1349,7 @@ impl<'tcx> Engine<'tcx> {
             || returned.epoch < before.epoch
             || !returned.owners.is_empty()
             || returned.pending.is_some()
-            || backing.data != *data
+            || *backing.data.scalar()? != *data
         {
             return Err("dormant primitive Return changed origin/counters/data/state".into());
         }
@@ -2244,7 +2244,7 @@ impl<'tcx> Engine<'tcx> {
                 return Ok(None);
             }
             self.mutable_hierarchy_bootstrap(body, state, place, id, &role)?;
-            Hierarchy::dormant(backing)
+            Hierarchy::dormant(backing, backing.data.scalar()?)
         };
         let caller_frame = self.mutable_u16_register_current_frame(body, &state.flow)?;
         let tip = Tip {
@@ -2745,13 +2745,13 @@ impl<'tcx> Engine<'tcx> {
 }
 
 impl Hierarchy {
-    fn dormant(backing: &super::mutable_u16::Backing) -> Self {
+    fn dormant(backing: &super::mutable_u16::Backing, data: &Term) -> Self {
         Self {
             origin: Rc::new(Origin {
                 certificate: backing.certificate,
                 allocation: backing.allocation,
                 capacity: backing.length.clone(),
-                data_context: backing.data.clone(),
+                data_context: data.clone(),
             }),
             issued: backing.generation,
             epoch: 0,
@@ -3405,7 +3405,10 @@ fn compiler_bool_return_probe<'tcx>(
         .terms
         .apply(
             Op::Select,
-            &[backing.data.clone(), zero.integer().unwrap().0.clone()],
+            &[
+                backing.data.scalar().unwrap().clone(),
+                zero.integer().unwrap().0.clone(),
+            ],
         )
         .unwrap();
     assert_eq!(observed.sort(), &Sort::Bool);
@@ -4290,7 +4293,10 @@ fn compiler_char_return_probe<'tcx>(
         .terms
         .apply(
             Op::Select,
-            &[backing.data.clone(), zero.integer().unwrap().0.clone()],
+            &[
+                backing.data.scalar().unwrap().clone(),
+                zero.integer().unwrap().0.clone(),
+            ],
         )
         .unwrap();
     assert_eq!(observed.sort(), &Sort::BitVec(32));
@@ -5130,7 +5136,7 @@ fn compiler_dormant_probe<'tcx>(engine: &mut Engine<'tcx>, memory: &Memory, cond
     let id = state.memory.mutable_hierarchy.unwrap();
     let backing = &state.memory.mutable_u16[id];
     let before = backing.hierarchy.as_ref().unwrap().clone();
-    let data_term = backing.data.clone();
+    let data_term = backing.data.scalar().unwrap().clone();
     let mut malformed = call();
     malformed.site.1 = rustc_span::DUMMY_SP;
     assert!(
@@ -5334,7 +5340,7 @@ impl Hierarchy {
                 certificate: backing.certificate,
                 allocation: backing.allocation,
                 capacity: backing.length.clone(),
-                data_context: backing.data.clone(),
+                data_context: backing.data.scalar()?.clone(),
             }),
             issued: backing.generation,
             epoch: 0,
@@ -5354,9 +5360,9 @@ impl Hierarchy {
             || backing.certificate != self.origin.certificate
             || backing.allocation != self.origin.allocation
             || backing.length.integer()? != self.origin.capacity.integer()?
-            || !backing.data.belongs_to(&engine.terms)
+            || !backing.data.scalar()?.belongs_to(&engine.terms)
             || !self.origin.data_context.belongs_to(&engine.terms)
-            || backing.data.sort() != self.origin.data_context.sort()
+            || backing.data.scalar()?.sort() != self.origin.data_context.sort()
             || !matches!(
                 state.memory.get(backing.allocation),
                 Some(Some(Value::Unit))
@@ -6184,16 +6190,26 @@ pub(super) fn compiler_float_boundary_probe<'tcx>(
             let hierarchy = backing.hierarchy.as_ref().unwrap();
             assert!(hierarchy.owners.is_empty() && hierarchy.pending.is_none());
             let mut changed = result.memory.clone();
-            Rc::make_mut(&mut changed.mutable_u16)[0].data =
-                engine.fresh(backing.data.sort().clone());
+            Rc::make_mut(&mut changed.mutable_u16)[0].data = super::mutable_u16::Storage::Scalar(
+                engine.fresh(backing.data.scalar().unwrap().sort().clone()),
+            );
             assert!(
                 engine
-                    .mutable_hierarchy_dormant_return(0, hierarchy, &backing.data, &changed)
+                    .mutable_hierarchy_dormant_return(
+                        0,
+                        hierarchy,
+                        backing.data.scalar().unwrap(),
+                        &changed
+                    )
                     .is_err()
             );
             let mut foreign_data = result.memory.clone();
             Rc::make_mut(&mut foreign_data.mutable_u16)[0].data =
-                foreign.symbol(0, backing.data.sort().clone()).unwrap();
+                super::mutable_u16::Storage::Scalar(
+                    foreign
+                        .symbol(0, backing.data.scalar().unwrap().sort().clone())
+                        .unwrap(),
+                );
             assert!(
                 engine
                     .mutable_hierarchy_float_backing(0, &foreign_data)
@@ -6813,8 +6829,11 @@ mod tests {
                 },
                 false,
             ));
-            assert!(backing.data.belongs_to(&engine.terms));
-            assert_eq!(backing.data.sort(), before.sort());
+            assert!(backing.data.scalar().unwrap().belongs_to(&engine.terms));
+            assert_eq!(
+                backing.data.scalar().unwrap().sort(),
+                before.scalar().unwrap().sort()
+            );
         }
         assert!(
             observed_current_store,

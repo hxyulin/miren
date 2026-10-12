@@ -72,9 +72,56 @@ fn typed_element_projection(place: Place<'_>) -> Option<TypedElementProjection> 
 }
 
 #[derive(Clone, Debug)]
+pub(super) enum ElementCodec<'tcx> {
+    Scalar(symbolic::ScalarSliceElement),
+    Product(super::composite_slices::CompositeType<'tcx>),
+}
+
+// Representation conversion only; this issues no certificate, owner or lease.
+impl<'tcx> From<super::composite_slices::CompositeType<'tcx>> for ElementCodec<'tcx> {
+    fn from(product: super::composite_slices::CompositeType<'tcx>) -> Self {
+        Self::Product(product)
+    }
+}
+
+impl ElementCodec<'_> {
+    fn scalar(&self) -> Result<symbolic::ScalarSliceElement, String> {
+        match self {
+            Self::Scalar(element) => Ok(*element),
+            Self::Product(product) => Err(format!(
+                "mutable product codec cannot enter scalar authority: {:?}",
+                product.ty
+            )),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(super) enum Storage {
+    Scalar(Term),
+    Product(Vec<Term>),
+}
+
+// Representation conversion only; these columns grant no tracked Memory authority.
+impl From<Vec<Term>> for Storage {
+    fn from(columns: Vec<Term>) -> Self {
+        Self::Product(columns)
+    }
+}
+
+impl Storage {
+    pub(super) fn scalar(&self) -> Result<&Term, &'static str> {
+        match self {
+            Self::Scalar(data) => Ok(data),
+            Self::Product(_) => Err("mutable product columns cannot enter scalar authority"),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
 pub(super) struct IntegerCertificate<'tcx> {
     original: Ty<'tcx>,
-    element: symbolic::ScalarSliceElement,
+    codec: ElementCodec<'tcx>,
     bytes: u64,
     alignment: u64,
 }
@@ -84,7 +131,7 @@ pub(super) struct Backing {
     pub(super) certificate: usize,
     pub(super) allocation: usize,
     pub(super) length: Value,
-    pub(super) data: Term,
+    pub(super) data: Storage,
     pub(super) generation: u64,
     pub(super) phase: super::mutable_u16_children::Phase,
     pub(super) interval: Option<super::mutable_interval::Descriptor>,
@@ -123,7 +170,7 @@ impl<'tcx> Engine<'tcx> {
             && (layout.size.bytes() != 1 || layout.align.abi.bytes() != 1))
             || (certificate.original == self.tcx.types.char
                 && (layout.size.bytes() != 4 || layout.align.abi.bytes() != 4))
-            || self.scalar_slice_element(certificate.original)? != Some(certificate.element)
+            || self.scalar_slice_element(certificate.original)? != Some(certificate.codec.scalar()?)
             || layout.size.bytes() != certificate.bytes
             || layout.align.abi.bytes() != certificate.alignment
         {
@@ -178,7 +225,8 @@ impl<'tcx> Engine<'tcx> {
         let backing = self.mutable_u16_backing(id, memory)?;
         Ok(matches!(
             self.mutable_integer_certificate(backing.certificate)?
-                .element,
+                .codec
+                .scalar()?,
             symbolic::ScalarSliceElement::Float { .. }
         ))
     }
@@ -224,7 +272,7 @@ impl<'tcx> Engine<'tcx> {
             let id = self.mutable_integer_types.len();
             self.mutable_integer_types.push(IntegerCertificate {
                 original,
-                element,
+                codec: ElementCodec::Scalar(element),
                 bytes: layout.size.bytes(),
                 alignment: layout.align.abi.bytes(),
             });
@@ -256,7 +304,7 @@ impl<'tcx> Engine<'tcx> {
                 bits,
                 signed: false,
             },
-            data,
+            data: Storage::Scalar(data),
             generation: 0,
             phase: super::mutable_u16_children::Phase::Idle,
             interval: None,
@@ -285,7 +333,7 @@ impl<'tcx> Engine<'tcx> {
         if !matches!(memory.get(backing.allocation), Some(Some(Value::Unit))) {
             return Err(self.mutable_u16_error("mutable u16 root backing is unavailable"));
         }
-        self.mutable_u16_terms(backing.certificate, &backing.length, &backing.data)?;
+        self.mutable_u16_terms(backing.certificate, &backing.length, backing.data.scalar()?)?;
         self.validate_mutable_interval(id, backing)?;
         Ok(backing)
     }
@@ -300,7 +348,10 @@ impl<'tcx> Engine<'tcx> {
         length: &Value,
         data: &Term,
     ) -> Result<(), String> {
-        let element = self.mutable_integer_certificate(certificate)?.element;
+        let element = self
+            .mutable_integer_certificate(certificate)?
+            .codec
+            .scalar()?;
         let bits = u32::from(self.tcx.sess.target.pointer_width);
         let (term, width, signed) = length.integer()?;
         if width != bits
@@ -348,7 +399,12 @@ impl<'tcx> Engine<'tcx> {
                 data,
             } => {
                 self.mutable_u16_terms(*certificate, length, data)?;
-                if self.mutable_integer_certificate(*certificate)?.element != *element {
+                if self
+                    .mutable_integer_certificate(*certificate)?
+                    .codec
+                    .scalar()?
+                    != *element
+                {
                     return Err("mutable integer ghost codec differs from its certificate".into());
                 }
                 Ok((**length).clone())
@@ -376,14 +432,15 @@ impl<'tcx> Engine<'tcx> {
                         certificate: backing.certificate,
                         element: self
                             .mutable_integer_certificate(backing.certificate)?
-                            .element,
+                            .codec
+                            .scalar()?,
                         length: Box::new(
                             backing.interval.as_ref().map_or_else(
                                 || backing.length.clone(),
                                 |view| view.length().clone(),
                             ),
                         ),
-                        data: backing.data.clone(),
+                        data: backing.data.scalar()?.clone(),
                     },
                 })
             }
@@ -396,9 +453,10 @@ impl<'tcx> Engine<'tcx> {
                         certificate: backing.certificate,
                         element: self
                             .mutable_integer_certificate(backing.certificate)?
-                            .element,
+                            .codec
+                            .scalar()?,
                         length: Box::new(backing.length.clone()),
-                        data: backing.data.clone(),
+                        data: backing.data.scalar()?.clone(),
                     },
                 })
             }
@@ -414,7 +472,12 @@ impl<'tcx> Engine<'tcx> {
                 data,
             } => {
                 self.mutable_u16_terms(*certificate, length, data)?;
-                if self.mutable_integer_certificate(*certificate)?.element != *element {
+                if self
+                    .mutable_integer_certificate(*certificate)?
+                    .codec
+                    .scalar()?
+                    != *element
+                {
                     return Err("mutable integer ghost codec differs from its certificate".into());
                 }
                 Ok(value.clone())
@@ -482,10 +545,11 @@ impl<'tcx> Engine<'tcx> {
         Ok(Some(super::scalar_slices::decode_scalar_element(
             &self.terms,
             self.mutable_integer_certificate(backing.certificate)?
-                .element,
+                .codec
+                .scalar()?,
             self.terms.apply(
                 Op::Select,
-                &[backing.data.clone(), index.integer()?.0.clone()],
+                &[backing.data.scalar()?.clone(), index.integer()?.0.clone()],
             )?,
         )?))
     }
@@ -659,18 +723,18 @@ impl<'tcx> Engine<'tcx> {
         if certificate.original == self.tcx.types.char {
             self.prove_char_value(replacement, &state.conditions)?;
         }
-        if let symbolic::ScalarSliceElement::Float { bits } = certificate.element {
+        if let symbolic::ScalarSliceElement::Float { bits } = certificate.codec.scalar()? {
             self.prove_float_pair(replacement, bits, &state.conditions)?;
         }
         let data = self.terms.apply(
             Op::Store,
             &[
-                backing.data.clone(),
+                backing.data.scalar()?.clone(),
                 index.integer()?.0.clone(),
                 term.clone(),
             ],
         )?;
-        std::rc::Rc::make_mut(&mut state.memory.mutable_u16)[id].data = data;
+        std::rc::Rc::make_mut(&mut state.memory.mutable_u16)[id].data = Storage::Scalar(data);
         Ok(true)
     }
 
@@ -679,7 +743,7 @@ impl<'tcx> Engine<'tcx> {
         certificate: &IntegerCertificate<'tcx>,
         replacement: &Value,
     ) -> Result<Term, String> {
-        if certificate.element == symbolic::ScalarSliceElement::Bool {
+        if certificate.codec.scalar()? == symbolic::ScalarSliceElement::Bool {
             let Value::Bool(term) = replacement else {
                 return Err(
                     "mutable Bool replacement requires logical Bool in current context".into(),
@@ -695,7 +759,7 @@ impl<'tcx> Engine<'tcx> {
             }
             return Ok(term.clone());
         }
-        if let symbolic::ScalarSliceElement::Float { bits } = certificate.element {
+        if let symbolic::ScalarSliceElement::Float { bits } = certificate.codec.scalar()? {
             if self.float_type(certificate.original) != Some(bits) {
                 return Err("mutable Float replacement differs from original compiler type".into());
             }
@@ -709,7 +773,7 @@ impl<'tcx> Engine<'tcx> {
             };
             return Ok(raw.clone());
         }
-        if certificate.element == symbolic::ScalarSliceElement::Char {
+        if certificate.codec.scalar()? == symbolic::ScalarSliceElement::Char {
             let (term, bits, signed) = replacement.integer()?;
             if certificate.original != self.tcx.types.char
                 || bits != 32
@@ -727,7 +791,7 @@ impl<'tcx> Engine<'tcx> {
         let symbolic::ScalarSliceElement::Integer {
             bits: expected_bits,
             signed: expected_signed,
-        } = certificate.element
+        } = certificate.codec.scalar()?
         else {
             return Err("mutable integer replacement certificate has a different kind".into());
         };
@@ -1115,7 +1179,10 @@ pub(super) fn compiler_bool_hierarchy_backing_probe(engine: &mut Engine<'_>, mem
     let certificate = backing.certificate;
     let issued = engine.mutable_integer_types[certificate].clone();
     assert_eq!(issued.original, engine.tcx.types.bool);
-    assert_eq!(issued.element, symbolic::ScalarSliceElement::Bool);
+    assert_eq!(
+        issued.codec.scalar().unwrap(),
+        symbolic::ScalarSliceElement::Bool
+    );
     assert_eq!((issued.bytes, issued.alignment), (1, 1));
     for original in [
         engine.tcx.types.u8,
@@ -1132,21 +1199,24 @@ pub(super) fn compiler_bool_hierarchy_backing_probe(engine: &mut Engine<'_>, mem
         assert!(engine.mutable_u16_backing(0, memory).is_err());
         engine.mutable_integer_types[certificate] = issued.clone();
     }
-    engine.mutable_integer_types[certificate].element = symbolic::ScalarSliceElement::Integer {
-        bits: 8,
-        signed: false,
-    };
+    engine.mutable_integer_types[certificate].codec =
+        ElementCodec::Scalar(symbolic::ScalarSliceElement::Integer {
+            bits: 8,
+            signed: false,
+        });
     assert!(engine.mutable_u16_backing(0, memory).is_err());
     engine.mutable_integer_types[certificate] = issued;
     let foreign = Context::default();
     let bits = u32::from(engine.tcx.sess.target.pointer_width);
     let mut context = memory.clone();
-    std::rc::Rc::make_mut(&mut context.mutable_u16)[0].data = foreign
-        .symbol(
-            99,
-            Sort::Array(Box::new(Sort::BitVec(bits)), Box::new(Sort::Bool)),
-        )
-        .unwrap();
+    std::rc::Rc::make_mut(&mut context.mutable_u16)[0].data = super::mutable_u16::Storage::Scalar(
+        foreign
+            .symbol(
+                99,
+                Sort::Array(Box::new(Sort::BitVec(bits)), Box::new(Sort::Bool)),
+            )
+            .unwrap(),
+    );
     assert!(engine.mutable_u16_backing(0, &context).is_err());
     for wrong in [
         symbolic::integer(&engine.terms, 1, 8, false),
@@ -1167,7 +1237,10 @@ pub(super) fn compiler_char_hierarchy_backing_probe(engine: &mut Engine<'_>, mem
     let certificate = backing.certificate;
     let issued = engine.mutable_integer_types[certificate].clone();
     assert_eq!(issued.original, engine.tcx.types.char);
-    assert_eq!(issued.element, symbolic::ScalarSliceElement::Char);
+    assert_eq!(
+        issued.codec.scalar().unwrap(),
+        symbolic::ScalarSliceElement::Char
+    );
     assert_eq!((issued.bytes, issued.alignment), (4, 4));
     for original in [
         engine.tcx.types.u32,
@@ -1184,21 +1257,25 @@ pub(super) fn compiler_char_hierarchy_backing_probe(engine: &mut Engine<'_>, mem
         assert!(engine.mutable_u16_backing(0, memory).is_err());
         engine.mutable_integer_types[certificate] = issued.clone();
     }
-    engine.mutable_integer_types[certificate].element = symbolic::ScalarSliceElement::Integer {
-        bits: 32,
-        signed: false,
-    };
+    engine.mutable_integer_types[certificate].codec =
+        ElementCodec::Scalar(symbolic::ScalarSliceElement::Integer {
+            bits: 32,
+            signed: false,
+        });
     assert!(engine.mutable_u16_backing(0, memory).is_err());
     engine.mutable_integer_types[certificate] = issued;
     let foreign = Context::default();
     let bits = u32::from(engine.tcx.sess.target.pointer_width);
     let mut wrong_context = memory.clone();
-    std::rc::Rc::make_mut(&mut wrong_context.mutable_u16)[0].data = foreign
-        .symbol(
-            99,
-            Sort::Array(Box::new(Sort::BitVec(bits)), Box::new(Sort::BitVec(32))),
-        )
-        .unwrap();
+    std::rc::Rc::make_mut(&mut wrong_context.mutable_u16)[0].data =
+        super::mutable_u16::Storage::Scalar(
+            foreign
+                .symbol(
+                    99,
+                    Sort::Array(Box::new(Sort::BitVec(bits)), Box::new(Sort::BitVec(32))),
+                )
+                .unwrap(),
+        );
     assert!(engine.mutable_u16_backing(0, &wrong_context).is_err());
     let symbolic = engine.terms.symbol(987, Sort::BitVec(32)).unwrap();
     let symbolic_value = Value::Int {
@@ -1339,6 +1416,48 @@ fn compiler_char_store_probe(engine: &mut Engine<'_>) {
 }
 
 #[cfg(test)]
+fn compiler_product_payload_refusal_probe(engine: &mut Engine<'_>, root: &Value, memory: &Memory) {
+    let backing = engine.mutable_u16_backing(0, memory).unwrap();
+    let certificate = backing.certificate;
+    let issued = engine.mutable_integer_types[certificate].clone();
+    let ghost = engine.mutable_u16_snapshot(root, memory).unwrap();
+    let product = engine
+        .composite_slice_shape(Ty::new_array(engine.tcx, engine.tcx.types.f32, 2))
+        .unwrap()
+        .unwrap();
+    engine.mutable_integer_types[certificate].codec = ElementCodec::from(product);
+    assert!(
+        engine
+            .mutable_u16_backing(0, memory)
+            .unwrap_err()
+            .contains("mutable product codec cannot enter scalar authority")
+    );
+    assert!(engine.mutable_u16_length(root, memory).is_err());
+    assert!(engine.mutable_u16_snapshot(root, memory).is_err());
+    assert!(engine.mutable_u16_length(&ghost, memory).is_err());
+    engine.mutable_integer_types[certificate] = issued;
+    let mut wrong_storage = memory.clone();
+    std::rc::Rc::make_mut(&mut wrong_storage.mutable_u16)[0].data =
+        Storage::from(vec![backing.data.scalar().unwrap().clone()]);
+    assert!(
+        engine
+            .mutable_u16_backing(0, &wrong_storage)
+            .unwrap_err()
+            .contains("mutable product columns cannot enter scalar authority")
+    );
+    assert!(engine.mutable_u16_length(root, &wrong_storage).is_err());
+    assert!(engine.mutable_u16_snapshot(root, &wrong_storage).is_err());
+    assert!(
+        engine
+            .mutable_u16_role_live(0, &MutableU16Role::Root, &wrong_storage)
+            .is_err()
+    );
+    assert!(engine.mutable_u16_backing(0, memory).is_ok());
+    assert_eq!(memory.mutable_u16[0].data, backing.data);
+    eprintln!("product_representation_refusal_targets=8");
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
     #[test]
@@ -1459,7 +1578,7 @@ mod tests {
                 else {
                     panic!("ghost")
                 };
-                assert_eq!(data, old_data);
+                assert_eq!(data, *old_data.scalar().unwrap());
                 let returned =
                     original_state.continuation(state.conditions.clone(), state.memory.clone());
                 assert_eq!(
@@ -1568,12 +1687,18 @@ mod tests {
                     .mutable_u16_call_allowed(&shared_body, &metadata_state, instance, &[argument])
                     .unwrap();
                 let mut wrong_backing = state.memory.clone();
-                std::rc::Rc::make_mut(&mut wrong_backing.mutable_u16)[id].data = foreign
-                    .symbol(
-                        0,
-                        Sort::Array(Box::new(Sort::BitVec(bits)), Box::new(Sort::BitVec(16))),
-                    )
-                    .unwrap();
+                std::rc::Rc::make_mut(&mut wrong_backing.mutable_u16)[id].data =
+                    super::mutable_u16::Storage::Scalar(
+                        foreign
+                            .symbol(
+                                0,
+                                Sort::Array(
+                                    Box::new(Sort::BitVec(bits)),
+                                    Box::new(Sort::BitVec(16)),
+                                ),
+                            )
+                            .unwrap(),
+                    );
                 assert!(engine.mutable_u16_backing(id, &wrong_backing).is_err());
                 for (original_name, wrong_name) in
                     [("caller_i32", "caller_u32"), ("caller_usize", "caller_u64")]
@@ -1766,12 +1891,16 @@ mod tests {
                 let bool_root = engine
                     .mutable_u16_input(tcx.types.bool, &mut bool_memory, &mut bool_conditions)
                     .unwrap();
+                compiler_product_payload_refusal_probe(&mut engine, &bool_root, &bool_memory);
                 let ghost = engine
                     .mutable_u16_snapshot(&bool_root, &bool_memory)
                     .unwrap();
                 let certificate = bool_memory.mutable_u16[0].certificate;
                 let issued = engine.mutable_integer_types[certificate].clone();
-                assert_eq!(issued.element, symbolic::ScalarSliceElement::Bool);
+                assert_eq!(
+                    issued.codec.scalar().unwrap(),
+                    symbolic::ScalarSliceElement::Bool
+                );
                 assert_eq!((issued.bytes, issued.alignment), (1, 1));
                 let good = Value::Bool(engine.terms.boolean(true));
                 assert!(engine.mutable_scalar_replacement(&issued, &good).is_ok());
@@ -1795,12 +1924,18 @@ mod tests {
                 }
                 for context in [&engine.terms, &foreign] {
                     let mut corrupt = bool_memory.clone();
-                    std::rc::Rc::make_mut(&mut corrupt.mutable_u16)[0].data = context
-                        .symbol(
-                            99,
-                            Sort::Array(Box::new(Sort::BitVec(bits)), Box::new(Sort::BitVec(8))),
-                        )
-                        .unwrap();
+                    std::rc::Rc::make_mut(&mut corrupt.mutable_u16)[0].data =
+                        super::mutable_u16::Storage::Scalar(
+                            context
+                                .symbol(
+                                    99,
+                                    Sort::Array(
+                                        Box::new(Sort::BitVec(bits)),
+                                        Box::new(Sort::BitVec(8)),
+                                    ),
+                                )
+                                .unwrap(),
+                        );
                     assert!(engine.mutable_u16_backing(0, &corrupt).is_err());
                 }
                 let bool_definition = tcx
@@ -1858,24 +1993,27 @@ mod tests {
                         .is_err()
                 );
                 let old_data = bool_memory.mutable_u16[0].data.clone();
-                std::rc::Rc::make_mut(&mut bool_memory.mutable_u16)[0].data = engine
-                    .terms
-                    .apply(
-                        Op::Store,
-                        &[
-                            old_data,
-                            engine.terms.bit_vector(0, bits).unwrap(),
-                            engine.terms.boolean(true),
-                        ],
-                    )
-                    .unwrap();
+                std::rc::Rc::make_mut(&mut bool_memory.mutable_u16)[0].data =
+                    super::mutable_u16::Storage::Scalar(
+                        engine
+                            .terms
+                            .apply(
+                                Op::Store,
+                                &[
+                                    old_data.scalar().unwrap().clone(),
+                                    engine.terms.bit_vector(0, bits).unwrap(),
+                                    engine.terms.boolean(true),
+                                ],
+                            )
+                            .unwrap(),
+                    );
                 assert!(engine.mutable_u16_length(&ghost, &bool_memory).is_ok());
                 if let Value::MutableU16 {
                     role: MutableU16Role::Ghost { data, .. },
                     ..
                 } = ghost
                 {
-                    assert_ne!(data, bool_memory.mutable_u16[0].data);
+                    assert_ne!(data, *bool_memory.mutable_u16[0].data.scalar().unwrap());
                 } else {
                     panic!("detached ghost");
                 }
@@ -1886,7 +2024,10 @@ mod tests {
                     .unwrap();
                 let certificate = char_memory.mutable_u16[0].certificate;
                 let issued = engine.mutable_integer_types[certificate].clone();
-                assert_eq!(issued.element, symbolic::ScalarSliceElement::Char);
+                assert_eq!(
+                    issued.codec.scalar().unwrap(),
+                    symbolic::ScalarSliceElement::Char
+                );
                 assert_eq!((issued.bytes, issued.alignment), (4, 4));
                 for wrong_type in [tcx.types.u32, tcx.types.i32] {
                     engine.mutable_integer_types[certificate].original = wrong_type;
@@ -1915,7 +2056,8 @@ mod tests {
                         .unwrap(),
                 ] {
                     let mut wrong = char_memory.clone();
-                    std::rc::Rc::make_mut(&mut wrong.mutable_u16)[0].data = data;
+                    std::rc::Rc::make_mut(&mut wrong.mutable_u16)[0].data =
+                        super::mutable_u16::Storage::Scalar(data);
                     assert!(engine.mutable_u16_backing(0, &wrong).is_err());
                 }
                 let definition = tcx
@@ -2024,7 +2166,7 @@ mod tests {
                     let certificate = memory.mutable_u16[0].certificate;
                     let issued = engine.mutable_integer_types[certificate].clone();
                     assert_eq!(
-                        issued.element,
+                        issued.codec.scalar().unwrap(),
                         symbolic::ScalarSliceElement::Float { bits: width }
                     );
                     assert_eq!(issued.bytes * 8, u64::from(width));
@@ -2137,10 +2279,10 @@ mod tests {
                     engine.mutable_integer_types[certificate].alignment += 1;
                     assert!(engine.mutable_u16_backing(0, &state.memory).is_err());
                     engine.mutable_integer_types[certificate] = issued.clone();
-                    engine.mutable_integer_types[certificate].element =
-                        symbolic::ScalarSliceElement::Float {
+                    engine.mutable_integer_types[certificate].codec =
+                        ElementCodec::Scalar(symbolic::ScalarSliceElement::Float {
                             bits: if width == 32 { 64 } else { 32 },
-                        };
+                        });
                     assert!(engine.mutable_u16_backing(0, &state.memory).is_err());
                     engine.mutable_integer_types[certificate] = issued;
                     assert!(

@@ -51,6 +51,14 @@ Cargo's target/profile flags. It does not rebuild precompiled sysroot libraries 
 functions a Rust body. `-Zbuild-std=core` can expose core MIR on a configured target. Missing bodies
 and unsupported operations remain UNKNOWN.
 
+## Mutable backing representation
+
+Mutable slice owners distinguish scalar storage from typed product leaf columns in one owner and
+role namespace. Representation conversions issue no certificate, allocation or lease. Product
+issuance remains closed; scalar observations, snapshots and child paths refuse product payloads.
+This representation refactor preserves the existing scalar domains and their compiler, current
+Memory, generation and floating raw-bit checks. Nested mutable product slices remain UNKNOWN.
+
 ## Compiler integration
 
 The proof engine consumes typed MIR directly. Inventory strings are diagnostics, not parsed

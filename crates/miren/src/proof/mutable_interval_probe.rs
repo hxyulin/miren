@@ -439,7 +439,7 @@ fn check_active_lifecycle<'tcx>(tcx: TyCtxt<'tcx>, root: DefId, original_type: T
         let element_sort = if std::ptr::eq(context, &engine.terms) {
             Sort::Bool
         } else {
-            match issued.memory.mutable_u16[0].data.sort() {
+            match issued.memory.mutable_u16[0].data.scalar().unwrap().sort() {
                 Sort::Array(_, element) => element.as_ref().clone(),
                 _ => panic!("array backing"),
             }
@@ -455,7 +455,8 @@ fn check_active_lifecycle<'tcx>(tcx: TyCtxt<'tcx>, root: DefId, original_type: T
     }
     for data in malformed_data {
         let mut malformed = state.clone();
-        std::rc::Rc::make_mut(&mut malformed.memory.mutable_u16)[0].data = data;
+        std::rc::Rc::make_mut(&mut malformed.memory.mutable_u16)[0].data =
+            super::mutable_u16::Storage::Scalar(data);
         assert!(engine.mutable_interval_issuer(&malformed, call()).is_err());
     }
     let mut masked_memory = state.clone();

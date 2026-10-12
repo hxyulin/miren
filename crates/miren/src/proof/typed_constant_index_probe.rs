@@ -397,13 +397,16 @@ fn check<'tcx>(tcx: TyCtxt<'tcx>) {
         symbolic::integer(&foreign, 3, bits, false);
     refuse_store(&engine, &body, &mut wrong_context, first, &word);
     let mut wrong_codec = state.clone();
-    std::rc::Rc::make_mut(&mut wrong_codec.memory.mutable_u16)[0].data = engine
-        .terms
-        .symbol(
-            902,
-            Sort::Array(Box::new(Sort::BitVec(bits)), Box::new(Sort::Bool)),
-        )
-        .unwrap();
+    std::rc::Rc::make_mut(&mut wrong_codec.memory.mutable_u16)[0].data =
+        super::mutable_u16::Storage::Scalar(
+            engine
+                .terms
+                .symbol(
+                    902,
+                    Sort::Array(Box::new(Sort::BitVec(bits)), Box::new(Sort::Bool)),
+                )
+                .unwrap(),
+        );
     refuse_store(&engine, &body, &mut wrong_codec, first, &word);
     for wrong in [
         symbolic::integer(&engine.terms, 17, 16, true),

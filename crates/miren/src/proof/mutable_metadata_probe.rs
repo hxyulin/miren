@@ -149,11 +149,11 @@ fn compiler_issued_is_empty_requires_exact_metadata_body_and_live_original_role(
                     } else {
                         Sort::Bool
                     };
-                    std::rc::Rc::make_mut(&mut wrong_codec.memory.mutable_u16)[0].data = engine
-                        .fresh(Sort::Array(
+                    std::rc::Rc::make_mut(&mut wrong_codec.memory.mutable_u16)[0].data =
+                        super::mutable_u16::Storage::Scalar(engine.fresh(Sort::Array(
                             Box::new(Sort::BitVec(bits)),
                             Box::new(wrong_sort),
-                        ));
+                        )));
                     let unchanged = wrong_codec.memory.mutable_u16[0].data.clone();
                     assert!(
                         engine

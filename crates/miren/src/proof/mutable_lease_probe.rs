@@ -154,7 +154,7 @@ impl<'tcx> Ledger<'tcx> {
                 certificate: backing.certificate,
                 allocation: backing.allocation,
                 length: backing.length.clone(),
-                context: backing.data.clone(),
+                context: backing.data.scalar()?.clone(),
             }),
             issued: 0,
             epoch: 0,
@@ -200,9 +200,9 @@ impl<'tcx> Ledger<'tcx> {
             || backing.allocation != self.origin.allocation
             || backing.length.integer().map_err(|_| "length")?.0
                 != self.origin.length.integer().map_err(|_| "length")?.0
-            || !backing.data.belongs_to(&engine.terms)
+            || !backing.data.scalar()?.belongs_to(&engine.terms)
             || !self.origin.context.belongs_to(&engine.terms)
-            || backing.data.sort() != self.origin.context.sort()
+            || backing.data.scalar()?.sort() != self.origin.context.sort()
         {
             return Err("issued backing differs");
         }
@@ -1221,9 +1221,10 @@ fn compiler_cases<'tcx>(tcx: TyCtxt<'tcx>, output: &std::path::Path, transport_o
         .clone();
     let changed = engine
         .terms
-        .apply(Op::Store, &[before.clone(), index, word])
+        .apply(Op::Store, &[before.scalar().unwrap().clone(), index, word])
         .unwrap();
-    Rc::make_mut(&mut leaf_state.memory.mutable_u16)[0].data = changed.clone();
+    Rc::make_mut(&mut leaf_state.memory.mutable_u16)[0].data =
+        super::mutable_u16::Storage::Scalar(changed.clone());
     let scalar_call = call_block(tcx, &leaf, scalar_instance.def_id());
     let before_scalar_issued = ledger.issued;
     let scalar_ticket = ledger
@@ -1412,7 +1413,10 @@ fn compiler_cases<'tcx>(tcx: TyCtxt<'tcx>, output: &std::path::Path, transport_o
             .metadata_access(&engine, &leaf_state, leaf_metadata, &leaf, 1)
             .is_err()
     );
-    assert_eq!(outer_state.memory.mutable_u16[0].data, changed);
+    assert_eq!(
+        *outer_state.memory.mutable_u16[0].data.scalar().unwrap(),
+        changed
+    );
     let fresh_metadata = ledger
         .metadata(&engine, &outer_state, 1, &outer, 1)
         .unwrap();
@@ -1473,7 +1477,10 @@ fn compiler_cases<'tcx>(tcx: TyCtxt<'tcx>, output: &std::path::Path, transport_o
         outer_state.memory.mutable_u16[0].generation,
         original_generation
     );
-    assert_eq!(outer_state.memory.mutable_u16[0].data, changed);
+    assert_eq!(
+        *outer_state.memory.mutable_u16[0].data.scalar().unwrap(),
+        changed
+    );
     let mut budget_state = root_state.clone();
     while budget_state.memory.storage_slots() < MAX_INPUT_VALUES {
         budget_state.memory.push(Some(Value::Unit));
@@ -1488,7 +1495,11 @@ fn compiler_cases<'tcx>(tcx: TyCtxt<'tcx>, output: &std::path::Path, transport_o
     let context = Context::default();
     let mut wrong_context = root_state.clone();
     Rc::make_mut(&mut wrong_context.memory.mutable_u16)[0].data =
-        context.symbol(0, before.sort().clone()).unwrap();
+        super::mutable_u16::Storage::Scalar(
+            context
+                .symbol(0, before.scalar().unwrap().sort().clone())
+                .unwrap(),
+        );
     assert!(ledger.current(&engine, &wrong_context).is_err());
     std::fs::write(
         output.join("checkpoint.txt"),

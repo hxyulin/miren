@@ -1202,12 +1202,14 @@ mod tests {
             certificate: 0,
             allocation: 0,
             length: symbolic::integer(&terms, 129, 64, false),
-            data: terms
-                .symbol(
-                    0,
-                    Sort::Array(Box::new(Sort::BitVec(64)), Box::new(Sort::BitVec(16))),
-                )
-                .unwrap(),
+            data: super::super::mutable_u16::Storage::Scalar(
+                terms
+                    .symbol(
+                        0,
+                        Sort::Array(Box::new(Sort::BitVec(64)), Box::new(Sort::BitVec(16))),
+                    )
+                    .unwrap(),
+            ),
             generation: 0,
             phase: Phase::Idle,
             interval: None,
