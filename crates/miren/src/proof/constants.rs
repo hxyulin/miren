@@ -40,6 +40,16 @@ impl<'tcx> Engine<'tcx> {
         let value = constant.eval(self.tcx, typing_env, span).map_err(|error| {
             format!("unsupported MIR constant {constant:?} evaluation: {error:?}")
         })?;
+        self.decoded_constant(constant, span, value)
+    }
+
+    pub(super) fn decoded_constant(
+        &self,
+        constant: Const<'tcx>,
+        span: Span,
+        value: rustc_middle::mir::ConstValue,
+    ) -> Result<Value, String> {
+        let typing_env = ty::TypingEnv::fully_monomorphized();
         if let ty::Ref(_, element, mutability) = constant.ty().kind()
             && !mutability.is_mut()
             && let Some(value) = self.atomic_container(*element, 0)

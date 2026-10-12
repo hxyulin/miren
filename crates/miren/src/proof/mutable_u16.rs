@@ -1421,6 +1421,7 @@ fn compiler_char_store_probe(engine: &mut Engine<'_>) {
         flow: activation_flow::Flow::Unarmed,
         locals: vec![None; body.local_decls.len()],
         addresses: vec![None; body.local_decls.len()],
+        constant_receipts: constant_reference_receipts::Slots::default(),
         missing_places: Default::default(),
         memory,
         conditions,
@@ -1619,6 +1620,7 @@ mod tests {
                     addresses: vec![None; body.local_decls.len()],
                     conditions,
                     memory,
+                    constant_receipts: constant_reference_receipts::Slots::default(),
                     missing_places: Default::default(),
                 };
                 state.locals[1] = Some(root.clone());
@@ -1823,6 +1825,7 @@ mod tests {
                         addresses: vec![None; wrong_body.local_decls.len()],
                         conditions,
                         memory,
+                        constant_receipts: constant_reference_receipts::Slots::default(),
                         missing_places: Default::default(),
                     };
                     state.locals[1] = Some(root);
@@ -2024,6 +2027,7 @@ mod tests {
                     addresses: vec![None; bool_body.local_decls.len()],
                     conditions: bool_conditions,
                     memory: bool_memory.clone(),
+                    constant_receipts: constant_reference_receipts::Slots::default(),
                     missing_places: Default::default(),
                 };
                 bool_state.locals[1] = Some(bool_root.clone());
@@ -2146,6 +2150,7 @@ mod tests {
                     addresses: vec![None; char_body.local_decls.len()],
                     conditions: char_conditions,
                     memory: char_memory,
+                    constant_receipts: constant_reference_receipts::Slots::default(),
                     missing_places: Default::default(),
                 };
                 char_state.locals[1] = Some(char_root);
@@ -2256,6 +2261,7 @@ mod tests {
                         addresses: vec![None; selected.local_decls.len()],
                         conditions,
                         memory,
+                        constant_receipts: constant_reference_receipts::Slots::default(),
                         missing_places: Default::default(),
                     };
                     state.locals[1] = Some(root);

@@ -1534,3 +1534,30 @@ caller claims; retained dependencies execute and omitted bodies remain UNKNOWN. 
 pass and mutants fail. Compiler controls exercise authentic staging/call/Return, revoked metadata,
 current frame/Body, initialization, Context, extent and branch-local Memory. Exact shared float-bit
 recognition routes current product frames to the existing model without widening scalar call gates.
+
+The private Option8 membership entry now observes the current caller Call, selected Instance,
+evaluated raw-argument occurrence, original operand types and live shared storage in one invocation.
+These observations retain current descriptor, offset, extent and symbolic Context associations;
+they do not reexecute operands or require a moved reference carrier local to remain initialized.
+The borrowed origin has no raw-read, reference-issuance or escape API. It does not authenticate the
+helper path's no-write behavior or turn current storage into a temporal permission certificate.
+Byte-sized niche membership still refuses until the genuine transport and memchr bodies have
+independent semantic certificates. Ordinary raw access and Option16/32 membership retain their
+existing gates.
+
+Private frame-local receipts can retain the compiler origin of an exact promoted shared
+`&Option<NonZeroU8>` None constant beside its ordinary decoded value. The producer evaluates the
+constant once, preserves the existing checked decoder and its budgets, and independently checks
+the complete closed original/current promoted None construction, shared borrow and Return bodies.
+Only initialized immutable one-byte compiler Memory with shared provenance at offset zero is
+recorded; static identities, numeric pointers and unmatched bodies receive no receipt. Whole-local
+Copy/Move transport retains occurrence keys before consumption, while writes, storage changes and
+call results invalidate local keys. Continuations clone private keys without inventing runtime
+Memory allocations. These observations issue no raw-read, reference or byte-membership permission;
+the current live-reference and byte-helper refusal boundaries remain required. Standalone compiler
+controls cover actual producers and hostile transport; they do not certify an application Body.
+
+Compiler constant observations retain the actual `WithRetag` tag, including the genuine promoted
+constant producer's `Yes` tag, and require exact original/current producer metadata. Retagged
+local Copy/Move assignments do not transport receipt keys. Recording compiler constant origin
+does not model a Rust retag or grant reference, raw-read or byte-membership permission.

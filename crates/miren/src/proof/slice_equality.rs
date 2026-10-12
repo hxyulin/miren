@@ -209,6 +209,7 @@ impl<'tcx> Engine<'tcx> {
             };
             let state = State {
                 flow: activation_flow::Flow::Unarmed,
+                constant_receipts: constant_reference_receipts::Slots::default(),
                 missing_places: initialized_places::MissingPlaces::default(),
                 conditions,
                 ..state.clone()

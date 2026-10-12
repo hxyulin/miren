@@ -172,9 +172,11 @@ impl Flow {
             locals.push(local.as_ref().map(Self::clone_constant_local).transpose()?);
         }
         self.charge_masks(&state.missing_places)?;
+        self.charge(state.constant_receipts.len().saturating_mul(2))?;
         Ok(State {
             flow: self.clone(),
             locals,
+            constant_receipts: state.constant_receipts.clone(),
             missing_places: state.missing_places.clone(),
             conditions,
             addresses: state.addresses.clone(),

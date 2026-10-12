@@ -109,8 +109,9 @@ impl<'tcx> Engine<'tcx> {
         raw_values: &[Value],
         state: &State,
         stack: &[DefId],
-        site: (DefId, Span),
+        call: &readonly_byte_origins::CallOccurrence<'_, 'tcx>,
     ) -> Result<Option<Vec<Return>>, String> {
+        let site = call.site()?;
         let callee = instance.def_id();
         if self.tcx.def_kind(callee) == DefKind::Closure {
             return Ok(None);
@@ -159,7 +160,7 @@ impl<'tcx> Engine<'tcx> {
             return Ok(Some(results));
         }
         if let Some(results) =
-            self.slice_membership(instance, values, raw_values, state, stack, site)?
+            self.slice_membership(instance, values, raw_values, state, stack, call)?
         {
             return Ok(Some(results));
         }

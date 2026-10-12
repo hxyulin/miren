@@ -283,6 +283,7 @@ fn check_current_destination<'tcx>(tcx: TyCtxt<'tcx>, root: DefId, fixed: DefId)
         flow: activation_flow::Flow::Unarmed,
         locals: vec![],
         addresses: vec![],
+        constant_receipts: constant_reference_receipts::Slots::default(),
         missing_places: Default::default(),
         memory,
         conditions: vec![
@@ -686,6 +687,7 @@ fn check_current_local_source(tcx: TyCtxt<'_>, id: DefId) {
         flow: activation_flow::Flow::Unarmed,
         locals: vec![None; body.local_decls.len()],
         addresses: vec![None; body.local_decls.len()],
+        constant_receipts: constant_reference_receipts::Slots::default(),
         missing_places: Default::default(),
         conditions: Vec::new(),
         memory: Memory::from(vec![Some(Value::Bytes {

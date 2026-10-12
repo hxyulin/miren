@@ -52,6 +52,7 @@ fn state<'tcx>(
         addresses: vec![None; body.local_decls.len()],
         conditions,
         memory,
+        constant_receipts: constant_reference_receipts::Slots::default(),
         missing_places: Default::default(),
     }
 }

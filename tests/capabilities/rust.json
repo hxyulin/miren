@@ -1496,8 +1496,8 @@
       "entry": "niche_membership_byte_frontier",
       "family": "readonly_nonzero_niche_membership",
       "expected": "unknown",
-      "unknown_reason": "niche byte-sized transport needs a separate available-body certificate",
-      "unknown_category": "semantics"
+      "unknown_reason": "readonly byte origin requires a live shared Rust reference",
+      "unknown_category": "unclassified"
     },
     {
       "entry": "issued_scalar_f64_metadata",

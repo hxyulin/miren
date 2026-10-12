@@ -42,6 +42,7 @@ impl<'tcx> Engine<'tcx> {
         captured: Option<&CapturedCallDestination<'tcx>>,
         value: Value,
     ) -> Result<(), String> {
+        state.constant_receipts.invalidate(place);
         self.activation_validate(&state.flow, &state.memory)?;
         state.flow.charge_publication(state, place)?;
         if !state.memory.owned_regions.is_empty()

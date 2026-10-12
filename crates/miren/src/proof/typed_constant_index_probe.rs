@@ -84,6 +84,7 @@ fn state_for<'tcx>(engine: &mut Engine<'tcx>, body: &Body<'tcx>, original: Ty<'t
         addresses: vec![None; body.local_decls.len()],
         conditions,
         memory,
+        constant_receipts: constant_reference_receipts::Slots::default(),
         missing_places: Default::default(),
     };
     state.locals[1] = Some(root);
@@ -164,6 +165,7 @@ fn check_interval<'tcx>(tcx: TyCtxt<'tcx>, name: &str, original: Ty<'tcx>) {
             addresses: vec![None; body.local_decls.len()],
             memory,
             conditions,
+            constant_receipts: constant_reference_receipts::Slots::default(),
             missing_places: Default::default(),
         };
         state.locals[1] = Some(value);

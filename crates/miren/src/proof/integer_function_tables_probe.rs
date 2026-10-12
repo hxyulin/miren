@@ -187,6 +187,7 @@ fn check_integer_calls(tcx: TyCtxt<'_>) {
         let mut source_state = State {
             flow: activation_flow::Flow::Unarmed,
             locals: vec![None; source_body.local_decls.len()],
+            constant_receipts: constant_reference_receipts::Slots::default(),
             missing_places: Default::default(),
             conditions: conditions.clone(),
             addresses: vec![None; source_body.local_decls.len()],
@@ -228,6 +229,7 @@ fn check_integer_calls(tcx: TyCtxt<'_>) {
         let mut state = State {
             flow: activation_flow::Flow::Unarmed,
             locals: vec![None; body.local_decls.len()],
+            constant_receipts: constant_reference_receipts::Slots::default(),
             missing_places: Default::default(),
             conditions: conditions.clone(),
             addresses: vec![None; body.local_decls.len()],
@@ -498,6 +500,7 @@ fn check_integer_calls(tcx: TyCtxt<'_>) {
             let mut copied_state = State {
                 flow: activation_flow::Flow::Unarmed,
                 locals: vec![None; copied_body.local_decls.len()],
+                constant_receipts: constant_reference_receipts::Slots::default(),
                 missing_places: Default::default(),
                 conditions: conditions.clone(),
                 addresses: vec![None; copied_body.local_decls.len()],

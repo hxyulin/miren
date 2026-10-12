@@ -44,6 +44,7 @@ mod call_metadata;
 mod characters;
 mod closure_captures;
 mod composite_slices;
+mod constant_reference_receipts;
 mod constants;
 mod coroutine_snapshots;
 mod coroutines;
@@ -118,6 +119,7 @@ mod typed_product_inputs;
 use startup::AtomicStorage;
 use startup_memory::Memory;
 mod raw_subobjects;
+mod readonly_byte_origins;
 mod tracked_pointers;
 mod trait_objects;
 mod typed_slices;
@@ -130,6 +132,7 @@ mod zeroed_storage;
 struct State {
     flow: activation_flow::Flow,
     locals: Vec<Option<Value>>,
+    constant_receipts: constant_reference_receipts::Slots,
     missing_places: initialized_places::MissingPlaces,
     conditions: Vec<Term>,
     addresses: Vec<Option<usize>>,
@@ -141,6 +144,7 @@ impl State {
         Self {
             flow: self.flow.clone(),
             locals: self.locals.clone(),
+            constant_receipts: self.constant_receipts.clone(),
             missing_places: self.missing_places.clone(),
             addresses: self.addresses.clone(),
             conditions,
@@ -1242,6 +1246,7 @@ impl<'tcx> Engine<'tcx> {
         flow: activation_flow::Flow,
     ) -> Result<Vec<Return>, String> {
         let id = instance.def_id();
+        let caller_instance = instance;
         if stack.len() >= self.limits.max_call_depth {
             return Err(self.categorized_error(
                 UnknownCategory::ResourceLimit,
@@ -1337,11 +1342,14 @@ impl<'tcx> Engine<'tcx> {
         let mut state = State {
             flow,
             locals: vec![None; body.local_decls.len()],
+            constant_receipts: constant_reference_receipts::Slots::default(),
             missing_places: initialized_places::MissingPlaces::default(),
             conditions,
             addresses: vec![None; body.local_decls.len()],
             memory,
         };
+        let mut constant_registry =
+            constant_reference_receipts::Registry::new(self, caller_instance, &owned_body);
         let incoming_allocations = state.memory.len();
         let mutable_u16_arguments = if matches!(state.flow, activation_flow::Flow::Unarmed) {
             let original = if state.memory.mutable_u16.is_empty() {
@@ -1410,15 +1418,24 @@ impl<'tcx> Engine<'tcx> {
                     }
                 }
             }
-            for statement in &body.basic_blocks[block].statements {
-                self.statement(instance, body, &mut state, &statement.kind)
-                    .map_err(|reason| {
-                        format!(
-                            "{} bb{}: {reason}",
-                            self.tcx.def_path_str(id),
-                            block.as_usize()
-                        )
-                    })?;
+            for statement_index in 0..body.basic_blocks[block].statements.len() {
+                self.receipt_statement(
+                    instance,
+                    &owned_body,
+                    &mut state,
+                    &mut constant_registry,
+                    rustc_middle::mir::Location {
+                        block,
+                        statement_index,
+                    },
+                )
+                .map_err(|reason| {
+                    format!(
+                        "{} bb{}: {reason}",
+                        self.tcx.def_path_str(id),
+                        block.as_usize()
+                    )
+                })?;
             }
             let terminator = body.basic_blocks[block].terminator();
             match &terminator.kind {
@@ -1789,6 +1806,16 @@ impl<'tcx> Engine<'tcx> {
                         )?;
                         continue;
                     }
+                    // Capture occurrence-bound sidecars before Move consumes carrier locals.
+                    let argument_receipts = if state.constant_receipts.len() == 0
+                        || state.flow.require_unarmed().is_err()
+                    {
+                        Vec::new()
+                    } else {
+                        args.iter()
+                            .map(|arg| state.constant_receipts.operand(&arg.node))
+                            .collect::<Vec<_>>()
+                    };
                     let mut values = args
                         .iter()
                         .map(|arg| {
@@ -2045,7 +2072,13 @@ impl<'tcx> Engine<'tcx> {
                             &values,
                             &state,
                             &stack,
-                            (id, terminator.source_info.span),
+                            &readonly_byte_origins::CallOccurrence::new(
+                                caller_instance,
+                                &owned_body,
+                                block,
+                                &values,
+                            )
+                            .with_receipts(&constant_registry, &argument_receipts),
                         )?
                     {
                         let target = target.ok_or("modeled call has no return edge")?;
@@ -2288,6 +2321,49 @@ impl<'tcx> Engine<'tcx> {
         Ok(returns)
     }
 
+    fn receipt_statement(
+        &mut self,
+        instance: ty::Instance<'tcx>,
+        body: &std::rc::Rc<Body<'tcx>>,
+        state: &mut State,
+        registry: &mut constant_reference_receipts::Registry<'tcx>,
+        location: rustc_middle::mir::Location,
+    ) -> Result<(), String> {
+        let statement =
+            &body.basic_blocks[location.block].statements[location.statement_index].kind;
+        if let StatementKind::Assign(assignment) = statement {
+            let (place, rvalue) = assignment.as_ref();
+            if let Rvalue::Use(operand, retag) = rvalue {
+                // A retagged local use does not transport a receipt or issue retag permission.
+                let key = match retag {
+                    rustc_middle::mir::WithRetag::No if state.flow.require_unarmed().is_ok() => {
+                        state.constant_receipts.operand(operand)
+                    }
+                    rustc_middle::mir::WithRetag::No | rustc_middle::mir::WithRetag::Yes => None,
+                };
+                if let Operand::Constant(constant) = operand
+                    && state.flow.require_unarmed().is_ok()
+                    && constant_reference_receipts::candidate_type(self, constant.const_.ty())
+                {
+                    let (value, receipt) =
+                        registry.paired_constant(self, body, location, constant)?;
+                    if let Err(error) =
+                        self.store_assignment_value(body, state, *place, value, statement)
+                    {
+                        registry.discard(receipt);
+                        return Err(error);
+                    }
+                    state.constant_receipts.publish(*place, receipt);
+                    return Ok(());
+                }
+                self.statement(instance, body, state, statement)?;
+                state.constant_receipts.publish(*place, key);
+                return Ok(());
+            }
+        }
+        self.statement(instance, body, state, statement)
+    }
+
     fn statement(
         &mut self,
         instance: ty::Instance<'tcx>,
@@ -2334,8 +2410,12 @@ impl<'tcx> Engine<'tcx> {
             StatementKind::SetDiscriminant {
                 place,
                 variant_index,
-            } => self.set_coroutine_state(body, state, **place, variant_index.as_usize()),
+            } => {
+                state.constant_receipts.invalidate(**place);
+                self.set_coroutine_state(body, state, **place, variant_index.as_usize())
+            }
             StatementKind::StorageLive(local) | StatementKind::StorageDead(local) => {
+                state.constant_receipts.invalidate(Place::from(*local));
                 state.missing_places.initialize(local.as_usize(), &[]);
                 if let Some(allocation) = state.addresses[local.as_usize()].take() {
                     state.memory[allocation] = None;
@@ -2360,6 +2440,7 @@ impl<'tcx> Engine<'tcx> {
         value: Value,
         occurrence: &StatementKind<'tcx>,
     ) -> Result<(), String> {
+        state.constant_receipts.invalidate(place);
         if self.mutable_u16_store(body, state, place, &value)? {
             return Ok(());
         }

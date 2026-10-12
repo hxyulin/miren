@@ -228,6 +228,7 @@ fn check_pair(tcx: TyCtxt<'_>, name: &str) {
     let mut source_state = State {
         flow: activation_flow::Flow::Unarmed,
         locals: vec![None; source.local_decls.len()],
+        constant_receipts: constant_reference_receipts::Slots::default(),
         missing_places: Default::default(),
         conditions: conditions.clone(),
         addresses: vec![None; source.local_decls.len()],
@@ -291,6 +292,7 @@ fn check_pair(tcx: TyCtxt<'_>, name: &str) {
     let mut state = State {
         flow: activation_flow::Flow::Unarmed,
         locals: vec![None; body.local_decls.len()],
+        constant_receipts: constant_reference_receipts::Slots::default(),
         missing_places: Default::default(),
         conditions: conditions.clone(),
         addresses: vec![None; body.local_decls.len()],
@@ -511,6 +513,7 @@ fn check_pair_fields<'tcx>(
     let mut state = State {
         flow: activation_flow::Flow::Unarmed,
         locals: vec![None; body.local_decls.len()],
+        constant_receipts: constant_reference_receipts::Slots::default(),
         missing_places: Default::default(),
         conditions: moved.conditions.clone(),
         addresses: vec![None; body.local_decls.len()],

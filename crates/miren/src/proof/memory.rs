@@ -1043,6 +1043,7 @@ impl<'tcx> Engine<'tcx> {
         value: Value,
         indices: Option<&CapturedDestinationIndices>,
     ) -> Result<(), String> {
+        state.constant_receipts.invalidate(place);
         let local = place.local.as_usize();
         if place.projection.is_empty() {
             if let Some(allocation) = state.addresses[local] {

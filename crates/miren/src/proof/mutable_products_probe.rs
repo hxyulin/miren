@@ -98,6 +98,7 @@ fn check(tcx: TyCtxt<'_>) {
         addresses: vec![None; root_body.local_decls.len()],
         conditions: conditions.clone(),
         memory: memory.clone(),
+        constant_receipts: constant_reference_receipts::Slots::default(),
         missing_places: Default::default(),
     };
     metadata_state.locals[1] = Some(root.clone());
@@ -150,6 +151,7 @@ fn check(tcx: TyCtxt<'_>) {
         addresses: vec![None; copied_body.local_decls.len()],
         conditions: conditions.clone(),
         memory: memory.clone(),
+        constant_receipts: constant_reference_receipts::Slots::default(),
         missing_places: Default::default(),
     };
     copied_state.locals[1] = Some(root.clone());
@@ -289,6 +291,7 @@ fn check(tcx: TyCtxt<'_>) {
         addresses: vec![None; store_body.local_decls.len()],
         conditions,
         memory,
+        constant_receipts: constant_reference_receipts::Slots::default(),
         missing_places: Default::default(),
     };
     for (local, declaration) in store_body.local_decls.iter_enumerated() {
@@ -420,6 +423,7 @@ fn check(tcx: TyCtxt<'_>) {
         addresses: vec![None; tuple_body.local_decls.len()],
         conditions: tuple_conditions,
         memory: tuple_memory,
+        constant_receipts: constant_reference_receipts::Slots::default(),
         missing_places: Default::default(),
     };
     for (local, declaration) in tuple_body.local_decls.iter_enumerated() {

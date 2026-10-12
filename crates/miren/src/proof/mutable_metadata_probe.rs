@@ -131,6 +131,7 @@ fn compiler_issued_is_empty_requires_exact_metadata_body_and_live_original_role(
                         flow: activation_flow::Flow::Unarmed,
                         locals: vec![],
                         addresses: vec![],
+                        constant_receipts: constant_reference_receipts::Slots::default(),
                         missing_places: Default::default(),
                         conditions,
                         memory,
@@ -373,6 +374,7 @@ fn compiler_issued_is_empty_requires_exact_metadata_body_and_live_original_role(
                 flow: activation_flow::Flow::Unarmed,
                 locals: vec![],
                 addresses: vec![],
+                constant_receipts: constant_reference_receipts::Slots::default(),
                 missing_places: Default::default(),
                 conditions,
                 memory,
@@ -662,6 +664,7 @@ fn check_actual_float_metadata<'tcx>(tcx: TyCtxt<'tcx>, engine: &mut Engine<'tcx
         let state = State {
             flow: activation_flow::Flow::Unarmed,
             locals: Vec::new(),
+            constant_receipts: constant_reference_receipts::Slots::default(),
             missing_places: Default::default(),
             conditions,
             addresses: Vec::new(),

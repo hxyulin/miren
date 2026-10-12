@@ -274,6 +274,9 @@ impl<'tcx> Engine<'tcx> {
         state: &mut State,
         operand: &Operand<'tcx>,
     ) -> Result<Value, String> {
+        if let Operand::Move(place) = operand {
+            state.constant_receipts.invalidate(*place);
+        }
         if let Operand::Move(place) = operand
             && place
                 .projection

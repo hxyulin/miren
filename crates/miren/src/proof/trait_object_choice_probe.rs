@@ -234,6 +234,7 @@ fn sample(tcx: TyCtxt<'_>) -> (Engine<'_>, State, Vec<Value>, Ty<'_>) {
         locals: Vec::new(),
         addresses: Vec::new(),
         conditions: Vec::new(),
+        constant_receipts: constant_reference_receipts::Slots::default(),
         missing_places: initialized_places::MissingPlaces::default(),
         memory: Memory::default(),
     };

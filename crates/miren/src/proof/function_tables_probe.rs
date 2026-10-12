@@ -213,6 +213,7 @@ fn check_prepared_calls<'tcx>(tcx: TyCtxt<'tcx>) {
     let mut source_state = State {
         flow: activation_flow::Flow::Unarmed,
         locals: vec![None; selected_body.local_decls.len()],
+        constant_receipts: constant_reference_receipts::Slots::default(),
         missing_places: Default::default(),
         conditions: conditions.clone(),
         addresses: vec![None; selected_body.local_decls.len()],
@@ -331,6 +332,7 @@ fn check_prepared_calls<'tcx>(tcx: TyCtxt<'tcx>) {
     let mut field_state = State {
         flow: activation_flow::Flow::Unarmed,
         locals: vec![None; field_body.local_decls.len()],
+        constant_receipts: constant_reference_receipts::Slots::default(),
         missing_places: Default::default(),
         conditions: conditions.clone(),
         addresses: vec![None; field_body.local_decls.len()],
@@ -445,6 +447,7 @@ fn check_prepared_calls<'tcx>(tcx: TyCtxt<'tcx>) {
     let mut state = State {
         flow: activation_flow::Flow::Unarmed,
         locals: vec![None; body.local_decls.len()],
+        constant_receipts: constant_reference_receipts::Slots::default(),
         missing_places: Default::default(),
         conditions: conditions.clone(),
         addresses: vec![None; body.local_decls.len()],
@@ -649,6 +652,7 @@ fn check_prepared_calls<'tcx>(tcx: TyCtxt<'tcx>) {
     let mut copied_state = State {
         flow: activation_flow::Flow::Unarmed,
         locals: vec![None; copied_body.local_decls.len()],
+        constant_receipts: constant_reference_receipts::Slots::default(),
         missing_places: Default::default(),
         conditions: conditions.clone(),
         addresses: vec![None; copied_body.local_decls.len()],
@@ -1059,6 +1063,7 @@ fn check_two_argument_calls<'tcx>(tcx: TyCtxt<'tcx>, output: &std::path::Path) {
             flow: activation_flow::Flow::Unarmed,
             locals: vec![None; body.local_decls.len()],
             addresses: vec![None; body.local_decls.len()],
+            constant_receipts: constant_reference_receipts::Slots::default(),
             missing_places: Default::default(),
             memory: Default::default(),
             conditions,
@@ -1352,6 +1357,7 @@ fn repeat_state(body: &Body<'_>) -> State {
     State {
         flow: activation_flow::Flow::Unarmed,
         locals: vec![None; body.local_decls.len()],
+        constant_receipts: constant_reference_receipts::Slots::default(),
         missing_places: Default::default(),
         conditions: Vec::new(),
         addresses: vec![None; body.local_decls.len()],
@@ -2299,6 +2305,7 @@ fn check_primitive_move_call<'tcx>(
     let mut state = State {
         flow: activation_flow::Flow::Unarmed,
         locals: vec![None; body.local_decls.len()],
+        constant_receipts: constant_reference_receipts::Slots::default(),
         missing_places: Default::default(),
         addresses: vec![None; body.local_decls.len()],
         conditions,

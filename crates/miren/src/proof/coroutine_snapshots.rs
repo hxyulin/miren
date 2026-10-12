@@ -647,6 +647,7 @@ mod tests {
                     flow: activation_flow::Flow::Unarmed,
                     locals: Vec::new(),
                     addresses: Vec::new(),
+                    constant_receipts: constant_reference_receipts::Slots::default(),
                     missing_places: Default::default(),
                     conditions: Vec::new(),
                     memory: Memory::from(vec![Some(Value::Unit), Some(nested), None]),

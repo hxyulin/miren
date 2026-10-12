@@ -12,7 +12,7 @@ structured UNKNOWN reporting, and passing repository checks. Completion establis
 baseline. It does not establish full Rust support or a completed memory-model refactor.
 
 The current manifest contains 331 cases across 92 families.
-The completed Stage238 host/ARM O0/O2 surveys measured 146 PROVED, 106 REFUTED and 79 UNKNOWN.
+The completed Stage239 host/ARM O0/O2 surveys measured 146 PROVED, 106 REFUTED and 79 UNKNOWN.
 The preceding 295-case surveys measured 127 PROVED, 99 REFUTED and 69 UNKNOWN per profile.
 Ten exact readonly `Option<NonZeroU8>` cases cover correlated payload observations, actual Eq/Ne
 helpers, false claims and unsupported domains. Actual observer and equality mutations refute
@@ -2408,3 +2408,35 @@ pass. Workspace test completion combines the complete no-fail-fast run with two 
 covering 922 outer Rust tests. One stale child expectation is corrected after four-profile evidence;
 two persistent-session tests require the ordinary solver invocation. Solver behavior and guest
 claims are unchanged. The stopped runs remain archived; no single green workspace run is claimed.
+
+
+## Compiler constant provenance receipts
+
+Private frame-local receipts retain the origin of an exact promoted shared
+`&Option<NonZeroU8>` None constant beside the ordinary checked decoded value. The actual caller,
+producer, original/current promoted bodies, type, retag metadata and initialized immutable compiler
+Memory must agree. Compiler allocation identities remain separate from runtime allocations.
+Whole-local Copy/Move transport captures keys before consumption; overwrites, storage changes,
+call results and dereferenced writes invalidate them. Retagged local uses receive no key.
+
+Receipts provide provenance observations only. They issue no reference, raw-read, retag or
+byte-membership permission and cannot replace the live shared-reference requirement. General
+promotions, static identities, missing bodies and unmatched producers receive no receipt.
+Future permission composition must account for producer, normalization and transport work.
+
+Both compiler callbacks pass on the integrated Root source. The earlier isolated four-profile
+membership controls retain six PROVED, two REFUTED and two UNKNOWN cases each. Their 32 P/R Proof
+query/model pairs remain exact, and all 40 whole Proofs match after exact guest-path/cwd relocation.
+Existing Option8 observer, comparison and actual helper/native mutation controls also pass.
+These isolated captures retain their actual Parent237 basis; they are not Root239 proofs.
+
+Fresh Root host/ARM O0/O2 surveys each retain 146 PROVED, 106 REFUTED and 79 UNKNOWN
+across 331 cases.
+One byte frontier remains UNKNOWN with its measured live-reference diagnostic. All 330 other case
+objects and the entire guest fixture remain unchanged. Across 1,320 other comparisons, 1,318 Proofs
+match literally; two query-free fold deadline contexts are recorded separately. All 2,640 existing
+queried obligations and models remain exact. No deadline-context difference is called FULL.
+
+Formatting, lint, a complete workspace run of 924 outer Rust tests, 91 Python tests, release builds,
+dependency policy, manual hooks and documentation pass. The initial producer-tag and composition
+initializer failures remain archived. This stage adds no application rewrites or hardware premises.

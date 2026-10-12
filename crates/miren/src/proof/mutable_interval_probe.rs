@@ -343,6 +343,7 @@ fn check_active_lifecycle<'tcx>(tcx: TyCtxt<'tcx>, root: DefId, original_type: T
         flow: activation_flow::Flow::Unarmed,
         locals: vec![None; body.local_decls.len()],
         addresses: vec![None; body.local_decls.len()],
+        constant_receipts: constant_reference_receipts::Slots::default(),
         missing_places: Default::default(),
         conditions,
         memory,

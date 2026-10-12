@@ -6983,3 +6983,34 @@ No solver policy, application code or hardware premises change.
 Evidence: /tmp/miren-whole-product-stage238-bounded-evidence/summary.json,
 /tmp/miren-stage238-root-final-checks/workspace-test-closure.json and
 /tmp/miren-stage238-root-survey-proof-audit.json.
+
+
+## Stage239: compiler constant provenance receipts
+
+Private frame receipts preserve the actual compiler origin of promoted shared Option8 None
+constants beside unchanged checked values. Complete original/current producer and promoted-body
+schemas, immutable initialized compiler backing, namespace, Body, type and Context are required.
+Retained retag metadata is an observation. Move transport captures keys before consumption; stores,
+storage changes and call results invalidate them. No raw/reference/byte permission is issued.
+
+The integrated compiler receipt and readonly-origin callbacks pass. Isolated Parent237 controls
+retain six PROVED, two REFUTED and two UNKNOWN results on each of four profiles. All 32 P/R Proof
+query/model pairs and 40 relocated whole Proofs remain exact. Option8 observer/Eq P/R/U and real
+helper/native mutation controls pass. The first No-only producer filter and its actual Yes-tag
+forensic failure remain archived; the corrected schema authenticates either exact producer tag.
+
+Fresh Root surveys retain 146 PROVED, 106 REFUTED and 79 UNKNOWN across 331 cases and 92 families.
+One existing byte UNKNOWN diagnostic moves to the live-reference boundary. The other 330 manifest
+objects and complete guest fixture are literal. Of 1,320 other whole Proof pairs, 1,318 are FULL;
+one query-free deadline prefix and one deadline call-chain depth differ with explicit qualification.
+All 2,640 existing queried obligations and models remain exact.
+
+Formatting, lint, one complete workspace run with 924 outer Rust tests, 91 Python tests, releases,
+dependency policy, manual hooks and documentation pass. Actual Stage238 helper/float behavior is
+preserved. A missed empty receipt slot in the new helper probe failed source coherence first;
+its one-line correction and failed capture remain retained. No assumptions or application changes.
+
+Evidence: /tmp/miren-stage239-root-composition-review.json,
+/tmp/miren-constant-receipts-retag-root-tcx-review.json,
+/tmp/miren-stage239-root-checks/complete.json and
+/tmp/miren-stage239-root-survey-proof-audit.json.

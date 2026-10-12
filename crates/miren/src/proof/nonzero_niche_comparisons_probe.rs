@@ -1483,6 +1483,7 @@ fn public_application_controls<'tcx>(
     let state = State {
         flow: super::super::super::activation_flow::Flow::Unarmed,
         locals: Vec::new(),
+        constant_receipts: constant_reference_receipts::Slots::default(),
         missing_places: Default::default(),
         conditions,
         addresses: Vec::new(),
