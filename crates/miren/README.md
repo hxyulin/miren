@@ -1477,3 +1477,8 @@ separate destination storage and preserves the untouched tail. Opaque, unsafe an
 remain unsupported. Four-profile proof and mutation tests cover concrete and symbolic payloads,
 tails and unsafe transport. Current storage controls reject stale, overlapping and incomplete source
 storage.
+
+The separate `local_byte_copy_boundaries` fixture targets a retained first element after an empty
+copy, the exact 128-byte source limit and a 129-byte refusal. Its payload mutation changes only the
+actual local helper body while preserving the caller assertions. These tests add no production
+model, resource policy or analysis premise.
