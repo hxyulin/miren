@@ -1,7 +1,12 @@
-//! Original same-block immutable byte source provenance; no runtime pointer issuance.
+//! Original same-block immutable byte source provenance and exact local-array borrow origins.
 use super::byte_copy_templates::CertificateError;
 use super::*;
-use rustc_middle::mir::{BasicBlock, ConstOperand};
+use rustc_middle::mir::{BasicBlock, ConstOperand, Local};
+
+pub(super) enum SourceOrigin {
+    Constant(Vec<u8>),
+    LocalArray { local: Local, count: u64 },
+}
 
 fn immutable_bytes<'tcx>(tcx: TyCtxt<'tcx>, original: Ty<'tcx>) -> Option<Option<u64>> {
     let ty::Ref(_, pointee, rustc_hir::Mutability::Not) = original.kind() else {
@@ -78,12 +83,27 @@ fn constant_bytes<'tcx>(
         .map_err(|_| "byte copy source contains unavailable or uninitialized bytes".into())
 }
 
+#[cfg(test)]
 pub(super) fn original_source<'tcx>(
     tcx: TyCtxt<'tcx>,
     body: &Body<'tcx>,
     block: BasicBlock,
     source: &Operand<'tcx>,
 ) -> Result<Vec<u8>, CertificateError> {
+    match source_origin(tcx, body, block, source)? {
+        SourceOrigin::Constant(bytes) => Ok(bytes),
+        SourceOrigin::LocalArray { .. } => {
+            Err("byte copy source has uncertified transport or effects".into())
+        }
+    }
+}
+
+pub(super) fn source_origin<'tcx>(
+    tcx: TyCtxt<'tcx>,
+    body: &Body<'tcx>,
+    block: BasicBlock,
+    source: &Operand<'tcx>,
+) -> Result<SourceOrigin, CertificateError> {
     let statements = &body.basic_blocks[block].statements;
     if statements.len() > 512 {
         return Err(CertificateError::resource(
@@ -95,7 +115,9 @@ pub(super) fn original_source<'tcx>(
     let mut work = 0;
     for _ in 0..16 {
         match &operand {
-            Operand::Constant(value) => return constant_bytes(tcx, value),
+            Operand::Constant(value) => {
+                return constant_bytes(tcx, value).map(SourceOrigin::Constant);
+            }
             Operand::Copy(place) | Operand::Move(place) if place.projection.is_empty() => {
                 let original = body.local_decls[place.local].ty;
                 if immutable_bytes(tcx, original).is_none() {
@@ -127,6 +149,31 @@ pub(super) fn original_source<'tcx>(
                 operand = match &assignment.1 {
                     Rvalue::Use(value, _) if value.ty(&body.local_decls, tcx) == original => {
                         value.clone()
+                    }
+                    Rvalue::Ref(_, BorrowKind::Shared, value) if value.projection.is_empty() => {
+                        let ty::Array(element, count) = body.local_decls[value.local].ty.kind()
+                        else {
+                            return Err("byte copy shared source is not an original array".into());
+                        };
+                        let count = count
+                            .try_to_target_usize(tcx)
+                            .ok_or("byte copy shared source lacks a concrete extent")?;
+                        if *element != tcx.types.u8
+                            || immutable_bytes(tcx, original) != Some(Some(count))
+                        {
+                            return Err(
+                                "byte copy shared source has a different original type".into()
+                            );
+                        }
+                        if count > 128 {
+                            return Err(CertificateError::resource(
+                                "byte copy source exceeds the fixed replacement budget",
+                            ));
+                        }
+                        return Ok(SourceOrigin::LocalArray {
+                            local: value.local,
+                            count,
+                        });
                     }
                     Rvalue::Ref(_, BorrowKind::Shared, value)
                         if value.projection.as_ref() == [ProjectionElem::Deref]

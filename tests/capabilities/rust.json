@@ -1026,9 +1026,7 @@
     {
       "entry": "fixed_byte_prefix_dynamic_unknown",
       "family": "fixed_byte_prefix_copy",
-      "expected": "unknown",
-      "unknown_reason": "byte copy source has uncertified transport or effects",
-      "unknown_category": "semantics"
+      "expected": "proved"
     },
     {
       "entry": "float_slice_child_call",
@@ -1521,6 +1519,43 @@
       "expected": "unknown",
       "unknown_category": "semantics",
       "unknown_reason": "only read-only byte slices and byte arrays are modeled: [[f32; 2_usize]]"
+    },
+    {
+      "entry": "local_byte_copy_positive",
+      "family": "local_byte_array_copy",
+      "expected": "proved"
+    },
+    {
+      "entry": "local_byte_copy_wrong",
+      "family": "local_byte_array_copy",
+      "expected": "refuted"
+    },
+    {
+      "entry": "local_byte_copy_symbolic",
+      "family": "local_byte_array_copy",
+      "expected": "proved"
+    },
+    {
+      "entry": "local_byte_copy_symbolic_wrong",
+      "family": "local_byte_array_copy",
+      "expected": "refuted"
+    },
+    {
+      "entry": "local_byte_copy_tail",
+      "family": "local_byte_array_copy",
+      "expected": "proved"
+    },
+    {
+      "entry": "local_byte_copy_empty",
+      "family": "local_byte_array_copy",
+      "expected": "proved"
+    },
+    {
+      "entry": "local_byte_copy_unsafe_transport",
+      "family": "local_byte_array_copy",
+      "expected": "unknown",
+      "unknown_category": "semantics",
+      "unknown_reason": "byte copy local source lacks an actual readonly tracked borrow"
     }
   ]
 }

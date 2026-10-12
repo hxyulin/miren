@@ -1469,3 +1469,11 @@ store mutations preserve assertions and are REFUTED in all four profiles; native
 pass and mutants fail. The preceding test101 and synthetic target-setup failures remain recorded.
 Armed, nested and payload boundaries retain their independent checks and UNKNOWN outcomes.
 See [Stage231](../../docs/stages.md#stage231-issued-float-slice-emptiness).
+
+Local byte-copy support authenticates a same-block original shared borrow of a bounded initialized
+local byte array and its live tracked allocation. A safe retained local helper with scalar inputs
+may return that array; its actual body executes. Copying uses the current source snapshot, checks
+separate destination storage and preserves the untouched tail. Opaque, unsafe and missing-body paths
+remain unsupported. Four-profile proof and mutation tests cover concrete and symbolic payloads,
+tails and unsafe transport. Current storage controls reject stale, overlapping and incomplete source
+storage.

@@ -15,14 +15,20 @@ fn compiler_byte_copy_selected_family_probe() {
                 .mir_keys(())
                 .iter()
                 .copied()
-                .find(|id| tcx.item_name(id.to_def_id()).as_str() == "probe")
+                .find(|id| {
+                    matches!(tcx.def_kind(id.to_def_id()), rustc_hir::def::DefKind::Fn)
+                        && tcx.item_name(id.to_def_id()).as_str() == "probe"
+                })
                 .unwrap();
             let root = ty::Instance::new_raw(root.to_def_id(), tcx.mk_args(&[]));
             let fixed = tcx
                 .mir_keys(())
                 .iter()
                 .copied()
-                .find(|id| tcx.item_name(id.to_def_id()).as_str() == "fixed")
+                .find(|id| {
+                    matches!(tcx.def_kind(id.to_def_id()), rustc_hir::def::DefKind::Fn)
+                        && tcx.item_name(id.to_def_id()).as_str() == "fixed"
+                })
                 .unwrap();
             std::fs::write(
                 self.output.join("caller-fixed.txt"),
@@ -30,11 +36,24 @@ fn compiler_byte_copy_selected_family_probe() {
             )
             .unwrap();
             check_current_destination(tcx, root.def_id(), fixed.to_def_id());
+            let local = tcx
+                .mir_keys(())
+                .iter()
+                .copied()
+                .find(|id| {
+                    matches!(tcx.def_kind(id.to_def_id()), rustc_hir::def::DefKind::Fn)
+                        && tcx.item_name(id.to_def_id()).as_str() == "local"
+                })
+                .unwrap();
+            check_current_local_source(tcx, local.to_def_id());
             let over = tcx
                 .mir_keys(())
                 .iter()
                 .copied()
-                .find(|id| tcx.item_name(id.to_def_id()).as_str() == "over")
+                .find(|id| {
+                    matches!(tcx.def_kind(id.to_def_id()), rustc_hir::def::DefKind::Fn)
+                        && tcx.item_name(id.to_def_id()).as_str() == "over"
+                })
                 .unwrap();
             let over = tcx.optimized_mir(over);
             let mut over_found = false;
@@ -167,7 +186,9 @@ fn compiler_byte_copy_selected_family_probe() {
         &source,
         "#![no_std]\npub fn probe(x:&mut[u8],y:&[u8]){x.copy_from_slice(y)}\n\
          pub fn fixed(x:&mut[u8]){if x.len()>=2{x[..2].copy_from_slice(&[17,19])}}\n\
-         pub fn over(x:&mut[u8]){if x.len()>=129{x[..129].copy_from_slice(&[7;129])}}\n",
+         pub fn over(x:&mut[u8]){if x.len()>=129{x[..129].copy_from_slice(&[7;129])}}\n\
+         pub fn local(x:&mut[u8],a:u8,b:u8){let s=[a,b];\n\
+         if x.len()>=2{x[..2].copy_from_slice(&s)}}\n",
     )
     .unwrap();
     let sysroot = std::process::Command::new("rustc")
@@ -479,7 +500,14 @@ fn check_current_destination<'tcx>(tcx: TyCtxt<'tcx>, root: DefId, fixed: DefId)
     };
     let mut copied = state.clone();
     engine
-        .finite_byte_copy(fixed, body, block, &reference, &source, &mut copied)
+        .finite_byte_copy(
+            fixed,
+            body,
+            block,
+            &reference,
+            (&source, &source),
+            &mut copied,
+        )
         .unwrap();
     let Value::Bytes { length, data } = copied.memory[0].as_ref().unwrap() else {
         panic!("bytes")
@@ -510,7 +538,14 @@ fn check_current_destination<'tcx>(tcx: TyCtxt<'tcx>, root: DefId, fixed: DefId)
     failed.memory.byte_copy_opaque = true;
     assert!(
         engine
-            .finite_byte_copy(fixed, body, block, &reference, &source, &mut failed)
+            .finite_byte_copy(
+                fixed,
+                body,
+                block,
+                &reference,
+                (&source, &source),
+                &mut failed
+            )
             .is_err()
     );
     let Value::Bytes { data, .. } = failed.memory[0].as_ref().unwrap() else {
@@ -535,7 +570,7 @@ fn check_current_destination<'tcx>(tcx: TyCtxt<'tcx>, root: DefId, fixed: DefId)
                 &wrong_body,
                 block,
                 &reference,
-                &source,
+                (&source, &source),
                 &mut rejected
             )
             .is_err()
@@ -557,7 +592,14 @@ fn check_current_destination<'tcx>(tcx: TyCtxt<'tcx>, root: DefId, fixed: DefId)
         .unwrap();
     assert!(
         engine
-            .finite_byte_copy(fixed, body, block, &reference, &wrong_source, &mut rejected)
+            .finite_byte_copy(
+                fixed,
+                body,
+                block,
+                &reference,
+                (&wrong_source, &wrong_source),
+                &mut rejected
+            )
             .is_err()
     );
     wrong_body = body.clone();
@@ -574,7 +616,7 @@ fn check_current_destination<'tcx>(tcx: TyCtxt<'tcx>, root: DefId, fixed: DefId)
                 &wrong_body,
                 block,
                 &reference,
-                &source,
+                (&source, &source),
                 &mut rejected
             )
             .is_err()
@@ -583,4 +625,167 @@ fn check_current_destination<'tcx>(tcx: TyCtxt<'tcx>, root: DefId, fixed: DefId)
         panic!("bytes")
     };
     assert_eq!(data, original);
+}
+
+fn check_current_local_source(tcx: TyCtxt<'_>, id: DefId) {
+    let config = miren::ContractConfig::default();
+    let engine = Engine::new(
+        tcx,
+        &config,
+        VerificationOptions {
+            all_failures: false,
+            induction: false,
+            startup: false,
+            isolated_startup: false,
+            async_entry: false,
+            limits: miren::AnalysisLimits::default(),
+        },
+    );
+    let body = tcx.optimized_mir(id.expect_local());
+    let origin = body
+        .basic_blocks
+        .iter_enumerated()
+        .find_map(|(block, data)| {
+            let TerminatorKind::Call { func, args, .. } = &data.terminator().kind else {
+                return None;
+            };
+            let ty::FnDef(callee, _) = func.ty(&body.local_decls, tcx).kind() else {
+                return None;
+            };
+            (tcx.item_name(*callee).as_str() == "copy_from_slice")
+                .then(|| byte_copy_origins::source_origin(tcx, body, block, &args[1].node).unwrap())
+        })
+        .unwrap();
+    let byte_copy_origins::SourceOrigin::LocalArray { local, count: 2 } = origin else {
+        panic!("original local array source");
+    };
+    let bits = u32::from(tcx.sess.target.pointer_width);
+    let capacity = symbolic::integer(&engine.terms, 4, bits, false);
+    let mut data = engine
+        .terms
+        .apply(
+            Op::ConstArray { index_bits: bits },
+            &[engine.terms.bit_vector(0, 8).unwrap()],
+        )
+        .unwrap();
+    for index in 0..2 {
+        let byte = engine.fresh(Sort::BitVec(8));
+        data = engine
+            .terms
+            .apply(
+                Op::Store,
+                &[data, engine.terms.bit_vector(index, bits).unwrap(), byte],
+            )
+            .unwrap();
+    }
+    let source = Value::Bytes {
+        length: Box::new(symbolic::integer(&engine.terms, 2, bits, false)),
+        data: data.clone(),
+    };
+    let mut state = State {
+        flow: activation_flow::Flow::Unarmed,
+        locals: vec![None; body.local_decls.len()],
+        addresses: vec![None; body.local_decls.len()],
+        missing_places: Default::default(),
+        conditions: Vec::new(),
+        memory: Memory::from(vec![Some(Value::Bytes {
+            length: Box::new(capacity.clone()),
+            data,
+        })]),
+    };
+    state
+        .memory
+        .incoming_byte_roots
+        .push(byte_copy_provenance::IncomingByteRoot {
+            allocation: 0,
+            capacity,
+        });
+    state.locals[local.as_usize()] = Some(source.clone());
+    let raw = engine
+        .retain_byte_copy_array_source(body, &mut state, Place::from(local))
+        .unwrap()
+        .unwrap();
+    let Value::Reference { allocation, .. } = raw else {
+        panic!("tracked source")
+    };
+    assert_eq!(allocation, 1);
+    let destination = Value::Reference {
+        allocation: 0,
+        projection: Vec::new(),
+        mutable: true,
+    };
+    engine
+        .byte_copy_local_source(body, &origin, &raw, &source, &destination, &state)
+        .unwrap();
+    let again = engine
+        .retain_byte_copy_array_source(body, &mut state, Place::from(local))
+        .unwrap()
+        .unwrap();
+    assert!(matches!(
+        again,
+        Value::Reference {
+            allocation: 1,
+            mutable: false,
+            ..
+        }
+    ));
+    assert_eq!(state.memory.len(), 2);
+    let reject = |state: &State, raw: &Value, source: &Value, destination: &Value| {
+        engine
+            .byte_copy_local_source(body, &origin, raw, source, destination, state)
+            .unwrap_err()
+    };
+    let mut changed = state.clone();
+    changed.memory[allocation] = None;
+    assert!(reject(&changed, &raw, &source, &destination).contains("dead or uninitialized"));
+    let mut changed = state.clone();
+    changed
+        .memory
+        .missing_places
+        .consume(allocation, Vec::new())
+        .unwrap();
+    assert!(reject(&changed, &raw, &source, &destination).contains("initialization"));
+    let mut changed = state.clone();
+    changed.addresses[local.as_usize()] = Some(0);
+    assert!(reject(&changed, &raw, &source, &destination).contains("allocation differs"));
+    assert!(reject(&state, &raw, &source, &raw).contains("overlaps destination"));
+    let mutable = Value::Reference {
+        allocation,
+        projection: Vec::new(),
+        mutable: true,
+    };
+    assert!(reject(&state, &mutable, &source, &destination).contains("readonly tracked"));
+    let projected = Value::Reference {
+        allocation,
+        mutable: false,
+        projection: vec![symbolic::MemoryProjection::Index(Box::new(
+            symbolic::integer(&engine.terms, 0, bits, false),
+        ))],
+    };
+    assert!(reject(&state, &projected, &source, &destination).contains("allocation differs"));
+    let other = Context::default();
+    let foreign = Value::Bytes {
+        length: Box::new(symbolic::integer(&other, 2, bits, false)),
+        data: other
+            .apply(
+                Op::ConstArray { index_bits: bits },
+                &[other.bit_vector(0, 8).unwrap()],
+            )
+            .unwrap(),
+    };
+    let mut changed = state.clone();
+    changed.memory[allocation] = Some(foreign.clone());
+    assert!(reject(&changed, &raw, &foreign, &destination).contains("snapshot differs"));
+    let wrong = Value::Bytes {
+        length: Box::new(symbolic::integer(&engine.terms, 2, bits, false)),
+        data: engine
+            .terms
+            .apply(
+                Op::ConstArray { index_bits: bits },
+                &[engine.terms.bit_vector(7, 8).unwrap()],
+            )
+            .unwrap(),
+    };
+    assert!(reject(&state, &raw, &wrong, &destination).contains("snapshot differs"));
+    eprintln!("localbyte source controls: published1; positive2; negative8; width{bits}");
 }

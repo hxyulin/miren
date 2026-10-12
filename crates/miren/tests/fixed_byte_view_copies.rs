@@ -98,7 +98,7 @@ fn finite_promoted_byte_copies_preserve_current_symbolic_backing_and_frontiers()
         ("wrong_sibling", R),
         ("bounds", R),
         ("mismatch", R),
-        ("dynamic_source", U),
+        ("dynamic_source", P),
         ("two_inputs", U),
         ("shifted", U),
         ("raw_exposure", U),
@@ -136,6 +136,20 @@ fn finite_promoted_byte_copies_preserve_current_symbolic_backing_and_frontiers()
                     .iter()
                     .any(|m| m.contains("fixed immutable source"))
             );
+            let dynamic = report
+                .functions
+                .iter()
+                .find(|f| f.name == "dynamic_source")
+                .unwrap()
+                .proof
+                .as_ref()
+                .unwrap();
+            assert!(
+                dynamic
+                    .body_entries
+                    .iter()
+                    .any(|b| b.function == "owned_source")
+            );
             let over = report
                 .functions
                 .iter()
@@ -148,7 +162,6 @@ fn finite_promoted_byte_copies_preserve_current_symbolic_backing_and_frontiers()
                 == Some(UnknownCategory::ResourceLimit)
                 && o.detail.contains("fixed replacement budget")));
             for (name, detail) in [
-                ("dynamic_source", "uncertified transport or effects"),
                 ("opaque_returned", "unexposed incoming writable origin"),
                 ("zero_copy", "unavailable or uninitialized bytes"),
             ] {

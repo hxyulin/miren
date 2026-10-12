@@ -11,16 +11,18 @@ execution at O0 and O2, positive/refuted/unknown controls, a source mutation tha
 structured UNKNOWN reporting, and passing repository checks. Completion establishes a repeatable
 baseline. It does not establish full Rust support or a completed memory-model refactor.
 
-The current manifest contains 278 cases across 89 families.
-Completed ROOT host/ARM O0/O2 surveys each measure 119 PROVED, 95 REFUTED and 64 UNKNOWN.
-Four new cases cover exact f64 metadata, false f32/f64 empty-slice claims and nested Float refusal.
-The unchanged original Float metadata claim advances from UNKNOWN to PROVED. The other 273 old
-case objects and the literal old fixture prefix remain unchanged. Metadata uses the actual core
-body, original scalar/layout certificate and current live backing; existing Float producer-pair
-checks still govern payload access. Three old guarded Float-store expectations also advance after
-four-profile safety proofs and separate readback/mutation controls. Required checks and qualified
-source-snapshot comparisons are recorded in
-[Stage231](stages.md#stage231-issued-float-slice-emptiness).
+The current manifest contains 285 cases across 90 families.
+Completed host/ARM O0/O2 surveys each measure 124 PROVED, 97 REFUTED and 64 UNKNOWN.
+Seven local byte-array cases cover concrete and symbolic payloads, wrong claims, tail preservation,
+empty copies and unsafe transport refusal. The unchanged dynamic byte-copy claim advances from
+UNKNOWN to PROVED. The other 277 old case objects and literal old fixture prefix remain unchanged.
+Current storage, original array type, initialization, Context and source snapshot must agree;
+unsafe or opaque transport remains unsupported. Full old-proof comparisons retain literal query
+and model equality, with recorded source-fingerprint and existing resource-context qualifications.
+See [Stage232](stages.md#stage232-current-local-byte-array-copy-sources).
+The historical Stage231 survey measured 278 cases across 89 families: 119 PROVED, 95 REFUTED and
+64 UNKNOWN per profile. It added exact Float metadata and false empty-slice claim controls without
+relaxing payload, nested-borrow or hardware boundaries.
 The historical Stage229 survey measured 274 cases across 89 families: 117 PROVED, 93 REFUTED and
 64 UNKNOWN per profile, including shared u16/u32 niche semantics in
 [Stage229](stages.md#stage229-shared-u16u32-niche-semantics).

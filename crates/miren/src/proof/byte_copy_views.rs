@@ -48,10 +48,10 @@ impl<'tcx> Engine<'tcx> {
         body: &Body<'tcx>,
         block: BasicBlock,
         raw_destination: &Value,
-        source: &Value,
+        sources: (&Value, &Value),
         state: &mut State,
     ) -> Result<Value, String> {
-        self.finite_byte_copy_transaction(id, body, block, raw_destination, source, state)
+        self.finite_byte_copy_transaction(id, body, block, raw_destination, sources, state)
             .map_err(|reason| {
                 if self.unknown_causes.borrow().contains_key(&reason) {
                     reason
@@ -67,9 +67,10 @@ impl<'tcx> Engine<'tcx> {
         body: &Body<'tcx>,
         block: BasicBlock,
         raw_destination: &Value,
-        source: &Value,
+        sources: (&Value, &Value),
         state: &mut State,
     ) -> Result<Value, String> {
+        let (raw_source, source) = sources;
         let Value::Reference { projection, .. } = raw_destination else {
             return Err("finite byte copy needs an evaluated tracked destination".into());
         };
@@ -102,12 +103,15 @@ impl<'tcx> Engine<'tcx> {
             return Err("finite byte copy requires a direct original selected Item".into());
         };
         let instance = self.resolve_function_item(*callee, generic.skip_binder())?;
-        let bytes = super::byte_copy_origins::original_source(self.tcx, body, block, &args[1].node)
+        let origin = byte_copy_origins::source_origin(self.tcx, body, block, &args[1].node)
             .map_err(|error| self.categorized_error(error.category, error.reason))?;
-        super::byte_copy_templates::certify(self.tcx, instance, bytes.len() as u128)
+        let count = match &origin {
+            byte_copy_origins::SourceOrigin::Constant(bytes) => bytes.len(),
+            byte_copy_origins::SourceOrigin::LocalArray { count, .. } => *count as usize,
+        };
+        super::byte_copy_templates::certify(self.tcx, instance, count as u128)
             .map_err(|error| self.categorized_error(error.category, error.reason))?;
-        let work = bytes
-            .len()
+        let work = count
             .checked_mul(2)
             .and_then(|nodes| nodes.checked_add(projection.len()));
         if work.is_none_or(|nodes| nodes > 512) {
@@ -117,20 +121,6 @@ impl<'tcx> Engine<'tcx> {
             ));
         }
         let bits = u32::from(self.tcx.sess.target.pointer_width);
-        let mut expected = self.terms.apply(
-            Op::ConstArray { index_bits: bits },
-            &[self.terms.bit_vector(0, 8)?],
-        )?;
-        for (index, byte) in bytes.iter().enumerate() {
-            expected = self.terms.apply(
-                Op::Store,
-                &[
-                    expected,
-                    self.terms.bit_vector(index as u128, bits)?,
-                    self.terms.bit_vector(u128::from(*byte), 8)?,
-                ],
-            )?;
-        }
         let Value::Bytes {
             length: source_length,
             data: source_data,
@@ -138,19 +128,48 @@ impl<'tcx> Engine<'tcx> {
         else {
             return Err("finite byte copy source has a different evaluated carrier".into());
         };
-        let (source_count, source_bits, source_signed) = source_length.integer()?;
-        if source_signed
-            || source_bits != bits
-            || source_data != &expected
-            || symbolic::constant(&source_count)
-                != Some(symbolic::Constant::BitVec {
-                    value: bytes.len() as u128,
-                    bits,
-                })
-        {
-            return Err(
-                "finite byte copy evaluated source differs from its original constant".into(),
-            );
+        match &origin {
+            byte_copy_origins::SourceOrigin::Constant(bytes) => {
+                let mut expected = self.terms.apply(
+                    Op::ConstArray { index_bits: bits },
+                    &[self.terms.bit_vector(0, 8)?],
+                )?;
+                for (index, byte) in bytes.iter().enumerate() {
+                    expected = self.terms.apply(
+                        Op::Store,
+                        &[
+                            expected,
+                            self.terms.bit_vector(index as u128, bits)?,
+                            self.terms.bit_vector(u128::from(*byte), 8)?,
+                        ],
+                    )?;
+                }
+                let (source_count, source_bits, source_signed) = source_length.integer()?;
+                if source_signed
+                    || source_bits != bits
+                    || source_data != &expected
+                    || symbolic::constant(&source_count)
+                        != Some(symbolic::Constant::BitVec {
+                            value: bytes.len() as u128,
+                            bits,
+                        })
+                {
+                    return Err(
+                        "finite byte copy evaluated source differs from its original constant"
+                            .into(),
+                    );
+                }
+            }
+            byte_copy_origins::SourceOrigin::LocalArray { .. } => {
+                self.byte_copy_local_source(
+                    body,
+                    &origin,
+                    raw_source,
+                    source,
+                    raw_destination,
+                    state,
+                )?;
+            }
         }
         let (allocation, mut current) =
             self.byte_copy_current_destination(raw_destination, state)?;
@@ -188,7 +207,14 @@ impl<'tcx> Engine<'tcx> {
         .boolean()?;
         self.record_model(
             *callee,
-            "certified core byte copy; fixed immutable source and current incoming view",
+            match origin {
+                byte_copy_origins::SourceOrigin::Constant(_) => {
+                    "certified core byte copy; fixed immutable source and current incoming view"
+                }
+                byte_copy_origins::SourceOrigin::LocalArray { .. } => {
+                    "certified core byte copy; initialized local array and current incoming view"
+                }
+            },
         );
         self.require(
             id,
@@ -203,7 +229,7 @@ impl<'tcx> Engine<'tcx> {
             return Err("finite byte copy current owner changed during preflight".into());
         };
         let mut updated = data.clone();
-        for index in 0..bytes.len() {
+        for index in 0..count {
             let cell = self.terms.bit_vector(index as u128, bits)?;
             let target = self
                 .terms

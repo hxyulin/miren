@@ -2083,7 +2083,7 @@ impl<'tcx> Engine<'tcx> {
                             body,
                             block,
                             &values[0],
-                            &modeled_values[1],
+                            (&values[1], &modeled_values[1]),
                             &mut state,
                         )?;
                         self.store_call_result(
@@ -2877,6 +2877,9 @@ impl<'tcx> Engine<'tcx> {
                         self.raw_slice_bytes(&value, state)?;
                         return Ok(value);
                     }
+                }
+                if let Some(value) = self.retain_byte_copy_array_source(body, state, *place)? {
+                    return Ok(value);
                 }
                 if let Some(value) = self.borrow_shared_snapshot(body, state, *place)? {
                     return Ok(value);

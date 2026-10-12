@@ -6888,3 +6888,31 @@ Evidence: /tmp/miren-stage231-root-owner-migration-review.json,
 /tmp/miren-stage231-root-float-store-review.json, /tmp/miren-stage231-root-corrected-full-checks,
 /tmp/miren-stage231-root-full-checks-audit.json and
 /tmp/miren-stage231-root-survey-proof-audit.json.
+
+## Stage232: current local byte-array copy sources
+
+Finite byte copying now recognizes an actual shared borrow of a fully initialized local byte array
+with at most 128 elements. The current tracked allocation, original type, full initialization,
+Context and evaluated snapshot must agree. Source and destination storage must be distinct.
+An available safe local nongeneric helper with scalar inputs can return the array; its actual body
+executes. Unsafe or opaque transport, missing bodies and unsupported source paths remain UNKNOWN.
+The existing destination issuer, equal-length obligation and tail-preserving single commit remain.
+
+Private host/ARM O0/O2 tests produce 16 PROVED, eight REFUTED and four UNKNOWN results. Changing the
+actual helper payload refutes the unchanged claim on all four profiles; native original tests pass
+and mutants fail at O0 and O2. Current-source controls pass on all four profiles, rejecting dead or
+partially initialized storage, wrong identity, overlap, mutable/projected sources, foreign Context
+and stale snapshots. Historical prototype binary captures retain their provenance qualification.
+Fresh host/ARM O0/O2 surveys each report 124 PROVED, 97 REFUTED and 64 UNKNOWN across 285 cases
+in 90 families. One existing dynamic byte-copy root advances from UNKNOWN to PROVED; seven new
+cases add four positive, two negative and one refusal control. The other 277 old cases retain
+query/model equality across 1,108 comparisons. Twenty are literal FULL matches; 1,088 retain actual
+source-fingerprint differences, including two qualified old unbounded-fold resource contexts.
+All 2,048 old rich queries/models remain exact. No source-fingerprint difference is called FULL.
+
+Formatting, lint, 912 outer Rust tests including examples, 91 Python tests, release builds,
+dependency checks, documentation, ARM examples and manual hooks pass. Test completion combines
+passing targets before the stopped run, the repaired capability target, remaining integration
+targets and other workspace/doc tests. The stopped stale dynamic-source expectation, temporary
+fixture module-path failure and end-of-file hook correction remain recorded. The guest fixture
+retains its old prefix and is self-contained for mutation tests; application code is unchanged.

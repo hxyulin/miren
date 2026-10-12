@@ -3922,3 +3922,68 @@ pub fn issued_scalar_f64_wrong_empty(values: &mut [f64]) {
 pub fn issued_scalar_nested_float_unknown(values: &mut [[f32; 2]]) {
     assert!(values.is_empty() == (values.len() == 0));
 }
+
+#[inline(never)]
+pub fn local_byte_copy_source() -> [u8; 2] {
+    [17, 19]
+}
+
+pub fn local_byte_copy_positive(values: &mut [u8]) {
+    if values.len() >= 2 {
+        let bytes = local_byte_copy_source();
+        values[..2].copy_from_slice(&bytes);
+        assert!(values[0] == 17 && values[1] == 19);
+    }
+}
+
+pub fn local_byte_copy_wrong(values: &mut [u8]) {
+    if values.len() >= 2 {
+        let bytes = local_byte_copy_source();
+        values[..2].copy_from_slice(&bytes);
+        assert!(values[0] == 17 && values[1] == 17);
+    }
+}
+
+pub fn local_byte_copy_symbolic(values: &mut [u8], first: u8, second: u8) {
+    if values.len() >= 2 {
+        let bytes = [first, second];
+        values[..2].copy_from_slice(&bytes);
+        assert!(values[0] == first && values[1] == second);
+    }
+}
+
+pub fn local_byte_copy_symbolic_wrong(values: &mut [u8], first: u8, second: u8) {
+    if values.len() >= 2 {
+        let bytes = [first, second];
+        values[..2].copy_from_slice(&bytes);
+        assert!(values[0] == first && values[1] == first);
+    }
+}
+
+pub fn local_byte_copy_tail(values: &mut [u8], first: u8, second: u8) {
+    if values.len() >= 3 {
+        let old = values[2];
+        let bytes = [first, second];
+        values[..2].copy_from_slice(&bytes);
+        assert!(values[0] == first && values[1] == second && values[2] == old);
+    }
+}
+
+pub fn local_byte_copy_empty(values: &mut [u8]) {
+    let bytes: [u8; 0] = [];
+    values[..0].copy_from_slice(&bytes);
+    assert!(values.len() == values.len());
+}
+
+#[inline(never)]
+unsafe fn local_byte_copy_unsafe_source() -> [u8; 2] {
+    [17, 19]
+}
+
+pub fn local_byte_copy_unsafe_transport(values: &mut [u8]) {
+    if values.len() >= 2 {
+        let bytes = unsafe { local_byte_copy_unsafe_source() };
+        values[..2].copy_from_slice(&bytes);
+        assert!(values[0] == 17 && values[1] == 19);
+    }
+}

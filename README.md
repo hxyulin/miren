@@ -56,7 +56,7 @@ associated calls and original constant-index reads and stores. Exact f32/f64 bac
 preserves NaN payloads and signed-zero bits. Deeper nesting and the dedicated proper-reborrow
 caller remain UNKNOWN. Bounded owned u16 products also support writes through multiple symbolic
 suffix indices, preserving compiler types and current Memory. The validated capability survey
-covers 278 cases across 89 families.
+covers 285 cases across 90 families, including concrete and symbolic local byte-copy controls.
 
 Finite known shared trait objects can be selected from local fixed arrays and retained slices.
 Selected alternatives execute actual method bodies, preserving their backing references and
