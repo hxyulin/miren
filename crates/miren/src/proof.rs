@@ -20,6 +20,9 @@ const MAX_INPUT_VALUES: usize = 512;
 const RAW_ACCESS_PERMISSION_GAP: &str =
     "raw memory access requires a verified temporal permission certificate";
 
+mod activation_flow;
+#[cfg(test)]
+mod activation_flow_probe;
 mod aggregate_validity;
 mod aggregates;
 mod arm_interrupts;
@@ -124,6 +127,7 @@ mod zeroed_storage;
 
 #[derive(Clone)]
 struct State {
+    flow: activation_flow::Flow,
     locals: Vec<Option<Value>>,
     missing_places: initialized_places::MissingPlaces,
     conditions: Vec<Term>,
@@ -134,6 +138,7 @@ struct State {
 impl State {
     fn continuation(&self, conditions: Vec<Term>, memory: Memory) -> Self {
         Self {
+            flow: self.flow.clone(),
             locals: self.locals.clone(),
             missing_places: self.missing_places.clone(),
             addresses: self.addresses.clone(),
@@ -144,12 +149,14 @@ impl State {
 }
 
 struct Return {
+    flow: activation_flow::Flow,
     value: Value,
     conditions: Vec<Term>,
     memory: Memory,
 }
 
 struct Engine<'tcx> {
+    activation: std::cell::RefCell<activation_flow::Registry<'tcx>>,
     unknown_causes: std::cell::RefCell<BTreeMap<String, UnknownCategory>>,
     tcx: TyCtxt<'tcx>,
     terms: Context,
@@ -279,6 +286,7 @@ pub fn verify(
         mutable_u16_frames: Default::default(),
         mutable_integer_types: Vec::new(),
         mutable_u16_staging: Default::default(),
+        activation: Default::default(),
         coroutine_places: Default::default(),
         bodies: std::cell::RefCell::new(std::collections::HashMap::new()),
         call_signatures: std::cell::RefCell::new(std::collections::HashMap::new()),
@@ -1174,9 +1182,28 @@ impl<'tcx> Engine<'tcx> {
         memory: Memory,
         stack: &[DefId],
     ) -> Result<Vec<Return>, String> {
+        self.execute_with_flow(
+            instance,
+            arguments,
+            conditions,
+            memory,
+            stack,
+            activation_flow::Flow::Unarmed,
+        )
+    }
+
+    fn execute_with_flow(
+        &mut self,
+        instance: ty::Instance<'tcx>,
+        arguments: Vec<Value>,
+        conditions: Vec<Term>,
+        memory: Memory,
+        stack: &[DefId],
+        flow: activation_flow::Flow,
+    ) -> Result<Vec<Return>, String> {
         let chain = stack.iter().copied().chain([instance.def_id()]).collect();
         let previous = std::mem::replace(&mut self.call_chain, chain);
-        let result = self.execute_body(instance, arguments, conditions, memory, stack);
+        let result = self.execute_body(instance, arguments, conditions, memory, stack, flow);
         if result.is_err() && self.failed_call_chain.is_none() {
             self.failed_call_chain = Some(self.call_chain.clone());
         }
@@ -1191,6 +1218,7 @@ impl<'tcx> Engine<'tcx> {
         conditions: Vec<Term>,
         memory: Memory,
         stack: &[DefId],
+        flow: activation_flow::Flow,
     ) -> Result<Vec<Return>, String> {
         let id = instance.def_id();
         if stack.len() >= self.limits.max_call_depth {
@@ -1204,7 +1232,18 @@ impl<'tcx> Engine<'tcx> {
         }
         let mut stack = stack.to_vec();
         stack.push(id);
-        let owned_body = self.instantiated_body(instance)?;
+        let owned_body = if matches!(flow, activation_flow::Flow::Unarmed) {
+            self.instantiated_body(instance)?
+        } else {
+            memory.activation_supported(&flow)?;
+            flow.validate_arguments(&arguments)?;
+            if self.specification(instance)?.is_some()
+                || !self.configured_contracts(instance)?.is_empty()
+            {
+                return Err("armed activation contract snapshots are unsupported".into());
+            }
+            self.activation_prepare_body(&flow, instance)?
+        };
         let body = &owned_body;
         let name = format!("{} {:?}", self.tcx.def_path_str(id), instance.args);
         if !self.proof.analyzed_bodies.contains(&name) {
@@ -1220,6 +1259,7 @@ impl<'tcx> Engine<'tcx> {
         } else {
             owned_boxes::owner_occurrences(&arguments)?
         };
+        flow.charge(arguments.len())?;
         for (local, value) in body.args_iter().zip(&arguments) {
             self.nonzero_niche_admission(body.local_decls[local].ty, value, &conditions)?;
             self.owned_box_type_value(body.local_decls[local].ty, value, &memory)?;
@@ -1230,12 +1270,18 @@ impl<'tcx> Engine<'tcx> {
                 &conditions,
             )?;
         }
+        flow.charge(body.arg_count)?;
         let argument_types: Vec<_> = body
             .args_iter()
             .map(|local| body.local_decls[local].ty)
             .collect();
-        let snapshots =
-            self.typed_coroutine_snapshots(&argument_types, &arguments, &memory, &conditions)?;
+        let snapshots = if matches!(flow, activation_flow::Flow::Unarmed) {
+            self.typed_coroutine_snapshots(&argument_types, &arguments, &memory, &conditions)?
+        } else {
+            // Armed contracts are rejected above. These unused observations would create
+            // detached payloads; omit the actual operation rather than credit its work.
+            Vec::new()
+        };
         let contracts = self.configured_contracts(instance)?;
         let binds_contract_names = contracts
             .iter()
@@ -1262,7 +1308,9 @@ impl<'tcx> Engine<'tcx> {
         {
             return Err("result is reserved for the postcondition return value".to_owned());
         }
+        flow.charge(body.local_decls.len().saturating_mul(2))?;
         let mut state = State {
+            flow,
             locals: vec![None; body.local_decls.len()],
             missing_places: initialized_places::MissingPlaces::default(),
             conditions,
@@ -1270,14 +1318,29 @@ impl<'tcx> Engine<'tcx> {
             memory,
         };
         let incoming_allocations = state.memory.len();
-        let mutable_u16_arguments = if state.memory.mutable_u16.is_empty() {
-            Vec::new()
+        let mutable_u16_arguments = if matches!(state.flow, activation_flow::Flow::Unarmed) {
+            let original = if state.memory.mutable_u16.is_empty() {
+                Vec::new()
+            } else {
+                arguments.clone()
+            };
+            for (local, argument) in body.args_iter().zip(arguments) {
+                state.locals[local.as_usize()] = Some(argument);
+            }
+            original
         } else {
-            arguments.clone()
+            // One consumed traversal constructs the exact original snapshot and local slots.
+            // Each constant snapshot clone is charged in addition to this traversal.
+            state.flow.charge(arguments.len())?;
+            let mut original = Vec::new();
+            for (local, argument) in body.args_iter().zip(arguments) {
+                if !state.memory.mutable_u16.is_empty() {
+                    original.push(state.flow.clone_argument(&argument)?);
+                }
+                state.locals[local.as_usize()] = Some(argument);
+            }
+            original
         };
-        for (local, argument) in body.args_iter().zip(arguments) {
-            state.locals[local.as_usize()] = Some(argument);
-        }
         let mut queue = VecDeque::from([(START_BLOCK, state, retry_frontiers::Path::default())]);
         let mut returns = Vec::new();
         while let Some((block, mut state, mut retry_path)) = queue.pop_front() {
@@ -1356,6 +1419,7 @@ impl<'tcx> Engine<'tcx> {
                             .boolean()?,
                             _ => return Err("unsupported switch discriminant".to_owned()),
                         };
+                        state.flow.charge_branch(&state)?;
                         let mut branch = state.clone();
                         branch.conditions.push(condition.clone());
                         queue.push_back((target, branch, retry_path.clone()));
@@ -1403,7 +1467,12 @@ impl<'tcx> Engine<'tcx> {
                         self.local(&state, 0)?
                     };
                     self.nonzero_niche_admission(body.return_ty(), &value, &state.conditions)?;
-                    self.mutable_u16_exit(body, &mutable_u16_arguments, &state.memory)?;
+                    self.mutable_u16_exit_with_flow(
+                        body,
+                        &mutable_u16_arguments,
+                        &state.memory,
+                        &state.flow,
+                    )?;
                     self.owned_box_type_value(body.return_ty(), &value, &state.memory)?;
                     self.validate_owned_exit(
                         &state.memory,
@@ -1507,7 +1576,10 @@ impl<'tcx> Engine<'tcx> {
                     for allocation in state.addresses.iter().flatten() {
                         state.memory[*allocation] = None;
                     }
+                    state.flow.validate_return()?;
+                    self.activation_validate(&state.flow, &state.memory)?;
                     returns.push(Return {
+                        flow: state.flow,
                         value,
                         conditions: state.conditions,
                         memory: state.memory,
@@ -1555,8 +1627,12 @@ impl<'tcx> Engine<'tcx> {
                         let target =
                             target.ok_or("function table call has no normal return edge")?;
                         for (consumed, result) in results {
-                            let mut continuation =
-                                consumed.continuation(result.conditions, result.memory);
+                            let mut continuation = self.adopt_flow_return(
+                                &consumed,
+                                result.conditions,
+                                result.memory,
+                                result.flow,
+                            )?;
                             self.store_call_result(
                                 body,
                                 &mut continuation,
@@ -1576,30 +1652,37 @@ impl<'tcx> Engine<'tcx> {
                             self.resolve_function_item(callee, generic_args.skip_binder())?
                         }
                         ty::FnPtr(..) => {
+                            state.flow.require_unarmed()?;
                             let value = self.evaluate_operand(id, body, &mut state, func)?;
                             self.known_function_pointer(&value, callable_ty)?
                         }
                         _ => return Err("unresolved indirect call".to_owned()),
                     };
-                    self.byte_copy_call_eligibility(
-                        instance,
-                        !matches!(callable_ty.kind(), ty::FnDef(..)),
-                        &mut state,
-                    );
-                    let callee = instance.def_id();
-                    if let Some((target, continuation)) = self.mutable_interval_call(
-                        &state,
-                        mutable_u16_children::ChildCall {
-                            body,
-                            block,
+                    let unarmed = matches!(state.flow, activation_flow::Flow::Unarmed);
+                    let armed_metadata = self.activation_armed_call_route(&state.flow, instance)?;
+                    if unarmed {
+                        self.byte_copy_call_eligibility(
                             instance,
-                            args,
-                            destination: *destination,
-                            target: *target,
-                            stack: &stack,
-                            site: (id, terminator.source_info.span),
-                        },
-                    )? {
+                            !matches!(callable_ty.kind(), ty::FnDef(..)),
+                            &mut state,
+                        );
+                    }
+                    let callee = instance.def_id();
+                    if unarmed
+                        && let Some((target, continuation)) = self.mutable_interval_call(
+                            &state,
+                            mutable_u16_children::ChildCall {
+                                body,
+                                block,
+                                instance,
+                                args,
+                                destination: *destination,
+                                target: *target,
+                                stack: &stack,
+                                site: (id, terminator.source_info.span),
+                            },
+                        )?
+                    {
                         queue.push_back((target, continuation, retry_path.clone()));
                         continue;
                     }
@@ -1618,8 +1701,12 @@ impl<'tcx> Engine<'tcx> {
                     )? {
                         let target = target.ok_or("mutable u16 child has no normal return edge")?;
                         for result in results {
-                            let mut continuation =
-                                state.continuation(result.conditions, result.memory);
+                            let mut continuation = self.adopt_flow_return(
+                                &state,
+                                result.conditions,
+                                result.memory,
+                                result.flow,
+                            )?;
                             self.store_call_result(
                                 body,
                                 &mut continuation,
@@ -1646,8 +1733,12 @@ impl<'tcx> Engine<'tcx> {
                     )? {
                         let target = target.ok_or("mutable u16 child has no normal return edge")?;
                         for result in results {
-                            let mut continuation =
-                                state.continuation(result.conditions, result.memory);
+                            let mut continuation = self.adopt_flow_return(
+                                &state,
+                                result.conditions,
+                                result.memory,
+                                result.flow,
+                            )?;
                             self.store_call_result(
                                 body,
                                 &mut continuation,
@@ -1728,22 +1819,30 @@ impl<'tcx> Engine<'tcx> {
                         instance
                     };
                     let instance = self.resolve_trait_object_call(instance, &mut values, &state)?;
-                    self.byte_copy_call_eligibility(instance, false, &mut state);
+                    if unarmed {
+                        self.byte_copy_call_eligibility(instance, false, &mut state);
+                    }
                     let callee = instance.def_id();
-                    if let Some(mut results) = self.trusted_call(
-                        instance,
-                        &values,
-                        &state,
-                        (id, terminator.source_info.span),
-                    )? {
+                    if unarmed
+                        && let Some(mut results) = self.trusted_call(
+                            instance,
+                            &values,
+                            &state,
+                            (id, terminator.source_info.span),
+                        )?
+                    {
                         state.memory.byte_copy_opaque = true;
                         for result in &mut results {
                             result.memory.byte_copy_opaque = true;
                         }
                         let target = target.ok_or("trusted call has no return edge")?;
                         for result in results {
-                            let mut continuation =
-                                state.continuation(result.conditions, result.memory);
+                            let mut continuation = self.adopt_flow_return(
+                                &state,
+                                result.conditions,
+                                result.memory,
+                                result.flow,
+                            )?;
                             self.store_call_result(
                                 body,
                                 &mut continuation,
@@ -1756,7 +1855,8 @@ impl<'tcx> Engine<'tcx> {
                         continue;
                     }
                     let configured = self.specification(instance)?.is_some();
-                    if !configured
+                    if unarmed
+                        && !configured
                         && let Some(results) = self.owned_iterator_call(
                             instance,
                             &values,
@@ -1767,8 +1867,12 @@ impl<'tcx> Engine<'tcx> {
                     {
                         let target = target.ok_or("owned iterator call has no return edge")?;
                         for result in results {
-                            let mut continuation =
-                                state.continuation(result.conditions, result.memory);
+                            let mut continuation = self.adopt_flow_return(
+                                &state,
+                                result.conditions,
+                                result.memory,
+                                result.flow,
+                            )?;
                             self.store_call_result(
                                 body,
                                 &mut continuation,
@@ -1780,7 +1884,8 @@ impl<'tcx> Engine<'tcx> {
                         }
                         continue;
                     }
-                    if !configured
+                    if unarmed
+                        && !configured
                         && let Some(results) = self.iterator_call(
                             instance,
                             &values,
@@ -1791,8 +1896,12 @@ impl<'tcx> Engine<'tcx> {
                     {
                         let target = target.ok_or("iterator call has no return edge")?;
                         for result in results {
-                            let mut continuation =
-                                state.continuation(result.conditions, result.memory);
+                            let mut continuation = self.adopt_flow_return(
+                                &state,
+                                result.conditions,
+                                result.memory,
+                                result.flow,
+                            )?;
                             self.store_call_result(
                                 body,
                                 &mut continuation,
@@ -1804,7 +1913,8 @@ impl<'tcx> Engine<'tcx> {
                         }
                         continue;
                     }
-                    if !configured
+                    if unarmed
+                        && !configured
                         && let Some(value) = self.isolated_pointer_atomic_call(
                             instance,
                             &values,
@@ -1830,7 +1940,8 @@ impl<'tcx> Engine<'tcx> {
                         queue.push_back((target, state, retry_path.clone()));
                         continue;
                     }
-                    if !configured
+                    if unarmed
+                        && !configured
                         && let Some(value) =
                             self.owned_box_call(&owned_body, block, instance, &values, &mut state)?
                     {
@@ -1855,7 +1966,8 @@ impl<'tcx> Engine<'tcx> {
                         &state.memory,
                         &state.conditions,
                     )?;
-                    if !configured
+                    if unarmed
+                        && !configured
                         && let Some(value) = self.interior_call(
                             instance,
                             &modeled_values,
@@ -1874,7 +1986,8 @@ impl<'tcx> Engine<'tcx> {
                         queue.push_back((target, state, retry_path.clone()));
                         continue;
                     }
-                    if !configured
+                    if (unarmed || armed_metadata)
+                        && !configured
                         && let Some(results) = self.library_call(
                             instance,
                             &modeled_values,
@@ -1886,8 +1999,12 @@ impl<'tcx> Engine<'tcx> {
                     {
                         let target = target.ok_or("modeled call has no return edge")?;
                         for result in results {
-                            let mut continuation =
-                                state.continuation(result.conditions, result.memory);
+                            let mut continuation = self.adopt_flow_return(
+                                &state,
+                                result.conditions,
+                                result.memory,
+                                result.flow,
+                            )?;
                             self.store_call_result(
                                 body,
                                 &mut continuation,
@@ -1899,7 +2016,10 @@ impl<'tcx> Engine<'tcx> {
                         }
                         continue;
                     }
-                    if !configured && self.finite_byte_copy_candidate(instance, &values, &state) {
+                    if unarmed
+                        && !configured
+                        && self.finite_byte_copy_candidate(instance, &values, &state)
+                    {
                         // These are the actual operands evaluated above in MIR order for this
                         // exact block. A direct selected copy Item cannot take either adapter
                         // path that rewrites the argument vector. Source snapshots are read
@@ -1936,7 +2056,8 @@ impl<'tcx> Engine<'tcx> {
                         queue.push_back((target, state, retry_path.clone()));
                         continue;
                     }
-                    if !configured
+                    if (unarmed || armed_metadata)
+                        && !configured
                         && let Some(value) = self.builtin(
                             body,
                             instance,
@@ -1976,17 +2097,25 @@ impl<'tcx> Engine<'tcx> {
                         }
                         values = flattened;
                     }
-                    let results = self.call_instance(
+                    state
+                        .flow
+                        .charge_call_memory(&state.conditions, &state.memory)?;
+                    let results = self.call_instance_flow(
+                        &mut state.flow,
                         instance,
                         values,
                         state.conditions.clone(),
                         state.memory.clone(),
-                        &stack,
-                        (id, terminator.source_info.span),
+                        (&stack, (id, terminator.source_info.span)),
                     )?;
                     let target = target.ok_or("local call has no return edge")?;
                     for result in results {
-                        let mut continuation = state.continuation(result.conditions, result.memory);
+                        let mut continuation = self.adopt_flow_return(
+                            &state,
+                            result.conditions,
+                            result.memory,
+                            result.flow,
+                        )?;
                         self.store_call_result(
                             body,
                             &mut continuation,
@@ -2003,6 +2132,7 @@ impl<'tcx> Engine<'tcx> {
                         queue.push_back((*target, state, retry_path.clone()));
                         continue;
                     }
+                    state.flow.require_unarmed()?;
                     let private = self.raw_local(&state, place.local.as_usize())?;
                     if matches!(private, Value::OwnedRegion { .. }) {
                         let value = self.place(&state, *place)?;
@@ -2066,8 +2196,12 @@ impl<'tcx> Engine<'tcx> {
                             (id, terminator.source_info.span),
                         )?;
                         for result in results {
-                            let mut continuation =
-                                state.continuation(result.conditions, result.memory);
+                            let mut continuation = self.adopt_flow_return(
+                                &state,
+                                result.conditions,
+                                result.memory,
+                                result.flow,
+                            )?;
                             continuation
                                 .memory
                                 .missing_places
@@ -2090,6 +2224,7 @@ impl<'tcx> Engine<'tcx> {
                     queue.push_back((*target, state, retry_path.clone()));
                 }
                 TerminatorKind::InlineAsm { .. } => {
+                    state.flow.require_unarmed()?;
                     let target = self.arm_interrupt_asm(id, body, &mut state, &terminator.kind)?;
                     queue.push_back((target, state, retry_path.clone()));
                 }
@@ -2111,24 +2246,27 @@ impl<'tcx> Engine<'tcx> {
     ) -> Result<(), String> {
         let id = instance.def_id();
         match statement {
-            StatementKind::Intrinsic(intrinsic) => match intrinsic.as_ref() {
-                rustc_middle::mir::NonDivergingIntrinsic::Assume(operand) => {
-                    let safe = self.evaluate_operand(id, body, state, operand)?.boolean()?;
-                    self.require(
-                        id,
-                        self.tcx.def_span(id),
-                        &state.conditions,
-                        &safe,
-                        ObligationKind::Validity,
-                        "MIR assume must follow from the current path".to_owned(),
-                    )?;
-                    state.conditions.push(safe);
-                    Ok(())
+            StatementKind::Intrinsic(intrinsic) => {
+                state.flow.require_unarmed()?;
+                match intrinsic.as_ref() {
+                    rustc_middle::mir::NonDivergingIntrinsic::Assume(operand) => {
+                        let safe = self.evaluate_operand(id, body, state, operand)?.boolean()?;
+                        self.require(
+                            id,
+                            self.tcx.def_span(id),
+                            &state.conditions,
+                            &safe,
+                            ObligationKind::Validity,
+                            "MIR assume must follow from the current path".to_owned(),
+                        )?;
+                        state.conditions.push(safe);
+                        Ok(())
+                    }
+                    rustc_middle::mir::NonDivergingIntrinsic::CopyNonOverlapping(_) => {
+                        Err("unmodeled pointer copy intrinsic".to_owned())
+                    }
                 }
-                rustc_middle::mir::NonDivergingIntrinsic::CopyNonOverlapping(_) => {
-                    Err("unmodeled pointer copy intrinsic".to_owned())
-                }
-            },
+            }
             StatementKind::Assign(assignment) => {
                 let (place, value) = assignment.as_ref();
                 if self.mutable_u16_stage(body, state, *place, value, statement)? {
@@ -2680,6 +2818,9 @@ impl<'tcx> Engine<'tcx> {
                 if let Some(value) = self.mutable_u16_metadata(body, state, *place)? {
                     return Ok(value);
                 }
+                // Armed shared whole-view borrows use live hierarchy metadata only.
+                // Other snapshot/owned/readonly adapters refuse before construction.
+                state.flow.require_unarmed()?;
                 if let Some(value) = self.owned_box_shared_borrow(state, *place, false)? {
                     return Ok(value);
                 }

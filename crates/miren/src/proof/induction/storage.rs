@@ -173,6 +173,7 @@ impl<'tcx> Engine<'tcx> {
         let mut used = UsedLocals(BTreeSet::new());
         used.visit_body(body);
         let mut state = State {
+            flow: activation_flow::Flow::Unarmed,
             missing_places: initialized_places::MissingPlaces::default(),
             locals: Vec::new(),
             conditions: Vec::new(),

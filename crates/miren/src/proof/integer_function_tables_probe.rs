@@ -185,6 +185,7 @@ fn check_integer_calls(tcx: TyCtxt<'_>) {
             .unwrap();
         let source_index = source_body.args_iter().next().unwrap();
         let mut source_state = State {
+            flow: activation_flow::Flow::Unarmed,
             locals: vec![None; source_body.local_decls.len()],
             missing_places: Default::default(),
             conditions: conditions.clone(),
@@ -225,6 +226,7 @@ fn check_integer_calls(tcx: TyCtxt<'_>) {
             panic!("actual word Move absent")
         };
         let mut state = State {
+            flow: activation_flow::Flow::Unarmed,
             locals: vec![None; body.local_decls.len()],
             missing_places: Default::default(),
             conditions: conditions.clone(),
@@ -494,6 +496,7 @@ fn check_integer_calls(tcx: TyCtxt<'_>) {
                 panic!("actual Copy field absent")
             };
             let mut copied_state = State {
+                flow: activation_flow::Flow::Unarmed,
                 locals: vec![None; copied_body.local_decls.len()],
                 missing_places: Default::default(),
                 conditions: conditions.clone(),

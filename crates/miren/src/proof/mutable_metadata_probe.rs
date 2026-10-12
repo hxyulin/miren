@@ -125,6 +125,7 @@ fn compiler_issued_is_empty_requires_exact_metadata_body_and_live_original_role(
                         .mutable_u16_input(element, &mut memory, &mut conditions)
                         .unwrap();
                     let state = State {
+                        flow: activation_flow::Flow::Unarmed,
                         locals: vec![],
                         addresses: vec![],
                         missing_places: Default::default(),
@@ -368,6 +369,7 @@ fn compiler_issued_is_empty_requires_exact_metadata_body_and_live_original_role(
                 role: MutableU16Role::Metadata { generation: 0 },
             };
             let state = State {
+                flow: activation_flow::Flow::Unarmed,
                 locals: vec![],
                 addresses: vec![],
                 missing_places: Default::default(),
@@ -525,7 +527,14 @@ fn compiler_issued_is_empty_requires_exact_metadata_body_and_live_original_role(
                     }
                 }
                 engine
-                    .execute_body(instance, values, conditions, memory, &[])
+                    .execute_body(
+                        instance,
+                        values,
+                        conditions,
+                        memory,
+                        &[],
+                        activation_flow::Flow::Unarmed,
+                    )
                     .unwrap();
                 assert_eq!(engine.proof.status, ProofStatus::Proved, "{name}");
             }
@@ -637,6 +646,7 @@ fn test_engine(tcx: TyCtxt<'_>) -> Engine<'_> {
         mutable_u16_frames: Default::default(),
         mutable_integer_types: Vec::new(),
         mutable_u16_staging: Default::default(),
+        activation: Default::default(),
         coroutine_places: Default::default(),
         owned_box_types: Vec::new(),
         next_owned_region: 0,

@@ -6644,3 +6644,39 @@ source association. These selected capabilities do not establish full Rust parit
 Evidence: /tmp/miren-float-repeat-parent224/final-checkpoint,
 /tmp/miren-stage225-root-full-checks, /tmp/miren-stage225-root-survey and
 /tmp/miren-stage225-root-comparison-data-audit.json.
+
+## Stage226: activation state transport infrastructure
+
+Private call-state transport now carries explicit Unarmed or Armed receipts through State and
+Return values. Exact live cached bodies, engine and invocation identity, retained receipt floors
+and current hierarchy generations are checked before publication. Each continuation uses actual
+returned Memory. Armed-empty stays distinct from Unarmed, and unsupported armed adapters refuse.
+Only compiler controls can arm this infrastructure; production hierarchy depth is unchanged.
+
+The shared structural-work limit is 2,048. Body, type, input and registry extents remain 512,
+and depth remains 16. Repeated validation, cloning and COW work are charged before execution.
+These engineering bounds do not establish a universal CPU or heap bound.
+
+Fresh owner controls measure four profiles each at main 1,954, scalar 1,883 and reused-call 1,509
+work units. Smaller-budget controls refuse at 2,056 with a final charge of 13. Current-memory,
+Armed-empty and nine hostile receipt controls remain conservative. Cached Repeat controls retain
+Bool, Char and Float behavior; the corrected exact test runs after an archived zero-test recipe.
+Nine scoped and 22 focused Rust tests pass. Earlier prototype captures keep their original parents.
+
+Four ordinary profiles compare 1,036 whole Proofs literally, including 1,976 rich queried
+obligations and models. No Resource normalization is used. The fresh required-check ROOT survey
+preserves 107 PROVED, 89 REFUTED and 63 UNKNOWN across 259 cases and 87 families per profile.
+Comparing its whole Proofs with the completed ROOT225 survey yields 1,034 literal FULL
+pairs and 2 qualified Resource contexts, with 1,976 rich queries/models unchanged.
+No completed baseline or historical corpus is rerun.
+
+All 24 required ROOT commands pass, including formatting, lint, workspace and Python tests,
+release builds, dependency policy, documentation, example ARM releases and manual hooks.
+Logs contain 885 workspace and 9 example Rust tests,
+894 outer Rust tests total, plus 91 Python tests.
+One nested native ticket test is excluded. Final prose has a separate source association.
+This refactor adds infrastructure and does not promote unsupported Rust operations to success.
+
+Evidence: /tmp/miren-carrier-parent225/execution,
+/tmp/miren-stage226-root-owner-review.json, /tmp/miren-stage226-root-full-checks and
+/tmp/miren-stage226-root-survey-proof-audit.json.

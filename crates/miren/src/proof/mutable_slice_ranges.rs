@@ -150,6 +150,7 @@ impl<'tcx> Engine<'tcx> {
             },
         );
         Ok(Some(vec![Return {
+            flow: activation_flow::Flow::Unarmed,
             value,
             conditions,
             memory: state.memory.clone(),

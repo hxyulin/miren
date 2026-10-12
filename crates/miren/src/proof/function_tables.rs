@@ -910,6 +910,9 @@ impl<'tcx> Engine<'tcx> {
         };
         {
             let pointers = self.function_pointers.borrow();
+            if matches!(pointers.get(*id), Some(Target::Choice(_))) {
+                state.flow.require_unarmed()?;
+            }
             if let Some(Target::Choice(choice)) = pointers.get(*id)
                 && (self.primitive_table_signature(choice.signature).is_some()
                     || call

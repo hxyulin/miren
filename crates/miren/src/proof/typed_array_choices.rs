@@ -2132,6 +2132,7 @@ fn suffix_test_engine(tcx: TyCtxt<'_>) -> Engine<'_> {
         mutable_u16_frames: Default::default(),
         mutable_integer_types: Vec::new(),
         mutable_u16_staging: Default::default(),
+        activation: Default::default(),
         coroutine_places: Default::default(),
         owned_box_types: Vec::new(),
         next_owned_region: 0,
@@ -2371,6 +2372,7 @@ pub fn wide(mut a: [[[u16; 4]; 4]; 4], i: usize, j: usize, k: usize, word: u16)
             };
             let bits = u32::from(tcx.sess.target.pointer_width);
             let mut state = State {
+                flow: activation_flow::Flow::Unarmed,
                 locals: vec![None; body.local_decls.len()],
                 addresses: vec![None; body.local_decls.len()],
                 missing_places: Default::default(),
@@ -2671,6 +2673,7 @@ pub fn wide(mut a: [[[u16; 4]; 4]; 4], i: usize, j: usize, k: usize, word: u16)
         let slab = Value::Elements(vec![row; 4].into());
         let storage = Value::Elements(vec![slab; 4].into());
         let mut state = State {
+            flow: activation_flow::Flow::Unarmed,
             locals: vec![None; body.local_decls.len()],
             addresses: vec![None; body.local_decls.len()],
             missing_places: Default::default(),

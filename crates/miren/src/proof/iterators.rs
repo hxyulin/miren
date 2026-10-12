@@ -114,6 +114,7 @@ impl<'tcx> Engine<'tcx> {
                 "known Some payload; preserves tracked mutable references",
             );
             return Ok(Some(vec![Return {
+                flow: activation_flow::Flow::Unarmed,
                 value: value.clone(),
                 conditions: state.conditions.clone(),
                 memory: state.memory.clone(),
@@ -193,6 +194,7 @@ impl<'tcx> Engine<'tcx> {
                 "slice iterator; ordered elements and tracked cursor",
             );
             return Ok(Some(vec![Return {
+                flow: activation_flow::Flow::Unarmed,
                 value: Value::SliceIterator {
                     unchecked: Vec::new(),
                     source: Box::new(source),
@@ -306,6 +308,7 @@ impl<'tcx> Engine<'tcx> {
                 "slice iterator; preserves the writable cursor reference",
             );
             return Ok(Some(vec![Return {
+                flow: activation_flow::Flow::Unarmed,
                 value: receiver.clone(),
                 conditions: state.conditions.clone(),
                 memory: state.memory.clone(),
@@ -391,6 +394,7 @@ impl<'tcx> Engine<'tcx> {
                         &iteration.conditions,
                     )?;
                     results.push(Return {
+                        flow: activation_flow::Flow::Unarmed,
                         value: self.constructed(
                             signature.output(),
                             usize::from(iteration.item.is_some()),
@@ -405,6 +409,7 @@ impl<'tcx> Engine<'tcx> {
             _ => unreachable!("supported iterator operation"),
         };
         Ok(Some(vec![Return {
+            flow: activation_flow::Flow::Unarmed,
             value,
             conditions: state.conditions.clone(),
             memory: state.memory.clone(),
@@ -457,6 +462,7 @@ impl<'tcx> Engine<'tcx> {
         {
             self.record_model(callee, "mutable slice iterator passthrough");
             return Ok(Some(vec![Return {
+                flow: activation_flow::Flow::Unarmed,
                 value: receiver.clone(),
                 conditions: state.conditions.clone(),
                 memory: state.memory.clone(),
@@ -473,6 +479,7 @@ impl<'tcx> Engine<'tcx> {
                 "mutable slice enumeration; tracked cursor and checked count",
             );
             return Ok(Some(vec![Return {
+                flow: activation_flow::Flow::Unarmed,
                 value: self.constructed(
                     output,
                     0,
@@ -564,6 +571,7 @@ impl<'tcx> Engine<'tcx> {
                 self.constructed(output, 0, vec![])?
             };
             results.push(Return {
+                flow: activation_flow::Flow::Unarmed,
                 value,
                 conditions,
                 memory,
@@ -791,6 +799,7 @@ impl<'tcx> Engine<'tcx> {
                 )?;
                 let Some(item) = iteration.item else {
                     returns.push(Return {
+                        flow: activation_flow::Flow::Unarmed,
                         value: if find_map || find {
                             self.constructed(signature.output(), 0, vec![])?
                         } else {
@@ -875,6 +884,7 @@ impl<'tcx> Engine<'tcx> {
                     let stopped = [result.conditions.clone(), vec![symbolic::not(&keep)]].concat();
                     if self.feasible(&stopped)? {
                         returns.push(Return {
+                            flow: activation_flow::Flow::Unarmed,
                             value: if find {
                                 self.constructed(signature.output(), 1, vec![item.clone()])?
                             } else {

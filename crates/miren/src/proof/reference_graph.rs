@@ -228,6 +228,7 @@ mod tests {
 
     fn state(memory: Vec<Option<Value>>) -> State {
         State {
+            flow: activation_flow::Flow::Unarmed,
             missing_places: initialized_places::MissingPlaces::default(),
             locals: Vec::new(),
             addresses: Vec::new(),

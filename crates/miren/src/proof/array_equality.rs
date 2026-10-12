@@ -106,6 +106,7 @@ impl<'tcx> Engine<'tcx> {
                 "fixed primitive array equality; exact numeric element comparisons",
             );
             return Ok(Some(vec![Return {
+                flow: activation_flow::Flow::Unarmed,
                 value: Value::Bool(if negate { symbolic::not(&equal) } else { equal }),
                 conditions: state.conditions.clone(),
                 memory: state.memory.clone(),
@@ -253,6 +254,7 @@ impl<'tcx> Engine<'tcx> {
                     let (left_item, right_item) = match (&left.item, &right.item) {
                         (None, None) => {
                             returns.push(Return {
+                                flow: activation_flow::Flow::Unarmed,
                                 value: Value::Bool(self.terms.boolean(!negate)),
                                 conditions: right.conditions,
                                 memory: right.memory,
@@ -277,6 +279,7 @@ impl<'tcx> Engine<'tcx> {
                             [result.conditions.clone(), vec![different.clone()]].concat();
                         if self.feasible(&mismatch)? {
                             returns.push(Return {
+                                flow: activation_flow::Flow::Unarmed,
                                 value: Value::Bool(self.terms.boolean(negate)),
                                 conditions: mismatch,
                                 memory: result.memory.clone(),

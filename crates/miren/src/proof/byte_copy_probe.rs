@@ -254,6 +254,7 @@ fn check_current_destination<'tcx>(tcx: TyCtxt<'tcx>, root: DefId, fixed: DefId)
         mutable_u16_frames: Default::default(),
         mutable_integer_types: Vec::new(),
         mutable_u16_staging: Default::default(),
+        activation: Default::default(),
         coroutine_places: Default::default(),
         owned_box_types: Vec::new(),
         next_owned_region: 0,
@@ -314,6 +315,7 @@ fn check_current_destination<'tcx>(tcx: TyCtxt<'tcx>, root: DefId, fixed: DefId)
         }],
     };
     let state = State {
+        flow: activation_flow::Flow::Unarmed,
         locals: vec![],
         addresses: vec![],
         missing_places: Default::default(),

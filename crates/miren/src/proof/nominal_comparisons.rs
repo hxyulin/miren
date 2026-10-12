@@ -736,6 +736,7 @@ mod tests {
                     mutable_u16_frames: Default::default(),
                     mutable_integer_types: Vec::new(),
                     mutable_u16_staging: Default::default(),
+                    activation: Default::default(),
                     coroutine_places: Default::default(),
                     owned_box_types: Vec::new(),
                     next_owned_region: 0,

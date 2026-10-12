@@ -1271,6 +1271,7 @@ fn compiler_char_store_probe(engine: &mut Engine<'_>) {
     std::rc::Rc::make_mut(&mut memory.mutable_u16)[0].length =
         symbolic::integer(&engine.terms, 2, bits, false);
     let mut state = State {
+        flow: activation_flow::Flow::Unarmed,
         locals: vec![None; body.local_decls.len()],
         addresses: vec![None; body.local_decls.len()],
         missing_places: Default::default(),
@@ -1401,6 +1402,7 @@ mod tests {
                     mutable_u16_frames: Default::default(),
                     mutable_integer_types: Vec::new(),
                     mutable_u16_staging: Default::default(),
+                    activation: Default::default(),
                     coroutine_places: Default::default(),
                     owned_box_types: Vec::new(),
                     next_owned_region: 0,
@@ -1479,6 +1481,7 @@ mod tests {
                     .unwrap(),
                 );
                 let mut state = State {
+                    flow: activation_flow::Flow::Unarmed,
                     locals: vec![None; body.local_decls.len()],
                     addresses: vec![None; body.local_decls.len()],
                     conditions,
@@ -1676,6 +1679,7 @@ mod tests {
                     assert!(engine.mutable_u16_backing(0, &memory).is_err());
                     engine.mutable_integer_types[certificate] = old_certificate;
                     let mut state = State {
+                        flow: activation_flow::Flow::Unarmed,
                         locals: vec![None; wrong_body.local_decls.len()],
                         addresses: vec![None; wrong_body.local_decls.len()],
                         conditions,
@@ -1866,6 +1870,7 @@ mod tests {
                 std::rc::Rc::make_mut(&mut bool_memory.mutable_u16)[0].length =
                     symbolic::integer(&engine.terms, 2, bits, false);
                 let mut bool_state = State {
+                    flow: activation_flow::Flow::Unarmed,
                     locals: vec![None; bool_body.local_decls.len()],
                     addresses: vec![None; bool_body.local_decls.len()],
                     conditions: bool_conditions,
@@ -1980,6 +1985,7 @@ mod tests {
                 std::rc::Rc::make_mut(&mut char_memory.mutable_u16)[0].length =
                     symbolic::integer(&engine.terms, 2, bits, false);
                 let mut char_state = State {
+                    flow: activation_flow::Flow::Unarmed,
                     locals: vec![None; char_body.local_decls.len()],
                     addresses: vec![None; char_body.local_decls.len()],
                     conditions: char_conditions,
@@ -2089,6 +2095,7 @@ mod tests {
                     std::rc::Rc::make_mut(&mut memory.mutable_u16)[0].length =
                         symbolic::integer(&engine.terms, 2, bits, false);
                     let mut state = State {
+                        flow: activation_flow::Flow::Unarmed,
                         locals: vec![None; selected.local_decls.len()],
                         addresses: vec![None; selected.local_decls.len()],
                         conditions,

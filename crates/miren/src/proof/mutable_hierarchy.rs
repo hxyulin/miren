@@ -11,6 +11,8 @@ struct AssociatedBodyWork<'a, 'tcx> {
     locals: usize,
     work: usize,
     error: Option<String>,
+    activation_shapes: bool,
+    activation_flow: Option<&'a super::activation_flow::Flow>,
 }
 
 impl<'tcx> AssociatedBodyWork<'_, 'tcx> {
@@ -22,6 +24,9 @@ impl<'tcx> AssociatedBodyWork<'_, 'tcx> {
                 "associated borrowed Body exceeds existing work budget".into(),
             ));
         }
+        if let Some(flow) = self.activation_flow {
+            flow.charge(count)?;
+        }
         Ok(())
     }
 
@@ -32,6 +37,27 @@ impl<'tcx> AssociatedBodyWork<'_, 'tcx> {
                 UnknownCategory::ResourceLimit,
                 "associated borrowed Body type exceeds existing depth budget".into(),
             ));
+        }
+        if self.activation_shapes {
+            match original.kind() {
+                ty::Tuple(fields) if !fields.is_empty() => {
+                    return Err("armed activation Tuple production or copy is unsupported".into());
+                }
+                ty::Adt(_, _) => {
+                    return Err(format!(
+                        "armed activation owned shape is unsupported: {original:?}"
+                    ));
+                }
+                ty::Array(inner, _)
+                    if !matches!(
+                        inner.kind(),
+                        ty::Bool | ty::Char | ty::Int(_) | ty::Uint(_) | ty::Float(_)
+                    ) =>
+                {
+                    return Err("armed activation nested array payload is unsupported".into());
+                }
+                _ => {}
+            }
         }
         match original.kind() {
             ty::Bool | ty::Char | ty::Int(_) | ty::Uint(_) | ty::Float(_) | ty::Str | ty::Never => {
@@ -185,6 +211,16 @@ impl<'tcx> Visitor<'tcx> for AssociatedBodyWork<'_, 'tcx> {
 
     fn visit_rvalue(&mut self, value: &Rvalue<'tcx>, location: rustc_middle::mir::Location) {
         if self.error.is_some() {
+            return;
+        }
+        if self.activation_shapes
+            && let Rvalue::Ref(_, borrow, place) = value
+            && (!matches!(
+                borrow,
+                rustc_middle::mir::BorrowKind::Mut { .. } | rustc_middle::mir::BorrowKind::Shared
+            ) || !matches!(place.projection.as_ref(), [ProjectionElem::Deref]))
+        {
+            self.error = Some("armed activation partial borrow is unsupported".into());
             return;
         }
         if let Rvalue::Aggregate(kind, operands) = value {
@@ -468,7 +504,7 @@ impl TestIssuance {
 }
 
 #[derive(Clone, Debug)]
-struct Origin {
+pub(super) struct Origin {
     certificate: usize,
     allocation: usize,
     capacity: Value,
@@ -524,6 +560,21 @@ pub(super) struct Hierarchy {
 }
 
 impl Hierarchy {
+    fn activation_charge_clone(&self, flow: &super::activation_flow::Flow) -> Result<(), String> {
+        if matches!(flow, super::activation_flow::Flow::Unarmed) {
+            return Ok(());
+        }
+        flow.charge(
+            self.owners
+                .len()
+                .saturating_add(1 + usize::from(self.pending.is_some())),
+        )?;
+        for owner in &self.owners {
+            flow.charge(owner.frames.len())?;
+        }
+        Ok(())
+    }
+
     pub(super) fn role_valid(&self, role: &symbolic::MutableU16Role, initialized: bool) -> bool {
         use symbolic::MutableU16Role;
         match role {
@@ -558,6 +609,13 @@ impl Hierarchy {
         Ok(self.metadata(lease)?.epoch)
     }
 
+    pub(super) fn activation_charge_storage(
+        &self,
+        flow: &super::activation_flow::Flow,
+    ) -> Result<(), String> {
+        flow.charge(self.owners.len())
+    }
+
     pub(super) fn storage_slots(&self) -> usize {
         // Dormant origin and counters persist even when the owner stack is empty.
         6usize
@@ -572,6 +630,263 @@ impl Hierarchy {
 }
 
 impl<'tcx> Engine<'tcx> {
+    fn activation_charge_backing_cow(
+        &self,
+        flow: &super::activation_flow::Flow,
+        memory: &Memory,
+    ) -> Result<(), String> {
+        if matches!(flow, super::activation_flow::Flow::Unarmed)
+            || Rc::strong_count(&memory.mutable_u16) == 1
+        {
+            return Ok(());
+        }
+        flow.charge(memory.mutable_u16.len())?;
+        for backing in memory.mutable_u16.iter() {
+            if backing.interval.is_some()
+                || !matches!(backing.phase, super::mutable_u16_children::Phase::Idle)
+            {
+                return Err("armed activation legacy backing clone is unsupported".into());
+            }
+            flow.charge_clone_value(&backing.length)?;
+            if let Some(hierarchy) = &backing.hierarchy {
+                hierarchy.activation_charge_clone(flow)?;
+            }
+        }
+        Ok(())
+    }
+
+    pub(super) fn activation_hierarchy_depth(
+        &self,
+        flow: &super::activation_flow::Flow,
+        memory: &Memory,
+    ) -> Result<usize, String> {
+        let Some(id) = memory.mutable_hierarchy else {
+            return Ok(0);
+        };
+        self.activation_charge_backing_schema(flow, memory, id)?;
+        let backing = self.mutable_u16_backing(id, memory)?;
+        let hierarchy = backing
+            .hierarchy
+            .as_ref()
+            .ok_or("activation depth namespace disappeared")?;
+        flow.charge(hierarchy.owners.len())?;
+        Ok(hierarchy
+            .owners
+            .iter()
+            .map(|owner| owner.frames.len())
+            .sum())
+    }
+
+    pub(super) fn mutable_hierarchy_activation_origin<'a>(
+        &self,
+        memory: &'a Memory,
+        id: usize,
+    ) -> Option<&'a Rc<Origin>> {
+        memory
+            .mutable_u16
+            .get(id)?
+            .hierarchy
+            .as_ref()
+            .map(|h| &h.origin)
+    }
+
+    pub(super) fn activation_charge_backing_schema(
+        &self,
+        flow: &super::activation_flow::Flow,
+        memory: &Memory,
+        id: usize,
+    ) -> Result<(), String> {
+        if matches!(flow, super::activation_flow::Flow::Unarmed) {
+            return Ok(());
+        }
+        // The existing backing validator checks this allocation's complete move mask,
+        // then traverses the owner lineage and each owner's frame certificates.
+        flow.charge(memory.missing_places.entries().len())?;
+        let backing = memory
+            .mutable_u16
+            .get(id)
+            .ok_or("activation backing disappeared")?;
+        if let Some(hierarchy) = &backing.hierarchy {
+            // This precharge loop and the actual validator are separate owner passes.
+            flow.charge(hierarchy.owners.len().saturating_mul(2))?;
+            for owner in &hierarchy.owners {
+                flow.charge(owner.frames.len())?;
+            }
+        }
+        Ok(())
+    }
+
+    pub(super) fn mutable_hierarchy_activation_snapshot(
+        &self,
+        memory: &Memory,
+        id: usize,
+        flow: &super::activation_flow::Flow,
+    ) -> Result<(Rc<Origin>, u64, u64), String> {
+        self.activation_charge_backing_schema(flow, memory, id)?;
+        let backing = self.mutable_u16_backing(id, memory)?;
+        let hierarchy = backing
+            .hierarchy
+            .as_ref()
+            .ok_or("activation hierarchy disappeared")?;
+        if hierarchy.origin.certificate != backing.certificate
+            || hierarchy.origin.allocation != backing.allocation
+            || hierarchy.origin.capacity.integer()? != backing.length.integer()?
+            || !hierarchy.origin.data_context.belongs_to(&self.terms)
+            || !backing.data.belongs_to(&self.terms)
+            || hierarchy.origin.data_context.sort() != backing.data.sort()
+        {
+            return Err("activation backing no longer matches its issued origin".into());
+        }
+        Ok((hierarchy.origin.clone(), hierarchy.issued, hierarchy.epoch))
+    }
+
+    pub(super) fn mutable_hierarchy_activation_live(
+        &self,
+        memory: &Memory,
+        id: usize,
+        origin: &Rc<Origin>,
+        issued: u64,
+        epoch: u64,
+        flow: &super::activation_flow::Flow,
+    ) -> Result<(), String> {
+        let (actual, current_issued, current_epoch) =
+            self.mutable_hierarchy_activation_snapshot(memory, id, flow)?;
+        if !Rc::ptr_eq(&actual, origin) || current_issued != issued || current_epoch != epoch {
+            return Err(
+                "activation current Memory lost its origin or exact observed generation".into(),
+            );
+        }
+        Ok(())
+    }
+
+    fn activation_signature_pass(
+        &self,
+        flow: &super::activation_flow::Flow,
+        instance: ty::Instance<'tcx>,
+    ) -> Result<(), String> {
+        if matches!(flow, super::activation_flow::Flow::Unarmed) {
+            return Ok(());
+        }
+        let mut local = 0;
+        self.activation_borrowed_signature(instance, &mut local, flow)?;
+        // Actual selected signature substitution and region erasure are separate passes.
+        flow.charge(local)?;
+        flow.charge(local)
+    }
+
+    pub(super) fn activation_borrowed_signature(
+        &self,
+        instance: ty::Instance<'tcx>,
+        work: &mut usize,
+        flow: &super::activation_flow::Flow,
+    ) -> Result<(), String> {
+        if !matches!(instance.def, ty::InstanceKind::Item(_))
+            || !matches!(
+                self.tcx.def_kind(instance.def_id()),
+                DefKind::Fn | DefKind::AssocFn
+            )
+            || !instance.def_id().is_local()
+            || !self.tcx.is_mir_available(instance.def_id())
+        {
+            return Err(format!(
+                "armed activation requires a local available Item body: {}",
+                self.tcx.def_path_str(instance.def_id())
+            ));
+        }
+        if self.tcx.def_kind(instance.def_id()) == DefKind::AssocFn
+            && self.tcx.associated_item(instance.def_id()).is_method()
+        {
+            return Err("armed activation method adapter is not implemented".into());
+        }
+        let signature = self
+            .tcx
+            .fn_sig(instance.def_id())
+            .instantiate_identity()
+            .skip_binder();
+        let mut inventory = AssociatedBodyWork {
+            engine: self,
+            arguments: instance.args,
+            locals: 0,
+            work: *work,
+            error: None,
+            activation_shapes: true,
+            activation_flow: Some(flow),
+        };
+        inventory.generic_arguments(instance.args, 0)?;
+        inventory.charge(signature.inputs().len().saturating_add(1))?;
+        for original in signature.inputs() {
+            inventory.original_type(*original, 0)?;
+        }
+        inventory.original_type(signature.output(), 0)?;
+        *work = inventory.work;
+        Ok(())
+    }
+
+    pub(super) fn activation_borrowed_preflight(
+        &self,
+        instance: ty::Instance<'tcx>,
+        work: &mut usize,
+        flow: &super::activation_flow::Flow,
+    ) -> Result<(), String> {
+        self.activation_borrowed_signature(instance, work, flow)?;
+        let original = self.tcx.instance_mir(instance.def);
+        self.mutable_hierarchy_associated_borrowed_body_work(
+            instance,
+            original,
+            work,
+            true,
+            Some(flow),
+        )
+    }
+
+    pub(super) fn activation_borrowed_publication(
+        &self,
+        instance: ty::Instance<'tcx>,
+        body: &Body<'tcx>,
+        work: &mut usize,
+        flow: &super::activation_flow::Flow,
+    ) -> Result<(), String> {
+        self.mutable_hierarchy_associated_borrowed_body_work(
+            instance,
+            body,
+            work,
+            true,
+            Some(flow),
+        )?;
+        // Raw arguments and the identity signature were bounded before substitution.
+        // The activation shape grammar rejects aliases/owned recursive shapes, so no
+        // normalization query or new call-signature cache is needed for this comparison.
+        // Substitution and region erasure are actual input passes, not validation credits.
+        flow.charge(*work)?;
+        flow.charge(*work)?;
+        let signature = self
+            .tcx
+            .fn_sig(instance.def_id())
+            .instantiate(self.tcx, instance.args)
+            .skip_norm_wip();
+        let signature = self.tcx.instantiate_bound_regions_with_erased(signature);
+        flow.charge(signature.inputs().len().saturating_add(1))?;
+        *work = work.saturating_add(signature.inputs().len().saturating_add(1));
+        if *work > MAX_INPUT_VALUES {
+            return Err("activation signature exceeds shared work budget".into());
+        }
+        if body.arg_count != signature.inputs().len()
+            || self.tcx.erase_and_anonymize_regions(body.return_ty())
+                != self.tcx.erase_and_anonymize_regions(signature.output())
+            || body
+                .args_iter()
+                .zip(signature.inputs())
+                .any(|(local, original)| {
+                    self.tcx
+                        .erase_and_anonymize_regions(body.local_decls[local].ty)
+                        != self.tcx.erase_and_anonymize_regions(*original)
+                })
+        {
+            return Err("activation cached Body original signature differs".into());
+        }
+        Ok(())
+    }
+
     pub(super) fn mutable_hierarchy_disabled_backing(
         &self,
         backing: &super::mutable_u16::Backing,
@@ -757,6 +1072,16 @@ impl<'tcx> Engine<'tcx> {
         if !issuance_enabled() && state.memory.mutable_hierarchy.is_none() {
             return Ok(None);
         }
+        if !matches!(state.flow, super::activation_flow::Flow::Unarmed)
+            && !self.mutable_metadata_operation(call.instance)
+            && !super::super::identity::is_panic_call(self.tcx, call.instance.def_id())
+            && !self.is_core_panic_helper(call.instance.def_id())
+        {
+            self.activation_preclone(&state.flow, call.instance)?;
+        }
+        if let Some(id) = state.memory.mutable_hierarchy {
+            self.activation_charge_backing_schema(&state.flow, &state.memory, id)?;
+        }
         self.mutable_hierarchy_namespace(&state.memory)?;
         if state.memory.mutable_hierarchy.is_none()
             && !self.mutable_hierarchy_route(state, &call)?
@@ -769,6 +1094,7 @@ impl<'tcx> Engine<'tcx> {
         {
             return Ok(None);
         }
+        self.activation_preclone(&state.flow, call.instance)?;
         if DORMANT_CALLS_ENABLED
             && let Some(results) = self.mutable_hierarchy_dormant_call(state, &call)?
         {
@@ -787,14 +1113,15 @@ impl<'tcx> Engine<'tcx> {
         };
         self.mutable_hierarchy_namespace(&state.memory)?;
         let backing = self.mutable_u16_backing(id, &state.memory)?;
-        let before = backing
+        let borrowed = backing
             .hierarchy
             .as_ref()
-            .ok_or("dormant hierarchy missing")?
-            .clone();
-        if !before.owners.is_empty() || before.pending.is_some() {
+            .ok_or("dormant hierarchy missing")?;
+        if !borrowed.owners.is_empty() || borrowed.pending.is_some() {
             return Ok(None);
         }
+        state.flow.require_unarmed()?;
+        let before = borrowed.clone();
         let data = backing.data.clone();
         let float_original = self.mutable_hierarchy_float_backing(id, &state.memory)?;
         if call.args.len() > MAX_INPUT_VALUES {
@@ -812,6 +1139,7 @@ impl<'tcx> Engine<'tcx> {
         {
             return Ok(None);
         }
+        self.activation_signature_pass(&state.flow, instance)?;
         let signature = self
             .tcx
             .instantiate_bound_regions_with_erased(self.call_poly_signature(instance)?);
@@ -829,7 +1157,7 @@ impl<'tcx> Engine<'tcx> {
             return Ok(None);
         }
         self.mutable_u16_body_budget(call.body)?;
-        self.mutable_u16_register_current_frame(call.body)?;
+        self.mutable_u16_register_current_frame(call.body, &state.flow)?;
         let TerminatorKind::Call {
             func,
             args,
@@ -925,6 +1253,7 @@ impl<'tcx> Engine<'tcx> {
             self.builtin(call.body, instance, &values, &values, state, call.site.1)?
         {
             vec![Return {
+                flow: activation_flow::Flow::Unarmed,
                 value,
                 conditions: state.conditions.clone(),
                 memory: state.memory.clone(),
@@ -1218,7 +1547,7 @@ impl<'tcx> Engine<'tcx> {
             instance.args,
             &mut work,
         )?;
-        self.mutable_hierarchy_associated_borrowed_body_work(instance, body, &mut work)
+        self.mutable_hierarchy_associated_borrowed_body_work(instance, body, &mut work, false, None)
     }
 
     fn mutable_hierarchy_associated_borrowed_body_work(
@@ -1226,12 +1555,18 @@ impl<'tcx> Engine<'tcx> {
         instance: ty::Instance<'tcx>,
         body: &Body<'tcx>,
         work: &mut usize,
+        activation_shapes: bool,
+        activation_flow: Option<&super::activation_flow::Flow>,
     ) -> Result<(), String> {
         if body.source.instance != instance.def
             || body.source.def_id() != instance.def_id()
             || body.source.promoted.is_some()
         {
             return Err("associated borrowed Body provenance differs".into());
+        }
+        if let Some(flow) = activation_flow {
+            // Preliminary Body budget walks blocks before the separate full inventory.
+            flow.charge(body.basic_blocks.len())?;
         }
         self.mutable_u16_body_budget(body)?;
         let mut inventory = AssociatedBodyWork {
@@ -1240,6 +1575,8 @@ impl<'tcx> Engine<'tcx> {
             locals: body.local_decls.len(),
             work: *work,
             error: None,
+            activation_shapes,
+            activation_flow,
         };
         inventory.generic_arguments(instance.args, 0)?;
         inventory.charge(
@@ -1342,9 +1679,13 @@ impl<'tcx> Engine<'tcx> {
         {
             return Err("associated hierarchy original Body provenance differs".into());
         }
-        self.mutable_hierarchy_associated_borrowed_body_work(instance, original, work)?;
+        self.mutable_hierarchy_associated_borrowed_body_work(
+            instance, original, work, false, None,
+        )?;
         if let Some(cached) = self.bodies.borrow().get(&instance) {
-            self.mutable_hierarchy_associated_borrowed_body_work(instance, cached, work)?;
+            self.mutable_hierarchy_associated_borrowed_body_work(
+                instance, cached, work, false, None,
+            )?;
         }
         Ok(())
     }
@@ -1419,7 +1760,7 @@ impl<'tcx> Engine<'tcx> {
             && !original_signature.c_variadic())
     }
 
-    fn mutable_hierarchy_associated_body(
+    fn mutable_hierarchy_associated_provenance(
         &self,
         instance: ty::Instance<'tcx>,
         selected: &Body<'tcx>,
@@ -1438,7 +1779,43 @@ impl<'tcx> Engine<'tcx> {
         {
             return Err("associated hierarchy selected Body provenance differs".into());
         }
-        self.mutable_hierarchy_associated_borrowed_body(instance, selected)
+        Ok(())
+    }
+
+    fn mutable_hierarchy_associated_body(
+        &self,
+        instance: ty::Instance<'tcx>,
+        selected: &Body<'tcx>,
+    ) -> Result<(), String> {
+        self.mutable_hierarchy_associated_provenance(instance, selected)?;
+        if self.tcx.def_kind(instance.def_id()) == DefKind::AssocFn {
+            self.mutable_hierarchy_associated_borrowed_body(instance, selected)?;
+        }
+        Ok(())
+    }
+
+    fn activation_associated_body(
+        &self,
+        instance: ty::Instance<'tcx>,
+        selected: &Body<'tcx>,
+        flow: &super::activation_flow::Flow,
+    ) -> Result<(), String> {
+        if matches!(flow, super::activation_flow::Flow::Unarmed) {
+            return self.mutable_hierarchy_associated_body(instance, selected);
+        }
+        self.mutable_hierarchy_associated_provenance(instance, selected)?;
+        if self.tcx.def_kind(instance.def_id()) == DefKind::AssocFn {
+            let mut admission = 0;
+            self.activation_borrowed_signature(instance, &mut admission, flow)?;
+            self.mutable_hierarchy_associated_borrowed_body_work(
+                instance,
+                selected,
+                &mut admission,
+                true,
+                Some(flow),
+            )?;
+        }
+        Ok(())
     }
 
     fn mutable_hierarchy_route(
@@ -1555,6 +1932,7 @@ impl<'tcx> Engine<'tcx> {
         {
             return Ok(false);
         }
+        self.activation_signature_pass(&state.flow, call.instance)?;
         let Some(signature) = self.mutable_hierarchy_routing_signature(
             call.instance,
             args.len(),
@@ -1581,8 +1959,8 @@ impl<'tcx> Engine<'tcx> {
             return Ok(false);
         }
         let selected = self.instantiated_body(call.instance)?;
-        self.mutable_hierarchy_associated_body(call.instance, &selected)?;
-        self.mutable_hierarchy_selector(&selected, position + 1)
+        self.activation_associated_body(call.instance, &selected, &state.flow)?;
+        self.mutable_hierarchy_selector_with_flow(&selected, position + 1, &state.flow)
     }
 
     fn mutable_hierarchy_element(&self, original: Ty<'tcx>) -> bool {
@@ -1647,6 +2025,12 @@ impl<'tcx> Engine<'tcx> {
         call: super::mutable_u16_children::ChildCall<'_, 'tcx>,
     ) -> Result<Option<Vec<Return>>, String> {
         use symbolic::MutableU16Role;
+        if !matches!(state.flow, super::activation_flow::Flow::Unarmed)
+            && (self.specification(call.instance)?.is_some()
+                || !self.contracts(call.instance.def_id()).is_empty())
+        {
+            return Err("armed activation contract adapter is not implemented".into());
+        }
         self.mutable_hierarchy_namespace(&state.memory)?;
         let super::mutable_u16_children::ChildCall {
             body,
@@ -1658,6 +2042,7 @@ impl<'tcx> Engine<'tcx> {
             stack,
             site,
         } = call;
+        state.flow.charge(body.basic_blocks.len())?;
         self.mutable_u16_body_budget(body)?;
         let TerminatorKind::Call {
             func,
@@ -1702,6 +2087,7 @@ impl<'tcx> Engine<'tcx> {
         {
             return Err("associated hierarchy Call occurrence differs".into());
         }
+        self.activation_signature_pass(&state.flow, instance)?;
         let signature = self
             .tcx
             .instantiate_bound_regions_with_erased(self.call_poly_signature(instance)?);
@@ -1783,8 +2169,15 @@ impl<'tcx> Engine<'tcx> {
             }
         }
         let selected = self.instantiated_body(instance)?;
-        self.mutable_hierarchy_associated_body(instance, &selected)?;
+        self.activation_associated_body(instance, &selected, &state.flow)?;
+        // These are actual repeated visits, independent of prepare_body's admission.
+        state.flow.charge(selected.basic_blocks.len())?;
         self.mutable_u16_body_budget(&selected)?;
+        state.flow.charge(
+            selected
+                .arg_count
+                .saturating_add(selected.basic_blocks.len()),
+        )?;
         if selected.arg_count != args.len()
             || selected.return_ty() != signature.output()
             || selected.args_iter().zip(signature.inputs()).any(|(l, t)| {
@@ -1844,15 +2237,16 @@ impl<'tcx> Engine<'tcx> {
             return Err("hierarchy intervals are deferred".into());
         }
         let mut hierarchy = if let Some(h) = &backing.hierarchy {
+            h.activation_charge_clone(&state.flow)?;
             h.clone()
         } else {
-            if !self.mutable_hierarchy_selector(&selected, position + 1)? {
+            if !self.mutable_hierarchy_selector_with_flow(&selected, position + 1, &state.flow)? {
                 return Ok(None);
             }
             self.mutable_hierarchy_bootstrap(body, state, place, id, &role)?;
             Hierarchy::dormant(backing)
         };
-        let caller_frame = self.mutable_u16_register_current_frame(body)?;
+        let caller_frame = self.mutable_u16_register_current_frame(body, &state.flow)?;
         let tip = Tip {
             frame: caller_frame,
             statement: std::ptr::from_ref(&body.basic_blocks[block].terminator().kind) as usize,
@@ -1865,7 +2259,7 @@ impl<'tcx> Engine<'tcx> {
                     tip.clone(),
                     state
                         .memory
-                        .storage_slots()
+                        .activation_storage_slots(&state.flow)?
                         .saturating_add(usize::from(backing.hierarchy.is_none()) * 6),
                 )
                 .map_err(|error| self.mutable_hierarchy_transition_error(error))?,
@@ -1879,7 +2273,7 @@ impl<'tcx> Engine<'tcx> {
                         tip.clone(),
                         state
                             .memory
-                            .storage_slots()
+                            .activation_storage_slots(&state.flow)?
                             .saturating_add(hierarchy.storage_slots()),
                     )
                     .map_err(|error| self.mutable_hierarchy_transition_error(error))?
@@ -1903,7 +2297,11 @@ impl<'tcx> Engine<'tcx> {
                     let owner = hierarchy.owners.last().ok_or("hierarchy owner missing")?;
                     self.mutable_u16_frame_top(body, &owner.frames)?;
                     hierarchy
-                        .issue(lease, tip.clone(), state.memory.storage_slots())
+                        .issue(
+                            lease,
+                            tip.clone(),
+                            state.memory.activation_storage_slots(&state.flow)?,
+                        )
                         .map_err(|error| self.mutable_hierarchy_transition_error(error))?
                 }
             }
@@ -1914,14 +2312,14 @@ impl<'tcx> Engine<'tcx> {
                 return Err("hierarchy source lacks owner grant".into());
             }
         };
-        let selected_frame = self.mutable_u16_register_frame(&selected)?;
+        let selected_frame = self.activation_register_frame(&selected, &state.flow)?;
         let ticket = hierarchy
             .enter(
                 &tip,
                 selected_frame,
                 state
                     .memory
-                    .storage_slots()
+                    .activation_storage_slots(&state.flow)?
                     .saturating_add(usize::from(backing.hierarchy.is_none()) * 6),
             )
             .map_err(|error| self.mutable_hierarchy_transition_error(error))?;
@@ -1957,17 +2355,22 @@ impl<'tcx> Engine<'tcx> {
                 )?;
             }
         }
+        self.activation_charge_backing_cow(&state.flow, &state.memory)?;
         let backing = &mut Rc::make_mut(&mut state.memory.mutable_u16)[id];
         backing.phase = super::mutable_u16_children::Phase::Idle;
         backing.hierarchy = Some(hierarchy);
         state.memory.mutable_hierarchy = Some(id);
-        let mut results = self.call_instance(
+        self.activation_observe(&mut state.flow, &state.memory)?;
+        state
+            .flow
+            .charge_call_memory(&state.conditions, &state.memory)?;
+        let mut results = self.call_instance_flow(
+            &mut state.flow,
             instance,
             values,
             state.conditions.clone(),
             state.memory.clone(),
-            stack,
-            site,
+            (stack, site),
         )?;
         for result in &mut results {
             if signature.output() == self.tcx.types.char {
@@ -1990,11 +2393,13 @@ impl<'tcx> Engine<'tcx> {
             if self.mutable_u16_contains(&result.value, &result.memory)? {
                 return Err("hierarchy returned executable role".into());
             }
+            self.activation_charge_backing_cow(&result.flow, &result.memory)?;
             let h = Rc::make_mut(&mut result.memory.mutable_u16)[id]
                 .hierarchy
                 .as_mut()
                 .ok_or("returned hierarchy disappeared")?;
             h.release(&ticket)?;
+            self.activation_observe(&mut result.flow, &result.memory)?;
             // Original masks and current updated data remain untouched on release.
         }
         Ok(Some(results))
@@ -2101,12 +2506,28 @@ impl<'tcx> Engine<'tcx> {
         self.prove_float_pair(value, self.float_type(original).unwrap(), conditions)
     }
 
+    #[cfg(test)]
     fn mutable_hierarchy_selector(
         &self,
         selected: &Body<'tcx>,
         argument: usize,
     ) -> Result<bool, String> {
+        self.mutable_hierarchy_selector_with_flow(
+            selected,
+            argument,
+            &super::activation_flow::Flow::Unarmed,
+        )
+    }
+
+    fn mutable_hierarchy_selector_with_flow(
+        &self,
+        selected: &Body<'tcx>,
+        argument: usize,
+        flow: &super::activation_flow::Flow,
+    ) -> Result<bool, String> {
+        flow.charge(selected.basic_blocks.len())?;
         self.mutable_u16_body_budget(selected)?;
+        flow.charge(selected.local_decls.len())?;
         let root = rustc_middle::mir::Local::from_usize(argument);
         if argument == 0
             || argument > selected.arg_count
@@ -2119,7 +2540,9 @@ impl<'tcx> Engine<'tcx> {
         }
         let float_original =
             self.mutable_hierarchy_float_reference_element(selected.local_decls[root].ty);
+        flow.charge(selected.basic_blocks.len())?;
         for block in selected.basic_blocks.iter() {
+            flow.charge(block.statements.len().saturating_add(1))?;
             let mut lineage = std::collections::BTreeSet::from([root]);
             for statement in &block.statements {
                 match &statement.kind {
@@ -2161,7 +2584,9 @@ impl<'tcx> Engine<'tcx> {
             else {
                 continue;
             };
+            flow.charge(generic.skip_binder().len().saturating_add(1))?;
             let instance = self.resolve_function_item(*definition, generic.skip_binder())?;
+            self.activation_signature_pass(flow, instance)?;
             if self.tcx.def_kind(*definition) == DefKind::AssocFn
                 && !self.mutable_hierarchy_associated_identity(
                     func.ty(&selected.local_decls, self.tcx),
@@ -2177,6 +2602,7 @@ impl<'tcx> Engine<'tcx> {
             };
             let mut receiver = None;
             let mut eligible = true;
+            flow.charge(args.len())?;
             for (position, (operand, original)) in args.iter().zip(signature.inputs()).enumerate() {
                 if self.mutable_hierarchy_reference(*original) {
                     let follows = matches!(operand.node, Operand::Copy(p) | Operand::Move(p)
@@ -2199,7 +2625,12 @@ impl<'tcx> Engine<'tcx> {
         Ok(false)
     }
 
-    fn mutable_u16_register_current_frame(&self, body: &Body<'tcx>) -> Result<usize, String> {
+    fn mutable_u16_register_current_frame(
+        &self,
+        body: &Body<'tcx>,
+        flow: &super::activation_flow::Flow,
+    ) -> Result<usize, String> {
+        flow.charge(self.bodies.borrow().len())?;
         let original = self
             .bodies
             .borrow()
@@ -2207,7 +2638,21 @@ impl<'tcx> Engine<'tcx> {
             .find(|candidate| std::ptr::eq(candidate.as_ref(), body))
             .cloned()
             .ok_or("hierarchy current instantiated Body unavailable")?;
-        self.mutable_u16_register_frame(&original)
+        self.activation_register_frame(&original, flow)
+    }
+
+    fn activation_register_frame(
+        &self,
+        body: &Rc<Body<'tcx>>,
+        flow: &super::activation_flow::Flow,
+    ) -> Result<usize, String> {
+        flow.charge(
+            body.basic_blocks
+                .len()
+                .saturating_add(self.mutable_u16_frames.borrow().len())
+                .saturating_add(1),
+        )?;
+        self.mutable_u16_register_frame(body)
     }
 
     fn mutable_hierarchy_charge(
@@ -2216,13 +2661,17 @@ impl<'tcx> Engine<'tcx> {
         id: usize,
         next: &Hierarchy,
     ) -> Result<(), String> {
+        if let Some(old) = &state.memory.mutable_u16[id].hierarchy {
+            old.activation_charge_storage(&state.flow)?;
+        }
+        next.activation_charge_storage(&state.flow)?;
         let old = state.memory.mutable_u16[id]
             .hierarchy
             .as_ref()
             .map_or(0, Hierarchy::storage_slots);
         if state
             .memory
-            .storage_slots()
+            .activation_storage_slots(&state.flow)?
             .saturating_sub(old)
             .saturating_add(next.storage_slots())
             .saturating_add(usize::from(state.memory.mutable_hierarchy.is_none()))
@@ -2376,11 +2825,13 @@ impl<'tcx> Engine<'tcx> {
         }
         self.check_local_initialization(state, source.local.as_usize(), &[])?;
         let backing = self.mutable_u16_backing(id, &state.memory)?;
-        let mut h = backing
+        let borrowed = backing
             .hierarchy
-            .clone()
+            .as_ref()
             .ok_or("hierarchy staging namespace missing")?;
-        let frame = self.mutable_u16_register_current_frame(body)?;
+        borrowed.activation_charge_clone(&state.flow)?;
+        let mut h = borrowed.clone();
+        let frame = self.mutable_u16_register_current_frame(body, &state.flow)?;
         let next = Tip {
             frame,
             statement: std::ptr::from_ref(occurrence) as usize,
@@ -2400,10 +2851,15 @@ impl<'tcx> Engine<'tcx> {
             } else if lease != 0 {
                 return Err("hierarchy source has no current owner".into());
             }
-            h.issue(lease, next, state.memory.storage_slots())
-                .map_err(|error| self.mutable_hierarchy_transition_error(error))?
+            h.issue(
+                lease,
+                next,
+                state.memory.activation_storage_slots(&state.flow)?,
+            )
+            .map_err(|error| self.mutable_hierarchy_transition_error(error))?
         };
         self.mutable_hierarchy_charge(state, id, &h)?;
+        self.activation_charge_backing_cow(&state.flow, &state.memory)?;
         Rc::make_mut(&mut state.memory.mutable_u16)[id].hierarchy = Some(h);
         // Sole private destination was authenticated before this ordinary exact write.
         self.write(
@@ -2423,7 +2879,9 @@ impl<'tcx> Engine<'tcx> {
         arguments: &[Value],
         id: usize,
         memory: &Memory,
+        flow: &super::activation_flow::Flow,
     ) -> Result<(), String> {
+        self.activation_charge_backing_schema(flow, memory, id)?;
         let backing = self.mutable_u16_backing(id, memory)?;
         let h = backing
             .hierarchy
@@ -2436,6 +2894,7 @@ impl<'tcx> Engine<'tcx> {
             return Ok(());
         };
         self.mutable_u16_frame_top(body, &owner.frames)?;
+        flow.charge(arguments.len())?;
         let count = arguments
             .iter()
             .filter(|v| {
@@ -2470,11 +2929,12 @@ impl<'tcx> Engine<'tcx> {
         };
         let backing = self.mutable_u16_backing(id, &state.memory)?;
         let float_original = self.mutable_hierarchy_float_backing(id, &state.memory)?;
-        let before = backing
+        let borrowed = backing
             .hierarchy
             .as_ref()
-            .ok_or("scalar hierarchy namespace missing")?
-            .clone();
+            .ok_or("scalar hierarchy namespace missing")?;
+        borrowed.activation_charge_clone(&state.flow)?;
+        let before = borrowed.clone();
         if before.owners.is_empty() {
             return Ok(None);
         }
@@ -2490,7 +2950,8 @@ impl<'tcx> Engine<'tcx> {
                 "hierarchy scalar depth exceeds existing budget".into(),
             ));
         }
-        let frame = self.mutable_u16_register_frame(selected)?;
+        let frame = self.activation_register_frame(selected, &state.flow)?;
+        before.activation_charge_clone(&state.flow)?;
         let mut entered = before.clone();
         entered.owners.last_mut().unwrap().frames.push(frame);
         self.mutable_hierarchy_charge(state, id, &entered)?;
@@ -2511,14 +2972,22 @@ impl<'tcx> Engine<'tcx> {
                 )?;
             }
         }
+        entered.activation_charge_clone(&state.flow)?;
+        self.activation_charge_backing_cow(&state.flow, &state.memory)?;
         Rc::make_mut(&mut state.memory.mutable_u16)[id].hierarchy = Some(entered.clone());
-        let mut results = self.call_instance(
+        self.activation_observe(&mut state.flow, &state.memory)?;
+        state
+            .flow
+            .charge_call_memory(&state.conditions, &state.memory)?;
+        #[cfg(test)]
+        let before_steps = self.steps;
+        let mut results = self.call_instance_flow(
+            &mut state.flow,
             instance,
             values,
             state.conditions.clone(),
             state.memory.clone(),
-            stack,
-            site,
+            (stack, site),
         )?;
         for result in &mut results {
             if selected.return_ty() == self.tcx.types.char {
@@ -2541,6 +3010,7 @@ impl<'tcx> Engine<'tcx> {
             if self.mutable_u16_contains(&result.value, &result.memory)? {
                 return Err("hierarchy scalar result carries role".into());
             }
+            self.activation_charge_backing_cow(&result.flow, &result.memory)?;
             let returned = Rc::make_mut(&mut result.memory.mutable_u16)[id]
                 .hierarchy
                 .as_mut()
@@ -2555,6 +3025,33 @@ impl<'tcx> Engine<'tcx> {
             }
             self.mutable_u16_frame_top(selected, &returned.owners.last().unwrap().frames)?;
             returned.owners.last_mut().unwrap().frames.pop();
+            self.activation_observe(&mut result.flow, &result.memory)?;
+        }
+        #[cfg(test)]
+        if !matches!(state.flow, super::activation_flow::Flow::Unarmed) {
+            let actual_name = format!(
+                "{} {:?}",
+                self.tcx.def_path_str(instance.def_id()),
+                instance.args
+            );
+            assert!(self.steps > before_steps);
+            assert!(!results.is_empty());
+            assert!(
+                self.proof
+                    .body_entries
+                    .iter()
+                    .any(|e| e.instance == actual_name)
+            );
+            assert!(
+                self.bodies
+                    .borrow()
+                    .get(&instance)
+                    .is_some_and(|actual| Rc::ptr_eq(actual, selected))
+            );
+            eprintln!(
+                "carrier actual Armed scalar Body={actual_name} Returns={}",
+                results.len()
+            );
         }
         Ok(Some(results))
     }
@@ -2624,6 +3121,7 @@ pub(super) fn compiler_element_boundary_probe<'tcx>(
         .mutable_u16_input(element, &mut memory, &mut conditions)
         .unwrap();
     let mut state = State {
+        flow: activation_flow::Flow::Unarmed,
         locals: vec![None; root.local_decls.len()],
         addresses: vec![None; root.local_decls.len()],
         missing_places: Default::default(),
@@ -3010,6 +3508,7 @@ pub(super) fn compiler_associated_probe<'tcx>(
         .mutable_u16_input(engine.tcx.types.u16, &mut memory, &mut conditions)
         .unwrap();
     let mut state = State {
+        flow: activation_flow::Flow::Unarmed,
         locals: vec![None; root.local_decls.len()],
         addresses: vec![None; root.local_decls.len()],
         missing_places: Default::default(),
@@ -3862,6 +4361,7 @@ fn compiler_char_scalar_probe<'tcx>(engine: &mut Engine<'tcx>, result: &Return, 
         site: (body.source.def_id(), data.terminator().source_info.span),
     };
     let base = State {
+        flow: activation_flow::Flow::Unarmed,
         locals: vec![None; body.local_decls.len()],
         addresses: vec![None; body.local_decls.len()],
         missing_places: Default::default(),
@@ -4081,11 +4581,201 @@ pub(super) fn compiler_production_probe<'tcx>(
 }
 
 #[cfg(test)]
+pub(super) fn compiler_activation_contract_refusal<'tcx>(
+    engine: &mut Engine<'tcx>,
+    root: &Rc<Body<'tcx>>,
+    base: &State,
+) {
+    let (block, data) = root
+        .basic_blocks
+        .iter_enumerated()
+        .find(|(_, b)| matches!(b.terminator().kind, TerminatorKind::Call { .. }))
+        .unwrap();
+    let TerminatorKind::Call {
+        func,
+        args,
+        destination,
+        target,
+        ..
+    } = &data.terminator().kind
+    else {
+        unreachable!()
+    };
+    let ty::FnDef(definition, generic) = func.ty(&root.local_decls, engine.tcx).kind() else {
+        unreachable!()
+    };
+    let instance = engine
+        .resolve_function_item(*definition, generic.skip_binder())
+        .unwrap();
+    assert!(
+        engine.specification(instance).unwrap().is_some()
+            || !engine.contracts(instance.def_id()).is_empty()
+    );
+    let root_instance = engine
+        .bodies
+        .borrow()
+        .iter()
+        .find(|(_, b)| Rc::ptr_eq(b, root))
+        .map(|(i, _)| *i)
+        .unwrap();
+    let mut state = base.clone();
+    state.locals.resize(root.local_decls.len(), None);
+    state.addresses.resize(root.local_decls.len(), None);
+    state.flow = engine.activation_test_root(root_instance, root).unwrap();
+    let before_data = state.memory.mutable_u16[0].data.clone();
+    let before_backings = state.memory.mutable_u16.clone();
+    let before_locals = format!("{:?}", state.locals);
+    let before_masks = state.missing_places.entries().to_vec();
+    let before_work = engine.activation_test_work_used(&state.flow);
+    let before_queries = engine.proof.obligations.len();
+    let before_entries = engine.proof.body_entries.len();
+    let before_cache = engine.bodies.borrow().len();
+    let sentinel = if engine.specification(instance).unwrap().is_some() {
+        0x51ef_2261
+    } else {
+        0x51ef_2251
+    };
+    let before_terms = engine.terms.bit_vector(sentinel, 64).unwrap();
+    assert!(state.flow.validate_return().is_ok());
+    assert!(
+        matches!(engine.activation_armed_call_route(&state.flow, instance),
+        Err(e) if e.contains("contract adapter"))
+    );
+    assert!(
+        matches!(engine.mutable_hierarchy_call_transaction(&mut state,
+        super::mutable_u16_children::ChildCall {
+            body: root, block, instance, args, destination: *destination, target: *target,
+            stack: &[], site: (root.source.def_id(), data.terminator().source_info.span),
+        }), Err(e) if e.contains("contract adapter"))
+    );
+    let after_terms = engine.terms.bit_vector(sentinel + 1, 64).unwrap();
+    assert_eq!(after_terms.id(), before_terms.id() + 1);
+    assert_eq!(engine.proof.obligations.len(), before_queries);
+    assert_eq!(engine.activation_test_work_used(&state.flow), before_work);
+    assert_eq!(engine.proof.body_entries.len(), before_entries);
+    assert_eq!(engine.bodies.borrow().len(), before_cache);
+    assert_eq!(state.memory.mutable_u16[0].data, before_data);
+    assert!(Rc::ptr_eq(&state.memory.mutable_u16, &before_backings));
+    assert_eq!(format!("{:?}", state.locals), before_locals);
+    assert_eq!(state.missing_places.entries(), before_masks.as_slice());
+    assert!(state.flow.validate_return().is_ok());
+    eprintln!("carrier configured/annotated contracts refused before effects");
+}
+
+#[cfg(test)]
+fn compiler_activation_pending_count<'tcx>(
+    engine: &Engine<'tcx>,
+    root: &Rc<Body<'tcx>>,
+    state: &State,
+) {
+    assert!(matches!(
+        state.memory.mutable_u16[0].phase,
+        super::mutable_u16_children::Phase::Pending { .. }
+    ));
+    let instance = engine
+        .bodies
+        .borrow()
+        .iter()
+        .find(|(_, body)| Rc::ptr_eq(body, root))
+        .map(|(i, _)| *i)
+        .unwrap();
+    // Independent test-only invocation; it never replenishes the actual root's Work.
+    let flow = engine.activation_test_root(instance, root).unwrap();
+    let before_backings = state.memory.mutable_u16.clone();
+    let before_data = state.memory.mutable_u16[0].data.clone();
+    let before_locals = format!("{:?}", state.locals);
+    let before_masks = state.missing_places.entries().to_vec();
+    let before_queries = engine.proof.obligations.len();
+    let before_pending = state.flow.validate_return();
+    let expected = state.memory.storage_slots();
+    let before_term = engine.fresh(Sort::Bool);
+    assert_eq!(
+        state.memory.activation_storage_slots(&flow).unwrap(),
+        expected
+    );
+    let after_term = engine.fresh(Sort::Bool);
+    assert_eq!(after_term.id(), before_term.id() + 1);
+    assert_eq!(engine.proof.obligations.len(), before_queries);
+    assert_eq!(state.flow.validate_return(), before_pending);
+    assert!(Rc::ptr_eq(&state.memory.mutable_u16, &before_backings));
+    assert_eq!(state.memory.mutable_u16[0].data, before_data);
+    assert_eq!(format!("{:?}", state.locals), before_locals);
+    assert_eq!(state.missing_places.entries(), before_masks.as_slice());
+    let mut active = state.memory.clone();
+    Rc::make_mut(&mut active.mutable_u16)[0].phase =
+        super::mutable_u16_children::Phase::Active { frames: vec![0] };
+    let retained = active.clone();
+    assert!(matches!(active.activation_storage_slots(&flow),
+        Err(e) if e.contains("storage namespace")));
+    assert!(
+        matches!(engine.activation_charge_backing_cow(&flow, &active),
+        Err(e) if e.contains("legacy backing clone"))
+    );
+    assert!(Rc::ptr_eq(&active.mutable_u16, &retained.mutable_u16));
+    assert!(matches!(
+        active.mutable_u16[0].phase,
+        super::mutable_u16_children::Phase::Active { .. }
+    ));
+    eprintln!("carrier Pending count unchanged; Active count and COW refused");
+}
+
+#[cfg(test)]
+pub(super) fn compiler_activation_scalar_registration<'tcx>(
+    engine: &Engine<'tcx>,
+    instance: ty::Instance<'tcx>,
+    body: &Rc<Body<'tcx>>,
+) {
+    let flow = engine.activation_test_root(instance, body).unwrap();
+    let frames = engine.mutable_u16_frames.borrow().len();
+    let before = engine.activation_test_work_used(&flow);
+    let first = engine.activation_register_frame(body, &flow).unwrap();
+    let expected = body
+        .basic_blocks
+        .len()
+        .saturating_add(frames)
+        .saturating_add(1);
+    assert_eq!(engine.activation_test_work_used(&flow) - before, expected);
+    let frames = engine.mutable_u16_frames.borrow().len();
+    let before = engine.activation_test_work_used(&flow);
+    assert_eq!(
+        engine.activation_register_frame(body, &flow).unwrap(),
+        first
+    );
+    let expected = body
+        .basic_blocks
+        .len()
+        .saturating_add(frames)
+        .saturating_add(1);
+    assert_eq!(engine.activation_test_work_used(&flow) - before, expected);
+    eprintln!("carrier Armed scalar registration charges budget and certificate scan");
+}
+
+#[cfg(test)]
 pub(super) fn compiler_return_transport_probe<'tcx>(
     engine: &mut Engine<'tcx>,
     root: &Rc<Body<'tcx>>,
     base: &State,
 ) {
+    compiler_return_transport_with_flow(
+        engine,
+        root,
+        base,
+        false,
+        false,
+        super::activation_flow_probe::ReturnFault::Erased,
+    )
+    .unwrap();
+}
+
+#[cfg(test)]
+pub(super) fn compiler_return_transport_with_flow<'tcx>(
+    engine: &mut Engine<'tcx>,
+    root: &Rc<Body<'tcx>>,
+    base: &State,
+    armed: bool,
+    legacy512: bool,
+    hostile_control: super::activation_flow_probe::ReturnFault,
+) -> Result<Option<Memory>, String> {
     let (block, data) = root
         .basic_blocks
         .iter_enumerated()
@@ -4108,6 +4798,20 @@ pub(super) fn compiler_return_transport_probe<'tcx>(
         .resolve_function_item(*definition, generic.skip_binder())
         .unwrap();
     let mut state = base.clone();
+    if armed {
+        let root_instance = engine
+            .bodies
+            .borrow()
+            .iter()
+            .find(|(_, body)| Rc::ptr_eq(body, root))
+            .map(|(instance, _)| *instance)
+            .unwrap();
+        state.flow = if legacy512 {
+            engine.activation_test_legacy_root(root_instance, root)?
+        } else {
+            engine.activation_test_root(root_instance, root)?
+        };
+    }
     let untouched = symbolic::integer(&engine.terms, 43, 16, false);
     let replacement = symbolic::integer(&engine.terms, 61, 16, false);
     state.locals[2] = Some(Value::Elements(
@@ -4142,6 +4846,9 @@ pub(super) fn compiler_return_transport_probe<'tcx>(
             );
         }
     }
+    if armed && !legacy512 && hostile_control == super::activation_flow_probe::ReturnFault::Erased {
+        compiler_activation_pending_count(engine, root, &state);
+    }
     let before = state.memory.mutable_u16[0].data.clone();
     let _scope = TestIssuance::enable();
     let results = engine
@@ -4157,10 +4864,12 @@ pub(super) fn compiler_return_transport_probe<'tcx>(
                 stack: &[],
                 site: (root.source.def_id(), data.terminator().source_info.span),
             },
-        )
-        .unwrap()
-        .unwrap();
+        )?
+        .ok_or("carrier actual hierarchy Call was not selected")?;
     assert_eq!(results.len(), 2, "two actual symbolic Returns required");
+    if armed {
+        engine.activation_test_sibling_receipts(&results[0], &results[1]);
+    }
     // The index changes after capture; a consumed unrelated place must remain consumed.
     state.locals[3] = Some(symbolic::integer(&engine.terms, 1, bits, false));
     state.missing_places.consume(0, Vec::new()).unwrap();
@@ -4182,7 +4891,37 @@ pub(super) fn compiler_return_transport_probe<'tcx>(
         assert!(!Rc::ptr_eq(&origin, &forged.origin));
         let conditions = returned.conditions.clone();
         let current = backing.data.clone();
-        let mut next = state.continuation(returned.conditions, returned.memory);
+        if armed {
+            eprintln!(
+                "carrier control={hostile_control:?} branch={} before-control-work={}",
+                continuations.len(),
+                engine.activation_test_work_used(&returned.flow)
+            );
+        }
+        if armed && continuations.is_empty() {
+            super::activation_flow_probe::return_controls(
+                engine,
+                &state,
+                &returned,
+                hostile_control,
+            );
+            if hostile_control != super::activation_flow_probe::ReturnFault::Erased {
+                // This root invocation is a hostile-envelope experiment, not a continuation.
+                // The separate positive invocation adopts and publishes both real Returns.
+                return Ok(None);
+            }
+        }
+        if armed {
+            eprintln!(
+                "carrier control={hostile_control:?} before-adoption-work={}",
+                engine.activation_test_work_used(&returned.flow)
+            );
+        }
+        let mut next = if armed {
+            engine.adopt_flow_return(&state, returned.conditions, returned.memory, returned.flow)?
+        } else {
+            state.continuation(returned.conditions, returned.memory)
+        };
         assert_eq!(next.conditions, conditions);
         assert_eq!(next.memory.mutable_u16[0].data, current);
         if current != before {
@@ -4190,15 +4929,19 @@ pub(super) fn compiler_return_transport_probe<'tcx>(
             assert_ne!(substituted.memory.mutable_u16[0].data, current);
         }
         assert!(next.missing_places.check(0, &[]).is_err());
-        engine
-            .store_call_result(
-                root,
-                &mut next,
-                projected,
-                captured.as_ref(),
-                returned.value.clone(),
-            )
-            .unwrap();
+        if armed {
+            eprintln!(
+                "carrier control={hostile_control:?} before-store-work={}",
+                engine.activation_test_work_used(&next.flow)
+            );
+        }
+        engine.store_call_result(
+            root,
+            &mut next,
+            projected,
+            captured.as_ref(),
+            returned.value.clone(),
+        )?;
         let Value::Elements(out) = next.locals[2].as_ref().unwrap() else {
             unreachable!()
         };
@@ -4216,15 +4959,29 @@ pub(super) fn compiler_return_transport_probe<'tcx>(
     let sibling_data = continuations[1].memory.mutable_u16[0].data.clone();
     let sibling_out = continuations[1].locals[2].clone().unwrap();
     Rc::make_mut(&mut continuations[0].memory.mutable_u16)[0].data = before.clone();
-    engine
-        .store_call_result(
-            root,
-            &mut continuations[0],
-            projected,
-            captured.as_ref(),
-            replacement,
-        )
-        .unwrap();
+    if armed {
+        // The two real typed publications above are the admitted execution. This subsequent
+        // host-only COW perturbation tests isolation without pretending to execute another Call.
+        let Some(Value::Elements(out)) = &mut continuations[0].locals[2] else {
+            unreachable!()
+        };
+        out[0] = replacement;
+    } else {
+        engine
+            .store_call_result(
+                root,
+                &mut continuations[0],
+                projected,
+                captured.as_ref(),
+                replacement,
+            )
+            .unwrap();
+    }
+    if armed {
+        let used = engine.activation_test_work_used(&continuations[0].flow);
+        assert!(used <= continuations[0].flow.structural_limit().unwrap());
+        eprintln!("carrier actual two-return publication work={used}");
+    }
     assert_eq!(continuations[1].memory.mutable_u16[0].data, sibling_data);
     let Value::Elements(out) = continuations[1].locals[2].as_ref().unwrap() else {
         unreachable!()
@@ -4233,6 +4990,7 @@ pub(super) fn compiler_return_transport_probe<'tcx>(
         unreachable!()
     };
     assert_eq!(out[0].integer().unwrap(), original[0].integer().unwrap());
+    Ok(armed.then(|| continuations[0].memory.clone()))
 }
 
 #[cfg(test)]
@@ -4341,6 +5099,7 @@ fn compiler_dormant_probe<'tcx>(engine: &mut Engine<'tcx>, memory: &Memory, cond
         .resolve_function_item(*definition, generic.skip_binder())
         .unwrap();
     let mut state = State {
+        flow: activation_flow::Flow::Unarmed,
         locals: vec![None; body.local_decls.len()],
         addresses: vec![None; body.local_decls.len()],
         missing_places: Default::default(),
@@ -4400,6 +5159,7 @@ fn compiler_dormant_probe<'tcx>(engine: &mut Engine<'tcx>, memory: &Memory, cond
         .unwrap();
     let pair = engine.instantiated_body(pair_instance).unwrap();
     let mut pair_state = State {
+        flow: activation_flow::Flow::Unarmed,
         locals: vec![None; pair.local_decls.len()],
         addresses: vec![None; pair.local_decls.len()],
         missing_places: Default::default(),
@@ -5001,6 +5761,7 @@ pub(super) fn compiler_float_boundary_probe<'tcx>(
         .mutable_u16_input(element, &mut memory, &mut conditions)
         .unwrap();
     let mut state = State {
+        flow: activation_flow::Flow::Unarmed,
         locals: vec![None; root.local_decls.len()],
         addresses: vec![None; root.local_decls.len()],
         missing_places: Default::default(),
@@ -5342,6 +6103,7 @@ pub(super) fn compiler_float_boundary_probe<'tcx>(
         };
         let scalar_instance = engine.resolve_function_item(*d, a.skip_binder()).unwrap();
         let mut dormant = State {
+            flow: activation_flow::Flow::Unarmed,
             locals: vec![None; leaf.local_decls.len()],
             addresses: vec![None; leaf.local_decls.len()],
             missing_places: Default::default(),
@@ -6101,6 +6863,7 @@ mod tests {
             unreachable!()
         };
         let mut state = State {
+            flow: activation_flow::Flow::Unarmed,
             locals: vec![None; outer.local_decls.len()],
             addresses: vec![None; outer.local_decls.len()],
             missing_places: Default::default(),

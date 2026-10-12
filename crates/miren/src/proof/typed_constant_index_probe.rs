@@ -52,6 +52,7 @@ fn engine<'tcx>(tcx: TyCtxt<'tcx>) -> Engine<'tcx> {
         mutable_u16_frames: Default::default(),
         mutable_integer_types: Vec::new(),
         mutable_u16_staging: Default::default(),
+        activation: Default::default(),
         coroutine_places: Default::default(),
         owned_box_types: Vec::new(),
         next_owned_region: 0,
@@ -134,6 +135,7 @@ fn state_for<'tcx>(engine: &mut Engine<'tcx>, body: &Body<'tcx>, original: Ty<'t
     std::rc::Rc::make_mut(&mut memory.mutable_u16)[0].length =
         symbolic::integer(&engine.terms, 3, bits, false);
     let mut state = State {
+        flow: activation_flow::Flow::Unarmed,
         locals: vec![None; body.local_decls.len()],
         addresses: vec![None; body.local_decls.len()],
         conditions,
@@ -213,6 +215,7 @@ fn check_interval<'tcx>(tcx: TyCtxt<'tcx>, name: &str, original: Ty<'tcx>) {
         std::rc::Rc::make_mut(&mut memory.mutable_u16)[id].length =
             symbolic::integer(&engine.terms, 4, bits, false);
         let mut state = State {
+            flow: activation_flow::Flow::Unarmed,
             locals: vec![None; body.local_decls.len()],
             addresses: vec![None; body.local_decls.len()],
             memory,

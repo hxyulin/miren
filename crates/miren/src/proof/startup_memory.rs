@@ -45,6 +45,70 @@ pub(super) struct Memory {
 }
 
 impl Memory {
+    pub(super) fn activation_supported(
+        &self,
+        flow: &super::activation_flow::Flow,
+    ) -> Result<(), String> {
+        if matches!(flow, super::activation_flow::Flow::Unarmed) {
+            return Ok(());
+        }
+        if !self.incoming_byte_roots.is_empty()
+            || !self.owned_regions.is_empty()
+            || !self.startup_values.is_empty()
+            || !self.isolated_static_types.is_empty()
+            || !self.startup_overwritten.is_empty()
+            || !self.static_uninitialized.is_empty()
+        {
+            return Err(
+                "armed activation startup, owned or byte Memory clone is unsupported".into(),
+            );
+        }
+        Ok(())
+    }
+
+    pub(super) fn activation_charge_clone(
+        &self,
+        flow: &super::activation_flow::Flow,
+    ) -> Result<(), String> {
+        if matches!(flow, super::activation_flow::Flow::Unarmed) {
+            return Ok(());
+        }
+        self.activation_supported(flow)?;
+        // Allocations, owned regions and u16 backings are Rc vectors here. No payload
+        // clone occurs; detached backing vectors are charged at their mutation seams.
+        flow.charge(3)?;
+        flow.charge_masks(&self.missing_places)
+    }
+
+    pub(super) fn activation_storage_slots(
+        &self,
+        flow: &super::activation_flow::Flow,
+    ) -> Result<usize, String> {
+        if matches!(flow, super::activation_flow::Flow::Unarmed) {
+            return Ok(self.storage_slots());
+        }
+        self.activation_supported(flow)?;
+        // storage_slots makes four distinct backing-vector passes; its owner sum
+        // visits owners but only reads each immutable frames vector's length.
+        flow.charge(self.mutable_u16.len().saturating_mul(5))?;
+        for backing in self.mutable_u16.iter() {
+            if backing.interval.is_some() {
+                return Err("armed activation storage namespace is unsupported".into());
+            }
+            match &backing.phase {
+                super::mutable_u16_children::Phase::Idle
+                | super::mutable_u16_children::Phase::Pending { .. } => {}
+                super::mutable_u16_children::Phase::Active { .. } => {
+                    return Err("armed activation storage namespace is unsupported".into());
+                }
+            }
+            if let Some(hierarchy) = &backing.hierarchy {
+                hierarchy.activation_charge_storage(flow)?;
+            }
+        }
+        Ok(self.storage_slots())
+    }
+
     pub(super) fn storage_slots(&self) -> usize {
         self.allocations
             .len()

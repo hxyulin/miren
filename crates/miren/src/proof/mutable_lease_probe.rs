@@ -736,6 +736,7 @@ fn compiler_cases<'tcx>(tcx: TyCtxt<'tcx>, output: &std::path::Path, transport_o
         mutable_u16_frames: Default::default(),
         mutable_integer_types: Vec::new(),
         mutable_u16_staging: Default::default(),
+        activation: Default::default(),
         coroutine_places: Default::default(),
         owned_box_types: Vec::new(),
         next_owned_region: 0,
@@ -782,6 +783,7 @@ fn compiler_cases<'tcx>(tcx: TyCtxt<'tcx>, output: &std::path::Path, transport_o
             .mutable_u16_input(tcx.types.u16, &mut memory, &mut conditions)
             .unwrap();
         let mut base = State {
+            flow: activation_flow::Flow::Unarmed,
             locals: vec![None; body.local_decls.len()],
             addresses: vec![None; body.local_decls.len()],
             missing_places: Default::default(),
@@ -790,6 +792,204 @@ fn compiler_cases<'tcx>(tcx: TyCtxt<'tcx>, output: &std::path::Path, transport_o
         };
         base.locals[1] = Some(value);
         super::mutable_hierarchy::compiler_return_transport_probe(&mut engine, &body, &base);
+        let carrier_instance = engine
+            .resolve_function_item(find("root_carrier"), tcx.mk_args(&[]))
+            .unwrap();
+        let carrier_body = engine.instantiated_body(carrier_instance).unwrap();
+        engine.activation_test_resource_controls(carrier_instance, &carrier_body, &base.memory);
+        let mut carrier_base = base.clone();
+        carrier_base
+            .locals
+            .resize(carrier_body.local_decls.len(), None);
+        carrier_base
+            .addresses
+            .resize(carrier_body.local_decls.len(), None);
+        // Each hostile envelope accompanies its own actual root invocation and common budget.
+        // No rejected experiment replenishes work for another Return of that invocation.
+        let original_resource = super::mutable_hierarchy::compiler_return_transport_with_flow(
+            &mut engine,
+            &carrier_body,
+            &carrier_base,
+            true,
+            true,
+            super::activation_flow_probe::ReturnFault::Erased,
+        );
+        let Err(original_error) = original_resource else {
+            panic!("original carrier must preserve its exact corrected Resource frontier");
+        };
+        // The old exact520 runs remain sealed. New accounting may refuse earlier.
+        assert!(original_error.contains("activation transport exceeds shared work budget"));
+        eprintln!("carrier current legacy512 Resource: {original_error}");
+        let current_original = super::mutable_hierarchy::compiler_return_transport_with_flow(
+            &mut engine,
+            &carrier_body,
+            &carrier_base,
+            true,
+            false,
+            super::activation_flow_probe::ReturnFault::Erased,
+        )
+        .unwrap();
+        assert!(current_original.is_some());
+        let scalar_instance = engine
+            .resolve_function_item(find("scalar"), tcx.mk_args(&[]))
+            .unwrap();
+        let scalar_body = engine.instantiated_body(scalar_instance).unwrap();
+        super::mutable_hierarchy::compiler_activation_scalar_registration(
+            &engine,
+            scalar_instance,
+            &scalar_body,
+        );
+        // A separate scalar-return caller retains the existing real scalar(17) child.
+        // The old array-return transport guest remains an unchanged Unarmed control.
+        let scalar_root = engine
+            .resolve_function_item(find("root_scalar_carrier"), tcx.mk_args(&[]))
+            .unwrap();
+        let scalar_root_body = engine.instantiated_body(scalar_root).unwrap();
+        let mut scalar_base = base.clone();
+        scalar_base
+            .locals
+            .resize(scalar_root_body.local_decls.len(), None);
+        scalar_base
+            .addresses
+            .resize(scalar_root_body.local_decls.len(), None);
+        let scalar_returns = super::mutable_hierarchy::compiler_return_transport_with_flow(
+            &mut engine,
+            &scalar_root_body,
+            &scalar_base,
+            true,
+            false,
+            super::activation_flow_probe::ReturnFault::Erased,
+        )
+        .unwrap();
+        assert!(scalar_returns.is_some());
+        let annotated_caller = engine
+            .resolve_function_item(find("annotated_carrier_caller"), tcx.mk_args(&[]))
+            .unwrap();
+        let annotated_body = engine.instantiated_body(annotated_caller).unwrap();
+        super::mutable_hierarchy::compiler_activation_contract_refusal(
+            &mut engine,
+            &annotated_body,
+            &base,
+        );
+        let configured_caller = engine
+            .resolve_function_item(find("configured_carrier_caller"), tcx.mk_args(&[]))
+            .unwrap();
+        let configured_body = engine.instantiated_body(configured_caller).unwrap();
+        let configured_target = engine
+            .resolve_function_item(find("configured_carrier_target"), tcx.mk_args(&[]))
+            .unwrap();
+        let saved_config = engine.config.clone();
+        let configured: miren::FunctionContract = serde_json::from_value(serde_json::json!({
+            "function": super::external::canonical_name(tcx, configured_target.def_id()),
+            "no_panic": true,
+        }))
+        .unwrap();
+        engine.config.functions.push(configured);
+        super::mutable_hierarchy::compiler_activation_contract_refusal(
+            &mut engine,
+            &configured_body,
+            &base,
+        );
+        engine.config = saved_config;
+        let small_instance = engine
+            .resolve_function_item(find("root_small_carrier"), tcx.mk_args(&[]))
+            .unwrap();
+        let small_body = engine.instantiated_body(small_instance).unwrap();
+        let mut small_base = base.clone();
+        small_base.locals.resize(small_body.local_decls.len(), None);
+        small_base
+            .addresses
+            .resize(small_body.local_decls.len(), None);
+        // This compiler-control domain is a one-element tracked input, not a Proof premise.
+        let bits = u32::from(tcx.sess.target.pointer_width);
+        let length = small_base.memory.mutable_u16[0].length.integer().unwrap().0;
+        let one = symbolic::integer(&engine.terms, 1, bits, false)
+            .integer()
+            .unwrap()
+            .0;
+        small_base
+            .conditions
+            .push(engine.terms.apply(Op::Equal, &[length, one]).unwrap());
+        let small_result = super::mutable_hierarchy::compiler_return_transport_with_flow(
+            &mut engine,
+            &small_body,
+            &small_base,
+            true,
+            false,
+            super::activation_flow_probe::ReturnFault::Erased,
+        );
+        match small_result {
+            Ok(current) => {
+                assert!(current.is_some());
+                eprintln!("activation smaller fixture completed full positive assertions");
+            }
+            Err(detail) => {
+                assert_eq!(
+                    detail,
+                    "activation transport exceeds shared work budget: used 2056, last charge 13"
+                );
+                eprintln!("activation smaller fixture exact Resource: {detail}");
+            }
+        }
+        let mut issued_memory = current_original;
+        for hostile_control in super::activation_flow_probe::RETURN_FAULTS {
+            let current = super::mutable_hierarchy::compiler_return_transport_with_flow(
+                &mut engine,
+                &carrier_body,
+                &carrier_base,
+                true,
+                false,
+                hostile_control,
+            )
+            .unwrap();
+            if current.is_some() {
+                issued_memory = current;
+            }
+        }
+        let empty = engine
+            .resolve_function_item(find("empty_carrier"), tcx.mk_args(&[]))
+            .unwrap();
+        let original_tuple = engine
+            .resolve_function_item(find("original_tuple_carrier"), tcx.mk_args(&[]))
+            .unwrap();
+        engine.activation_test_cached_and_original_controls(
+            carrier_instance,
+            &carrier_body,
+            empty,
+            original_tuple,
+        );
+        engine.activation_test_empty_return(
+            carrier_instance,
+            &carrier_body,
+            empty,
+            &base,
+            issued_memory.as_ref().unwrap(),
+        );
+        let unsupported = engine
+            .resolve_function_item(find("unsupported_carrier"), tcx.mk_args(&[]))
+            .unwrap();
+        let unsupported_body = engine.instantiated_body(unsupported).unwrap();
+        let func = unsupported_body
+            .basic_blocks
+            .iter()
+            .find_map(|block| match &block.terminator().kind {
+                TerminatorKind::Call { func, .. } => Some(func),
+                _ => None,
+            })
+            .unwrap();
+        let ty::FnDef(definition, generic) = func.ty(&unsupported_body.local_decls, tcx).kind()
+        else {
+            unreachable!()
+        };
+        let unsupported_target = engine
+            .resolve_function_item(*definition, generic.skip_binder())
+            .unwrap();
+        engine.activation_test_unsupported_route(
+            carrier_instance,
+            &carrier_body,
+            unsupported_target,
+        );
+        engine.activation_test_unsupported_execution(unsupported, &unsupported_body, &base);
         std::fs::write(output.join("return-transport.mir"), format!("{body:#?}")).unwrap();
         assert!(engine.proof.assumptions.is_empty());
         assert!(engine.proof.entry_assumptions.is_empty());
@@ -832,6 +1032,7 @@ fn compiler_cases<'tcx>(tcx: TyCtxt<'tcx>, output: &std::path::Path, transport_o
         .unwrap();
     let make_state = |body: &Body<'tcx>, memory: Memory| {
         let mut state = State {
+            flow: activation_flow::Flow::Unarmed,
             locals: vec![None; body.local_decls.len()],
             addresses: vec![None; body.local_decls.len()],
             missing_places: Default::default(),
@@ -1577,6 +1778,31 @@ fn compiler_nested_whole_u16_inactive_lifecycle() {
                     "leaf_transport(&mut *v) }\n",
                     "pub fn root_transport(v:&mut[u16],mut out:[u16;2],index:usize)->[u16;2] { ",
                     "out[index]=outer_transport(v); out }\n",
+                    "pub fn root_scalar_carrier(v:&mut[u16],_out:[u16;2],_index:usize)->u16 { ",
+                    "outer_transport(v) }\n",
+                    "#[inline(never)] fn leaf_carrier(v:&mut[u16])->u16 { if v.len()>0 { ",
+                    "v[0]=17; 17 } else { 23 } }\n",
+                    "#[inline(never)] fn outer_carrier(v:&mut[u16])->u16 { ",
+                    "leaf_carrier(&mut *v) }\n",
+                    "pub fn root_carrier(v:&mut[u16],_out:[u16;2],_index:usize)->u16 { ",
+                    "outer_carrier(v) }\n",
+                    "#[inline(never)] fn leaf_small_carrier(v:&mut[u16])->u16 { ",
+                    "let previous=v[0]; v[0]=17; if previous==0 {17}else{23} }\n",
+                    "#[inline(never)] fn outer_small_carrier(v:&mut[u16])->u16 { ",
+                    "leaf_small_carrier(&mut*v) }\n",
+                    "pub fn root_small_carrier(v:&mut[u16],_out:[u16;2],_index:usize)->u16 { ",
+                    "outer_small_carrier(v) }\n",
+                    "#[inline(never)] fn carrier_pair(v:(u16,u16))->u16 {v.0^v.1}\n",
+                    "pub fn original_tuple_carrier(v:u16)->u16 {carrier_pair((v,1))}\n",
+                    "#[doc=\"<!-- miren:v1:no_panic -->\"]\n",
+                    "pub fn annotated_carrier_target(v:&mut[u16])->u16 {v[0]=31;31}\n",
+                    "pub fn annotated_carrier_caller(v:&mut[u16],_out:[u16;2],_index:usize)",
+                    "->u16 {annotated_carrier_target(v)}\n",
+                    "pub fn configured_carrier_target(v:&mut[u16])->u16 {v[0]=37;37}\n",
+                    "pub fn configured_carrier_caller(v:&mut[u16],_out:[u16;2],_index:usize)",
+                    "->u16 {configured_carrier_target(v)}\n",
+                    "pub fn empty_carrier()->u16 {17}\n",
+                    "pub fn unsupported_carrier(v:&mut[u16])->usize {v.fill(1);0}\n",
                 ),
             )
             .unwrap();

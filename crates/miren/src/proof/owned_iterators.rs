@@ -119,6 +119,7 @@ impl<'tcx> Engine<'tcx> {
                 "owned array iterator; no-drop values and ordered cursor",
             );
             return Ok(Some(vec![Return {
+                flow: activation_flow::Flow::Unarmed,
                 value: Value::SliceIterator {
                     unchecked: Vec::new(),
                     source: Box::new(source.clone()),
@@ -231,6 +232,7 @@ impl<'tcx> Engine<'tcx> {
                         &state.conditions,
                     )?;
                     return Ok(Some(vec![Return {
+                        flow: activation_flow::Flow::Unarmed,
                         value: remaining,
                         conditions: state.conditions.clone(),
                         memory,
@@ -291,6 +293,7 @@ impl<'tcx> Engine<'tcx> {
                         )?;
                     }
                     results.push(Return {
+                        flow: activation_flow::Flow::Unarmed,
                         value: self.constructed(
                             signature.output(),
                             usize::from(iteration.item.is_some()),
@@ -305,6 +308,7 @@ impl<'tcx> Engine<'tcx> {
             _ => unreachable!("supported owned iterator operation"),
         };
         Ok(Some(vec![Return {
+            flow: activation_flow::Flow::Unarmed,
             value,
             conditions: state.conditions.clone(),
             memory: state.memory.clone(),
@@ -359,6 +363,7 @@ impl<'tcx> Engine<'tcx> {
                 }
                 let Some(item) = iteration.item else {
                     returns.push(Return {
+                        flow: activation_flow::Flow::Unarmed,
                         value: accumulator.clone(),
                         conditions: iteration.conditions,
                         memory,
@@ -430,6 +435,7 @@ impl<'tcx> Engine<'tcx> {
                 }
                 let Some(item) = iteration.item else {
                     returns.push(Return {
+                        flow: activation_flow::Flow::Unarmed,
                         value: Value::Unit,
                         conditions: iteration.conditions,
                         memory,

@@ -548,6 +548,7 @@ impl<'tcx> Engine<'tcx> {
             source: crate::source(self.tcx, site.1),
         });
         Ok(Some(vec![Return {
+            flow: activation_flow::Flow::Unarmed,
             value: result,
             conditions,
             memory,

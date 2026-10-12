@@ -374,6 +374,7 @@ impl<'tcx> Engine<'tcx> {
                 let mut memory = state.memory.clone();
                 Self::invalidate_published_atomics(state, &mut memory)?;
                 return Ok(Some(vec![Return {
+                    flow: activation_flow::Flow::Unarmed,
                     value,
                     conditions: state.conditions.clone(),
                     memory,
@@ -425,6 +426,7 @@ impl<'tcx> Engine<'tcx> {
                 let mut memory = state.memory.clone();
                 Self::invalidate_published_atomics(state, &mut memory)?;
                 return Ok(Some(vec![Return {
+                    flow: activation_flow::Flow::Unarmed,
                     value: Value::Unit,
                     conditions: state.conditions.clone(),
                     memory,

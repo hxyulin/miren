@@ -455,6 +455,7 @@ mod tests {
                     mutable_u16_frames: Default::default(),
                     mutable_integer_types: Vec::new(),
                     mutable_u16_staging: Default::default(),
+                    activation: Default::default(),
                     coroutine_places: Default::default(),
                     bodies: std::cell::RefCell::new(std::collections::HashMap::new()),
                     call_signatures: std::cell::RefCell::new(std::collections::HashMap::new()),
@@ -699,6 +700,7 @@ mod tests {
                     fields: fields.into(),
                 };
                 let mut state = State {
+                    flow: activation_flow::Flow::Unarmed,
                     locals: Vec::new(),
                     addresses: Vec::new(),
                     missing_places: Default::default(),

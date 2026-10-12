@@ -73,15 +73,27 @@ impl<'tcx> Engine<'tcx> {
         Ok(())
     }
 
+    #[cfg(test)]
     pub(super) fn mutable_u16_exit(
         &self,
         body: &Body<'tcx>,
         arguments: &[Value],
         memory: &Memory,
     ) -> Result<(), String> {
+        self.mutable_u16_exit_with_flow(body, arguments, memory, &activation_flow::Flow::Unarmed)
+    }
+
+    pub(super) fn mutable_u16_exit_with_flow(
+        &self,
+        body: &Body<'tcx>,
+        arguments: &[Value],
+        memory: &Memory,
+        flow: &activation_flow::Flow,
+    ) -> Result<(), String> {
+        flow.charge(memory.mutable_u16.len())?;
         for (id, backing) in memory.mutable_u16.iter().enumerate() {
             if backing.hierarchy.is_some() {
-                self.mutable_hierarchy_exit(body, arguments, id, memory)?;
+                self.mutable_hierarchy_exit(body, arguments, id, memory, flow)?;
                 continue;
             }
             if backing.interval.is_some() {
@@ -96,6 +108,7 @@ impl<'tcx> Engine<'tcx> {
                 }
                 Phase::Active { frames } => {
                     self.mutable_u16_frame_top(body, frames)?;
+                    flow.charge(arguments.len())?;
                     let count = arguments
                         .iter()
                         .filter(|argument| {
@@ -521,6 +534,7 @@ impl<'tcx> Engine<'tcx> {
         if state.memory.mutable_hierarchy.is_some() {
             return Ok(None);
         }
+        state.flow.require_unarmed()?;
         let mut source = None;
         for (position, arg) in args.iter().enumerate() {
             if let Operand::Copy(place) | Operand::Move(place) = &arg.node {

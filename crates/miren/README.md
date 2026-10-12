@@ -1329,3 +1329,27 @@ decoder consistency does not authenticate substituted NaN payloads. Arithmetic N
 retains its existing limitations. Dedicated compiler, unchanged-claim mutation and omitted-body
 controls pass, and the two existing Float Repeat survey cases prove across four profiles. See
 [Stage225](../../docs/stages.md#stage225-unary-float-function-pointer-repeat-arrays).
+
+The isolated activation-carrier prototype explicitly transports Unarmed or Armed receipts through
+current State and Return values. Only compiler controls can arm it. A caller-owned expected call
+nonce, immutable incoming and retained floors, exact live cached bodies and current hierarchy
+generations are checked before returned Memory is adopted or a Call result is published. Sibling
+Returns retain independent receipt histories; Armed-empty cannot silently become Unarmed.
+Current Memory origins require exact issued receipts, and observed generations must match exactly;
+immutable incoming and retained floors remain monotone even after release.
+Unsupported armed adapters refuse before target execution. Experimental activation structural
+work has an independently named shared2048 limit; body/type/input and registry extents remain512,
+and depth remains16. Admission visits charge local512 and shared work before each operation;
+actual clone/substitution passes are charged separately. Ordinary execution keeps its existing
+step/time/SMT limits; this structural counter is not a universal CPU or queue-size bound.
+The old512 controls and exact520 Resource measurements remain historical evidence. Earlier
+provisional controls measured four main/scalar positives and exact smaller-fixture Resource.
+Actual224 scoped controls and ordinary comparisons are archived against their original source.
+Actual225 compiler controls and four ordinary profiles validate this composition.
+Completed ROOT checks are recorded in
+[Stage226](../../docs/stages.md#stage226-activation-state-transport-infrastructure).
+Exact cached bodies receive a full current inventory and original signature check; original MIR
+is inventoried before actual instantiation on cache miss. Narrow Armed shape checks refuse
+recursive owned values and snapshots before production. Local continuation validation and cloning
+share one bounded pass; backing and array COW costs are charged before detachment.
+This prototype enables no additional hierarchy depth or production arming path.

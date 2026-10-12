@@ -111,6 +111,7 @@ impl<'tcx> Engine<'tcx> {
         let mismatch = [state.conditions.clone(), vec![symbolic::not(&same_length)]].concat();
         if self.feasible(&mismatch)? {
             returns.push(Return {
+                flow: activation_flow::Flow::Unarmed,
                 value: Value::Bool(self.terms.boolean(negate)),
                 conditions: mismatch,
                 memory: state.memory.clone(),
@@ -145,6 +146,7 @@ impl<'tcx> Engine<'tcx> {
                 ),
             );
             returns.push(Return {
+                flow: activation_flow::Flow::Unarmed,
                 value: Value::Bool(if negate { symbolic::not(&equal) } else { equal }),
                 conditions,
                 memory: state.memory.clone(),
@@ -177,6 +179,7 @@ impl<'tcx> Engine<'tcx> {
                 "full-domain primitive scalar slice equality; scoped universal numeric equality",
             );
             returns.push(Return {
+                flow: activation_flow::Flow::Unarmed,
                 value: Value::Bool(if negate { symbolic::not(&equal) } else { equal }),
                 conditions,
                 memory: state.memory.clone(),
@@ -205,6 +208,7 @@ impl<'tcx> Engine<'tcx> {
                 return Err("custom slice equality needs fixed modeled element storage".into());
             };
             let state = State {
+                flow: activation_flow::Flow::Unarmed,
                 missing_places: initialized_places::MissingPlaces::default(),
                 conditions,
                 ..state.clone()
@@ -249,6 +253,7 @@ impl<'tcx> Engine<'tcx> {
             "bounded primitive slice equality; exact numeric comparisons",
         );
         returns.push(Return {
+            flow: activation_flow::Flow::Unarmed,
             value: Value::Bool(if negate { symbolic::not(&equal) } else { equal }),
             conditions,
             memory: state.memory.clone(),

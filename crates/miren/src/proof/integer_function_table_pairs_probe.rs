@@ -226,6 +226,7 @@ fn check_pair(tcx: TyCtxt<'_>, name: &str) {
         .unwrap();
     let source_index = source.args_iter().next().unwrap();
     let mut source_state = State {
+        flow: activation_flow::Flow::Unarmed,
         locals: vec![None; source.local_decls.len()],
         missing_places: Default::default(),
         conditions: conditions.clone(),
@@ -288,6 +289,7 @@ fn check_pair(tcx: TyCtxt<'_>, name: &str) {
         certificate.argument.signed,
     );
     let mut state = State {
+        flow: activation_flow::Flow::Unarmed,
         locals: vec![None; body.local_decls.len()],
         missing_places: Default::default(),
         conditions: conditions.clone(),
@@ -507,6 +509,7 @@ fn check_pair_fields<'tcx>(
     };
     assert_eq!(call.destination.projection.len(), 1);
     let mut state = State {
+        flow: activation_flow::Flow::Unarmed,
         locals: vec![None; body.local_decls.len()],
         missing_places: Default::default(),
         conditions: moved.conditions.clone(),

@@ -234,6 +234,7 @@ mod tests {
                 let isolated_startup = false;
                 let async_entry = false;
                 let mut engine = Engine {
+                    activation: Default::default(),
                     tcx,
                     terms: Context::default(),
                     next_symbol: std::cell::Cell::new(0),

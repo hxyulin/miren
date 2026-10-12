@@ -175,6 +175,7 @@ impl<'tcx> Engine<'tcx> {
             "core unchecked slice iteration; proven bounds and distinct mutable indices",
         );
         Ok(Some(Return {
+            flow: activation_flow::Flow::Unarmed,
             value: item,
             conditions: state.conditions.clone(),
             memory: state.memory.clone(),

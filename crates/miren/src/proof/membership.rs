@@ -139,6 +139,7 @@ impl<'tcx> Engine<'tcx> {
                 ),
             );
             return Ok(Some(vec![Return {
+                flow: activation_flow::Flow::Unarmed,
                 value: Value::Bool(member),
                 conditions: state.conditions.clone(),
                 memory: state.memory.clone(),
@@ -167,6 +168,7 @@ impl<'tcx> Engine<'tcx> {
                 ),
             );
             return Ok(Some(vec![Return {
+                flow: activation_flow::Flow::Unarmed,
                 value: Value::Bool(member),
                 conditions: state.conditions.clone(),
                 memory: state.memory.clone(),
@@ -287,6 +289,7 @@ impl<'tcx> Engine<'tcx> {
             "bounded primitive slice membership; exact equality per element",
         );
         Ok(Some(vec![Return {
+            flow: activation_flow::Flow::Unarmed,
             value: Value::Bool(member),
             conditions: state.conditions.clone(),
             memory: state.memory.clone(),
@@ -329,6 +332,7 @@ impl<'tcx> Engine<'tcx> {
             {
                 let Some(item) = iteration.item else {
                     returns.push(Return {
+                        flow: activation_flow::Flow::Unarmed,
                         value: Value::Bool(self.terms.boolean(false)),
                         conditions: iteration.conditions,
                         memory: iteration.memory,
@@ -348,6 +352,7 @@ impl<'tcx> Engine<'tcx> {
                     found.push(equal.clone());
                     if self.feasible(&found)? {
                         returns.push(Return {
+                            flow: activation_flow::Flow::Unarmed,
                             value: Value::Bool(self.terms.boolean(true)),
                             conditions: found,
                             memory: result.memory.clone(),

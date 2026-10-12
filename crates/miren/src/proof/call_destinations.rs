@@ -42,6 +42,8 @@ impl<'tcx> Engine<'tcx> {
         captured: Option<&CapturedCallDestination<'tcx>>,
         value: Value,
     ) -> Result<(), String> {
+        self.activation_validate(&state.flow, &state.memory)?;
+        state.flow.charge_publication(state, place)?;
         if !state.memory.owned_regions.is_empty()
             && super::owned_boxes::region_occurrences(std::slice::from_ref(&value))?
                 .iter()

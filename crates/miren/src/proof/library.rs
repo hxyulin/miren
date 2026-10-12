@@ -79,6 +79,29 @@ impl<'tcx> Engine<'tcx> {
         self.execute(instance, values, conditions, memory, stack)
     }
 
+    pub(super) fn call_instance_flow(
+        &mut self,
+        caller: &mut activation_flow::Flow,
+        instance: ty::Instance<'tcx>,
+        values: Vec<Value>,
+        conditions: Vec<Term>,
+        memory: Memory,
+        call: (&[DefId], (DefId, Span)),
+    ) -> Result<Vec<Return>, String> {
+        let (stack, site) = call;
+        if matches!(caller, activation_flow::Flow::Unarmed) {
+            return self.call_instance(instance, values, conditions, memory, stack, site);
+        }
+        if !self.configured_contracts(instance)?.is_empty()
+            || self.foreign_rust_target(instance)?.is_some()
+        {
+            return Err("armed contract or foreign adapter is not implemented".into());
+        }
+        let body = self.activation_prepare_body(caller, instance)?;
+        let flow = self.activation_call_flow(caller, instance, &body, &memory, stack)?;
+        self.execute_with_flow(instance, values, conditions, memory, stack, flow)
+    }
+
     pub(super) fn library_call(
         &mut self,
         instance: ty::Instance<'tcx>,
@@ -100,6 +123,15 @@ impl<'tcx> Engine<'tcx> {
         if Some(callee.krate) != core {
             return Ok(None);
         }
+        if matches!(state.flow, activation_flow::Flow::Armed(_))
+            && self.mutable_metadata_operation(instance)
+        {
+            // The existing typed metadata adapter executes inline on the same State.
+            // It neither creates a Return envelope nor resets its activation floor.
+            self.activation_validate(&state.flow, &state.memory)?;
+            return Ok(None);
+        }
+        state.flow.require_unarmed()?;
         self.hardware_pointer_call_guard(instance, raw_values, state)?;
         if let Some(results) = self.readonly_slice_range(instance, raw_values, state, site)? {
             return Ok(Some(results));
@@ -236,6 +268,7 @@ impl<'tcx> Engine<'tcx> {
                 "fixed mutable byte chunks and remainder; shared allocation regions",
             );
             return Ok(Some(vec![Return {
+                flow: state.flow.unarmed_leaf()?,
                 value: Value::Tuple(vec![
                     Value::Reference {
                         allocation: *allocation,
@@ -355,11 +388,13 @@ impl<'tcx> Engine<'tcx> {
             failure.push(symbolic::not(&equal));
             return Ok(Some(vec![
                 Return {
+                    flow: state.flow.unarmed_leaf()?,
                     value: self.constructed(signature.output(), 0, vec![borrowed])?,
                     conditions: success,
                     memory: state.memory.clone(),
                 },
                 Return {
+                    flow: state.flow.unarmed_leaf()?,
                     value: self.constructed(
                         signature.output(),
                         1,
@@ -453,6 +488,7 @@ impl<'tcx> Engine<'tcx> {
                     Value::Elements(elements.into())
                 };
                 results.push(Return {
+                    flow: state.flow.unarmed_leaf()?,
                     value,
                     conditions,
                     memory,
@@ -596,6 +632,7 @@ impl<'tcx> Engine<'tcx> {
                 Value::Elements(elements.into())
             };
             results.push(Return {
+                flow: state.flow.unarmed_leaf()?,
                 value,
                 conditions,
                 memory,

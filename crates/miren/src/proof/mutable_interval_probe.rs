@@ -292,6 +292,7 @@ fn check_active_lifecycle<'tcx>(tcx: TyCtxt<'tcx>, root: DefId, original_type: T
         mutable_u16_frames: Default::default(),
         mutable_integer_types: Vec::new(),
         mutable_u16_staging: Default::default(),
+        activation: Default::default(),
         coroutine_places: Default::default(),
         owned_box_types: Vec::new(),
         next_owned_region: 0,
@@ -395,6 +396,7 @@ fn check_active_lifecycle<'tcx>(tcx: TyCtxt<'tcx>, root: DefId, original_type: T
         .unwrap(),
     );
     let mut state = State {
+        flow: activation_flow::Flow::Unarmed,
         locals: vec![None; body.local_decls.len()],
         addresses: vec![None; body.local_decls.len()],
         missing_places: Default::default(),

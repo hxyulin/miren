@@ -211,6 +211,7 @@ fn check_prepared_calls<'tcx>(tcx: TyCtxt<'tcx>) {
         .find(|local| selected_body.local_decls[*local].ty == tcx.types.usize)
         .unwrap();
     let mut source_state = State {
+        flow: activation_flow::Flow::Unarmed,
         locals: vec![None; selected_body.local_decls.len()],
         missing_places: Default::default(),
         conditions: conditions.clone(),
@@ -328,6 +329,7 @@ fn check_prepared_calls<'tcx>(tcx: TyCtxt<'tcx>) {
         )]),
     };
     let mut field_state = State {
+        flow: activation_flow::Flow::Unarmed,
         locals: vec![None; field_body.local_decls.len()],
         missing_places: Default::default(),
         conditions: conditions.clone(),
@@ -441,6 +443,7 @@ fn check_prepared_calls<'tcx>(tcx: TyCtxt<'tcx>) {
         panic!("actual argument Move absent");
     };
     let mut state = State {
+        flow: activation_flow::Flow::Unarmed,
         locals: vec![None; body.local_decls.len()],
         missing_places: Default::default(),
         conditions: conditions.clone(),
@@ -644,6 +647,7 @@ fn check_prepared_calls<'tcx>(tcx: TyCtxt<'tcx>) {
         panic!("field Copy missing");
     };
     let mut copied_state = State {
+        flow: activation_flow::Flow::Unarmed,
         locals: vec![None; copied_body.local_decls.len()],
         missing_places: Default::default(),
         conditions: conditions.clone(),
@@ -866,6 +870,7 @@ pub(super) fn test_engine(tcx: TyCtxt<'_>) -> Engine<'_> {
         mutable_u16_frames: Default::default(),
         mutable_integer_types: Vec::new(),
         mutable_u16_staging: Default::default(),
+        activation: Default::default(),
         coroutine_places: Default::default(),
         owned_box_types: Vec::new(),
         next_owned_region: 0,
@@ -1107,6 +1112,7 @@ fn check_two_argument_calls<'tcx>(tcx: TyCtxt<'tcx>, output: &std::path::Path) {
             panic!("Move func");
         };
         let mut state = State {
+            flow: activation_flow::Flow::Unarmed,
             locals: vec![None; body.local_decls.len()],
             addresses: vec![None; body.local_decls.len()],
             missing_places: Default::default(),
@@ -1400,6 +1406,7 @@ pub fn too_large(value: fn(u16)->u16) -> [fn(u16)->u16;129] { [value;129] }
 
 fn repeat_state(body: &Body<'_>) -> State {
     State {
+        flow: activation_flow::Flow::Unarmed,
         locals: vec![None; body.local_decls.len()],
         missing_places: Default::default(),
         conditions: Vec::new(),
@@ -1918,6 +1925,7 @@ fn check_known_repeats<'tcx>(tcx: TyCtxt<'tcx>, output: &std::path::Path) {
             Vec::new(),
             Memory::default(),
             &[],
+            activation_flow::Flow::Unarmed,
         )
         .unwrap();
     assert_eq!(returns.len(), 1);
@@ -2345,6 +2353,7 @@ fn check_primitive_move_call<'tcx>(
         panic!("argument Move absent");
     };
     let mut state = State {
+        flow: activation_flow::Flow::Unarmed,
         locals: vec![None; body.local_decls.len()],
         missing_places: Default::default(),
         addresses: vec![None; body.local_decls.len()],

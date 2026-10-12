@@ -826,6 +826,7 @@ impl<'tcx> Engine<'tcx> {
             "checked core readonly scalar range; retained caller allocation and projections",
         );
         Ok(Some(vec![Return {
+            flow: activation_flow::Flow::Unarmed,
             value: Value::Reference {
                 allocation: *allocation,
                 projection,
@@ -1059,6 +1060,7 @@ mod tests {
             mutable: false,
         };
         let mut state = State {
+            flow: activation_flow::Flow::Unarmed,
             missing_places: initialized_places::MissingPlaces::default(),
             locals: Vec::new(),
             addresses: Vec::new(),
