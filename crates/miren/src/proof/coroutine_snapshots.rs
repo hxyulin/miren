@@ -64,7 +64,7 @@ impl<'tcx> Engine<'tcx> {
             incoming,
         };
         let checked = self.coroutine_snapshot(original, value, &observation, None, 0)?;
-        Self::validate_reference_graph(&checked, state, incoming, &mut Vec::new())?;
+        self.validate_typed_reference_graph(&checked, state, incoming, &mut Vec::new())?;
         self.validate_static_initialization_graph(&checked, state, &mut Vec::new())?;
         Ok(true)
     }
@@ -143,7 +143,7 @@ impl<'tcx> Engine<'tcx> {
         let active = self
             .coroutine_snapshot(original, &value, &observation, Some((allocation, path)), 0)
             .map_err(|reason| format!("coroutine active carrier observation: {reason}"))?;
-        Self::validate_reference_graph(&active, state, None, &mut Vec::new())?;
+        self.validate_typed_reference_graph(&active, state, None, &mut Vec::new())?;
         self.validate_static_initialization_graph(&active, state, &mut Vec::new())?;
         Ok(Some(reference))
     }
@@ -178,7 +178,7 @@ impl<'tcx> Engine<'tcx> {
             .any(|arg| arg.as_type().is_some_and(|ty| ty.is_coroutine()))
         {
             if let Some((allocation, path)) = &source {
-                memory.check_projection_initialization(*allocation, path)?;
+                self.check_memory_initialization(memory, *allocation, path)?;
             }
             return if observation.detached {
                 self.snapshot(value, memory, conditions, depth)
@@ -191,7 +191,7 @@ impl<'tcx> Engine<'tcx> {
             && !self.pin_macro_coroutine_helper(original)
         {
             if let Some((allocation, path)) = &source {
-                memory.check_projection_initialization(*allocation, path)?;
+                self.check_memory_initialization(memory, *allocation, path)?;
             }
             return if observation.detached {
                 self.snapshot(value, memory, conditions, depth)
@@ -209,7 +209,7 @@ impl<'tcx> Engine<'tcx> {
                 },
             ) => {
                 if let Some((owner, path)) = &source {
-                    memory.check_projection_initialization(*owner, path)?;
+                    self.check_memory_initialization(memory, *owner, path)?;
                 }
                 if permission.is_mut() && !*mutable {
                     return Err("coroutine snapshot receiver lacks original mutable rights".into());
@@ -223,7 +223,8 @@ impl<'tcx> Engine<'tcx> {
                         "reference to frame-owned storage cannot escape its frame".into(),
                     ));
                 }
-                let fields = initialized_places::field_footprint(projection)
+                let fields = self
+                    .typed_memory_footprint(memory, *allocation, projection)?
                     .ok_or("coroutine snapshot requires exact retained field path")?;
                 memory.missing_places.descendants(*allocation, &fields)?;
                 let stored = self.reference_storage(value, memory, conditions)?;
@@ -314,7 +315,8 @@ impl<'tcx> Engine<'tcx> {
                     );
                 }
                 let holes = if let Some((allocation, path)) = &source {
-                    let path = initialized_places::field_footprint(path)
+                    let path = self
+                        .typed_memory_footprint(memory, *allocation, path)?
                         .ok_or("coroutine snapshot has unsupported original storage path")?;
                     memory.missing_places.descendants(*allocation, &path)?
                 } else {

@@ -1926,6 +1926,31 @@
       "unknown_category": "resource_limit",
       "unknown_reason":
         "mutable product symbolic projection exceeds its shared node or depth budget"
+    },
+    {
+      "entry": "array_move_initialization_survey::array_claim",
+      "family": "array_move_initialization",
+      "expected": "proved"
+    },
+    {
+      "entry": "array_move_initialization_survey::array_wrong",
+      "family": "array_move_initialization",
+      "expected": "refuted"
+    },
+    {
+      "entry": "array_move_initialization_survey::nested_claim",
+      "family": "array_move_initialization",
+      "expected": "proved"
+    },
+    {
+      "entry": "array_move_initialization_survey::nested_wrong",
+      "family": "array_move_initialization",
+      "expected": "refuted"
+    },
+    {
+      "entry": "array_move_initialization_survey::covering_array_repair",
+      "family": "array_move_initialization",
+      "expected": "proved"
     }
   ]
 }

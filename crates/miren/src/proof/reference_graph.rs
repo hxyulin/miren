@@ -8,7 +8,7 @@ impl<'tcx> Engine<'tcx> {
         state: &State,
     ) -> Result<(), String> {
         self.validate_shared_trait_graph(value, state)?;
-        Self::validate_reference_graph(value, state, None, &mut Vec::new())?;
+        self.validate_typed_reference_graph(value, state, None, &mut Vec::new())?;
         self.validate_static_initialization_graph(value, state, &mut Vec::new())
     }
 
@@ -29,19 +29,37 @@ impl<'tcx> Engine<'tcx> {
     ) -> Result<(), String> {
         for value in state.memory[..incoming].iter().flatten() {
             self.validate_shared_trait_graph(value, state)?;
-            Self::reference_graph(value, state, Some(incoming), &mut Vec::new(), false)?;
+            Self::reference_graph(
+                value,
+                state,
+                Some(incoming),
+                &mut Vec::new(),
+                false,
+                Some(self),
+            )?;
             self.validate_static_initialization_graph(value, state, &mut Vec::new())?;
         }
         Ok(())
     }
 
+    pub(super) fn validate_typed_reference_graph(
+        &self,
+        value: &Value,
+        state: &State,
+        incoming: Option<usize>,
+        visited: &mut Vec<usize>,
+    ) -> Result<(), String> {
+        Self::reference_graph(value, state, incoming, visited, true, Some(self))
+    }
+
+    #[cfg(test)]
     pub(super) fn validate_reference_graph(
         value: &Value,
         state: &State,
         incoming: Option<usize>,
         visited: &mut Vec<usize>,
     ) -> Result<(), String> {
-        Self::reference_graph(value, state, incoming, visited, true)
+        Self::reference_graph(value, state, incoming, visited, true, None)
     }
 
     #[cfg(test)]
@@ -49,7 +67,7 @@ impl<'tcx> Engine<'tcx> {
         value: &Value,
         state: &State,
     ) -> Result<(), String> {
-        Self::reference_graph(value, state, None, &mut Vec::new(), false)
+        Self::reference_graph(value, state, None, &mut Vec::new(), false, None)
     }
 
     fn reference_graph(
@@ -58,6 +76,7 @@ impl<'tcx> Engine<'tcx> {
         incoming: Option<usize>,
         visited: &mut Vec<usize>,
         initialized: bool,
+        engine: Option<&Self>,
     ) -> Result<(), String> {
         if let Value::Reference {
             allocation,
@@ -66,13 +85,17 @@ impl<'tcx> Engine<'tcx> {
         } = value
         {
             if initialized {
-                state
-                    .memory
-                    .check_projection_initialization(*allocation, projection)?;
+                if let Some(engine) = engine {
+                    engine.check_memory_initialization(&state.memory, *allocation, projection)?;
+                } else {
+                    state
+                        .memory
+                        .check_projection_initialization(*allocation, projection)?;
+                }
             }
             for part in projection {
                 if let symbolic::MemoryProjection::TypedIndex { index, .. } = part {
-                    Self::reference_graph(index, state, incoming, visited, initialized)?;
+                    Self::reference_graph(index, state, incoming, visited, initialized, engine)?;
                 }
             }
         }
@@ -130,11 +153,11 @@ impl<'tcx> Engine<'tcx> {
                 Err("contract owned-region ghost is not an executable graph".into())
             }
             Value::ScalarSlice { length, .. } | Value::CompositeSlice { length, .. } => {
-                Self::reference_graph(length, state, incoming, visited, initialized)
+                Self::reference_graph(length, state, incoming, visited, initialized, engine)
             }
             Value::MaybeUninit { payload, .. } => {
                 if let Some(payload) = payload {
-                    Self::reference_graph(payload, state, incoming, visited, initialized)?;
+                    Self::reference_graph(payload, state, incoming, visited, initialized, engine)?;
                 }
                 Ok(())
             }
@@ -155,43 +178,43 @@ impl<'tcx> Engine<'tcx> {
                     StorageLocation::tracked(*allocation, false).read_storage(&state.memory)?;
                 if !visited.contains(allocation) {
                     visited.push(*allocation);
-                    Self::reference_graph(stored, state, incoming, visited, initialized)?;
+                    Self::reference_graph(stored, state, incoming, visited, initialized, engine)?;
                 }
                 Ok(())
             }
             Value::Adt { fields, .. } => {
                 for (_, value) in fields {
-                    Self::reference_graph(value, state, incoming, visited, initialized)?;
+                    Self::reference_graph(value, state, incoming, visited, initialized, engine)?;
                 }
                 Ok(())
             }
             Value::Enum { variants, .. } => {
                 for value in variants {
-                    Self::reference_graph(value, state, incoming, visited, initialized)?;
+                    Self::reference_graph(value, state, incoming, visited, initialized, engine)?;
                 }
                 Ok(())
             }
             Value::Tuple(fields) => {
                 for value in fields {
-                    Self::reference_graph(value, state, incoming, visited, initialized)?;
+                    Self::reference_graph(value, state, incoming, visited, initialized, engine)?;
                 }
                 Ok(())
             }
             Value::Elements(fields) => {
                 for value in fields {
-                    Self::reference_graph(value, state, incoming, visited, initialized)?;
+                    Self::reference_graph(value, state, incoming, visited, initialized, engine)?;
                 }
                 Ok(())
             }
             Value::TrackedPointer { reference, .. } => {
-                Self::reference_graph(reference, state, incoming, visited, initialized)
+                Self::reference_graph(reference, state, incoming, visited, initialized, engine)
             }
             Value::RawSlice { source, .. }
             | Value::SliceIterator { source, .. }
             | Value::MetadataPointer(source)
             | Value::TraitObject { source, .. }
             | Value::DebugReference { source, .. } => {
-                Self::reference_graph(source, state, incoming, visited, initialized)
+                Self::reference_graph(source, state, incoming, visited, initialized, engine)
             }
             Value::StaticSlice {
                 source,
@@ -199,10 +222,10 @@ impl<'tcx> Engine<'tcx> {
                 elements,
                 ..
             } => {
-                Self::reference_graph(source, state, incoming, visited, initialized)?;
+                Self::reference_graph(source, state, incoming, visited, initialized, engine)?;
                 validate_static_epoch(&state.memory, *epoch)?;
                 for element in elements {
-                    Self::reference_graph(element, state, incoming, visited, initialized)?;
+                    Self::reference_graph(element, state, incoming, visited, initialized, engine)?;
                 }
                 Ok(())
             }
@@ -365,7 +388,8 @@ mod tests {
                 certificate: 3,
                 kind,
             };
-            Engine::reference_graph(&borrowed, &state, Some(0), &mut Vec::new(), false).unwrap();
+            Engine::reference_graph(&borrowed, &state, Some(0), &mut Vec::new(), false, None)
+                .unwrap();
         }
         state.memory.retire_owned_region(7, 3).unwrap();
         for kind in [
@@ -379,7 +403,7 @@ mod tests {
                 kind,
             };
             assert!(
-                Engine::reference_graph(&borrowed, &state, Some(0), &mut Vec::new(), false)
+                Engine::reference_graph(&borrowed, &state, Some(0), &mut Vec::new(), false, None)
                     .is_err()
             );
         }
@@ -388,7 +412,15 @@ mod tests {
             certificate: 3,
             kind: symbolic::OwnedRegionKind::Owner,
         };
-        Engine::reference_graph(&consumed_owner, &state, Some(0), &mut Vec::new(), false).unwrap();
+        Engine::reference_graph(
+            &consumed_owner,
+            &state,
+            Some(0),
+            &mut Vec::new(),
+            false,
+            None,
+        )
+        .unwrap();
         assert!(
             Engine::validate_reference_graph(&consumed_owner, &state, None, &mut Vec::new())
                 .is_err()

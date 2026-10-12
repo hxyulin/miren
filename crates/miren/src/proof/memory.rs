@@ -240,8 +240,7 @@ impl<'tcx> Engine<'tcx> {
             ..
         } = reference
         {
-            memory
-                .check_projection_initialization(*allocation, projection)
+            self.check_memory_initialization(memory, *allocation, projection)
                 .map_err(|reason| self.categorized_error(UnknownCategory::Semantics, reason))?;
         }
         if matches!(reference, Value::OwnedRegion { .. }) {
@@ -884,6 +883,41 @@ impl<'tcx> Engine<'tcx> {
         place: Place<'tcx>,
         mutable: bool,
     ) -> Result<Value, String> {
+        self.borrow_with_body(state, place, mutable, None)
+    }
+
+    pub(super) fn borrow_typed(
+        &self,
+        body: &Body<'tcx>,
+        state: &mut State,
+        place: Place<'tcx>,
+        mutable: bool,
+    ) -> Result<Value, String> {
+        if place
+            .projection
+            .iter()
+            .any(|part| matches!(part, ProjectionElem::ConstantIndex { .. }))
+            && place.projection.iter().all(|part| {
+                matches!(
+                    part,
+                    ProjectionElem::Field(..)
+                        | ProjectionElem::Downcast(..)
+                        | ProjectionElem::ConstantIndex { .. }
+                )
+            })
+        {
+            self.preflight_initialized_owner(body, state, place)?;
+        }
+        self.borrow_with_body(state, place, mutable, Some(body))
+    }
+
+    fn borrow_with_body(
+        &self,
+        state: &mut State,
+        place: Place<'tcx>,
+        mutable: bool,
+        body: Option<&Body<'tcx>>,
+    ) -> Result<Value, String> {
         if matches!(place.projection.as_ref(), [ProjectionElem::Deref]) {
             let source = self.local(state, place.local.as_usize())?;
             if self
@@ -910,7 +944,7 @@ impl<'tcx> Engine<'tcx> {
                 });
             }
         }
-        let value = self.place(state, place)?;
+        let value = self.read_place(state, place, body)?;
         if let Value::TraitObject {
             source,
             id,
@@ -1020,6 +1054,18 @@ impl<'tcx> Engine<'tcx> {
             state.addresses[place.local.as_usize()] = Some(allocation);
             allocation
         };
+        if let Some(body) = body
+            && place
+                .projection
+                .iter()
+                .any(|part| matches!(part, ProjectionElem::ConstantIndex { .. }))
+            && !place
+                .projection
+                .iter()
+                .any(|part| matches!(part, ProjectionElem::Deref))
+        {
+            self.bind_initialized_owner(body, state, place)?;
+        }
         Ok(Value::Reference {
             allocation,
             projection,
@@ -1042,6 +1088,38 @@ impl<'tcx> Engine<'tcx> {
         place: Place<'tcx>,
         value: Value,
         indices: Option<&CapturedDestinationIndices>,
+    ) -> Result<(), String> {
+        self.write_with_body(state, place, value, indices, None)
+    }
+
+    pub(super) fn write_typed(
+        &self,
+        body: &Body<'tcx>,
+        state: &mut State,
+        place: Place<'tcx>,
+        value: Value,
+    ) -> Result<(), String> {
+        self.write_with_body(state, place, value, None, Some(body))
+    }
+
+    pub(super) fn write_with_indices_typed(
+        &self,
+        body: &Body<'tcx>,
+        state: &mut State,
+        place: Place<'tcx>,
+        value: Value,
+        indices: Option<&CapturedDestinationIndices>,
+    ) -> Result<(), String> {
+        self.write_with_body(state, place, value, indices, Some(body))
+    }
+
+    fn write_with_body(
+        &self,
+        state: &mut State,
+        place: Place<'tcx>,
+        value: Value,
+        indices: Option<&CapturedDestinationIndices>,
+        body: Option<&Body<'tcx>>,
     ) -> Result<(), String> {
         state.constant_receipts.invalidate(place);
         let local = place.local.as_usize();
@@ -1071,16 +1149,46 @@ impl<'tcx> Engine<'tcx> {
                 .clone()
                 .ok_or("write into uninitialized aggregate storage")?
         };
+        if let Some(body) = body {
+            self.validate_fixed_array_storage(body, state, place)?;
+        }
+        let fields = if let Some(body) = body
+            && place
+                .projection
+                .iter()
+                .any(|part| matches!(part, ProjectionElem::ConstantIndex { .. }))
+            && place.projection.iter().all(|part| {
+                matches!(
+                    part,
+                    ProjectionElem::Field(..)
+                        | ProjectionElem::Downcast(..)
+                        | ProjectionElem::ConstantIndex { .. }
+                )
+            }) {
+            let fields = self.owned_field_footprint(body, place)?;
+            if fields
+                .iter()
+                .any(|part| matches!(part, initialized_places::Step::Element(_)))
+                && allocation.is_some()
+            {
+                self.bind_initialized_owner(body, state, place)?;
+            }
+            Some(fields)
+        } else if let Some(allocation) = allocation {
+            self.typed_memory_footprint(&state.memory, allocation, &path)?
+        } else {
+            initialized_places::field_footprint(&path)
+        };
         self.write_projection(&mut storage, &path, value, &state.conditions)?;
         if let Some(allocation) = allocation {
             state.memory[allocation] = Some(storage);
-            if let Some(fields) = initialized_places::field_footprint(&path) {
-                state.memory.missing_places.initialize(allocation, &fields);
+            if let Some(fields) = &fields {
+                state.memory.missing_places.initialize(allocation, fields);
             }
         } else {
             state.locals[local] = Some(storage);
-            if let Some(fields) = initialized_places::field_footprint(&path) {
-                state.missing_places.initialize(local, &fields);
+            if let Some(fields) = &fields {
+                state.missing_places.initialize(local, fields);
             }
         }
         Ok(())
@@ -1339,6 +1447,7 @@ impl<'tcx> Engine<'tcx> {
     pub(super) fn retire_callback_environment(&self, callback: &Value, results: &mut [Return]) {
         if let Value::Reference { allocation, .. } = callback {
             for result in results {
+                result.memory.retire_initialized_owner(*allocation);
                 result.memory[*allocation] = None;
             }
         }
@@ -1407,13 +1516,23 @@ impl<'tcx> Engine<'tcx> {
                 #[cfg(not(test))]
                 let checked = &value;
                 self.validate_shared_trait_graph(checked, state)?;
-                Self::validate_reference_graph(checked, state, Some(incoming), &mut Vec::new())?;
+                self.validate_typed_reference_graph(
+                    checked,
+                    state,
+                    Some(incoming),
+                    &mut Vec::new(),
+                )?;
                 Ok(value)
             }
             Value::RawSlice { .. }
             | Value::DebugReference { place: false, .. }
             | Value::TrackedPointer { .. } => {
-                Self::validate_reference_graph(&value, state, Some(incoming), &mut Vec::new())?;
+                self.validate_typed_reference_graph(
+                    &value,
+                    state,
+                    Some(incoming),
+                    &mut Vec::new(),
+                )?;
                 Ok(value)
             }
             Value::SliceIterator {
@@ -1456,7 +1575,12 @@ impl<'tcx> Engine<'tcx> {
                 self.return_value(referent, state, incoming)
             }
             value @ (Value::Reference { .. } | Value::Cell { .. } | Value::LocalAtomic { .. }) => {
-                Self::validate_reference_graph(&value, state, Some(incoming), &mut Vec::new())?;
+                self.validate_typed_reference_graph(
+                    &value,
+                    state,
+                    Some(incoming),
+                    &mut Vec::new(),
+                )?;
                 Ok(value)
             }
             Value::Adt {

@@ -37,6 +37,7 @@ pub(super) struct Memory {
     allocations: Rc<Vec<Option<Value>>>,
     pub(super) owned_regions: Rc<Vec<OwnedRegion>>,
     pub(super) missing_places: initialized_places::MissingPlaces,
+    pub(super) initialized_owners: Rc<Vec<(usize, initialized_places::Owner)>>,
     pub(super) startup_values: std::collections::HashMap<StaticLocation, Value>,
     pub(super) startup_invalidated: bool,
     pub(super) isolated_static_types: std::collections::HashMap<StaticLocation, usize>,
@@ -54,6 +55,7 @@ impl Memory {
         }
         if !self.incoming_byte_roots.is_empty()
             || !self.owned_regions.is_empty()
+            || !self.initialized_owners.is_empty()
             || !self.startup_values.is_empty()
             || !self.isolated_static_types.is_empty()
             || !self.startup_overwritten.is_empty()
@@ -74,9 +76,9 @@ impl Memory {
             return Ok(());
         }
         self.activation_supported(flow)?;
-        // Allocations, owned regions and u16 backings are Rc vectors here. No payload
-        // clone occurs; detached backing vectors are charged at their mutation seams.
-        flow.charge(3)?;
+        // Allocations, owned regions, u16 backings and initialization owners are Rc vectors.
+        // No payload clone occurs; detached backing vectors are charged at mutation seams.
+        flow.charge(4)?;
         flow.charge_masks(&self.missing_places)
     }
 
@@ -88,6 +90,7 @@ impl Memory {
             return Ok(self.storage_slots());
         }
         self.activation_supported(flow)?;
+        flow.charge(2)?; // Actual new initialization-owner length read and slot-sum addition.
         // storage_slots makes four distinct backing-vector passes; its owner sum
         // visits owners but only reads each immutable frames vector's length.
         flow.charge(self.mutable_u16.len().saturating_mul(5))?;
@@ -113,6 +116,7 @@ impl Memory {
         self.allocations
             .len()
             .saturating_add(self.owned_regions.iter().map(|region| region.slots).sum())
+            .saturating_add(self.initialized_owners.len())
             .saturating_add(self.mutable_u16.len())
             .saturating_add(usize::from(self.mutable_hierarchy.is_some()))
             .saturating_add(

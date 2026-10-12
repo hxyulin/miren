@@ -851,12 +851,18 @@ impl<'tcx> Engine<'tcx> {
                     site,
                 )? {
                     if let Some(allocation) = temporary {
+                        result.memory.retire_initialized_owner(allocation);
                         result.memory[allocation] = None;
                         // A predicate cannot preserve its short-lived &Item in tracked storage.
                         let post =
                             state.continuation(result.conditions.clone(), result.memory.clone());
                         for stored in post.memory.iter().flatten() {
-                            Self::validate_reference_graph(stored, &post, None, &mut Vec::new())?;
+                            self.validate_typed_reference_graph(
+                                stored,
+                                &post,
+                                None,
+                                &mut Vec::new(),
+                            )?;
                         }
                     }
                     if find_map {

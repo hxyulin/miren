@@ -7052,3 +7052,43 @@ Evidence: /tmp/miren-stage240-root-corrected-checks/complete.json,
 /tmp/miren-stage240-root-new-symbolic/proof-audit.json,
 /tmp/miren-stage240-root-extra-evidence-review.json and
 /tmp/miren-stage240-root-survey-proof-audit.json.
+
+
+## Stage241: typed fixed-array initialization paths
+
+Owned fixed-array moves use original compiler ConstantIndex types and bounds to distinguish
+initialized elements, missing siblings and nested paths. Reads and borrows reject holes and missing
+ancestors; successful stores repair exact or covering paths. A private bounded type registry and
+allocation metadata preserve original types, current storage, namespace and retirement. Snapshots,
+call destinations, reference graphs and element Drop share the typed path checks. Element Drop
+executes actual glue before consuming its footprint. Partial-array and IntoIter destruction remain
+unsupported; no ordinary whole-array borrow is issued over holes.
+
+The isolated compiler callback validates actual original types, backing, bounds, namespaces,
+retirement and branch repair. Four-profile captures retain 172 full Proofs: 72 PROVED, 24 REFUTED
+and 76 UNKNOWN, with 24 queries and 24 models. This includes original, actual helper-mutant and
+legacy ownership controls. Native originals pass six runs; four false claims and two helper-mutant
+runs fail unchanged assertions. Invalid custom-MIR indexed moves retain query-free UNKNOWN.
+Root's five new cases independently record twelve proofs and eight refutations across four
+profiles, with eight queries and models. No assumptions or trusted calls are added.
+
+Fresh release surveys each report 166 PROVED, 111 REFUTED and 80 UNKNOWN across 357 cases and
+94 families. Five cases are appended; all 352 previous case objects and the literal guest fixture
+prefix are unchanged. Of 1,408 old whole Proof pairs, 44 match literally and 1,364 differ only by
+the actual appended-source fingerprint. All 3,384 existing queried obligations/models are exact.
+No old UNKNOWN is advanced by this stage.
+
+Formatting, lint, one corrected full workspace run with 933 outer Rust tests, 91 Python tests,
+release builds, dependency policy, manual hooks and documentation pass. The initial complete run
+exposed two integration issues: an exact resource diagnostic reflected the additional metadata
+clone charge, and the embedded positive native filter included intentionally false new tests.
+The expected last charge changes from 13 to the measured 14 without changing the resource cap;
+new false tests retain their assertions in a separate native group. Targeted corrections and the
+single corrected full run pass. Failed captures remain archived. Prototype and Root source reviews
+verify the composition preserves compiler constant provenance invalidation. No application rewrite,
+unsafe premise or solver-policy change is introduced.
+
+Evidence: /tmp/miren-stage241-root-corrected-checks/complete.json,
+/tmp/miren-stage241-root-isolated-evidence-review.json,
+/tmp/miren-stage241-root-array-probe/proof-audit.json and
+/tmp/miren-stage241-root-survey-proof-audit.json.

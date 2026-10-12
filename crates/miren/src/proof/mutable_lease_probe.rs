@@ -871,7 +871,7 @@ fn compiler_cases<'tcx>(tcx: TyCtxt<'tcx>, output: &std::path::Path, transport_o
             Err(detail) => {
                 assert_eq!(
                     detail,
-                    "activation transport exceeds shared work budget: used 2056, last charge 13"
+                    "activation transport exceeds shared work budget: used 2056, last charge 14"
                 );
                 eprintln!("activation smaller fixture exact Resource: {detail}");
             }

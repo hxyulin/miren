@@ -11,8 +11,12 @@ execution at O0 and O2, positive/refuted/unknown controls, a source mutation tha
 structured UNKNOWN reporting, and passing repository checks. Completion establishes a repeatable
 baseline. It does not establish full Rust support or a completed memory-model refactor.
 
-The current manifest contains 352 cases across 93 families.
-The completed Stage240 host/ARM O0/O2 surveys measured 163 PROVED, 109 REFUTED and 80 UNKNOWN.
+The current manifest contains 357 cases across 94 families.
+The completed Stage241 host/ARM O0/O2 surveys measured 166 PROVED, 111 REFUTED and 80 UNKNOWN.
+Fixed-array moves retain typed initialization holes, distinguish siblings and nested elements,
+and support covering whole-array repair. Whole reads over holes and invalid indexed MIR remain
+unsupported; partial-array destruction is a separate boundary.
+The preceding Stage240 surveys measured 163 PROVED, 109 REFUTED and 80 UNKNOWN across 352 cases.
 Typed mutable products support guarded symbolic fixed-array suffix reads and stores, including
 nested and correlated indices, mixed scalar leaves and selected whole subproducts. Actual helper
 mutations refute unchanged assertions; aliases and budget exhaustion retain explicit UNKNOWN.

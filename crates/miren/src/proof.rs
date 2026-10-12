@@ -161,6 +161,7 @@ struct Return {
 }
 
 struct Engine<'tcx> {
+    initialized_types: initialized_places::Registry<'tcx>,
     activation: std::cell::RefCell<activation_flow::Registry<'tcx>>,
     unknown_causes: std::cell::RefCell<BTreeMap<String, UnknownCategory>>,
     tcx: TyCtxt<'tcx>,
@@ -285,6 +286,7 @@ impl<'tcx> Engine<'tcx> {
             limits,
         } = options;
         Engine {
+            initialized_types: initialized_places::Registry::default(),
             tcx,
             terms: Context::default(),
             next_symbol: std::cell::Cell::new(0),
@@ -1616,6 +1618,7 @@ impl<'tcx> Engine<'tcx> {
                         self.return_value(value, &state, incoming_allocations)?
                     };
                     for allocation in state.addresses.iter().flatten() {
+                        state.memory.retire_initialized_owner(*allocation);
                         state.memory[*allocation] = None;
                     }
                     state.flow.validate_return()?;
@@ -2219,7 +2222,7 @@ impl<'tcx> Engine<'tcx> {
                     state.flow.require_unarmed()?;
                     let private = self.raw_local(&state, place.local.as_usize())?;
                     if matches!(private, Value::OwnedRegion { .. }) {
-                        let value = self.place(&state, *place)?;
+                        let value = self.read_place(&state, *place, Some(body))?;
                         if !self.owned_box_drop(ty, &value, &mut state, id)? {
                             return Err("owned-region destructor protocol is unavailable".into());
                         }
@@ -2238,7 +2241,7 @@ impl<'tcx> Engine<'tcx> {
                     let dropped = if coroutine_argument.is_some() {
                         Ok(Value::Unit)
                     } else {
-                        self.place(&state, *place)
+                        self.read_place(&state, *place, Some(body))
                     };
                     if !place.projection.is_empty() && dropped.is_err() {
                         dropped?;
@@ -2254,7 +2257,7 @@ impl<'tcx> Engine<'tcx> {
                         let argument = if let Some(value) = coroutine_argument {
                             value
                         } else {
-                            self.borrow(&mut state, *place, true)?
+                            self.borrow_typed(body, &mut state, *place, true)?
                         };
                         let Value::Reference {
                             allocation: drop_allocation,
@@ -2266,9 +2269,11 @@ impl<'tcx> Engine<'tcx> {
                                 "destructor consumption requires retained tracked storage".into()
                             );
                         };
-                        let drop_fields = initialized_places::field_footprint(projection).ok_or(
-                            "destructor consumption requires an exact fixed field footprint",
-                        )?;
+                        let drop_fields = self
+                            .typed_memory_footprint(&state.memory, *drop_allocation, projection)?
+                            .ok_or(
+                                "destructor consumption requires an exact fixed field footprint",
+                            )?;
                         let drop_allocation = *drop_allocation;
                         let instance = ty::Instance::resolve_drop_glue(self.tcx, ty);
                         let results = self.call_instance(
@@ -2297,6 +2302,7 @@ impl<'tcx> Engine<'tcx> {
                                 if let Some(allocation) =
                                     continuation.addresses[place.local.as_usize()].take()
                                 {
+                                    continuation.memory.retire_initialized_owner(allocation);
                                     continuation.memory[allocation] = None;
                                 }
                                 continuation.locals[place.local.as_usize()] = None;
@@ -2418,6 +2424,7 @@ impl<'tcx> Engine<'tcx> {
                 state.constant_receipts.invalidate(Place::from(*local));
                 state.missing_places.initialize(local.as_usize(), &[]);
                 if let Some(allocation) = state.addresses[local.as_usize()].take() {
+                    state.memory.retire_initialized_owner(allocation);
                     state.memory[allocation] = None;
                 }
                 state.locals[local.as_usize()] = None;
@@ -2477,7 +2484,7 @@ impl<'tcx> Engine<'tcx> {
         } else if self.known_owned_array_write_candidate(body, place)
             || self.owned_field_array_write_candidate(body, place)
         {
-            match self.write(state, place, value.clone()) {
+            match self.write_typed(body, state, place, value.clone()) {
                 Err(error) if typed_array_choices::known_owned_write_frontier(&error) => {
                     if self.write_known_owned_array_element(body, state, place, &value, None)?
                         || self.write_owned_field_array(body, state, place, &value, None)?
@@ -2490,7 +2497,7 @@ impl<'tcx> Engine<'tcx> {
                 result => result,
             }
         } else {
-            self.write(state, place, value)
+            self.write_typed(body, state, place, value)
         }
     }
 
@@ -2507,7 +2514,12 @@ impl<'tcx> Engine<'tcx> {
         if let Some(value) = self.mutable_u16_read(body, state, place)? {
             return Ok(value);
         }
-        self.check_place_initialization(state, place)?;
+        if let Some(body) = body {
+            self.check_typed_place_initialization(body, state, place)?;
+            self.validate_fixed_array_storage(body, state, place)?;
+        } else {
+            self.check_place_initialization(state, place)?;
+        }
         let mut value = self.raw_local(state, place.local.as_usize())?;
         if let [ProjectionElem::Deref, suffix @ ..] = place.projection.as_ref()
             && !suffix.is_empty()
@@ -2964,7 +2976,7 @@ impl<'tcx> Engine<'tcx> {
                         local: place.local,
                         projection: self.tcx.mk_place_elems(prefix),
                     };
-                    let value = self.place(state, base)?;
+                    let value = self.read_place(state, base, Some(body))?;
                     if matches!(value, Value::RawSlice { .. }) {
                         self.raw_slice_bytes(&value, state)?;
                         return Ok(value);
@@ -2976,7 +2988,7 @@ impl<'tcx> Engine<'tcx> {
                 if let Some(value) = self.borrow_shared_snapshot(body, state, *place)? {
                     return Ok(value);
                 }
-                match self.borrow(state, *place, false) {
+                match self.borrow_typed(body, state, *place, false) {
                     Ok(value) => Ok(value),
                     Err(error)
                         if error
@@ -3007,12 +3019,13 @@ impl<'tcx> Engine<'tcx> {
                 if let Some(value) = self.borrow_coroutine_carrier(body, state, *place, true)? {
                     Ok(value)
                 } else {
-                    self.borrow(state, *place, true).map_err(|reason| {
-                        format!(
-                            "mutable borrow of compiler type {:?}: {reason}",
-                            place.ty(&body.local_decls, self.tcx).ty
-                        )
-                    })
+                    self.borrow_typed(body, state, *place, true)
+                        .map_err(|reason| {
+                            format!(
+                                "mutable borrow of compiler type {:?}: {reason}",
+                                place.ty(&body.local_decls, self.tcx).ty
+                            )
+                        })
                 }
             }
             Rvalue::RawPtr(
@@ -3031,7 +3044,7 @@ impl<'tcx> Engine<'tcx> {
                     ));
                 }
                 self.validate_owned_raw_borrow(state, *place)?;
-                let value = self.place(state, *place)?;
+                let value = self.read_place(state, *place, Some(body))?;
                 if matches!(value, Value::StaticView { .. }) {
                     self.raw_static_view(&value, state)
                 } else {
@@ -3048,7 +3061,7 @@ impl<'tcx> Engine<'tcx> {
                 if let Some(value) = self.mutable_u16_metadata(body, state, *place)? {
                     return Ok(value);
                 }
-                let value = self.place(state, *place)?;
+                let value = self.read_place(state, *place, Some(body))?;
                 let length = match value {
                     value @ Value::CompositeSlice { .. } => {
                         self.composite_slice_length(&value, &state.conditions)?
@@ -3094,8 +3107,8 @@ impl<'tcx> Engine<'tcx> {
                 if let Some(tag) = self.retained_enum_tag(body, state, *place, bits, signed)? {
                     return Ok(tag);
                 }
-                self.check_place_initialization(state, *place)?;
-                let modeled = self.place(state, *place);
+                self.check_typed_place_initialization(body, state, *place)?;
+                let modeled = self.read_place(state, *place, Some(body));
                 if let Ok(modeled) = &modeled
                     && let Some(tag) =
                         self.static_discriminant_snapshot(modeled, ty, state, bits, signed)?

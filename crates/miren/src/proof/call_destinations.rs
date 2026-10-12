@@ -281,7 +281,7 @@ impl<'tcx> Engine<'tcx> {
                 &state.conditions,
             )?;
         }
-        match self.write_with_indices(state, place, value.clone(), indices) {
+        match self.write_with_indices_typed(body, state, place, value.clone(), indices) {
             Err(error) if typed_array_choices::known_owned_write_frontier(&error) => {
                 if self.write_owned_array_element(body, state, place, &value, indices)?
                     || (self.known_owned_array_write_candidate(body, place)

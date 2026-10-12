@@ -141,7 +141,12 @@ impl<'tcx> Engine<'tcx> {
                 return Err("closure carrier lacks retained capture storage".into());
             };
             for (_, capture) in fields {
-                Self::validate_reference_graph(capture, state, Some(incoming), &mut Vec::new())?;
+                self.validate_typed_reference_graph(
+                    capture,
+                    state,
+                    Some(incoming),
+                    &mut Vec::new(),
+                )?;
             }
             // Shape checking above also validates closures without captures.
             return Ok(true);
@@ -239,7 +244,7 @@ impl<'tcx> Engine<'tcx> {
             (ty::Ref(_, pointee, _), value @ Value::Reference { allocation, .. }) => {
                 // A compiler reference result must preserve its allocation, even when the
                 // legacy owned-value return adapter could snapshot the referent.
-                Self::validate_reference_graph(value, state, Some(incoming), &mut Vec::new())
+                self.validate_typed_reference_graph(value, state, Some(incoming), &mut Vec::new())
                     .map_err(|error| {
                         if error == "reference to frame-owned storage cannot escape its frame" {
                             self.categorized_error(UnknownCategory::Semantics, error)
@@ -265,7 +270,12 @@ impl<'tcx> Engine<'tcx> {
                 contains =
                     self.closure_escape_depth(*pointee, &stored, state, incoming, depth + 1)?;
                 if contains {
-                    Self::validate_reference_graph(value, state, Some(incoming), &mut Vec::new())?;
+                    self.validate_typed_reference_graph(
+                        value,
+                        state,
+                        Some(incoming),
+                        &mut Vec::new(),
+                    )?;
                 }
             }
             (
@@ -278,7 +288,7 @@ impl<'tcx> Engine<'tcx> {
             ) => {
                 // An uncorrelated aggregate cannot hide a captured borrow from the pre-snapshot
                 // check. Pure owned values remain safe under the existing return policy.
-                Self::validate_reference_graph(value, state, Some(incoming), &mut Vec::new())?;
+                self.validate_typed_reference_graph(value, state, Some(incoming), &mut Vec::new())?;
             }
             _ => {}
         }

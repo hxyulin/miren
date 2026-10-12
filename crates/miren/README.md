@@ -1580,3 +1580,17 @@ column selection and stores; exhaustion refuses before publication. No assumptio
 Host/ARM O0/O2 compiler assertions cover fifteen valid claims, three refuted claims and three
 exact alias/budget refusals. Actual helper/index mutations refute unchanged claims; native originals
 pass and mutants fail. Retained dependency bodies execute; omitted bodies remain UNKNOWN.
+
+Owned initialization paths additionally distinguish exact compiler fixed-array elements, including
+nested arrays and compiler from-end projections. Actual Body local types, field identities, concrete
+array lengths and projection bounds determine those keys. Element consumption preserves siblings;
+whole or ancestor loads still refuse holes, and only exact successful writes repair them. Addressed
+array paths retain bounded Engine-scoped original-type evidence, separate from borrow permissions,
+values and actual Body services. Branch clones preserve masks and retirement; retired allocation
+identities cannot regain that evidence. Unresolved indices, ordinary raw/Deref/Subslice ownership
+and partially initialized whole-array destructor carriers remain unsupported. This adds no general
+IntoIter, partial MaybeUninit, allocating Box or unwinding certificate. Compiler controls exercise
+precise paths, foreign/type/retirement refusal and branch-local masks.
+Four-profile compiler claims cover array and nested destructuring, whole covering repairs and
+actual helper mutations. Native originals pass and mutations fail; the prior invalid indexed-Move
+MIR remains UNKNOWN. Host compiler controls check masks and original-type/lifetime associations.
