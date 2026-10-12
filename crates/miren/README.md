@@ -1488,3 +1488,12 @@ that shape, then moves the validated root field names and compiler types into th
 list. It avoids constructing a discarded owned annotation tree and repeating root field extraction.
 Original type, layout and unsupported-domain checks remain required, including legacy Float fields.
 This host refactor adds no Rust feature, comparison relation, analysis premise or resource policy.
+
+Readonly `Option<NonZeroU8>` slices retain the exact core zero-only niche, with an 8-bit
+payload, target-width indices and signed tags. Guarded observations and `get` calls
+execute or authenticate their actual available bodies, and actual `Eq` and `Ne` calls retain
+those original types. Equal-width signed niches, mutable niches, pointer niches and local
+u8 empty/payload enums remain unsupported. The existing local u16 enum domain is unchanged.
+One-byte `contains` transport remains UNKNOWN: its actual byte specialization requires a
+separate available-body certificate. Dedicated asserted membership, helper mutation and
+missing-body controls exercise these boundaries without changing caller claims.

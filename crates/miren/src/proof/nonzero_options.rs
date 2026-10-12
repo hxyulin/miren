@@ -339,6 +339,7 @@ pub(super) fn nonzero_integer_scalar(
 // same-width types are not certificates. Byte-sized membership remains a separate body route.
 pub(super) fn readonly_niche_unsigned_bits(original: Ty<'_>) -> Option<u32> {
     match original.kind() {
+        ty::Uint(ty::UintTy::U8) => Some(8),
         ty::Uint(ty::UintTy::U16) => Some(16),
         ty::Uint(ty::UintTy::U32) => Some(32),
         _ => None,

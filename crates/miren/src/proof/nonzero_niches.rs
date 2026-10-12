@@ -1,4 +1,4 @@
-//! Exact bounded readonly zero-only NonZero<u16/u32> niche observations.
+//! Exact bounded readonly zero-only NonZero<u8/u16/u32> niche observations.
 use super::*;
 use crate::symbolic::ScalarSliceElement;
 #[path = "nonzero_niche_comparisons.rs"]
@@ -42,7 +42,7 @@ fn scalar_range(repr: BackendRepr, bits: u32, start: u128) -> bool {
 }
 
 fn facts_match(facts: &NicheFacts) -> bool {
-    matches!(facts.payload_bits, 16 | 32)
+    matches!(facts.payload_bits, 8 | 16 | 32)
         && facts.untagged < 2
         && facts.niche_first == 1 - facts.untagged
         && facts.niche_last == facts.niche_first

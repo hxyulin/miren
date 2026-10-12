@@ -1771,8 +1771,12 @@ fn actual_unsigned_u32_niche_membership_source_control() {
             law.validate(&selected).unwrap();
             assert_eq!(law.relation, 0x83);
             public_application_controls(tcx, *original, outer);
+            assert_eq!(
+                super::super::super::nonzero_options::readonly_niche_unsigned_bits(tcx.types.u8),
+                Some(8)
+            );
             assert!(
-                super::super::super::nonzero_options::readonly_niche_unsigned_bits(tcx.types.u8)
+                super::super::super::nonzero_options::readonly_niche_unsigned_bits(tcx.types.i8)
                     .is_none()
             );
             assert!(
@@ -1845,4 +1849,240 @@ fn actual_unsigned_u32_niche_membership_source_control() {
         "actual u32 niche control directory: {}",
         directory.display()
     );
+}
+
+#[test]
+fn actual_option8_observation_and_cached_body_controls() {
+    struct Check(bool);
+    impl rustc_driver::Callbacks for Check {
+        fn after_analysis<'tcx>(
+            &mut self,
+            _: &rustc_interface::interface::Compiler,
+            tcx: TyCtxt<'tcx>,
+        ) -> rustc_driver::Compilation {
+            let root = tcx
+                .mir_keys(())
+                .iter()
+                .copied()
+                .find(|id| {
+                    tcx.def_kind(*id) == DefKind::Fn
+                        && tcx.item_name(id.to_def_id()).as_str() == "observe8"
+                })
+                .unwrap();
+            let signature = tcx.fn_sig(root).instantiate_identity().skip_norm_wip();
+            let signature = tcx.instantiate_bound_regions_with_erased(signature);
+            let ty::Ref(_, slice, _) = signature.inputs()[0].kind() else {
+                panic!("shared slice")
+            };
+            let ty::Slice(original) = slice.kind() else {
+                panic!("slice element")
+            };
+            let certificate = certify(tcx, *original).unwrap();
+            assert_eq!(certificate.primitive, tcx.types.u8);
+            assert_eq!(certificate.facts.payload_bits, 8);
+            assert_eq!(certificate.facts.size, 1);
+            assert_eq!(certificate.bits, u32::from(tcx.sess.target.pointer_width));
+            assert!(certificate.signed);
+            check_observation(&certificate, certificate.bits);
+            let context = Context::default();
+            let index = context.bit_vector(0, certificate.bits).unwrap();
+            let array = context
+                .symbol(
+                    0,
+                    Sort::Array(
+                        Box::new(Sort::BitVec(certificate.bits)),
+                        Box::new(Sort::BitVec(8)),
+                    ),
+                )
+                .unwrap();
+            let observation =
+                Observation::new(&context, &certificate, &array, &index, certificate.bits).unwrap();
+            assert_eq!(observation.raw.sort(), &Sort::BitVec(8));
+            assert_eq!(
+                observation.discriminant.sort(),
+                &Sort::BitVec(certificate.bits)
+            );
+            for fault in 0..3 {
+                let mut facts = certificate.facts.clone();
+                match fault {
+                    0 => facts.niche_start = 1,
+                    1 => facts.payload_bits = 16,
+                    2 => facts.align = 2,
+                    _ => unreachable!(),
+                }
+                assert!(!facts_match(&facts));
+            }
+            assert_eq!(
+                super::super::super::nonzero_options::readonly_niche_unsigned_bits(tcx.types.u8),
+                Some(8)
+            );
+            for refused in [tcx.types.i8, tcx.types.i32, tcx.types.char] {
+                assert!(
+                    super::super::super::nonzero_options::readonly_niche_unsigned_bits(refused)
+                        .is_none()
+                );
+            }
+            check_selected_getter_body(tcx, &certificate, signature.inputs()[1]);
+            let ty::Adt(nonzero, args) = certificate.nonzero.kind() else {
+                unreachable!()
+            };
+            let getter = tcx
+                .inherent_impls(nonzero.did())
+                .iter()
+                .find_map(|id| {
+                    tcx.associated_items(*id)
+                        .in_definition_order()
+                        .find(|item| item.name() == rustc_span::Symbol::intern("get"))
+                        .map(|item| item.def_id)
+                })
+                .unwrap();
+            let selected = engine(tcx);
+            let getter = selected.resolve_function_item(getter, args).unwrap();
+            selected
+                .nonzero_get_body_certificate(getter, certificate.nonzero)
+                .unwrap();
+            let mut changed = (*selected.instantiated_body(getter).unwrap()).clone();
+            changed.basic_blocks.as_mut()[START_BLOCK]
+                .statements
+                .clear();
+            selected
+                .bodies
+                .borrow_mut()
+                .insert(getter, std::rc::Rc::new(changed));
+            assert!(
+                selected
+                    .nonzero_get_body_certificate(getter, certificate.nonzero)
+                    .is_err()
+            );
+
+            let eq = tcx
+                .get_diagnostic_item(rustc_span::Symbol::intern("cmp_partialeq_eq"))
+                .unwrap();
+            let ne = tcx
+                .associated_items(tcx.parent(eq))
+                .in_definition_order()
+                .find(|item| item.opt_name() == Some(rustc_span::Symbol::intern("ne")))
+                .unwrap()
+                .def_id;
+            let arguments = tcx.mk_args(&[(*original).into(), (*original).into()]);
+            let eq = selected.resolve_function_item(eq, arguments).unwrap();
+            let ne = selected.resolve_function_item(ne, arguments).unwrap();
+            for instance in [eq, ne] {
+                let target = engine(tcx);
+                target
+                    .capture_niche_comparison_body(
+                        instance,
+                        &mut GraphBudget::new(0).unwrap(),
+                        false,
+                    )
+                    .unwrap();
+                let mut changed = (*target.instantiated_body(instance).unwrap()).clone();
+                changed.basic_blocks.as_mut()[START_BLOCK].is_cleanup = true;
+                target
+                    .bodies
+                    .borrow_mut()
+                    .insert(instance, std::rc::Rc::new(changed));
+                assert!(
+                    target
+                        .capture_niche_comparison_body(
+                            instance,
+                            &mut GraphBudget::new(0).unwrap(),
+                            false
+                        )
+                        .is_err()
+                );
+            }
+            struct WrongField<'tcx> {
+                tcx: TyCtxt<'tcx>,
+                changed: usize,
+            }
+            impl<'tcx> rustc_middle::mir::visit::MutVisitor<'tcx> for WrongField<'tcx> {
+                fn tcx(&self) -> TyCtxt<'tcx> {
+                    self.tcx
+                }
+
+                fn visit_place(
+                    &mut self,
+                    place: &mut Place<'tcx>,
+                    _: rustc_middle::mir::visit::PlaceContext,
+                    _: Location,
+                ) {
+                    let mut elements = place.projection.to_vec();
+                    for element in &mut elements {
+                        if let ProjectionElem::Field(_, field_ty) = element {
+                            *field_ty = self.tcx.types.i8;
+                            self.changed += 1;
+                        }
+                    }
+                    place.projection = self.tcx.mk_place_elems(&elements);
+                }
+            }
+            let target = engine(tcx);
+            let mut changed = (*target.instantiated_body(eq).unwrap()).clone();
+            let mut mutation = WrongField { tcx, changed: 0 };
+            rustc_middle::mir::visit::MutVisitor::visit_body(&mut mutation, &mut changed);
+            assert!(mutation.changed > 0);
+            target
+                .bodies
+                .borrow_mut()
+                .insert(eq, std::rc::Rc::new(changed));
+            assert!(
+                target
+                    .capture_niche_comparison_body(eq, &mut GraphBudget::new(0).unwrap(), false)
+                    .is_err()
+            );
+            eprintln!(
+                "actual Option8: BV8 payload; {}-bit tag/index; cached \
+                 getter/Eq/Ne/FieldTy refused",
+                certificate.bits
+            );
+            self.0 = true;
+            rustc_driver::Compilation::Stop
+        }
+    }
+    let directory = std::env::temp_dir().join(format!(
+        "miren-option8-tcx-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    std::fs::create_dir(&directory).unwrap();
+    let source = directory.join("guest.rs");
+    std::fs::write(
+        &source,
+        "#![no_std]\n#![forbid(unsafe_code)]\n\
+        pub fn observe8(v:&[Option<core::num::NonZeroU8>],\n\
+        external:core::cmp::Reverse<core::num::NonZeroU8>){let _=(v,external);}\n",
+    )
+    .unwrap();
+    let sysroot = std::process::Command::new("rustc")
+        .args(["--print", "sysroot"])
+        .output()
+        .unwrap();
+    assert!(sysroot.status.success());
+    let sysroot = String::from_utf8(sysroot.stdout).unwrap();
+    for target in [None, Some("thumbv7em-none-eabihf")] {
+        for opt in [0, 2] {
+            let mut args = vec![
+                "rustc".into(),
+                source.to_str().unwrap().into(),
+                "--crate-type=lib".into(),
+                "--edition=2024".into(),
+                "-Cpanic=abort".into(),
+                format!("-Copt-level={opt}"),
+                "--sysroot".into(),
+                sysroot.trim().into(),
+                "--out-dir".into(),
+                directory.to_str().unwrap().into(),
+            ];
+            if let Some(target) = target {
+                args.extend(["--target".into(), target.into()]);
+            }
+            let mut check = Check(false);
+            rustc_driver::run_compiler(&args, &mut check);
+            assert!(check.0);
+        }
+    }
 }

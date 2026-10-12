@@ -11,8 +11,16 @@ execution at O0 and O2, positive/refuted/unknown controls, a source mutation tha
 structured UNKNOWN reporting, and passing repository checks. Completion establishes a repeatable
 baseline. It does not establish full Rust support or a completed memory-model refactor.
 
-The current manifest contains 285 cases across 90 families.
-Completed host/ARM O0/O2 surveys each measure 124 PROVED, 97 REFUTED and 64 UNKNOWN.
+The current manifest contains 295 cases across 90 families.
+Completed host/ARM O0/O2 surveys each measure 127 PROVED, 99 REFUTED and 69 UNKNOWN.
+Ten exact readonly `Option<NonZeroU8>` cases cover correlated payload observations, actual Eq/Ne
+helpers, false claims and unsupported domains. Actual observer and equality mutations refute
+unchanged caller claims and fail native execution. Missing dependency bodies remain UNKNOWN.
+One-byte membership reaches its semantic transport-certificate refusal; it is not established by
+admitting the niche. Mutable, signed, pointer and local u8 enum niches remain unsupported.
+
+The historical Stage232 survey measured 285 cases across 90 families: 124 PROVED, 97 REFUTED and
+64 UNKNOWN per profile.
 Seven local byte-array cases cover concrete and symbolic payloads, wrong claims, tail preservation,
 empty copies and unsafe transport refusal. The unchanged dynamic byte-copy claim advances from
 UNKNOWN to PROVED. The other 277 old case objects and literal old fixture prefix remain unchanged.

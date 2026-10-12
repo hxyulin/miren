@@ -1253,7 +1253,8 @@
       "entry": "float_hierarchy_deeper_unknown",
       "family": "mutable_float_hierarchy",
       "expected": "unknown",
-      "unknown_reason": "float_hierarchy_outer bb0: hierarchy exceeds the single nested-child scope",
+      "unknown_reason":
+        "float_hierarchy_outer bb0: hierarchy exceeds the single nested-child scope",
       "unknown_category": "semantics"
     },
     {
@@ -1495,7 +1496,7 @@
       "entry": "niche_membership_byte_frontier",
       "family": "readonly_nonzero_niche_membership",
       "expected": "unknown",
-      "unknown_reason": "NonZero wrapper original identity mismatch",
+      "unknown_reason": "niche byte-sized transport needs a separate available-body certificate",
       "unknown_category": "semantics"
     },
     {
@@ -1556,6 +1557,66 @@
       "expected": "unknown",
       "unknown_category": "semantics",
       "unknown_reason": "byte copy local source lacks an actual readonly tracked borrow"
+    },
+    {
+      "entry": "observe_correlated8",
+      "family": "readonly_nonzero_niche",
+      "expected": "proved"
+    },
+    {
+      "entry": "wrong_some_zero8",
+      "family": "readonly_nonzero_niche",
+      "expected": "refuted"
+    },
+    {
+      "entry": "same_observation_eq8",
+      "family": "readonly_nonzero_niche",
+      "expected": "proved"
+    },
+    {
+      "entry": "same_observation_ne8",
+      "family": "readonly_nonzero_niche",
+      "expected": "proved"
+    },
+    {
+      "entry": "wrong_ne8",
+      "family": "readonly_nonzero_niche",
+      "expected": "refuted"
+    },
+    {
+      "entry": "asserted_contains8",
+      "family": "readonly_nonzero_niche",
+      "expected": "unknown",
+      "unknown_reason": "niche byte-sized transport needs a separate available-body certificate",
+      "unknown_category": "semantics"
+    },
+    {
+      "entry": "local_enum_unknown",
+      "family": "readonly_nonzero_niche",
+      "expected": "unknown",
+      "unknown_reason": "NonZero new readonly width requires original core Option",
+      "unknown_category": "semantics"
+    },
+    {
+      "entry": "mutable_unknown",
+      "family": "readonly_nonzero_niche",
+      "expected": "unknown",
+      "unknown_reason": "only read-only byte slices and byte arrays are modeled",
+      "unknown_category": "semantics"
+    },
+    {
+      "entry": "signed_unknown",
+      "family": "readonly_nonzero_niche",
+      "expected": "unknown",
+      "unknown_reason": "NonZero wrapper original identity mismatch",
+      "unknown_category": "semantics"
+    },
+    {
+      "entry": "pointer_unknown",
+      "family": "readonly_nonzero_niche",
+      "expected": "unknown",
+      "unknown_reason": "only read-only byte slices and byte arrays are modeled",
+      "unknown_category": "semantics"
     }
   ]
 }

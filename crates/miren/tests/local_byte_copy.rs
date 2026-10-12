@@ -3,6 +3,9 @@
 use miren::{ProofStatus, Report};
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::atomic::{AtomicU64, Ordering};
+
+static NEXT_SCRATCH: AtomicU64 = AtomicU64::new(0);
 
 struct Scratch(PathBuf);
 
@@ -13,8 +16,9 @@ impl Scratch {
             .unwrap()
             .as_nanos();
         let path = std::env::temp_dir().join(format!(
-            "miren-local-byte-copy-{}-{nonce}",
+            "miren-local-byte-copy-{}-{nonce}-{}",
             std::process::id(),
+            NEXT_SCRATCH.fetch_add(1, Ordering::Relaxed),
         ));
         std::fs::create_dir(&path).unwrap();
         Self(path)

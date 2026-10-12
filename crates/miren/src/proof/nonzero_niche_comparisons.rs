@@ -1752,9 +1752,10 @@ impl<'tcx> Engine<'tcx> {
                 return Err("niche membership outer original element mismatch".into());
             }
             if family == templates::PureTemplateFamily::ContainsBytes && schema.facts.size == 1 {
-                return Err(
+                return Err(self.categorized_error(
+                    UnknownCategory::Semantics,
                     "niche byte-sized transport needs a separate available-body certificate".into(),
-                );
+                ));
             }
             budget.phase(GraphPhase::Edges, inventory)?;
             for block in body.basic_blocks.iter() {

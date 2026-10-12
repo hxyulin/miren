@@ -3987,3 +3987,108 @@ pub fn local_byte_copy_unsafe_transport(values: &mut [u8]) {
         assert!(values[0] == 17 && values[1] == 19);
     }
 }
+
+
+use core::num::{NonZeroI8, NonZeroU8};
+
+#[inline(never)]
+pub fn selected_observer(value: Option<NonZeroU8>) -> u8 {
+    match value {
+        None => 0,
+        Some(word) => word.get(),
+    }
+}
+
+#[inline(never)]
+pub fn selected_equal8(left: Option<NonZeroU8>, right: Option<NonZeroU8>) -> bool {
+    left == right
+}
+
+#[inline(never)]
+pub fn selected_not_equal8(left: Option<NonZeroU8>, right: Option<NonZeroU8>) -> bool {
+    left != right
+}
+
+pub fn same_observation_ne8(values: &[Option<NonZeroU8>], index: usize) {
+    if index < values.len() {
+        let value = values[index];
+        assert!(!selected_not_equal8(value, value));
+    }
+}
+
+pub fn observe_correlated8(values: &[Option<NonZeroU8>], index: usize) {
+    if index < values.len() {
+        let value = values[index];
+        match value {
+            None => assert!(selected_observer(value) == 0),
+            Some(word) => assert!(selected_observer(value) == word.get() && word.get() != 0),
+        }
+    }
+}
+
+pub fn wrong_some_zero8(values: &[Option<NonZeroU8>], index: usize) {
+    if index < values.len()
+        && let Some(word) = values[index]
+    {
+        assert!(word.get() == 0);
+    }
+}
+
+pub fn same_observation_eq8(values: &[Option<NonZeroU8>], index: usize) {
+    if index < values.len() {
+        let value = values[index];
+        assert!(selected_equal8(value, value));
+    }
+}
+
+pub fn wrong_ne8(values: &[Option<NonZeroU8>], index: usize) {
+    if index < values.len() {
+        let value = values[index];
+        assert!(selected_not_equal8(value, value));
+    }
+}
+
+#[inline(never)]
+pub fn selected_member8(values: &[Option<NonZeroU8>], needle: Option<NonZeroU8>) -> bool {
+    values.contains(&needle)
+}
+
+pub fn asserted_contains8(values: &[Option<NonZeroU8>]) {
+    if !values.is_empty() && values[0].is_none() {
+        assert!(selected_member8(values, None));
+    }
+}
+
+#[derive(Clone, Copy)]
+pub enum Local8 {
+    Empty,
+    Word(NonZeroU8),
+}
+
+pub fn local_enum_unknown(values: &[Local8], index: usize) {
+    if index < values.len()
+        && let Local8::Word(word) = values[index]
+    {
+        assert!(word.get() != 0);
+    }
+}
+
+pub fn mutable_unknown(values: &mut [Option<NonZeroU8>], index: usize) {
+    if index < values.len() {
+        assert!(values[index].is_some() || values[index].is_none());
+    }
+}
+
+pub fn signed_unknown(values: &[Option<NonZeroI8>], index: usize) {
+    if index < values.len()
+        && let Some(word) = values[index]
+    {
+        assert!(word.get() != 0);
+    }
+}
+
+pub fn pointer_unknown(values: &[Option<&u8>], index: usize) {
+    if index < values.len() {
+        assert!(values[index].is_some() || values[index].is_none());
+    }
+}
