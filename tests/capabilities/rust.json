@@ -1367,9 +1367,7 @@
     {
       "entry": "float_table_repeat32",
       "family": "float_function_tables_f32",
-      "expected": "unknown",
-      "unknown_reason": "known Repeat signature needs exact original integer types",
-      "unknown_category": "unclassified"
+      "expected": "proved"
     },
     {
       "entry": "float_table_selected64",
@@ -1391,9 +1389,7 @@
     {
       "entry": "float_table_repeat64",
       "family": "float_function_tables_f64",
-      "expected": "unknown",
-      "unknown_reason": "known Repeat signature needs exact original integer types",
-      "unknown_category": "unclassified"
+      "expected": "proved"
     },
     {
       "entry": "primitive_repeat_bool_selected",

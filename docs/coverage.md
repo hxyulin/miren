@@ -3585,3 +3585,15 @@ Existing integer Repeat and all admission bounds remain unchanged. Opaque, gener
 and missing-body controls remain UNKNOWN; Float Repeat remains unsupported. Six appended cases
 preserve all 253 prior manifest objects and the literal guest prefix. Completed validation is in
 [Stage224](stages.md#stage224-unary-bool-and-char-function-pointer-repeat-arrays).
+
+## Unary Float function-pointer Repeat arrays
+
+Known Repeat arrays admit exact original nongeneric safe Rust unary f32-to-f32 and f64-to-f64
+signatures. Construction preserves evaluation once, Move consumption, zero-count behavior and
+existing admission limits. Selected calls execute actual available bodies and validate current
+returned Memory. Copy and negation retain raw bits; arithmetic NaN limitations remain unchanged.
+Opaque, generic, ABI, mixed-width, count, dispatch and missing-body controls remain UNKNOWN.
+Two existing survey expectations advance to PROVED without changing guest assertions or adding
+premises. Dedicated tests include unchanged-claim helper mutations with solver counterexamples
+and native failures, plus genuine retained and omitted dependencies. Validation is recorded in
+[Stage225](stages.md#stage225-unary-float-function-pointer-repeat-arrays).

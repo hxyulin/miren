@@ -125,7 +125,10 @@ impl<'tcx> Engine<'tcx> {
         let result = signature.output();
         let primitive = arity == 1
             && signature.inputs()[0] == result
-            && matches!(result.kind(), ty::Bool | ty::Char);
+            && matches!(
+                result.kind(),
+                ty::Bool | ty::Char | ty::Float(ty::FloatTy::F32 | ty::FloatTy::F64)
+            );
         for original in signature.inputs().iter().chain(std::iter::once(&result)) {
             let selected = self.repeat_type_work(*original, arguments, depth, work)?;
             if !primitive && !matches!(selected.kind(), ty::Int(_) | ty::Uint(_)) {

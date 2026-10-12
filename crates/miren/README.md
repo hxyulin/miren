@@ -1321,3 +1321,11 @@ Float Repeat remains unsupported. Opaque, generic, ABI, count, dispatch and sele
 retain conservative refusals. Six appended survey cases are measured across four profiles;
 completed ROOT checks and release comparison are recorded in
 [Stage224](../../docs/stages.md#stage224-unary-bool-and-char-function-pointer-repeat-arrays).
+
+Known Repeat construction accepts exact original unary f32-to-f32 and f64-to-f64 pointers.
+Existing Bool/Char and integer routes, Move evaluation, selected-body/returned Memory checks and
+all admission bounds remain unchanged. Float raw-copy and sign-bit claims require actual bodies;
+decoder consistency does not authenticate substituted NaN payloads. Arithmetic NaN behavior
+retains its existing limitations. Dedicated compiler, unchanged-claim mutation and omitted-body
+controls pass, and the two existing Float Repeat survey cases prove across four profiles. See
+[Stage225](../../docs/stages.md#stage225-unary-float-function-pointer-repeat-arrays).

@@ -6604,3 +6604,43 @@ review remains separate from ROOT consistency validation.
 Evidence: /tmp/miren-primitive-repeat-parent223/compatibility-completed,
 /tmp/miren-stage224-root-full-checks, /tmp/miren-stage224-root-survey and
 /tmp/miren-stage224-root-release-comparison-ready.
+
+## Stage225: unary Float function-pointer Repeat arrays
+
+Known Repeat arrays now admit exact original nongeneric safe Rust `fn(f32) -> f32` and
+`fn(f64) -> f64` signatures. The operand is evaluated once, including at zero count; Move
+consumption, construction and dispatch limits are preserved. Calls execute actual selected bodies
+and retain current returned Memory. Opaque, generic, ABI, mixed-width and missing-body cases
+remain UNKNOWN. Float arithmetic NaN limitations and mutable Float pair admission are unchanged.
+
+Two existing manifest expectations advance from UNKNOWN to PROVED. The other 257 case objects
+and all survey guest assertions remain unchanged. Four fresh ROOT host/ARM O0/O2 surveys measure
+259 cases across 87 families: 107 PROVED, 89 REFUTED and 63 UNKNOWN per profile.
+
+The owner comparison measures 32 existing Float Proof pairs: 24 literal FULL and eight exact
+Repeat promotions. All 32 baseline rich queried obligations/models remain exact prefixes of
+40 current ones. Four global profiles measure 1,036 pairs: 1,028 literal FULL and eight exact
+promotions, with all 1,968 baseline rich queries/models exact prefixes of 1,976 current ones.
+Partial UNKNOWN evidence participates in these comparisons. No Resource exception was used.
+
+Dedicated tests execute actual identity and negation bodies and check signed zeros, infinities,
+subnormals and NaN representations. Actual helper mutations refute unchanged assertions, produce
+queried counterexamples/models and fail native execution at O0/O2. Genuine retained dependencies
+prove; omitted selected and constant bodies remain UNKNOWN. Native and dependency controls run
+within the integration tests; no standalone archived corpus replay is claimed.
+
+All 24 required ROOT commands pass, including formatting, lint, workspace/Python tests, release
+builds, dependency policy, documentation, three examples with ARM releases and manual hooks.
+Actual logs contain 884 workspace and 9 example Rust tests:
+893 outer Rust tests, plus 91 Python tests. One nested native ticket test is excluded.
+
+Four fresh ROOT release captures use the owner's exact frozen guest paths and compare the full
+1,036 Proof objects, including all 1,976 rich queried obligations/models. The detailed independent
+comparison record preserves any qualified Resource context. No baseline, historical 100-group,
+native or dependency corpus replay is claimed. Pre-upkeep captures keep their original source
+association; only two measured expectation files change afterward. Final prose keeps a separate
+source association. These selected capabilities do not establish full Rust parity.
+
+Evidence: /tmp/miren-float-repeat-parent224/final-checkpoint,
+/tmp/miren-stage225-root-full-checks, /tmp/miren-stage225-root-survey and
+/tmp/miren-stage225-root-comparison-data-audit.json.

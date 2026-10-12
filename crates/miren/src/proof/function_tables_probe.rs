@@ -1346,6 +1346,12 @@ fn compiler_known_pointer_repeat_authenticates_cached_assignments() {
 #[inline(never)] pub fn identity(value: u16) -> u16 { value }
 #[inline(never)] pub fn boolean(value: bool) -> bool { value }
 #[inline(never)] pub fn character(value: char) -> char { value }
+#[inline(never)] pub fn floating32(value: f32) -> f32 { value }
+#[inline(never)] pub fn floating64(value: f64) -> f64 { value }
+pub fn float32_twice(value: fn(f32)->f32) -> [fn(f32)->f32;2] { [value;2] }
+pub fn float64_twice(value: fn(f64)->f64) -> [fn(f64)->f64;2] { [value;2] }
+pub fn mixed_float(value: f32) -> f64 { value as f64 }
+
 pub fn bool_twice(value: fn(bool)->bool) -> [fn(bool)->bool;2] { [value;2] }
 pub fn char_twice(value: fn(char)->char) -> [fn(char)->char;2] { [value;2] }
 #[inline(never)] pub fn binary(a: u16, b: i32) -> i64 { (a as i64) - (b as i64) }
@@ -1421,6 +1427,8 @@ fn check_known_repeats<'tcx>(tcx: TyCtxt<'tcx>, output: &std::path::Path) {
         "too_large",
         "bool_twice",
         "char_twice",
+        "float32_twice",
+        "float64_twice",
     ] {
         let definition = find(name);
         let instance = engine
@@ -1455,6 +1463,8 @@ fn check_known_repeats<'tcx>(tcx: TyCtxt<'tcx>, output: &std::path::Path) {
         let helper = match name {
             "bool_twice" => "boolean",
             "char_twice" => "character",
+            "float32_twice" => "floating32",
+            "float64_twice" => "floating64",
             _ => "identity",
         };
         let selected = engine
@@ -1486,7 +1496,7 @@ fn check_known_repeats<'tcx>(tcx: TyCtxt<'tcx>, output: &std::path::Path) {
             };
             let count = match name {
                 "once" => 1,
-                "twice" | "bool_twice" | "char_twice" => 2,
+                "twice" | "bool_twice" | "char_twice" | "float32_twice" | "float64_twice" => 2,
                 "sixteen" => 16,
                 "large" => 128,
                 "too_large" => unreachable!(),
@@ -1534,7 +1544,10 @@ fn check_known_repeats<'tcx>(tcx: TyCtxt<'tcx>, output: &std::path::Path) {
         observations.push(format!(
             "{name}: actual Repeat/cached identity/refusal controls"
         ));
-        if !matches!(name, "twice" | "bool_twice" | "char_twice") {
+        if !matches!(
+            name,
+            "twice" | "bool_twice" | "char_twice" | "float32_twice" | "float64_twice"
+        ) {
             continue;
         }
         for count in [0, 1, 16, 128, 129] {
@@ -1664,7 +1677,14 @@ fn check_known_repeats<'tcx>(tcx: TyCtxt<'tcx>, output: &std::path::Path) {
                 .is_err()
         );
         let wrong = engine
-            .resolve_function_item(find("binary"), tcx.mk_args(&[]))
+            .resolve_function_item(
+                find(if name == "float32_twice" {
+                    "mixed_float"
+                } else {
+                    "binary"
+                }),
+                tcx.mk_args(&[]),
+            )
             .unwrap();
         let wrong = engine
             .register_function_pointer(Target::Known {

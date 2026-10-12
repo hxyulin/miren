@@ -60,14 +60,14 @@ covers 259 cases across 87 families.
 
 Known local integer function tables support one or two integer arguments, preserving exact
 compiler signatures and executing selected helper bodies. Authenticated MIR Repeat assignments
-can construct bounded arrays of known integer, unary Bool and unary Char function pointers.
+can construct bounded arrays of known integer, unary Bool, unary Char and unary Float pointers.
 Selected calls still require
 actual bodies; opaque targets and pointer-bearing product repeats remain unsupported.
 See the [capability evidence](docs/rust-capabilities.md) for scope and limits.
 Known nongeneric Bool-to-Bool and Char-to-Char tables also execute actual available bodies.
 Char values retain Unicode scalar validity; opaque targets and missing bodies remain UNKNOWN.
-Known unary f32/f64 tables also execute actual bodies with checked raw representation.
-Float Repeat and mixed signatures remain unsupported.
+Known unary f32/f64 tables and Repeat arrays execute actual bodies with checked raw representation.
+Mixed signatures and opaque targets remain unsupported.
 
 ## Install
 

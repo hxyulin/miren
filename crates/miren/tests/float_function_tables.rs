@@ -16,16 +16,21 @@ fn exact_float_tables_follow_actual_bits_and_bodies() {
         ("selected32", ProofStatus::Proved),
         ("wrong32", ProofStatus::Refuted),
         ("opaque32", ProofStatus::Unknown),
-        ("repeat32", ProofStatus::Unknown),
+        ("repeat32", ProofStatus::Proved),
         ("selected64", ProofStatus::Proved),
         ("wrong64", ProofStatus::Refuted),
         ("opaque64", ProofStatus::Unknown),
-        ("repeat64", ProofStatus::Unknown),
+        ("repeat64", ProofStatus::Proved),
     ];
     for target in [None, Some("thumbv7em-none-eabihf")] {
         for optimized in [false, true] {
             let report = verify(&fixture(), &entries, target, optimized, &[]);
-            for (name, body) in [("selected32", "second32"), ("selected64", "second64")] {
+            for (name, body) in [
+                ("selected32", "second32"),
+                ("selected64", "second64"),
+                ("repeat32", "first32"),
+                ("repeat64", "first64"),
+            ] {
                 let proof = report
                     .functions
                     .iter()

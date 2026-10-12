@@ -12,11 +12,10 @@ structured UNKNOWN reporting, and passing repository checks. Completion establis
 baseline. It does not establish full Rust support or a completed memory-model refactor.
 
 The current manifest contains 259 cases across 87 families.
-Completed ROOT host/ARM O0/O2 surveys each measure
-105 PROVED, 89 REFUTED and 65 UNKNOWN. Six Bool/Char Repeat cases append to the unchanged
-253-case source and manifest prefix. Required checks and fresh release comparison are
-recorded in
-[Stage224](stages.md#stage224-unary-bool-and-char-function-pointer-repeat-arrays).
+Completed ROOT host/ARM O0/O2 surveys each measure 107 PROVED, 89 REFUTED and 63 UNKNOWN.
+The two existing Float Repeat controls now prove; the other 257 case objects and every original
+survey assertion remain unchanged. Required checks and release comparisons are recorded in
+[Stage225](stages.md#stage225-unary-float-function-pointer-repeat-arrays).
 These are selected capabilities, not a Rust parity percentage.
 
 Historical Stage217 host/ARM O0/O2 surveys
@@ -2330,3 +2329,15 @@ Existing integer Repeat and all admission bounds remain unchanged. Opaque, gener
 and missing-body controls remain UNKNOWN; Float Repeat remains unsupported. Six appended cases
 preserve all 253 prior manifest objects and the literal guest prefix. Completed validation is in
 [Stage224](stages.md#stage224-unary-bool-and-char-function-pointer-repeat-arrays).
+
+## Unary Float function-pointer Repeat arrays
+
+Known Repeat arrays admit exact original nongeneric safe Rust unary f32-to-f32 and f64-to-f64
+signatures. Construction preserves evaluation once, Move consumption, zero-count behavior and
+existing admission limits. Selected calls execute actual available bodies and validate current
+returned Memory. Copy and negation retain raw bits; arithmetic NaN limitations remain unchanged.
+Opaque, generic, ABI, mixed-width, count, dispatch and missing-body controls remain UNKNOWN.
+Two existing survey expectations advance to PROVED without changing guest assertions or adding
+premises. Dedicated tests include unchanged-claim helper mutations with solver counterexamples
+and native failures, plus genuine retained and omitted dependencies. Validation is recorded in
+[Stage225](stages.md#stage225-unary-float-function-pointer-repeat-arrays).
