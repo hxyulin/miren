@@ -7092,3 +7092,45 @@ Evidence: /tmp/miren-stage241-root-corrected-checks/complete.json,
 /tmp/miren-stage241-root-isolated-evidence-review.json,
 /tmp/miren-stage241-root-array-probe/proof-audit.json and
 /tmp/miren-stage241-root-survey-proof-audit.json.
+
+
+## Stage242: certified effect-free custom Box destruction
+
+Aligned fieldless local zero-sized Box payloads support exact effect-free custom Drop. A separate
+certificate authenticates the original unpacked Freeze type, physical zero fields and layout,
+actual selected Drop trait/Self/full Instance and original fieldless value. Complete raw/current
+payload glue and destructor schemas require the exact receiver, forwarding, Unit result and normal
+return. Current Body source identity is checked independently. Existing Box/Global forwarding
+checks remain; the private encoder admits only the exact certified payload leaf. No receiver,
+shared or raw payload permission is granted. Effectful, panicking, nonzero, nested and array
+payloads remain unsupported. Ordinary Unarmed execution pays the additional actual checks.
+
+Four compiler callbacks pass on host/ARM O0/O2, including hostile current bodies/source headers,
+forged Instance/layout, borrowed owners and duplicate retirement. Three authored integrations
+pass. Dedicated captures retain 68 full Proofs: 24 PROVED, twelve REFUTED and 32 UNKNOWN, with
+twelve queries/models and no assumptions or trusted calls. Actual helper mutations refute
+unchanged assertions; destructor panic mutations remain UNKNOWN in the analyzer. Native original
+runs pass and both mutants fail at O0/O2. Eight additional unchanged old aligned/nominal destructor
+Proofs are PROVED across four profiles, corroborated by native originals and real panic mutations.
+
+Fresh release surveys each report 172 PROVED, 112 REFUTED and 85 UNKNOWN across 369 cases and
+95 families. Twelve cases are appended. The unchanged aligned zero-sized Box destructor entry
+advances from UNKNOWN to PROVED. All other 356 old case objects and the entire fixture prefix
+remain unchanged. Of 1,424 old whole Proof pairs, 44 match literally and 1,378 differ only by
+the appended-source fingerprint. Two also retain the inherited query-free deadline
+resource-context qualification.
+All 3,392 existing queried obligations and models remain exact.
+
+Formatting, lint, one complete workspace run with 937 outer Rust tests, 91 Python tests,
+release builds, dependency policy, manual hooks and documentation pass.
+The first prototype compiler checks exposed genuine Unit-return retag metadata and the separate
+shim Unit-result local. Both narrow schema corrections preserve failed and forensic captures.
+A previous aligned matrix stopped at its newly proved destructor expectation; unchanged guest
+claims were measured across all four profiles before the old aligned/nominal expectations changed.
+One native evidence-driver exception is retained; completed analyzer/compile commands were not
+repeated. No application rewrite, unsafe premise, resource cap or solver policy changes.
+
+Evidence: /tmp/miren-stage242-root-checks/complete.json,
+/tmp/miren-stage242-root-isolated-evidence-review.json,
+/tmp/miren-owned-zst-drop-source-v4/bounded-handoff.json and
+/tmp/miren-stage242-root-survey-proof-audit.json.

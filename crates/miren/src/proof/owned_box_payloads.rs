@@ -49,6 +49,9 @@ impl ZeroLayout {
 }
 
 impl<'tcx> Certificate<'tcx> {
+    pub(super) fn new(original: Ty<'tcx>, layout: ZeroLayout) -> Self {
+        Self { original, layout }
+    }
     pub(super) fn original(&self) -> Ty<'tcx> {
         self.original
     }
@@ -162,6 +165,12 @@ impl<'tcx> Engine<'tcx> {
         if original == self.tcx.types.unit {
             return owned_box_templates::certify_unit_protocol(self.tcx, instance);
         }
+        if original.needs_drop(self.tcx, ty::TypingEnv::fully_monomorphized()) {
+            let certificate = owned_box_effect_free_drop::certify_type(self.tcx, original)
+                .map_err(|reason| self.effect_free_drop_error(reason))?;
+            return owned_box_templates::certify_effect_free_protocol(self, instance, &certificate)
+                .map_err(|reason| self.effect_free_drop_error(reason));
+        }
         self.nominal_box_shape(original)?;
         let certificate = Certificate {
             original,
@@ -182,6 +191,15 @@ impl<'tcx> Engine<'tcx> {
                 return Ok(Value::Unit);
             }
             return Err("Box constructor payload differs from initialized Unit".into());
+        }
+        if entry
+            .payload
+            .needs_drop(self.tcx, ty::TypingEnv::fully_monomorphized())
+        {
+            let certificate = owned_box_effect_free_drop::certify_type(self.tcx, entry.payload)
+                .map_err(|reason| self.effect_free_drop_error(reason))?;
+            return owned_box_effect_free_drop::validate_value(self.tcx, &certificate, value)
+                .map_err(|reason| self.effect_free_drop_error(reason));
         }
         let shape = entry
             .shape

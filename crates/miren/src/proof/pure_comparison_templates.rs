@@ -122,7 +122,7 @@ pub(super) fn encode_template_with_alloc<'tcx>(
     core: rustc_span::def_id::CrateNum,
     alloc: Option<rustc_span::def_id::CrateNum>,
 ) -> Result<String, String> {
-    encode_template_domain(tcx, body, core, alloc, false).map_err(|error| error.reason)
+    encode_template_domain(tcx, body, core, alloc, false, None).map_err(|error| error.reason)
 }
 
 /// Byte-copy certificates encode the exact copy operands without admitting runtime pointers.
@@ -131,7 +131,21 @@ pub(super) fn encode_byte_copy_template<'tcx>(
     body: &Body<'tcx>,
     core: rustc_span::def_id::CrateNum,
 ) -> Result<String, TemplateError> {
-    encode_template_domain(tcx, body, core, None, true)
+    encode_template_domain(tcx, body, core, None, true, None)
+}
+
+/// Only the independently certified fieldless Box payload can extend this private comparison.
+/// This permits one exact type, never its crate, destructor name or arbitrary application body.
+pub(super) fn encode_exact_box_payload<'tcx>(
+    tcx: TyCtxt<'tcx>,
+    body: &Body<'tcx>,
+    core: rustc_span::def_id::CrateNum,
+    alloc: rustc_span::def_id::CrateNum,
+    payload: Ty<'tcx>,
+) -> Result<String, String> {
+    super::owned_box_effect_free_drop::certify_type(tcx, payload)?;
+    encode_template_domain(tcx, body, core, Some(alloc), false, Some(payload))
+        .map_err(|error| error.reason)
 }
 
 fn encode_template_domain<'tcx>(
@@ -140,6 +154,7 @@ fn encode_template_domain<'tcx>(
     core: rustc_span::def_id::CrateNum,
     alloc: Option<rustc_span::def_id::CrateNum>,
     byte_copy: bool,
+    payload: Option<Ty<'tcx>>,
 ) -> Result<String, TemplateError> {
     if body.basic_blocks.len() > 128 || body.local_decls.len() > TEMPLATE_NODES {
         return Err(TemplateError::resource(
@@ -150,7 +165,7 @@ fn encode_template_domain<'tcx>(
         return Err("comparison template exceeds its supported body domain".into());
     }
     template_work(body)?;
-    validate_template_core(body, core, alloc)?;
+    validate_template_core(body, core, alloc, payload)?;
     let mut work = 0;
     let mut lines = vec![format!(
         "args={} spread={:?}",
@@ -563,12 +578,14 @@ fn validate_template_core<'tcx>(
     body: &Body<'tcx>,
     core: rustc_span::def_id::CrateNum,
     alloc: Option<rustc_span::def_id::CrateNum>,
+    payload: Option<Ty<'tcx>>,
 ) -> Result<(), TemplateError> {
     use rustc_middle::mir::visit::Visitor;
     let mut checker = CoreTemplateVisitor {
         types: CoreTemplateTypes {
             core,
             alloc,
+            payload,
             count: 0,
             depth: 0,
             exhausted: false,
@@ -588,21 +605,22 @@ fn validate_template_core<'tcx>(
     Ok(())
 }
 
-struct CoreTemplateTypes {
+struct CoreTemplateTypes<'tcx> {
     core: rustc_span::def_id::CrateNum,
     alloc: Option<rustc_span::def_id::CrateNum>,
+    payload: Option<Ty<'tcx>>,
     count: usize,
     depth: usize,
     exhausted: bool,
 }
 
-impl CoreTemplateTypes {
+impl CoreTemplateTypes<'_> {
     fn permits(&self, krate: rustc_span::def_id::CrateNum) -> bool {
         krate == self.core || self.alloc == Some(krate)
     }
 }
 
-impl<'tcx> ty::TypeVisitor<TyCtxt<'tcx>> for CoreTemplateTypes {
+impl<'tcx> ty::TypeVisitor<TyCtxt<'tcx>> for CoreTemplateTypes<'tcx> {
     type Result = std::ops::ControlFlow<()>;
 
     fn visit_ty(&mut self, original: Ty<'tcx>) -> Self::Result {
@@ -612,6 +630,9 @@ impl<'tcx> ty::TypeVisitor<TyCtxt<'tcx>> for CoreTemplateTypes {
             return std::ops::ControlFlow::Break(());
         }
         self.count += 1;
+        if self.payload == Some(original) {
+            return std::ops::ControlFlow::Continue(());
+        }
         let named = match original.kind() {
             ty::Adt(def, _) => Some(def.did()),
             ty::FnDef(id, _) | ty::Closure(id, _) => Some(*id),
@@ -673,13 +694,13 @@ impl<'tcx> ty::TypeVisitor<TyCtxt<'tcx>> for CoreTemplateTypes {
     }
 }
 
-struct CoreTemplateVisitor {
-    types: CoreTemplateTypes,
+struct CoreTemplateVisitor<'tcx> {
+    types: CoreTemplateTypes<'tcx>,
     valid: bool,
     work: usize,
 }
 
-impl<'tcx> rustc_middle::mir::visit::Visitor<'tcx> for CoreTemplateVisitor {
+impl<'tcx> rustc_middle::mir::visit::Visitor<'tcx> for CoreTemplateVisitor<'tcx> {
     fn visit_var_debug_info(&mut self, info: &rustc_middle::mir::VarDebugInfo<'tcx>) {
         // Debug-only promoted Global constants are not executable MIR operands. Existing
         // comparison validation stays unchanged; the owned encoder still visits every statement.

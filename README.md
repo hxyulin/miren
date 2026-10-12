@@ -60,7 +60,7 @@ stores. Whole product helpers execute actual bodies and preserve returned storag
 calls and proper reborrows remain UNKNOWN. Deeper scalar nesting and the dedicated
 proper-reborrow caller remain UNKNOWN. Bounded owned u16 products support writes through multiple
 symbolic suffix indices, preserving compiler types and current Memory. The capability manifest
-covers 357 cases across 94 families, including concrete and symbolic local byte-copy controls.
+covers 369 cases across 95 families, including concrete and symbolic local byte-copy controls.
 
 Finite known shared trait objects can be selected from local fixed arrays and retained slices.
 Selected alternatives execute actual method bodies, preserving their backing references and

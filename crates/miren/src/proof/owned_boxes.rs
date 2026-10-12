@@ -76,7 +76,14 @@ impl<'tcx> Engine<'tcx> {
     }
 
     fn register_nominal_box(&mut self, payload: Ty<'tcx>) -> Result<usize, String> {
-        let (shape, slots) = self.nominal_box_shape(payload)?;
+        let (shape, slots) = if payload.needs_drop(self.tcx, ty::TypingEnv::fully_monomorphized()) {
+            owned_box_effect_free_drop::certify_type(self.tcx, payload)
+                .map_err(|reason| self.effect_free_drop_error(reason))?;
+            (None, 1)
+        } else {
+            let (shape, slots) = self.nominal_box_shape(payload)?;
+            (Some(shape), slots)
+        };
         let original = self.original_box_type(payload)?;
         if let Some(index) = self
             .owned_box_types
@@ -95,7 +102,7 @@ impl<'tcx> Engine<'tcx> {
         self.owned_box_types.push(BoxType {
             original,
             payload,
-            shape: Some(shape),
+            shape,
             slots,
         });
         Ok(index)
@@ -558,6 +565,16 @@ impl<'tcx> Engine<'tcx> {
                 "logical owned Box region grants readonly Unit borrowing only".into(),
             ));
         }
+        if self
+            .region_box_type(&source)?
+            .payload
+            .needs_drop(self.tcx, ty::TypingEnv::fully_monomorphized())
+        {
+            return Err(self.categorized_error(
+                UnknownCategory::Semantics,
+                "effect-free Box Drop certificate grants no payload reference authority".into(),
+            ));
+        }
         let Value::OwnedRegion { kind, .. } = &source else {
             unreachable!()
         };
@@ -608,6 +625,11 @@ impl<'tcx> Engine<'tcx> {
             location,
             if payload == self.tcx.types.unit {
                 "complete selected Unit Box DropGlue/Global zero-size certificate; region retired"
+            } else if payload.needs_drop(self.tcx, ty::TypingEnv::fully_monomorphized()) {
+                concat!(
+                    "complete original/current effect-free custom Drop/Box/Global certificate; ",
+                    "region retired"
+                )
             } else {
                 "complete typed nominal Box DropGlue/Global zero-size certificate; region retired"
             },

@@ -964,9 +964,7 @@
     {
       "entry": "aligned_zero_box_drop_unknown",
       "family": "aligned_zero_box",
-      "expected": "unknown",
-      "unknown_reason": "owned nominal Box payload requires Copy, Freeze and no drop glue",
-      "unknown_category": "semantics"
+      "expected": "proved"
     },
     {
       "entry": "integer_slice_child_call",
@@ -1951,6 +1949,80 @@
       "entry": "array_move_initialization_survey::covering_array_repair",
       "family": "array_move_initialization",
       "expected": "proved"
+    },
+    {
+      "entry": "effect_free_zst_box_drop_survey::implicit",
+      "family": "effect_free_zst_box_drop",
+      "expected": "proved"
+    },
+    {
+      "entry": "effect_free_zst_box_drop_survey::explicit",
+      "family": "effect_free_zst_box_drop",
+      "expected": "proved"
+    },
+    {
+      "entry": "effect_free_zst_box_drop_survey::transfer",
+      "family": "effect_free_zst_box_drop",
+      "expected": "proved"
+    },
+    {
+      "entry": "effect_free_zst_box_drop_survey::independent",
+      "family": "effect_free_zst_box_drop",
+      "expected": "proved"
+    },
+    {
+      "entry": "effect_free_zst_box_drop_survey::branches",
+      "family": "effect_free_zst_box_drop",
+      "expected": "proved"
+    },
+    {
+      "entry": "effect_free_zst_box_drop_survey::wrong_tag",
+      "family": "effect_free_zst_box_drop",
+      "expected": "refuted"
+    },
+    {
+      "entry": "effect_free_zst_box_drop_survey::panicking",
+      "family": "effect_free_zst_box_drop",
+      "expected": "unknown",
+      "unknown_reason":
+        "effect-free Box Drop original/current destructor identity or locals differ",
+      "unknown_category": "semantics"
+    },
+    {
+      "entry": "effect_free_zst_box_drop_survey::effectful",
+      "family": "effect_free_zst_box_drop",
+      "expected": "unknown",
+      "unknown_reason":
+        "effect-free Box Drop original/current destructor identity or locals differ",
+      "unknown_category": "semantics"
+    },
+    {
+      "entry": "effect_free_zst_box_drop_survey::nested",
+      "family": "effect_free_zst_box_drop",
+      "expected": "unknown",
+      "unknown_reason": "effect-free Box Drop requires local fieldless unpacked Freeze storage",
+      "unknown_category": "semantics"
+    },
+    {
+      "entry": "effect_free_zst_box_drop_survey::nonzero",
+      "family": "effect_free_zst_box_drop",
+      "expected": "unknown",
+      "unknown_reason": "effect-free Box Drop requires local fieldless unpacked Freeze storage",
+      "unknown_category": "semantics"
+    },
+    {
+      "entry": "effect_free_zst_box_drop_survey::zero_array",
+      "family": "effect_free_zst_box_drop",
+      "expected": "unknown",
+      "unknown_reason": "effect-free Box Drop requires local fieldless unpacked Freeze storage",
+      "unknown_category": "semantics"
+    },
+    {
+      "entry": "effect_free_zst_box_drop_survey::not_freeze",
+      "family": "effect_free_zst_box_drop",
+      "expected": "unknown",
+      "unknown_reason": "effect-free Box Drop requires local fieldless unpacked Freeze storage",
+      "unknown_category": "semantics"
     }
   ]
 }

@@ -1594,3 +1594,22 @@ precise paths, foreign/type/retirement refusal and branch-local masks.
 Four-profile compiler claims cover array and nested destructuring, whole covering repairs and
 actual helper mutations. Native originals pass and mutations fail; the prior invalid indexed-Move
 MIR remains UNKNOWN. Host compiler controls check masks and original-type/lifetime associations.
+
+Owned aligned fieldless local zero-size Box payloads can have an independently certified
+custom Drop implementation. This separate certificate requires the original local unpacked Freeze
+struct, zero physical fields, exact zero size/alignment and selected Drop trait/self/full Instance.
+It validates the original fieldless value directly; it does not use or broaden the Copy product
+certificate. Raw and current payload shim/destructor bodies must have the complete specified
+receiver, forwarding and effect-free normal Return schemas. The original Box/Global protocol
+remains certified, with current forwarding bodies independently compared to their raw instances.
+Only the exact certified payload type can extend the private forwarding encoder; its crate and
+arbitrary local functions remain excluded.
+
+Certification models absence of destructor effects. It does not execute an application Drop
+callback or grant its mutable receiver, raw or shared payload reference rights. Every body/type,
+value and live/sealed owner gate completes before the normal single region retirement. Missing,
+effectful, panicful or incompatible bodies stay UNKNOWN; nonzero allocation, nested/array payload
+Drop and general destructors are separate unsupported domains. Existing Unit and Copy/noDrop
+routes preserve their original schemas. The new route is ordinary Unarmed execution, with actual
+additional type, body clone/cache, complete encoding and comparison work; it gives no Armed fee
+or resource discount. Existing per-body template and cumulative owner/storage limits remain.

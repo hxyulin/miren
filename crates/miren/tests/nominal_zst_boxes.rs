@@ -97,7 +97,6 @@ fn verify_dependency(
                     UnknownCategory::Semantics,
                     "unsupported original child type",
                 ),
-                "drop_payload" => (UnknownCategory::Semantics, "Copy, Freeze and no drop glue"),
                 "enum_payload" | "external_payload" => (
                     UnknownCategory::Semantics,
                     "exact local nominal zero-sized struct",
@@ -197,7 +196,7 @@ fn nominal_zero_boxes_preserve_original_payload_and_retirement() {
         ("pat_zero", ProofStatus::Unknown),
         ("core_zero", ProofStatus::Unknown),
         ("aligned", ProofStatus::Proved),
-        ("drop_payload", ProofStatus::Unknown),
+        ("drop_payload", ProofStatus::Proved),
         ("enum_payload", ProofStatus::Unknown),
         ("arbitrary_input", ProofStatus::Unknown),
         ("weighted_raw_budget", ProofStatus::Unknown),

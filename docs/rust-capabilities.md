@@ -11,8 +11,12 @@ execution at O0 and O2, positive/refuted/unknown controls, a source mutation tha
 structured UNKNOWN reporting, and passing repository checks. Completion establishes a repeatable
 baseline. It does not establish full Rust support or a completed memory-model refactor.
 
-The current manifest contains 357 cases across 94 families.
-The completed Stage241 host/ARM O0/O2 surveys measured 166 PROVED, 111 REFUTED and 80 UNKNOWN.
+The current manifest contains 369 cases across 95 families.
+The completed Stage242 host/ARM O0/O2 surveys measured 172 PROVED, 112 REFUTED and 85 UNKNOWN.
+Fieldless local zero-sized Box payloads support certified effect-free custom Drop, preserving
+original/current compiler bodies and exact owner retirement. Effectful and allocating payloads
+remain unsupported. One unchanged old destructor case advances from UNKNOWN to PROVED.
+The preceding Stage241 surveys measured 166 PROVED, 111 REFUTED and 80 UNKNOWN across 357 cases.
 Fixed-array moves retain typed initialization holes, distinguish siblings and nested elements,
 and support covering whole-array repair. Whole reads over holes and invalid indexed MIR remain
 unsupported; partial-array destruction is a separate boundary.

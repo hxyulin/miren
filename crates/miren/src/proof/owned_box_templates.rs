@@ -5,6 +5,8 @@ use rustc_span::Symbol;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) enum BoxTemplateFamily {
+    EffectFreePayloadGlue,
+    EffectFreeDestructor,
     MemDrop,
     UnitBoxDropGlue,
     UnitDropGlue,
@@ -65,6 +67,8 @@ fn reached_blocks(
         (BoxTemplateFamily::MemDrop, ProtocolInput::Owner) => Ok(&[0, 1]),
         (BoxTemplateFamily::UnitBoxDropGlue, ProtocolInput::OwnerReference) => Ok(&[0, 2, 1]),
         (BoxTemplateFamily::UnitDropGlue, ProtocolInput::PayloadReference) => Ok(&[0]),
+        (BoxTemplateFamily::EffectFreePayloadGlue, ProtocolInput::PayloadReference) => Ok(&[0, 1]),
+        (BoxTemplateFamily::EffectFreeDestructor, ProtocolInput::PayloadReference) => Ok(&[0]),
         // Original size_of_val is zero and align_of_val is the certified alignment.
         // Both UbChecks settings are covered; size selects bb3, excluding deallocate.
         (BoxTemplateFamily::BoxDrop, ProtocolInput::OwnerReference) => {
@@ -186,7 +190,7 @@ pub(super) fn certify_unit_protocol<'tcx>(
     tcx: TyCtxt<'tcx>,
     outer: ty::Instance<'tcx>,
 ) -> Result<(), String> {
-    certify_protocol(tcx, outer, tcx.types.unit, None)
+    certify_protocol(tcx, outer, tcx.types.unit, None, None)
 }
 
 pub(super) fn certify_nominal_protocol<'tcx>(
@@ -194,7 +198,38 @@ pub(super) fn certify_nominal_protocol<'tcx>(
     outer: ty::Instance<'tcx>,
     certificate: &owned_box_payloads::Certificate<'tcx>,
 ) -> Result<(), String> {
-    certify_protocol(tcx, outer, certificate.original(), Some(certificate))
+    certify_protocol(tcx, outer, certificate.original(), Some(certificate), None)
+}
+
+pub(super) fn certify_effect_free_protocol<'tcx>(
+    engine: &Engine<'tcx>,
+    outer: ty::Instance<'tcx>,
+    certificate: &owned_box_effect_free_drop::Certificate<'tcx>,
+) -> Result<(), String> {
+    let actual = owned_box_effect_free_drop::certify_type(engine.tcx, certificate.original)?;
+    if actual.destructor != certificate.destructor || actual.layout != certificate.layout {
+        return Err("effect-free Box Drop certificate differs from original selected type".into());
+    }
+    let nominal = owned_box_payloads::Certificate::new(certificate.original, certificate.layout);
+    if engine.tcx.get_diagnostic_item(Symbol::intern("box_new")) == Some(outer.def_id()) {
+        // Constructor normal blocks do not visit cleanup Drop. Certify the actual complete
+        // owner destruction chain independently before any custom-payload owner is issued.
+        let owner = engine.original_box_type(certificate.original)?;
+        certify_protocol(
+            engine.tcx,
+            ty::Instance::resolve_drop_glue(engine.tcx, owner),
+            certificate.original,
+            Some(&nominal),
+            Some((engine, certificate)),
+        )?;
+    }
+    certify_protocol(
+        engine.tcx,
+        outer,
+        certificate.original,
+        Some(&nominal),
+        Some((engine, certificate)),
+    )
 }
 
 fn certify_protocol<'tcx>(
@@ -202,6 +237,10 @@ fn certify_protocol<'tcx>(
     outer: ty::Instance<'tcx>,
     original: Ty<'tcx>,
     nominal: Option<&owned_box_payloads::Certificate<'tcx>>,
+    effect_free: Option<(
+        &Engine<'tcx>,
+        &owned_box_effect_free_drop::Certificate<'tcx>,
+    )>,
 ) -> Result<(), String> {
     let owned = tcx
         .lang_items()
@@ -270,10 +309,23 @@ fn certify_protocol<'tcx>(
         if seen.len() > 512 {
             return Err("Box body certificate exceeds its node budget".into());
         }
-        if instance.def_id().krate != core && instance.def_id().krate != owned.krate {
+        let local_destructor = effect_free.is_some_and(|(_, certificate)| {
+            instance == certificate.destructor
+                && input == ProtocolInput::PayloadReference
+                && expected_family == Some(BoxTemplateFamily::EffectFreeDestructor)
+        });
+        if instance.def_id().krate != core
+            && instance.def_id().krate != owned.krate
+            && !local_destructor
+        {
             return Err(
                 "Box protocol selected a definition outside authenticated core/alloc".into(),
             );
+        }
+        if let Some((engine, _)) = effect_free
+            && matches!(instance.def, ty::InstanceKind::Item(id) if !tcx.is_mir_available(id))
+        {
+            return Err(engine.missing_body_reason(instance.def_id()));
         }
         match instance.def {
             ty::InstanceKind::Item(id) if tcx.is_mir_available(id) => {}
@@ -291,11 +343,24 @@ fn certify_protocol<'tcx>(
             )
             .map_err(|_| "Box selected body could not be instantiated")?;
         let definition = pure_comparison_templates::owned_definition_key(instance.def_id());
-        let family = if original != tcx.types.unit
+        let payload_glue = effect_free.is_some_and(|(_, certificate)| {
+            instance == ty::Instance::resolve_drop_glue(tcx, certificate.original)
+        });
+        let family = if local_destructor {
+            owned_box_effect_free_drop::destructor_body(
+                tcx,
+                instance,
+                &body,
+                effect_free.unwrap().1,
+            )?
+        } else if payload_glue {
+            owned_box_effect_free_drop::payload_glue(tcx, instance, &body, effect_free.unwrap().1)?
+        } else if original != tcx.types.unit
             && matches!(
                 instance.def,
                 ty::InstanceKind::Shim(ty::ShimKind::DropGlue(_, _))
-            ) {
+            )
+        {
             owned_box_glue::nominal_glue(
                 tcx,
                 instance,
@@ -314,6 +379,46 @@ fn certify_protocol<'tcx>(
                 format!("Box protocol body differs from its complete reference: {definition}")
             })?
         };
+        if let Some((engine, certificate)) = effect_free {
+            let current = engine.instantiated_body(instance)?;
+            if current.source.instance != instance.def || current.source.promoted.is_some() {
+                return Err("effect-free Box protocol current source Instance differs".into());
+            }
+
+            if local_destructor {
+                owned_box_effect_free_drop::destructor_body(tcx, instance, &current, certificate)?;
+            } else if payload_glue {
+                owned_box_effect_free_drop::payload_glue(tcx, instance, &current, certificate)?;
+            } else if family == BoxTemplateFamily::UnitBoxDropGlue {
+                owned_box_glue::nominal_glue(
+                    tcx,
+                    instance,
+                    &current,
+                    nominal.ok_or("effect-free Box owner certificate unavailable")?,
+                    box_type,
+                )?;
+            } else {
+                let raw = pure_comparison_templates::encode_exact_box_payload(
+                    tcx,
+                    &body,
+                    core,
+                    owned.krate,
+                    original,
+                )?;
+                let live = pure_comparison_templates::encode_exact_box_payload(
+                    tcx,
+                    &current,
+                    core,
+                    owned.krate,
+                    original,
+                )?;
+                if raw != live {
+                    return Err(
+                        "effect-free Box protocol current body differs from raw body".into(),
+                    );
+                }
+            }
+        }
         if family == BoxTemplateFamily::BoxNew && instance.def_id() != constructor {
             return Err("Box constructor does not have the actual diagnostic identity".into());
         }
@@ -322,7 +427,12 @@ fn certify_protocol<'tcx>(
             BoxTemplateFamily::MemDrop | BoxTemplateFamily::UnitBoxDropGlue => {
                 instance.args.type_at(0) == box_type
             }
-            BoxTemplateFamily::UnitDropGlue => instance.args.type_at(0) == original,
+            BoxTemplateFamily::UnitDropGlue | BoxTemplateFamily::EffectFreePayloadGlue => {
+                instance.args.type_at(0) == original
+            }
+            BoxTemplateFamily::EffectFreeDestructor => {
+                effect_free.is_some_and(|(_, certificate)| instance == certificate.destructor)
+            }
             BoxTemplateFamily::BoxDrop => {
                 instance.args.type_at(0) == original && instance.args.type_at(1) == global
             }
@@ -381,6 +491,13 @@ fn certify_protocol<'tcx>(
                         continue;
                     }
                     let (child_family, child_input) = match (family, *index) {
+                        (BoxTemplateFamily::EffectFreePayloadGlue, 0) => {
+                            local_argument(args, 0, 2)?;
+                            (
+                                BoxTemplateFamily::EffectFreeDestructor,
+                                ProtocolInput::PayloadReference,
+                            )
+                        }
                         (BoxTemplateFamily::BoxNew, 0) => {
                             compiler_zero_layout(tcx, &args[0].node, layout)?;
                             (BoxTemplateFamily::BoxNewUninit, ProtocolInput::ZeroLayout)
@@ -439,7 +556,11 @@ fn certify_protocol<'tcx>(
                             box_type,
                         ),
                         BoxTemplateFamily::UnitBoxDropGlue => (
-                            BoxTemplateFamily::UnitDropGlue,
+                            if effect_free.is_some() {
+                                BoxTemplateFamily::EffectFreePayloadGlue
+                            } else {
+                                BoxTemplateFamily::UnitDropGlue
+                            },
                             ProtocolInput::PayloadReference,
                             original,
                         ),
