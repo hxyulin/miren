@@ -11,8 +11,12 @@ execution at O0 and O2, positive/refuted/unknown controls, a source mutation tha
 structured UNKNOWN reporting, and passing repository checks. Completion establishes a repeatable
 baseline. It does not establish full Rust support or a completed memory-model refactor.
 
-The current manifest contains 331 cases across 92 families.
-The completed Stage239 host/ARM O0/O2 surveys measured 146 PROVED, 106 REFUTED and 79 UNKNOWN.
+The current manifest contains 352 cases across 93 families.
+The completed Stage240 host/ARM O0/O2 surveys measured 163 PROVED, 109 REFUTED and 80 UNKNOWN.
+Typed mutable products support guarded symbolic fixed-array suffix reads and stores, including
+nested and correlated indices, mixed scalar leaves and selected whole subproducts. Actual helper
+mutations refute unchanged assertions; aliases and budget exhaustion retain explicit UNKNOWN.
+The preceding Stage239 surveys measured 146 PROVED, 106 REFUTED and 79 UNKNOWN across 331 cases.
 The preceding 295-case surveys measured 127 PROVED, 99 REFUTED and 69 UNKNOWN per profile.
 Ten exact readonly `Option<NonZeroU8>` cases cover correlated payload observations, actual Eq/Ne
 helpers, false claims and unsupported domains. Actual observer and equality mutations refute

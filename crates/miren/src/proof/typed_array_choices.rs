@@ -1763,7 +1763,7 @@ fn conditional_product_field(
     Ok(result)
 }
 
-fn validate_indexed_spans(
+pub(super) fn validate_indexed_spans(
     spans: &[std::ops::Range<usize>],
     count: usize,
     width: usize,
@@ -1888,7 +1888,7 @@ fn owned_row_condition(
     }
 }
 
-fn fixed_index_value(
+pub(super) fn fixed_index_value(
     context: &Context,
     value: &Value,
     pointer_bits: u32,

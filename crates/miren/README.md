@@ -1561,3 +1561,22 @@ Compiler constant observations retain the actual `WithRetag` tag, including the 
 constant producer's `Yes` tag, and require exact original/current producer metadata. Retagged
 local Copy/Move assignments do not transport receipt keys. Recording compiler constant origin
 does not model a Rust retag or grant reference, raw-read or byte-membership permission.
+
+Typed mutable product payload projections can select fixed-array suffixes with genuine symbolic
+Rust usize indices. Each current initialized index is captured once; exact original array counts,
+FieldTy, target width/Context, bounds and complete target coverage precede observation. Nested and
+correlated indices use conjunctions of their real equality guards across pure tuple/array/plain
+local struct compositions. Integer, Bool, Char and f32/f64 columns preserve their original codecs.
+Whole selected subproducts use the same typed observation and replacement validation as fixed paths.
+
+Masked stores compute every selected column in temporary storage and publish one COW update only
+when type, Char/Float validity, Context and all expressions succeed. Unselected suffixes, other
+outer indices and branches retain current storage. Root and current whole-child
+frame/generation/cache checks remain; symbolic selection creates no alias, lease or reference
+permission. Existing constant paths and scalar/owned behavior retain their original checks. Proper
+intervals, general aliases, Product Ghost, Armed execution and uncaptured dereferenced call
+destinations remain conservative. One operation budget512/depth16 spans new traversal, guards,
+column selection and stores; exhaustion refuses before publication. No assumption or cap is widened.
+Host/ARM O0/O2 compiler assertions cover fifteen valid claims, three refuted claims and three
+exact alias/budget refusals. Actual helper/index mutations refute unchanged claims; native originals
+pass and mutants fail. Retained dependency bodies execute; omitted bodies remain UNKNOWN.

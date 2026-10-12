@@ -1689,9 +1689,7 @@
     {
       "entry": "mutable_product_survey::symbolic_suffix",
       "family": "mutable_product_slice",
-      "expected": "unknown",
-      "unknown_category": "unclassified",
-      "unknown_reason": "mutable product symbolic suffix index is unsupported"
+      "expected": "proved"
     },
     {
       "entry": "mutable_product_survey::tuple_pair",
@@ -1807,9 +1805,7 @@
     {
       "entry": "mutable_product_child_survey::symbolic_unknown",
       "family": "mutable_product_children",
-      "expected": "unknown",
-      "unknown_category": "unclassified",
-      "unknown_reason": "mutable product symbolic suffix index is unsupported"
+      "expected": "proved"
     },
     {
       "entry": "mutable_product_child_survey::escape_unknown",
@@ -1817,6 +1813,119 @@
       "expected": "unknown",
       "unknown_category": "semantics",
       "unknown_reason": "mutable u16 child needs direct abort-only Rust body"
+    },
+    {
+      "entry": "mutable_product_symbolic_survey::float_selected",
+      "family": "mutable_product_symbolic_suffix",
+      "expected": "proved"
+    },
+    {
+      "entry": "mutable_product_symbolic_survey::float_other_outer",
+      "family": "mutable_product_symbolic_suffix",
+      "expected": "proved"
+    },
+    {
+      "entry": "mutable_product_symbolic_survey::two_indices",
+      "family": "mutable_product_symbolic_suffix",
+      "expected": "proved"
+    },
+    {
+      "entry": "mutable_product_symbolic_survey::correlated",
+      "family": "mutable_product_symbolic_suffix",
+      "expected": "proved"
+    },
+    {
+      "entry": "mutable_product_symbolic_survey::bool_selected",
+      "family": "mutable_product_symbolic_suffix",
+      "expected": "proved"
+    },
+    {
+      "entry": "mutable_product_symbolic_survey::char_selected",
+      "family": "mutable_product_symbolic_suffix",
+      "expected": "proved"
+    },
+    {
+      "entry": "mutable_product_symbolic_survey::whole_tuple",
+      "family": "mutable_product_symbolic_suffix",
+      "expected": "proved"
+    },
+    {
+      "entry": "mutable_product_symbolic_survey::whole_array",
+      "family": "mutable_product_symbolic_suffix",
+      "expected": "proved"
+    },
+    {
+      "entry": "mutable_product_symbolic_survey::record_fields",
+      "family": "mutable_product_symbolic_suffix",
+      "expected": "proved"
+    },
+    {
+      "entry": "mutable_product_symbolic_survey::tuple_fields",
+      "family": "mutable_product_symbolic_suffix",
+      "expected": "proved"
+    },
+    {
+      "entry": "mutable_product_symbolic_survey::whole_record",
+      "family": "mutable_product_symbolic_suffix",
+      "expected": "proved"
+    },
+    {
+      "entry": "mutable_product_symbolic_survey::zero_selected",
+      "family": "mutable_product_symbolic_suffix",
+      "expected": "proved"
+    },
+    {
+      "entry": "mutable_product_symbolic_survey::sequential",
+      "family": "mutable_product_symbolic_suffix",
+      "expected": "proved"
+    },
+    {
+      "entry": "mutable_product_symbolic_survey::branch",
+      "family": "mutable_product_symbolic_suffix",
+      "expected": "proved"
+    },
+    {
+      "entry": "mutable_product_symbolic_survey::current_child",
+      "family": "mutable_product_symbolic_suffix",
+      "expected": "proved"
+    },
+    {
+      "entry": "mutable_product_symbolic_survey::wrong_float",
+      "family": "mutable_product_symbolic_suffix",
+      "expected": "refuted"
+    },
+    {
+      "entry": "mutable_product_symbolic_survey::wrong_retention",
+      "family": "mutable_product_symbolic_suffix",
+      "expected": "refuted"
+    },
+    {
+      "entry": "mutable_product_symbolic_survey::unguarded_inner",
+      "family": "mutable_product_symbolic_suffix",
+      "expected": "refuted"
+    },
+    {
+      "entry": "mutable_product_symbolic_survey::alias_unknown",
+      "family": "mutable_product_symbolic_suffix",
+      "expected": "unknown",
+      "unknown_category": "semantics",
+      "unknown_reason": "mutable u16 staging needs a private whole tip"
+    },
+    {
+      "entry": "mutable_product_symbolic_survey::budget_unknown",
+      "family": "mutable_product_symbolic_suffix",
+      "expected": "unknown",
+      "unknown_category": "resource_limit",
+      "unknown_reason":
+        "mutable product symbolic projection exceeds its shared node or depth budget"
+    },
+    {
+      "entry": "mutable_product_symbolic_survey::whole_budget",
+      "family": "mutable_product_symbolic_suffix",
+      "expected": "unknown",
+      "unknown_category": "resource_limit",
+      "unknown_reason":
+        "mutable product symbolic projection exceeds its shared node or depth budget"
     }
   ]
 }

@@ -7014,3 +7014,41 @@ Evidence: /tmp/miren-stage239-root-composition-review.json,
 /tmp/miren-constant-receipts-retag-root-tcx-review.json,
 /tmp/miren-stage239-root-checks/complete.json and
 /tmp/miren-stage239-root-survey-proof-audit.json.
+
+## Stage240: symbolic mutable product suffixes
+
+Typed mutable tuple, fixed-array and plain local struct storage supports symbolic fixed-array
+suffix reads and stores. Original types, field identities, initialized current indices, bounds,
+Context, current owner/frame and complete target coverage precede access. Nested and correlated
+indices retain their actual equality guards. Bool, Char and Float validity use existing codecs;
+whole selected subproducts retain their original shapes. Stores publish one completed COW update.
+General aliases, proper intervals, nested owners and unsupported reference permissions stay UNKNOWN.
+One cumulative node/depth budget covers planning, guards, observations and stores without a cap
+change.
+
+The dedicated four-profile matrix records fifteen PROVED, three REFUTED and three exact UNKNOWN
+cases per profile: 84 full Proofs, 744 queries and twelve models. Additional captures retain sixteen
+actual index/payload mutant refutations and dependency P/R/U controls: 28 full Proofs, 212 queries
+and twenty models. Native originals pass at O0/O2; both actual mutants fail unchanged assertions.
+Four MIR-level-zero compiler callbacks validate current storage, hostile type/index/body/lifetime
+associations and atomic refusal. These callbacks are host invariants, not application proofs.
+
+Fresh host/ARM O0/O2 release surveys each report 163 PROVED, 109 REFUTED and 80 UNKNOWN across
+352 cases and 93 families. Two unchanged old symbolic suffix claims advance to PROVED; 21 cases
+are appended. The other 329 manifest objects and complete old fixture prefix remain literal.
+Of their 1,316 whole Proof pairs, 44 match literally and 1,270 differ only by the actual appended
+source fingerprint. One also retains the inherited query-free deadline context qualification;
+one additionally differs only in deadline call-chain depth. All 2,624 unchanged old queried
+obligations and models remain exact; actual differing reports are retained.
+
+Formatting, lint, one corrected full workspace run with 929 outer Rust tests, 91 Python tests,
+release builds, dependency policy, manual hooks and documentation pass. The initial full run
+exposed a copied-fixture module packaging error and was stopped; the missing-file capture remains.
+The added survey module is now self-contained, preserving its assertions, and the copied mutation
+passes both its targeted rerun and the corrected full run. Extra evidence tooling failures are
+retained separately. No application rewrite, assumption, solver policy or resource cap changes.
+
+Evidence: /tmp/miren-stage240-root-corrected-checks/complete.json,
+/tmp/miren-stage240-root-new-symbolic/proof-audit.json,
+/tmp/miren-stage240-root-extra-evidence-review.json and
+/tmp/miren-stage240-root-survey-proof-audit.json.

@@ -87,10 +87,6 @@ fn check_report(output: std::process::Output, entries: &[(&str, ProofStatus)]) {
                         UnknownCategory::Semantics,
                         "mutable u16 child needs direct abort-only Rust body",
                     ),
-                    "symbolic_unknown" => (
-                        UnknownCategory::Unclassified,
-                        "mutable product symbolic suffix index is unsupported",
-                    ),
                     "escape_unknown" => (
                         UnknownCategory::Semantics,
                         "mutable u16 child needs direct abort-only Rust body",
@@ -190,7 +186,7 @@ fn actual_whole_product_children_preserve_current_storage_and_refusals() {
             ("nested_owner_unknown", U),
             ("moved_parent_unknown", U),
             ("interval_unknown", U),
-            ("symbolic_unknown", U),
+            ("symbolic_unknown", P),
             ("escape_unknown", U),
         ],
     );

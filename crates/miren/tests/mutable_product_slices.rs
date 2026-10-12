@@ -149,7 +149,7 @@ fn mutable_product_root_storage_metadata_and_refusals() {
             ("zero_inner", P),
             ("proper_reborrow", U),
             ("unsupported_child", P),
-            ("symbolic_suffix", U),
+            ("symbolic_suffix", P),
             ("pointer_product", U),
             ("reference_product", U),
             ("niche_product", U),

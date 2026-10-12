@@ -5,6 +5,9 @@ use super::mutable_u16_children::Phase;
 use super::*;
 use symbolic::{MutableU16Role, ScalarSliceElement};
 
+#[path = "mutable_product_projection.rs"]
+mod projection;
+
 fn same_product_shape(left: &CompositeShape, right: &CompositeShape) -> bool {
     match (left, right) {
         (CompositeShape::Primitive(left), CompositeShape::Primitive(right)) => left == right,
@@ -532,7 +535,7 @@ impl<'tcx> Engine<'tcx> {
         place: Place<'tcx>,
         descriptor: &'a CompositeType<'tcx>,
         length: &Value,
-    ) -> Result<(Value, Ty<'tcx>, &'a CompositeShape, usize), String> {
+    ) -> Result<projection::Projection<'a, 'tcx>, String> {
         let [ProjectionElem::Deref, outer, suffix @ ..] = place.projection.as_ref() else {
             return Err("mutable product observation needs one direct outer index".into());
         };
@@ -625,7 +628,25 @@ impl<'tcx> Engine<'tcx> {
                         bits,
                     }) = symbolic::constant(&term)
                     else {
-                        return Err("mutable product symbolic suffix index is unsupported".into());
+                        let position = suffix
+                            .iter()
+                            .position(|current| std::ptr::eq(current, projection))
+                            .unwrap();
+                        return projection::prepare(
+                            self,
+                            projection::Source { body, state, place },
+                            projection::Seed {
+                                outer: index,
+                                original,
+                                shape,
+                                start,
+                                first: value,
+                                suffix: &suffix[position..],
+                                columns: descriptor.leaves.len(),
+                                prefix_scan: position + 1,
+                            },
+                        )
+                        .map(projection::Projection::Symbolic);
                     };
                     if width != u32::from(self.tcx.sess.target.pointer_width)
                         || signed
@@ -683,7 +704,9 @@ impl<'tcx> Engine<'tcx> {
         if place.ty(&body.local_decls, self.tcx).ty != original {
             return Err("mutable product projected original type differs".into());
         }
-        Ok((index, original, shape, start))
+        Ok(projection::Projection::Direct(
+            index, original, shape, start,
+        ))
     }
 
     fn product_constant_index(
@@ -764,8 +787,13 @@ impl<'tcx> Engine<'tcx> {
         let Storage::Product(columns) = &backing.data else {
             unreachable!()
         };
-        let (index, _, shape, start) =
-            self.product_projection(body, state, place, descriptor, &length)?;
+        let selected = self.product_projection(body, state, place, descriptor, &length)?;
+        let (index, shape, start) = match selected {
+            projection::Projection::Direct(index, _, shape, start) => (index, shape, start),
+            projection::Projection::Symbolic(mut selection) => {
+                return selection.read(self, columns, &state.conditions).map(Some);
+            }
+        };
         let mut cursor = start;
         let value = shape.observe(&self.terms, columns, &index.integer()?.0, &mut cursor)?;
         if cursor != start + leaf_count(shape)? {
@@ -811,8 +839,18 @@ impl<'tcx> Engine<'tcx> {
         let Storage::Product(columns) = &backing.data else {
             unreachable!()
         };
-        let (index, original, shape, start) =
-            self.product_projection(body, state, place, descriptor, &length)?;
+        let selected = self.product_projection(body, state, place, descriptor, &length)?;
+        let (index, original, shape, start) = match selected {
+            projection::Projection::Direct(index, original, shape, start) => {
+                (index, original, shape, start)
+            }
+            projection::Projection::Symbolic(mut selection) => {
+                let next = selection.store(self, columns, value, &state.conditions)?;
+                std::rc::Rc::make_mut(&mut state.memory.mutable_u16)[id].data =
+                    Storage::Product(next);
+                return Ok(true);
+            }
+        };
         let mut replacements = Vec::new();
         self.product_replacements(original, shape, value, &state.conditions, &mut replacements)?;
         if replacements.len() != leaf_count(shape)? {
