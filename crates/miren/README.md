@@ -1482,3 +1482,9 @@ The separate `local_byte_copy_boundaries` fixture targets a retained first eleme
 copy, the exact 128-byte source limit and a 129-byte refusal. Its payload mutation changes only the
 actual local helper body while preserving the caller assertions. These tests add no production
 model, resource policy or analysis premise.
+
+Ordinary nominal comparison field construction now validates its fresh compiler shape by borrowing
+that shape, then moves the validated root field names and compiler types into the ordered field
+list. It avoids constructing a discarded owned annotation tree and repeating root field extraction.
+Original type, layout and unsupported-domain checks remain required, including legacy Float fields.
+This host refactor adds no Rust feature, comparison relation, analysis premise or resource policy.

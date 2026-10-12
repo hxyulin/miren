@@ -1,6 +1,8 @@
 use super::*;
+use composite_slices::CompositeShape;
 use rustc_middle::mir::{BasicBlock, Local};
 use std::collections::HashMap;
+use symbolic::ScalarSliceElement;
 
 const LIMIT: usize = 512;
 
@@ -135,25 +137,155 @@ impl<'tcx> Engine<'tcx> {
         &self,
         original: Ty<'tcx>,
     ) -> Result<Option<Vec<(String, Ty<'tcx>)>>, String> {
-        let ty::Adt(definition, args) = original.kind() else {
+        let ty::Adt(definition, _) = original.kind() else {
             return Ok(None);
         };
-        if !definition.is_struct() || self.owned_product_shape(original)?.is_none() {
+        if !definition.is_struct() {
             return Ok(None);
         }
-        Ok(Some(
-            definition
-                .non_enum_variant()
-                .fields
-                .iter()
-                .map(|field| {
-                    (
-                        field.name.to_string(),
+        // Preserve the original owned-product scalar probe before its full fresh shape service.
+        let _primitive = self.scalar_slice_element(original)?;
+        let Some(shape) = self.owned_struct_choice_shape(original)? else {
+            return Ok(None);
+        };
+        self.nominal_product_fields_from_shape(original, shape)
+            .map(Some)
+    }
+
+    fn nominal_product_fields_from_shape(
+        &self,
+        original: Ty<'tcx>,
+        shape: CompositeShape,
+    ) -> Result<Vec<(String, Ty<'tcx>)>, String> {
+        // Production callers supply the fresh shape for this exact original Ty. Its existing
+        // Copy/Freeze/no-Drop/layout/physical-field/zero-storage gates have already succeeded.
+        let ty::Adt(definition, args) = original.kind() else {
+            return Err("owned choice annotation differs from original compiler type".into());
+        };
+        match shape {
+            CompositeShape::Struct { name, fields }
+                if self.plain_composite_struct(*definition)
+                    && self.tcx.def_path_str(definition.did()) == name
+                    && definition.non_enum_variant().fields.len() == fields.len() =>
+            {
+                let mut result = Vec::with_capacity(fields.len());
+                for (field, (name, shape)) in
+                    definition.non_enum_variant().fields.iter().zip(fields)
+                {
+                    if field.name.as_str() != name {
+                        return Err("owned struct annotation field identity mismatch".into());
+                    }
+                    let original = field.ty(self.tcx, args).skip_norm_wip();
+                    self.validate_nominal_product_shape(original, &shape)?;
+                    result.push((name, original));
+                }
+                Ok(result)
+            }
+            CompositeShape::Primitive(_)
+            | CompositeShape::Tuple(_)
+            | CompositeShape::Array(_)
+            | CompositeShape::Struct { .. }
+            | CompositeShape::NonZeroNiche(_)
+            | CompositeShape::Sum { .. } => {
+                Err("owned choice annotation differs from original compiler type".into())
+            }
+        }
+    }
+
+    fn validate_nominal_product_shape(
+        &self,
+        original: Ty<'tcx>,
+        shape: &CompositeShape,
+    ) -> Result<(), String> {
+        match shape {
+            CompositeShape::Primitive(kind) => {
+                if self.scalar_slice_element(original)? == Some(*kind) {
+                    Ok(())
+                } else {
+                    Err("owned choice annotation differs from original compiler type".into())
+                }
+            }
+            CompositeShape::Tuple(fields) => {
+                let ty::Tuple(types) = original.kind() else {
+                    return Err(
+                        "owned choice annotation differs from original compiler type".into(),
+                    );
+                };
+                if types.len() != fields.len() {
+                    return Err(
+                        "owned choice annotation differs from original compiler type".into(),
+                    );
+                }
+                for (original, shape) in types.iter().zip(fields) {
+                    self.validate_nominal_product_shape(original, shape)?;
+                }
+                Ok(())
+            }
+            CompositeShape::Array(fields) => {
+                let ty::Array(element, count) = original.kind() else {
+                    return Err(
+                        "owned choice annotation differs from original compiler type".into(),
+                    );
+                };
+                let count = count
+                    .try_to_target_usize(self.tcx)
+                    .ok_or("owned array annotation requires concrete compiler count")?;
+                if count != fields.len() as u64 {
+                    return Err("owned array annotation differs from certified count".into());
+                }
+                if *element == self.tcx.types.u8 {
+                    if fields.iter().any(|field| {
+                        !matches!(
+                            field,
+                            CompositeShape::Primitive(ScalarSliceElement::Integer {
+                                bits: 8,
+                                signed: false,
+                            })
+                        )
+                    }) {
+                        return Err(
+                            "owned byte array annotation differs from certified primitive shape"
+                                .into(),
+                        );
+                    }
+                    return Ok(());
+                }
+                for shape in fields {
+                    self.validate_nominal_product_shape(*element, shape)?;
+                }
+                Ok(())
+            }
+            CompositeShape::Struct { name, fields } => {
+                let ty::Adt(definition, args) = original.kind() else {
+                    return Err(
+                        "owned choice annotation differs from original compiler type".into(),
+                    );
+                };
+                if !self.plain_composite_struct(*definition)
+                    || self.tcx.def_path_str(definition.did()) != *name
+                    || definition.non_enum_variant().fields.len() != fields.len()
+                {
+                    return Err(
+                        "owned choice annotation differs from original compiler type".into(),
+                    );
+                }
+                for (field, (name, shape)) in
+                    definition.non_enum_variant().fields.iter().zip(fields)
+                {
+                    if field.name.as_str() != name {
+                        return Err("owned struct annotation field identity mismatch".into());
+                    }
+                    self.validate_nominal_product_shape(
                         field.ty(self.tcx, args).skip_norm_wip(),
-                    )
-                })
-                .collect(),
-        ))
+                        shape,
+                    )?;
+                }
+                Ok(())
+            }
+            CompositeShape::NonZeroNiche(_) | CompositeShape::Sum { .. } => {
+                Err("owned choice annotation differs from original compiler type".into())
+            }
+        }
     }
 
     // This validates a selected body, not an inventory entry or derive marker. It is separate
@@ -991,6 +1123,328 @@ pub fn wrong(_: Wrong) {} pub fn missing(_: Missing) {} pub fn panic_eq(_: Panic
                         .unwrap()
                         .trim()
                         .into(),
+                ],
+                &mut check,
+            );
+            assert!(check.checked);
+        }
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+}
+
+#[cfg(test)]
+mod nominal_field_constructor_tests {
+    use super::*;
+
+    fn legacy_fields<'tcx>(
+        engine: &Engine<'tcx>,
+        original: Ty<'tcx>,
+    ) -> Result<Option<Vec<(String, Ty<'tcx>)>>, String> {
+        let ty::Adt(definition, args) = original.kind() else {
+            return Ok(None);
+        };
+        if !definition.is_struct() || engine.owned_product_shape(original)?.is_none() {
+            return Ok(None);
+        }
+        Ok(Some(
+            definition
+                .non_enum_variant()
+                .fields
+                .iter()
+                .map(|field| {
+                    (
+                        field.name.to_string(),
+                        field.ty(engine.tcx, args).skip_norm_wip(),
+                    )
+                })
+                .collect(),
+        ))
+    }
+
+    fn changed_root_shapes_refuse<'tcx>(engine: &Engine<'tcx>, original: Ty<'tcx>) {
+        let shape = engine.owned_struct_choice_shape(original).unwrap().unwrap();
+        let fields = engine
+            .nominal_product_fields_from_shape(original, shape.clone())
+            .unwrap();
+        assert_eq!(fields[0].0, "field");
+        assert_eq!(fields[0].1, engine.tcx.types.u16);
+        for mutation in 0..7 {
+            let mut changed = shape.clone();
+            let CompositeShape::Struct { name, fields } = &mut changed else {
+                panic!("fresh original struct")
+            };
+            match mutation {
+                0 => name.push_str("::wrong"),
+                1 => fields[0].0.push_str("_wrong"),
+                2 => fields.clear(),
+                3 => {
+                    fields[0].1 = CompositeShape::Primitive(ScalarSliceElement::Integer {
+                        bits: 8,
+                        signed: false,
+                    });
+                }
+                4 => {
+                    fields[0].1 = CompositeShape::Primitive(ScalarSliceElement::Integer {
+                        bits: 16,
+                        signed: true,
+                    });
+                }
+                5 => fields[0].1 = CompositeShape::Primitive(ScalarSliceElement::Bool),
+                6 => fields[0].1 = CompositeShape::Tuple(Vec::new()),
+                _ => unreachable!(),
+            }
+            assert!(
+                engine
+                    .nominal_product_fields_from_shape(original, changed)
+                    .is_err()
+            );
+        }
+        for changed in [
+            CompositeShape::Primitive(ScalarSliceElement::Bool),
+            CompositeShape::Tuple(Vec::new()),
+            CompositeShape::Array(Vec::new()),
+            CompositeShape::Sum {
+                name: "wrong".into(),
+                bits: 8,
+                signed: false,
+                is_option: false,
+                variants: Vec::new(),
+            },
+        ] {
+            assert!(
+                engine
+                    .nominal_product_fields_from_shape(original, changed)
+                    .is_err()
+            );
+        }
+    }
+
+    #[test]
+    fn fresh_nominal_fields_preserve_legacy_domains_and_refuse_shape_mutations() {
+        struct Check {
+            checked: bool,
+        }
+        impl rustc_driver::Callbacks for Check {
+            fn after_analysis<'tcx>(
+                &mut self,
+                _: &rustc_interface::interface::Compiler,
+                tcx: TyCtxt<'tcx>,
+            ) -> rustc_driver::Compilation {
+                let config = miren::ContractConfig::default();
+                let engine = Engine::new(
+                    tcx,
+                    &config,
+                    VerificationOptions {
+                        all_failures: false,
+                        induction: false,
+                        startup: false,
+                        isolated_startup: false,
+                        async_entry: false,
+                        limits: miren::AnalysisLimits::default(),
+                    },
+                );
+                let original = |name| {
+                    let definition = tcx
+                        .mir_keys(())
+                        .iter()
+                        .copied()
+                        .find(|id| {
+                            tcx.def_kind(id.to_def_id()) == DefKind::Fn
+                                && tcx.item_name(id.to_def_id()).as_str() == name
+                        })
+                        .unwrap();
+                    let signature = tcx
+                        .fn_sig(definition)
+                        .instantiate_identity()
+                        .skip_norm_wip();
+                    tcx.instantiate_bound_regions_with_erased(signature)
+                        .inputs()[0]
+                };
+                for (name, accepted) in [
+                    ("narrow", true),
+                    ("wide", true),
+                    ("unrelated", true),
+                    ("pair", true),
+                    ("nested", true),
+                    ("floats", true),
+                    ("vacant", true),
+                    ("zero", true),
+                    ("raw", false),
+                    ("borrowed", false),
+                    ("interior", false),
+                    ("function", false),
+                    ("noncopy", false),
+                    ("dropping", false),
+                    ("packed", false),
+                    ("sum", false),
+                ] {
+                    let original = original(name);
+                    let fields = engine.nominal_comparison_fields(original).unwrap();
+                    assert_eq!(fields.is_some(), accepted, "{name}");
+                    assert_eq!(fields, legacy_fields(&engine, original).unwrap(), "{name}");
+                }
+                let excessive = original("excessive");
+                assert_eq!(
+                    engine.nominal_comparison_fields(excessive).unwrap_err(),
+                    legacy_fields(&engine, excessive).unwrap_err()
+                );
+                let narrow = original("narrow");
+                changed_root_shapes_refuse(&engine, narrow);
+                for name in ["wide", "unrelated"] {
+                    let foreign = engine
+                        .owned_struct_choice_shape(original(name))
+                        .unwrap()
+                        .unwrap();
+                    assert!(
+                        engine
+                            .nominal_product_fields_from_shape(narrow, foreign)
+                            .is_err()
+                    );
+                }
+                for name in ["bytes", "tuple"] {
+                    let original = original(name);
+                    let shape = engine.owned_struct_choice_shape(original).unwrap().unwrap();
+                    engine
+                        .validate_nominal_product_shape(original, &shape)
+                        .unwrap();
+                    let mut changed = shape;
+                    match &mut changed {
+                        CompositeShape::Array(fields) | CompositeShape::Tuple(fields) => {
+                            fields.pop().unwrap();
+                        }
+                        CompositeShape::Primitive(_)
+                        | CompositeShape::Struct { .. }
+                        | CompositeShape::NonZeroNiche(_)
+                        | CompositeShape::Sum { .. } => panic!("fresh array or tuple"),
+                    }
+                    assert!(
+                        engine
+                            .validate_nominal_product_shape(original, &changed)
+                            .is_err()
+                    );
+                }
+                let bytes = original("bytes");
+                let mut changed = engine.owned_struct_choice_shape(bytes).unwrap().unwrap();
+                let CompositeShape::Array(fields) = &mut changed else {
+                    panic!("fresh byte array")
+                };
+                fields[0] = CompositeShape::Primitive(ScalarSliceElement::Integer {
+                    bits: 8,
+                    signed: true,
+                });
+                assert_eq!(
+                    engine
+                        .validate_nominal_product_shape(bytes, &changed)
+                        .unwrap_err(),
+                    "owned byte array annotation differs from certified primitive shape"
+                );
+                let pair = original("pair");
+                let mut changed = engine.owned_struct_choice_shape(pair).unwrap().unwrap();
+                let CompositeShape::Struct { fields, .. } = &mut changed else {
+                    panic!("fresh pair")
+                };
+                fields.swap(0, 1);
+                assert_eq!(
+                    engine
+                        .nominal_product_fields_from_shape(pair, changed)
+                        .unwrap_err(),
+                    "owned struct annotation field identity mismatch"
+                );
+                let nested = original("nested");
+                let mut changed = engine.owned_struct_choice_shape(nested).unwrap().unwrap();
+                let CompositeShape::Struct { fields, .. } = &mut changed else {
+                    panic!("fresh nested product")
+                };
+                let CompositeShape::Struct { name, .. } = &mut fields[0].1 else {
+                    panic!("fresh nested struct")
+                };
+                name.push_str("::wrong");
+                assert!(
+                    engine
+                        .nominal_product_fields_from_shape(nested, changed)
+                        .is_err()
+                );
+                let floats = original("floats");
+                let mut changed = engine.owned_struct_choice_shape(floats).unwrap().unwrap();
+                let CompositeShape::Struct { fields, .. } = &mut changed else {
+                    panic!("fresh legacy Float product")
+                };
+                fields[0].1 = CompositeShape::Primitive(ScalarSliceElement::Float { bits: 64 });
+                assert!(
+                    engine
+                        .nominal_product_fields_from_shape(floats, changed)
+                        .is_err()
+                );
+                self.checked = true;
+                rustc_driver::Compilation::Stop
+            }
+        }
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let directory = std::env::temp_dir().join(format!(
+            "miren-common-nominal-fields-{}-{nonce}",
+            std::process::id(),
+        ));
+        std::fs::create_dir(&directory).unwrap();
+        let source = directory.join("probe.rs");
+        std::fs::write(
+            &source,
+            r#"
+#![no_std]
+#![forbid(unsafe_code)]
+#[derive(Clone, Copy)] pub struct Generic<T> { pub field: T }
+#[derive(Clone, Copy)] pub struct Other { pub field: u16 }
+#[derive(Clone, Copy)] pub struct Pair { pub left: u16, pub right: u16 }
+#[derive(Clone, Copy)] pub struct Nested {
+    pub inner: Other, pub data: [u8; 2], pub pair: (bool, u16)
+}
+#[derive(Clone, Copy)] pub struct Floats {
+    pub single: f32, pub double: f64, pub vacant: [f32; 0]
+}
+#[derive(Clone, Copy)] pub struct Vacant { pub data: [[u16; 0]; 2] }
+#[derive(Clone, Copy)] pub struct Zero;
+#[derive(Clone, Copy)] pub struct Raw { pub data: [*const u16; 0] }
+#[derive(Clone, Copy)] pub struct Borrowed<'a> { pub data: [&'a u16; 0] }
+#[derive(Clone, Copy)] pub struct Interior<'a> { pub data: [&'a core::cell::Cell<u16>; 0] }
+#[derive(Clone, Copy)] pub struct Function { pub data: [fn(u16) -> u16; 0] }
+pub struct Noncopy { pub field: u16 }
+pub struct Dropping { pub field: u16 }
+impl Drop for Dropping { fn drop(&mut self) {} }
+#[derive(Clone, Copy)] #[repr(packed)] pub struct Packed { pub field: u16 }
+#[derive(Clone, Copy)] pub enum Sum { Empty, Value(u16) }
+#[derive(Clone, Copy)] pub struct Excessive { pub data: [u16; 129] }
+pub fn narrow(_: Generic<u16>) {} pub fn wide(_: Generic<u32>) {} pub fn unrelated(_: Other) {}
+pub fn pair(_: Pair) {} pub fn nested(_: Nested) {} pub fn floats(_: Floats) {}
+pub fn vacant(_: Vacant) {} pub fn zero(_: Zero) {} pub fn raw(_: Raw) {}
+pub fn borrowed(_: Borrowed<'_>) {} pub fn noncopy(_: Noncopy) {} pub fn dropping(_: Dropping) {}
+pub fn interior(_: Interior<'_>) {} pub fn function(_: Function) {}
+pub fn packed(_: Packed) {} pub fn sum(_: Sum) {} pub fn excessive(_: Excessive) {}
+pub fn bytes(_: [u8; 2]) {} pub fn tuple(_: (bool, u16)) {}
+"#,
+        )
+        .unwrap();
+        let sysroot = std::process::Command::new("rustc")
+            .args(["--print", "sysroot"])
+            .output()
+            .unwrap();
+        assert!(sysroot.status.success());
+        let sysroot = String::from_utf8(sysroot.stdout).unwrap();
+        for level in ["0", "2"] {
+            let mut check = Check { checked: false };
+            rustc_driver::run_compiler(
+                &[
+                    "rustc".into(),
+                    source.to_str().unwrap().into(),
+                    "--crate-type=lib".into(),
+                    "--edition=2024".into(),
+                    "-Cpanic=abort".into(),
+                    format!("-Copt-level={level}"),
+                    "--sysroot".into(),
+                    sysroot.trim().into(),
+                    "--out-dir".into(),
+                    directory.to_str().unwrap().into(),
                 ],
                 &mut check,
             );
