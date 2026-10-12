@@ -263,9 +263,9 @@ impl<'tcx> Engine<'tcx> {
         let Storage::Product(columns) = &backing.data else {
             return Err("mutable product owner has a scalar storage payload".into());
         };
-        if backing.phase != Phase::Idle
-            || backing.generation != 0
-            || backing.interval.is_some()
+        // This gate validates representation, not lifecycle permission. Pending observations
+        // remain refused by role validation; only original staging/call transactions use it.
+        if backing.interval.is_some()
             || backing.hierarchy.is_some()
             || memory.mutable_hierarchy.is_some()
             || columns.len() != descriptor.leaves.len()
@@ -312,8 +312,17 @@ impl<'tcx> Engine<'tcx> {
         };
         let backing = self.mutable_product_backing(*id, memory)?;
         self.mutable_u16_role_live(*id, role, memory)?;
-        if !matches!(role, MutableU16Role::Root | MutableU16Role::Metadata { .. }) {
-            return Err("mutable product child/Ghost length is unsupported".into());
+        if !matches!(
+            role,
+            MutableU16Role::Root
+                | MutableU16Role::Metadata { .. }
+                | MutableU16Role::Child { .. }
+                | MutableU16Role::ChildMetadata { .. }
+        ) {
+            return Err("mutable product hierarchy/Ghost length is unsupported".into());
+        }
+        if let Phase::Active { frames } = &backing.phase {
+            self.mutable_product_issued_frames(frames)?;
         }
         let certificate = self.mutable_product_certificate(backing.certificate)?;
         let bits = u32::from(self.tcx.sess.target.pointer_width);
@@ -349,8 +358,70 @@ impl<'tcx> Engine<'tcx> {
         }
     }
 
+    pub(super) fn mutable_product_issued_frames(&self, frames: &[usize]) -> Result<(), String> {
+        if frames.is_empty() {
+            return Err("mutable product active frame inventory is unsupported".into());
+        }
+        if frames.len() > MAX_INPUT_DEPTH {
+            return Err(self.categorized_error(
+                UnknownCategory::ResourceLimit,
+                "mutable u16 active frame stack exceeds existing depth budget".into(),
+            ));
+        }
+        let issued = self.mutable_u16_frames.borrow();
+        let bodies = self.bodies.borrow();
+        for frame in frames {
+            let body = issued
+                .get(*frame)
+                .and_then(std::rc::Weak::upgrade)
+                .ok_or("mutable product current frame Body expired or was not issued")?;
+            if !bodies
+                .values()
+                .any(|current| std::rc::Rc::ptr_eq(current, &body))
+            {
+                return Err("mutable product current frame Body was replaced".into());
+            }
+        }
+        Ok(())
+    }
+
+    pub(super) fn mutable_product_frame(
+        &self,
+        body: &Body<'tcx>,
+        id: usize,
+        role: &MutableU16Role,
+        memory: &Memory,
+    ) -> Result<(), String> {
+        let backing = self.mutable_product_backing(id, memory)?;
+        self.mutable_u16_role_live(id, role, memory)?;
+        match &backing.phase {
+            Phase::Idle => {
+                if !matches!(role, MutableU16Role::Root | MutableU16Role::Metadata { .. }) {
+                    return Err("mutable product idle owner has no current root role".into());
+                }
+            }
+            Phase::Pending { .. } => {
+                return Err("mutable product pending child has no observation permission".into());
+            }
+            Phase::Active { frames } => {
+                if !matches!(
+                    role,
+                    MutableU16Role::Child { .. } | MutableU16Role::ChildMetadata { .. }
+                ) {
+                    return Err(
+                        "mutable product active owner requires its current child role".into(),
+                    );
+                }
+                self.mutable_product_issued_frames(frames)?;
+                self.mutable_u16_frame_top(body, frames)?;
+            }
+        }
+        Ok(())
+    }
+
     fn product_local(
         &self,
+        body: &Body<'tcx>,
         state: &State,
         local: usize,
     ) -> Result<Option<(usize, MutableU16Role)>, String> {
@@ -370,8 +441,7 @@ impl<'tcx> Engine<'tcx> {
         let (id, role) = (*id, role.clone());
         state.flow.require_unarmed()?;
         self.check_local_initialization(state, local, &[])?;
-        self.mutable_product_backing(id, &state.memory)?;
-        self.mutable_u16_role_live(id, &role, &state.memory)?;
+        self.mutable_product_frame(body, id, &role, &state.memory)?;
         Ok(Some((id, role)))
     }
 
@@ -381,10 +451,10 @@ impl<'tcx> Engine<'tcx> {
         state: &State,
         place: Place<'tcx>,
     ) -> Result<Option<Value>, String> {
-        let Some((id, role)) = self.product_local(state, place.local.as_usize())? else {
+        let Some((id, role)) = self.product_local(body, state, place.local.as_usize())? else {
             return Ok(None);
         };
-        if !matches!(role, MutableU16Role::Root)
+        if !matches!(role, MutableU16Role::Root | MutableU16Role::Child { .. })
             || place.projection.as_ref() != [ProjectionElem::Deref]
             || !self.mutable_u16_matches(
                 body.local_decls[place.local].ty,
@@ -395,12 +465,21 @@ impl<'tcx> Engine<'tcx> {
         {
             return Err("mutable product metadata needs the original direct root".into());
         }
+        let generation = self.mutable_product_backing(id, &state.memory)?.generation;
+        let metadata = match role {
+            MutableU16Role::Root => MutableU16Role::Metadata { generation },
+            MutableU16Role::Child { .. } => MutableU16Role::ChildMetadata { generation },
+            MutableU16Role::Metadata { .. }
+            | MutableU16Role::ChildMetadata { .. }
+            | MutableU16Role::Ghost { .. }
+            | MutableU16Role::HierarchyChild { .. }
+            | MutableU16Role::HierarchyMetadata { .. } => {
+                return Err("mutable product metadata source lacks payload authority".into());
+            }
+        };
         let root = Value::MutableU16 { id, role };
         self.mutable_product_length(&root, &state.memory, &state.conditions)?;
-        Ok(Some(Value::MutableU16 {
-            id,
-            role: MutableU16Role::Metadata { generation: 0 },
-        }))
+        Ok(Some(Value::MutableU16 { id, role: metadata }))
     }
 
     pub(super) fn mutable_product_store_role(
@@ -417,8 +496,11 @@ impl<'tcx> Engine<'tcx> {
             return Ok(false);
         }
         state.flow.require_unarmed()?;
-        if !matches!(role, MutableU16Role::Metadata { .. })
-            || !place.projection.is_empty()
+        self.mutable_product_frame(body, *id, role, &state.memory)?;
+        if !matches!(
+            role,
+            MutableU16Role::Metadata { .. } | MutableU16Role::ChildMetadata { .. }
+        ) || !place.projection.is_empty()
             || place.local.as_usize() <= body.arg_count
             || state.addresses[place.local.as_usize()].is_some()
         {
@@ -642,16 +724,30 @@ impl<'tcx> Engine<'tcx> {
         state: &State,
         place: Place<'tcx>,
     ) -> Result<Option<Value>, String> {
-        let Some((id, role)) = self.product_local(state, place.local.as_usize())? else {
+        let Some(body) = body else {
+            let local = place.local.as_usize();
+            let current = if let Some(allocation) = state.addresses[local] {
+                state.memory.get(allocation).and_then(Option::as_ref)
+            } else {
+                state.locals[local].as_ref()
+            };
+            if let Some(Value::MutableU16 { id, role }) = current
+                && !matches!(role, MutableU16Role::Ghost { .. })
+                && self.mutable_product_owner(*id, &state.memory)?
+            {
+                return Err("mutable product observation needs original compiler Body".into());
+            }
+            return Ok(None);
+        };
+        let Some((id, role)) = self.product_local(body, state, place.local.as_usize())? else {
             return Ok(None);
         };
         if place.projection.is_empty() {
             return Ok(Some(Value::MutableU16 { id, role }));
         }
-        if !matches!(role, MutableU16Role::Root) {
+        if !matches!(role, MutableU16Role::Root | MutableU16Role::Child { .. }) {
             return Err("mutable product metadata cannot observe payload".into());
         }
-        let body = body.ok_or("mutable product observation needs original compiler Body")?;
         if !self.mutable_u16_matches(body.local_decls[place.local].ty, id, &state.memory, true)? {
             return Err("mutable product root differs from original compiler type".into());
         }
@@ -685,13 +781,18 @@ impl<'tcx> Engine<'tcx> {
         place: Place<'tcx>,
         value: &Value,
     ) -> Result<bool, String> {
-        let Some((id, role)) = self.product_local(state, place.local.as_usize())? else {
+        let Some((id, role)) = self.product_local(body, state, place.local.as_usize())? else {
             return Ok(false);
         };
-        if place.projection.is_empty() && matches!(role, MutableU16Role::Metadata { .. }) {
+        if place.projection.is_empty()
+            && matches!(
+                role,
+                MutableU16Role::Metadata { .. } | MutableU16Role::ChildMetadata { .. }
+            )
+        {
             return Ok(false);
         }
-        if !matches!(role, MutableU16Role::Root) {
+        if !matches!(role, MutableU16Role::Root | MutableU16Role::Child { .. }) {
             return Err("mutable product metadata cannot write payload".into());
         }
         if !self.mutable_u16_matches(body.local_decls[place.local].ty, id, &state.memory, true)? {
@@ -893,3 +994,7 @@ impl<'tcx> Engine<'tcx> {
 #[cfg(test)]
 #[path = "mutable_products_probe.rs"]
 mod probe;
+
+#[cfg(test)]
+#[path = "mutable_product_children_probe.rs"]
+mod children_probe;

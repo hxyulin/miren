@@ -6953,3 +6953,33 @@ Evidence: /tmp/miren-nested-mutable-products-phase2-bounded-validation/summary.j
 /tmp/miren-stage237-byte-boundary-migration-review.json,
 /tmp/miren-stage237-root-final-checks/workspace-test-closure.json and
 /tmp/miren-stage237-root-survey-proof-audit.json.
+
+## Stage238: whole mutable product helpers
+
+Whole tuple, bounded array and plain local struct helpers execute actual available Rust bodies,
+retain current child generations and return updated storage through the existing owner protocol.
+Metadata snapshots carry a live child role. Shared float-bit builtin recognition preserves exact
+payloads. Nested owners, moved roots, proper intervals, symbolic suffixes and escapes stay UNKNOWN.
+
+The dedicated four-profile matrix records seven PROVED, three REFUTED and five UNKNOWN cases each.
+Sixteen actual helper/payload mutants refute unchanged claims; dependency controls record four
+PROVED, four REFUTED and four missing-body UNKNOWN results. Native originals pass and mutants fail.
+Four compiler callbacks check staging, calls, returns and hostile associations at MIR level zero;
+the alternate PtrMetadata branch is not reached.
+
+Fresh surveys each report 146 PROVED, 106 REFUTED and 79 UNKNOWN across 331 cases in 92 families.
+One old whole-child case advances to PROVED; fifteen cases are appended. All 315 other old manifest
+objects and the literal fixture prefix remain unchanged. Across 1,260 comparisons, 44 whole Proofs
+match literally, 1,215 retain only appended-source fingerprints, and one also retains the inherited
+query-free fold resource-context qualification. All 2,440 old queried obligations/models are exact.
+
+Formatting, lint, 91 Python tests, releases, dependency policy, manual hooks and documentation pass.
+Completion of 922 outer Rust tests combines the complete no-fail-fast run and two target reruns.
+The initial launcher selected custom one-shot solving; ordinary mode restores two session tests.
+One stale child expectation is corrected from measured four-profile results with an actual scalar
+body-entry assertion. Stopped runs remain archived; no single green full workspace run is claimed.
+No solver policy, application code or hardware premises change.
+
+Evidence: /tmp/miren-whole-product-stage238-bounded-evidence/summary.json,
+/tmp/miren-stage238-root-final-checks/workspace-test-closure.json and
+/tmp/miren-stage238-root-survey-proof-audit.json.

@@ -55,11 +55,12 @@ and whole-slice comparison are separate unsupported domains. See the
 Mutable scalar slices support bounded whole-child helpers, scalar returns, local static associated
 calls and original constant-index reads and stores. Exact f32/f64 backing preserves NaN payloads
 and signed-zero bits. Typed mutable tuple, array and plain local struct slices support direct
-metadata and guarded whole-element or constant-suffix reads and stores. Product child calls,
-proper reborrows and symbolic suffixes remain UNKNOWN. Deeper scalar nesting and the dedicated
+metadata and guarded whole-element or constant-suffix reads and stores. Whole product helpers
+execute actual bodies and preserve returned storage. Nested owner calls, proper reborrows and
+symbolic suffixes remain UNKNOWN. Deeper scalar nesting and the dedicated
 proper-reborrow caller remain UNKNOWN. Bounded owned u16 products support writes through multiple
 symbolic suffix indices, preserving compiler types and current Memory. The capability manifest
-covers 316 cases across 91 families, including concrete and symbolic local byte-copy controls.
+covers 331 cases across 92 families, including concrete and symbolic local byte-copy controls.
 
 Finite known shared trait objects can be selected from local fixed arrays and retained slices.
 Selected alternatives execute actual method bodies, preserving their backing references and

@@ -11,8 +11,8 @@ execution at O0 and O2, positive/refuted/unknown controls, a source mutation tha
 structured UNKNOWN reporting, and passing repository checks. Completion establishes a repeatable
 baseline. It does not establish full Rust support or a completed memory-model refactor.
 
-The current manifest contains 316 cases across 91 families.
-Fresh host/ARM O0/O2 surveys each measure 138 PROVED, 103 REFUTED and 75 UNKNOWN.
+The current manifest contains 331 cases across 92 families.
+The completed Stage238 host/ARM O0/O2 surveys measured 146 PROVED, 106 REFUTED and 79 UNKNOWN.
 The preceding 295-case surveys measured 127 PROVED, 99 REFUTED and 69 UNKNOWN per profile.
 Ten exact readonly `Option<NonZeroU8>` cases cover correlated payload observations, actual Eq/Ne
 helpers, false claims and unsupported domains. Actual observer and equality mutations refute
@@ -2379,5 +2379,32 @@ Actual helper and store mutations refute unchanged claims; native originals pass
 Retained dependency bodies execute; unavailable bodies remain UNKNOWN. Compiler controls cover
 exact original types, Context, initialization, extent, atomic stores and fake metadata pointers.
 One existing nested Float metadata case advances to PROVED without changing its source assertion.
-Product child calls, proper reborrows, symbolic suffixes, contract snapshots, Armed access and
-sum/niche/reference/pointer products remain unsupported. No hardware assumptions are introduced.
+Nested product owner calls, proper reborrows, symbolic suffixes, contract snapshots and Armed
+access remain unsupported, as do sum/niche/reference/pointer products. No hardware assumptions
+are introduced.
+
+## Whole mutable product helpers
+
+Whole tuple, array and plain local struct helpers execute their actual available bodies and return
+current storage through the existing owner/frame protocol. Pending tips suspend observations;
+current child generation, issued Body identity and complete Return checks remain required.
+Child metadata snapshots retain a live role, never a frozen payload or new access permission.
+Exact float bit operations share existing builtin recognition and preserve NaN and signed-zero bits.
+
+The dedicated host/ARM O0/O2 matrix records seven PROVED, three REFUTED and five UNKNOWN cases each.
+Actual helper/payload mutants refute sixteen unchanged claims. Dependency controls record four
+PROVED, four REFUTED and four missing-body UNKNOWN outcomes. Native originals pass and mutants fail.
+The four compiler callbacks complete staging/call/Return and hostile frame/Context controls.
+Their MIR optimization level is zero; the alternate PtrMetadata probe branch is not reached.
+Nested owners, moved roots, proper intervals, symbolic suffixes and owner escapes remain UNKNOWN.
+One existing whole-child survey case proves in all four Root profiles without changing its source.
+Fresh host/ARM O0/O2 surveys each record 146 PROVED, 106 REFUTED and 79 UNKNOWN across 331 cases
+and 92 families. All 315 other old case objects and the literal fixture prefix remain unchanged.
+Their 2,440 queried obligations and models remain exact. Actual appended-source fingerprints and
+one inherited query-free fold resource context are retained and qualified separately.
+
+Formatting, lint, 91 Python tests, release builds, dependency policy, manual hooks and documentation
+pass. Workspace test completion combines the complete no-fail-fast run with two target reruns,
+covering 922 outer Rust tests. One stale child expectation is corrected after four-profile evidence;
+two persistent-session tests require the ordinary solver invocation. Solver behavior and guest
+claims are unchanged. The stopped runs remain archived; no single green workspace run is claimed.

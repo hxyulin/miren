@@ -95,7 +95,10 @@ impl<'tcx> Engine<'tcx> {
             if matches!(backing.data, super::mutable_u16::Storage::Product(_)) {
                 flow.require_unarmed()?;
                 self.mutable_product_backing(id, memory)?;
-                continue;
+                if let Phase::Active { frames } = &backing.phase {
+                    self.mutable_product_issued_frames(frames)?;
+                    // Common frame-top/grant-count and temporal Return checks below also apply.
+                }
             }
             if backing.hierarchy.is_some() {
                 self.mutable_hierarchy_exit(body, arguments, id, memory, flow)?;
@@ -197,6 +200,10 @@ impl<'tcx> Engine<'tcx> {
         }
         self.check_local_initialization(state, place.local.as_usize(), &[])?;
         self.mutable_u16_role_live(id, &role, &state.memory)?;
+        if self.mutable_product_owner(id, &state.memory)? {
+            state.flow.require_unarmed()?;
+            self.mutable_product_frame(body, id, &role, &state.memory)?;
+        }
         Ok(Some(self.mutable_owner_length(
             &Value::MutableU16 { id, role },
             state,
@@ -214,7 +221,15 @@ impl<'tcx> Engine<'tcx> {
         self.check_local_initialization(state, local, &[])?;
         let backing = self.mutable_u16_backing(id, &state.memory)?;
         let Phase::Pending { certificate } = backing.phase else {
-            let detail = self.mutable_integer_pending_message(backing.certificate)?;
+            let detail = match &backing.data {
+                super::mutable_u16::Storage::Scalar(_) => {
+                    self.mutable_integer_pending_message(backing.certificate)?
+                }
+                super::mutable_u16::Storage::Product(_) => {
+                    self.mutable_owner_certificate(backing.certificate)?;
+                    "mutable product staging needs a pending child"
+                }
+            };
             return Err(self.mutable_u16_child_error(detail));
         };
         let certificates = self.mutable_u16_staging.borrow();
@@ -405,6 +420,9 @@ impl<'tcx> Engine<'tcx> {
         else {
             return Ok(false);
         };
+        if self.mutable_product_owner(id, &state.memory)? {
+            state.flow.require_unarmed()?;
+        }
         if source.projection.as_ref() != [ProjectionElem::Deref]
             || !self.mutable_u16_matches(
                 body.local_decls[source.local].ty,
@@ -580,6 +598,18 @@ impl<'tcx> Engine<'tcx> {
                 },
             );
         };
+        let product = self.mutable_product_owner(id, &state.memory)?;
+        if product {
+            self.mutable_product_unbound_contracts(instance)?;
+        }
+        let element = if product {
+            Some(
+                self.mutable_owner_certificate(state.memory.mutable_u16[id].certificate)?
+                    .original,
+            )
+        } else {
+            None
+        };
         let signature = self.tcx.erase_and_anonymize_regions(
             self.tcx
                 .fn_sig(instance.def_id())
@@ -590,6 +620,17 @@ impl<'tcx> Engine<'tcx> {
         let TerminatorKind::Call { func, unwind, .. } = caller else {
             return Err("mutable u16 child certificate needs actual Call".into());
         };
+        if product {
+            let ty::FnDef(definition, arguments) = func.ty(&body.local_decls, self.tcx).kind()
+            else {
+                return Err("mutable product child lacks an original FnDef".into());
+            };
+            if !arguments.bound_vars().is_empty()
+                || self.resolve_function_item(*definition, arguments.skip_binder())? != instance
+            {
+                return Err("mutable product child differs from its full selected Instance".into());
+            }
+        }
         if !matches!(func.ty(&body.local_decls, self.tcx).kind(), ty::FnDef(definition, _)
             if *definition == instance.def_id())
             || !matches!(instance.def, ty::InstanceKind::Item(_))
@@ -638,7 +679,11 @@ impl<'tcx> Engine<'tcx> {
                 .enumerate()
                 .any(|(i, (local, original))| {
                     if i == position {
-                        !self.mutable_u16_type(selected.local_decls[local].ty)
+                        if let Some(element) = element {
+                            !self.mutable_owner_type(selected.local_decls[local].ty, element)
+                        } else {
+                            !self.mutable_u16_type(selected.local_decls[local].ty)
+                        }
                     } else {
                         selected.local_decls[local].ty != *original
                     }
@@ -822,6 +867,61 @@ impl<'tcx> Engine<'tcx> {
         Ok(())
     }
 
+    // A current Product frame may reach the already modeled primitive float bit operations.
+    // This recognizes no owner operand and grants no new frame, metadata or payload authority.
+    pub(super) fn mutable_product_float_bits_route(
+        &self,
+        state: &State,
+        call: &ChildCall<'_, 'tcx>,
+        id: usize,
+        generation: u64,
+    ) -> Result<bool, String> {
+        state.flow.require_unarmed()?;
+        self.mutable_product_frame(
+            call.body,
+            id,
+            &MutableU16Role::Child { generation },
+            &state.memory,
+        )?;
+        let signature = self
+            .tcx
+            .fn_sig(call.instance.def_id())
+            .instantiate(self.tcx, call.instance.args)
+            .skip_binder();
+        if self
+            .float_bits_operation(call.instance.def_id(), call.instance.args, signature)
+            .is_none()
+        {
+            return Ok(false);
+        }
+        let TerminatorKind::Call { func, unwind, .. } =
+            &call.body.basic_blocks[call.block].terminator().kind
+        else {
+            return Err("mutable product float model needs an actual Call".into());
+        };
+        let ty::FnDef(definition, arguments) = func.ty(&call.body.local_decls, self.tcx).kind()
+        else {
+            return Err("mutable product float model needs its original FnDef".into());
+        };
+        if !arguments.bound_vars().is_empty()
+            || self.resolve_function_item(*definition, arguments.skip_binder())? != call.instance
+            || !matches!(call.instance.def, ty::InstanceKind::Item(_))
+            || signature.safety() != rustc_hir::Safety::Safe
+            || signature.abi() != rustc_abi::ExternAbi::Rust
+            || signature.c_variadic()
+            || signature.inputs().len() != call.args.len()
+            || call.destination.ty(&call.body.local_decls, self.tcx).ty != signature.output()
+            || !call.destination.projection.is_empty()
+            || call.target.is_none()
+            || !matches!(unwind, rustc_middle::mir::UnwindAction::Unreachable)
+            || self.tcx.sess.panic_strategy() != rustc_target::spec::PanicStrategy::Abort
+            || self.specification(call.instance)?.is_some()
+        {
+            return Err("mutable product float model differs from its original Call".into());
+        }
+        Ok(true)
+    }
+
     fn mutable_u16_scalar_child(
         &mut self,
         state: &mut State,
@@ -862,6 +962,25 @@ impl<'tcx> Engine<'tcx> {
             return Ok(None);
         }
         self.mutable_u16_frame_top(body, frames)?;
+        if self.mutable_product_owner(*id, &state.memory)?
+            && self.mutable_product_float_bits_route(
+                state,
+                &ChildCall {
+                    body,
+                    block,
+                    instance,
+                    args,
+                    destination,
+                    target,
+                    stack,
+                    site,
+                },
+                *id,
+                *generation,
+            )?
+        {
+            return Ok(None);
+        }
         let signature = self
             .tcx
             .fn_sig(instance.def_id())

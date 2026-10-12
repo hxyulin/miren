@@ -84,7 +84,11 @@ impl<'tcx> Engine<'tcx> {
                 if !matches!(role, symbolic::MutableU16Role::Ghost { .. })
                     && self.mutable_product_owner(*id, memory)? =>
             {
-                if !matches!(role, symbolic::MutableU16Role::Metadata { .. }) {
+                if !matches!(
+                    role,
+                    symbolic::MutableU16Role::Metadata { .. }
+                        | symbolic::MutableU16Role::ChildMetadata { .. }
+                ) {
                     return Err("mutable product Ghost observations are unsupported".into());
                 }
                 self.mutable_product_length(value, memory, conditions)?;

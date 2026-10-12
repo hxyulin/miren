@@ -1706,9 +1706,7 @@
     {
       "entry": "mutable_product_survey::unsupported_child",
       "family": "mutable_product_slice",
-      "expected": "unknown",
-      "unknown_category": "unclassified",
-      "unknown_reason": "mutable product root identity/phase/column inventory differs"
+      "expected": "proved"
     },
     {
       "entry": "mutable_product_survey::whole64",
@@ -1734,6 +1732,91 @@
       "entry": "mutable_product_survey::zero_inner",
       "family": "mutable_product_slice",
       "expected": "proved"
+    },
+    {
+      "entry": "mutable_product_child_survey::float_call",
+      "family": "mutable_product_children",
+      "expected": "proved"
+    },
+    {
+      "entry": "mutable_product_child_survey::sequential",
+      "family": "mutable_product_children",
+      "expected": "proved"
+    },
+    {
+      "entry": "mutable_product_child_survey::wide_call",
+      "family": "mutable_product_children",
+      "expected": "proved"
+    },
+    {
+      "entry": "mutable_product_child_survey::tuple_call",
+      "family": "mutable_product_children",
+      "expected": "proved"
+    },
+    {
+      "entry": "mutable_product_child_survey::record_call",
+      "family": "mutable_product_children",
+      "expected": "proved"
+    },
+    {
+      "entry": "mutable_product_child_survey::metadata_call",
+      "family": "mutable_product_children",
+      "expected": "proved"
+    },
+    {
+      "entry": "mutable_product_child_survey::zero_call",
+      "family": "mutable_product_children",
+      "expected": "proved"
+    },
+    {
+      "entry": "mutable_product_child_survey::wrong_float_call",
+      "family": "mutable_product_children",
+      "expected": "refuted"
+    },
+    {
+      "entry": "mutable_product_child_survey::false_retention",
+      "family": "mutable_product_children",
+      "expected": "refuted"
+    },
+    {
+      "entry": "mutable_product_child_survey::unchecked_call",
+      "family": "mutable_product_children",
+      "expected": "refuted"
+    },
+    {
+      "entry": "mutable_product_child_survey::nested_owner_unknown",
+      "family": "mutable_product_children",
+      "expected": "unknown",
+      "unknown_category": "semantics",
+      "unknown_reason": "mutable product staging needs a pending child"
+    },
+    {
+      "entry": "mutable_product_child_survey::moved_parent_unknown",
+      "family": "mutable_product_children",
+      "expected": "unknown",
+      "unknown_category": "semantics",
+      "unknown_reason": "mutable u16 root Copy/Move transport is unsupported"
+    },
+    {
+      "entry": "mutable_product_child_survey::interval_unknown",
+      "family": "mutable_product_children",
+      "expected": "unknown",
+      "unknown_category": "semantics",
+      "unknown_reason": "mutable u16 child needs direct abort-only Rust body"
+    },
+    {
+      "entry": "mutable_product_child_survey::symbolic_unknown",
+      "family": "mutable_product_children",
+      "expected": "unknown",
+      "unknown_category": "unclassified",
+      "unknown_reason": "mutable product symbolic suffix index is unsupported"
+    },
+    {
+      "entry": "mutable_product_child_survey::escape_unknown",
+      "family": "mutable_product_children",
+      "expected": "unknown",
+      "unknown_category": "semantics",
+      "unknown_reason": "mutable u16 child needs direct abort-only Rust body"
     }
   ]
 }

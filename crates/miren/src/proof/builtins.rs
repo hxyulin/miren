@@ -1,7 +1,55 @@
 use super::*;
 use rustc_span::Symbol;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum FloatBitsOperation {
+    Observe(u32),
+    Construct(u32),
+}
+
 impl<'tcx> Engine<'tcx> {
+    // Recognition grants no memory rights; the original builtin still validates values.
+    pub(super) fn float_bits_operation(
+        &self,
+        callee: DefId,
+        args: ty::GenericArgsRef<'tcx>,
+        signature: ty::FnSig<'tcx>,
+    ) -> Option<FloatBitsOperation> {
+        let parent = self.tcx.parent(callee);
+        if !self
+            .tcx
+            .lang_items()
+            .get(LangItem::SliceLen)
+            .is_some_and(|id| id.krate == callee.krate)
+            || !matches!(self.tcx.def_kind(parent), DefKind::Impl { of_trait: false })
+            || self
+                .float_type(
+                    self.tcx
+                        .type_of(parent)
+                        .instantiate(self.tcx, args)
+                        .skip_norm_wip(),
+                )
+                .is_none()
+            || signature.inputs().len() != 1
+        {
+            return None;
+        }
+        let name = self.tcx.item_name(callee);
+        if name == Symbol::intern("to_bits")
+            && let Some(width) = self.float_type(signature.inputs()[0])
+            && self.integer_type(signature.output()) == Some((width, false))
+        {
+            return Some(FloatBitsOperation::Observe(width));
+        }
+        if name == Symbol::intern("from_bits")
+            && let Some(width) = self.float_type(signature.output())
+            && self.integer_type(signature.inputs()[0]) == Some((width, false))
+        {
+            return Some(FloatBitsOperation::Construct(width));
+        }
+        None
+    }
+
     pub(super) fn is_core_panic_helper(&self, callee: DefId) -> bool {
         if self.is_result_panic_helper(callee) {
             return true;
@@ -412,55 +460,36 @@ impl<'tcx> Engine<'tcx> {
             None
         };
         let name = self.tcx.item_name(callee);
-        if self
-            .tcx
-            .lang_items()
-            .get(LangItem::SliceLen)
-            .is_some_and(|id| id.krate == callee.krate)
-            && matches!(self.tcx.def_kind(parent), DefKind::Impl { of_trait: false })
-            && self
-                .float_type(
-                    self.tcx
-                        .type_of(parent)
-                        .instantiate(self.tcx, args)
-                        .skip_norm_wip(),
-                )
-                .is_some()
-            && signature.inputs().len() == 1
-        {
-            if name == Symbol::intern("to_bits")
-                && let Some(width) = self.float_type(signature.inputs()[0])
-                && self.integer_type(signature.output()) == Some((width, false))
-            {
-                let [value] = values else {
-                    return Err("float bit observation requires one float".to_owned());
-                };
-                self.record_model(
-                    callee,
-                    "exact floating-point storage bits, including NaN payloads",
-                );
-                return self.float_to_bits(value.clone(), width, false).map(Some);
-            }
-            if name == Symbol::intern("from_bits")
-                && let Some(width) = self.float_type(signature.output())
-                && self.integer_type(signature.inputs()[0]) == Some((width, false))
-            {
-                let [value] = values else {
-                    return Err("float bit construction requires one integer".to_owned());
-                };
-                let (expression, bits, _) = value.integer()?;
-                if bits != width {
-                    return Err("float bit construction width mismatch".to_owned());
+        if let Some(operation) = self.float_bits_operation(callee, args, signature) {
+            match operation {
+                FloatBitsOperation::Observe(width) => {
+                    let [value] = values else {
+                        return Err("float bit observation requires one float".to_owned());
+                    };
+                    self.record_model(
+                        callee,
+                        "exact floating-point storage bits, including NaN payloads",
+                    );
+                    return self.float_to_bits(value.clone(), width, false).map(Some);
                 }
-                self.record_model(
-                    callee,
-                    "exact floating-point construction from storage bits",
-                );
-                return Ok(Some(symbolic::float_from_bits(
-                    &self.terms,
-                    expression,
-                    bits,
-                )));
+                FloatBitsOperation::Construct(width) => {
+                    let [value] = values else {
+                        return Err("float bit construction requires one integer".to_owned());
+                    };
+                    let (expression, bits, _) = value.integer()?;
+                    if bits != width {
+                        return Err("float bit construction width mismatch".to_owned());
+                    }
+                    self.record_model(
+                        callee,
+                        "exact floating-point construction from storage bits",
+                    );
+                    return Ok(Some(symbolic::float_from_bits(
+                        &self.terms,
+                        expression,
+                        bits,
+                    )));
+                }
             }
         }
         if self

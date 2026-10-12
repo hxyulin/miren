@@ -66,7 +66,13 @@ one allocation; the backing slot covers the scalar/first product column, and fur
 storage slots within the existing backing accounting pass. Columns create no new allocation ids,
 addresses or physical access rights. Existing scalar counts and Armed fee expressions are retained.
 
-Product owner child calls, proper intervals, symbolic suffix indices, Armed access, Ghost/contract
+Whole mutable product helper calls reuse issued whole staging, one child generation and actual
+available Body/frame checks. Primitive helper arguments and returns, direct child metadata and
+constant-suffix stores retain current returned storage. Pending tips grant no observation; old
+metadata and Root are suspended while a child is active. Caller release requires the complete
+current frame/grant/returned-memory checks. Representation validation alone grants no access.
+
+Nested owner child calls, proper intervals, symbolic suffix indices, Armed access, Ghost/contract
 snapshots, replay of arbitrary original payloads, and sum/niche/pointer/reference products remain
 unsupported. Unbound entry diagnostics record a live owner id; they never expose current payload
 as frozen original inputs. Copied primitive/product values may enter actual available helpers.
@@ -1521,3 +1527,10 @@ u8 empty/payload enums remain unsupported. The existing local u16 enum domain is
 One-byte `contains` transport remains UNKNOWN: its actual byte specialization requires a
 separate available-body certificate. Dedicated asserted membership, helper mutation and
 missing-body controls exercise these boundaries without changing caller claims.
+
+Dedicated whole product helper tests record seven PROVED, three REFUTED and five precise UNKNOWN
+outcomes at host/ARM O0/O2. Actual store and scalar-helper payload mutations refute unchanged
+caller claims; retained dependencies execute and omitted bodies remain UNKNOWN. Native originals
+pass and mutants fail. Compiler controls exercise authentic staging/call/Return, revoked metadata,
+current frame/Body, initialization, Context, extent and branch-local Memory. Exact shared float-bit
+recognition routes current product frames to the existing model without widening scalar call gates.

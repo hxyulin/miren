@@ -179,6 +179,27 @@ impl<'tcx> Engine<'tcx> {
         Ok(certificate)
     }
 
+    pub(super) fn mutable_owner_certificate(
+        &self,
+        id: usize,
+    ) -> Result<&IntegerCertificate<'tcx>, String> {
+        match &self
+            .mutable_integer_types
+            .get(id)
+            .ok_or("mutable owner certificate was not issued")?
+            .codec
+        {
+            ElementCodec::Scalar(_) => self.mutable_integer_certificate(id),
+            ElementCodec::Product(_) => self.mutable_product_certificate(id),
+        }
+    }
+
+    pub(super) fn mutable_owner_type(&self, original: Ty<'tcx>, element: Ty<'tcx>) -> bool {
+        matches!(original.kind(), ty::Ref(_, inner, mutability)
+            if mutability.is_mut()
+                && matches!(inner.kind(), ty::Slice(actual) if *actual == element))
+    }
+
     pub(super) fn mutable_integer_pending_message(
         &self,
         certificate: usize,
@@ -232,12 +253,24 @@ impl<'tcx> Engine<'tcx> {
         memory: &Memory,
     ) -> Result<bool, String> {
         let backing = self.mutable_u16_backing(id, memory)?;
-        Ok(matches!(
-            self.mutable_integer_certificate(backing.certificate)?
-                .codec
-                .scalar()?,
-            symbolic::ScalarSliceElement::Float { .. }
-        ))
+        match &backing.data {
+            Storage::Scalar(_) => Ok(matches!(
+                self.mutable_integer_certificate(backing.certificate)?
+                    .codec
+                    .scalar()?,
+                symbolic::ScalarSliceElement::Float { .. }
+            )),
+            Storage::Product(_) => {
+                let certificate = self.mutable_owner_certificate(backing.certificate)?;
+                let ElementCodec::Product(product) = &certificate.codec else {
+                    return Err("mutable product float inventory differs from its storage".into());
+                };
+                Ok(product
+                    .leaves
+                    .iter()
+                    .any(|leaf| matches!(leaf, symbolic::ScalarSliceElement::Float { .. })))
+            }
+        }
     }
 
     fn mutable_u16_error(&self, detail: &str) -> String {
@@ -978,6 +1011,10 @@ impl<'tcx> Engine<'tcx> {
                     ));
                 }
                 if let Value::MutableU16 { id, role } = value {
+                    if self.mutable_product_owner(id, &state.memory)? {
+                        state.flow.require_unarmed()?;
+                        self.mutable_product_frame(body, id, &role, &state.memory)?;
+                    }
                     self.check_local_initialization(state, place.local.as_usize(), &[])?;
                     self.mutable_u16_backing(id, &state.memory)?;
                     if args.len() != 1

@@ -111,7 +111,10 @@ fn inspect(source: &Path, entries: &[(&str, ProofStatus)]) {
                             .any(|b| b.function == "observe_bits")
                     );
                 }
-                if matches!(*name, "store_nan" | "wrong_stored_bits" | "outer_retention") {
+                if matches!(
+                    *name,
+                    "store_nan" | "wrong_stored_bits" | "outer_retention" | "unsupported_child"
+                ) {
                     assert!(
                         proof
                             .body_entries
@@ -145,7 +148,7 @@ fn mutable_product_root_storage_metadata_and_refusals() {
             ("struct_fields", P),
             ("zero_inner", P),
             ("proper_reborrow", U),
-            ("unsupported_child", U),
+            ("unsupported_child", P),
             ("symbolic_suffix", U),
             ("pointer_product", U),
             ("reference_product", U),
