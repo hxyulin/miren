@@ -6561,3 +6561,46 @@ Owner independent implementation/data review remains separate from ROOT consiste
 
 Evidence: /tmp/miren-float-tables-parent222, /tmp/miren-stage223-root-full-checks,
 /tmp/miren-stage223-root-survey and /tmp/miren-stage223-root-release-comparison-ready.
+
+## Stage224: unary Bool and Char function-pointer Repeat arrays
+
+Known Repeat arrays now admit nongeneric safe Rust `fn(bool) -> bool` and `fn(char) -> char`
+values with their exact original unary signatures. Array construction and dispatch retain the
+existing bounds. The constructor evaluates its operand once, including for a zero count;
+Move consumption is preserved. Calls execute actual available selected bodies and validate
+returned values and Memory. Integer unary/binary Repeat admission remains unchanged.
+
+Opaque, generic, wrong-signature and missing-body cases remain UNKNOWN. Float Repeat is still
+unsupported. Six P/R/U cases append to the unchanged 253-case manifest and literal guest prefix.
+All four fresh ROOT host/ARM O0/O2 surveys measure 259 cases across 87 families:
+105 PROVED, 89 REFUTED and 65 UNKNOWN. These selected capabilities do not measure Rust parity.
+
+The reviewed owner comparison contains 100 groups and 2,980 whole Proof pairs:
+2,891 literal FULL, 88 exact named changes and one closed query-free Resource context.
+All 5,140 baseline rich queried obligations/models are exact prefixes of 5,232 current ones,
+including partial results in UNKNOWN cases. Named UNKNOWN changes do not establish a proof.
+Sixty-four previously reviewed Repeat changes reproduce identical before/after Proof hashes and
+refuted queries/models in fresh actual223 captures. The 24 expanded survey changes are also
+bound to fresh current captures. Six native runs comprise two passing originals
+and four failing actual helper mutations with unchanged assertions. Unicode boundaries and both
+boolean states are covered by the native controls.
+
+All 24 required ROOT commands pass, including formatting, lint, tests, release builds, dependency
+policy, documentation, three examples with ARM releases, manual hooks and the capability survey.
+Actual logs contain 881 workspace and nine example Rust tests: 890 outer Rust tests, plus
+91 Python tests. One nested native ticket test is excluded from the outer total.
+
+Fresh ROOT release captures cover 100 groups and 2,980 whole Proof objects:
+2,979 literal FULL and one closed query-free Resource context. All 5,232 rich queried
+obligations/models match, including UNKNOWN partials. Owner AFTER references are reused;
+no baseline, native or archive replay is claimed. The existing generic Resource predicate remains
+limited to the recorded unbounded scalar fold.
+
+The 951-source adoption preserves 944 parent paths. Five final prose updates yield 11 owned
+paths and 940 unchanged parent paths. Pre-prose captures keep their immutable association;
+final source/index records authenticate the prose delta. Independent owner implementation/data
+review remains separate from ROOT consistency validation.
+
+Evidence: /tmp/miren-primitive-repeat-parent223/compatibility-completed,
+/tmp/miren-stage224-root-full-checks, /tmp/miren-stage224-root-survey and
+/tmp/miren-stage224-root-release-comparison-ready.

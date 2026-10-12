@@ -1394,6 +1394,40 @@
       "expected": "unknown",
       "unknown_reason": "known Repeat signature needs exact original integer types",
       "unknown_category": "unclassified"
+    },
+    {
+      "entry": "primitive_repeat_bool_selected",
+      "family": "primitive_function_pointer_repeat_bool",
+      "expected": "proved"
+    },
+    {
+      "entry": "primitive_repeat_bool_wrong",
+      "family": "primitive_function_pointer_repeat_bool",
+      "expected": "refuted"
+    },
+    {
+      "entry": "primitive_repeat_bool_opaque",
+      "family": "primitive_function_pointer_repeat_bool",
+      "expected": "unknown",
+      "unknown_reason": "known Repeat refuses opaque or nested Choice targets",
+      "unknown_category": "unclassified"
+    },
+    {
+      "entry": "primitive_repeat_char_selected",
+      "family": "primitive_function_pointer_repeat_char",
+      "expected": "proved"
+    },
+    {
+      "entry": "primitive_repeat_char_wrong",
+      "family": "primitive_function_pointer_repeat_char",
+      "expected": "refuted"
+    },
+    {
+      "entry": "primitive_repeat_char_opaque",
+      "family": "primitive_function_pointer_repeat_char",
+      "expected": "unknown",
+      "unknown_reason": "known Repeat refuses opaque or nested Choice targets",
+      "unknown_category": "unclassified"
     }
   ]
 }

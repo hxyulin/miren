@@ -3691,3 +3691,70 @@ pub fn float_table_repeat64(index: usize, value: f64) {
     let table = [callback; 2];
     if index < 2 { assert!(table[index](value).to_bits() == value.to_bits()); }
 }
+
+mod primitive_repeat_bool {
+    #[inline(never)]
+    pub fn identity(value: bool) -> bool {
+        value ^ false
+    }
+}
+
+pub fn primitive_repeat_bool_selected(index: usize, value: bool) {
+    let table: [fn(bool) -> bool; 16] = [primitive_repeat_bool::identity; 16];
+    if index < 16 {
+        assert!(table[index](value) == value);
+    }
+}
+
+pub fn primitive_repeat_bool_wrong(index: usize, value: bool) {
+    let table: [fn(bool) -> bool; 16] = [primitive_repeat_bool::identity; 16];
+    if index < 16 {
+        assert!(table[index](value) != value);
+    }
+}
+
+pub fn primitive_repeat_bool_opaque(value: bool, callback: fn(bool) -> bool) {
+    let table = [callback; 2];
+    assert!(table[0](value) == value);
+}
+
+mod primitive_repeat_char {
+    #[inline(never)]
+    pub fn identity(value: char) -> char {
+        value
+    }
+}
+
+pub fn primitive_repeat_char_selected(index: usize, value: char) {
+    let table: [fn(char) -> char; 16] = [primitive_repeat_char::identity; 16];
+    if index < 16 {
+        assert!(table[index](value) == value);
+    }
+}
+
+pub fn primitive_repeat_char_wrong(index: usize, value: char) {
+    let table: [fn(char) -> char; 16] = [primitive_repeat_char::identity; 16];
+    if index < 16 {
+        assert!(table[index](value) != value);
+    }
+}
+
+pub fn primitive_repeat_char_opaque(value: char, callback: fn(char) -> char) {
+    let table = [callback; 2];
+    assert!(table[0](value) == value);
+}
+
+#[cfg(test)]
+mod primitive_repeat_native {
+    #[test]
+    fn genuine_claims() {
+        for index in 0..16 {
+            for value in [false, true] {
+                super::primitive_repeat_bool_selected(index, value);
+            }
+            for value in ['\0', 'A', 'B', '\u{d7ff}', '\u{e000}', '\u{10ffff}'] {
+                super::primitive_repeat_char_selected(index, value);
+            }
+        }
+    }
+}

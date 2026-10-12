@@ -1344,6 +1344,10 @@ fn compiler_known_pointer_repeat_authenticates_cached_assignments() {
         r#"#![no_std]
 #![forbid(unsafe_code)]
 #[inline(never)] pub fn identity(value: u16) -> u16 { value }
+#[inline(never)] pub fn boolean(value: bool) -> bool { value }
+#[inline(never)] pub fn character(value: char) -> char { value }
+pub fn bool_twice(value: fn(bool)->bool) -> [fn(bool)->bool;2] { [value;2] }
+pub fn char_twice(value: fn(char)->char) -> [fn(char)->char;2] { [value;2] }
 #[inline(never)] pub fn binary(a: u16, b: i32) -> i64 { (a as i64) - (b as i64) }
 #[inline(never)] pub fn generic<T: Copy>(value: T) -> T { value }
 pub fn result_bool(_: u16) -> bool { true }
@@ -1409,7 +1413,15 @@ fn check_known_repeats<'tcx>(tcx: TyCtxt<'tcx>, output: &std::path::Path) {
             .unwrap()
     };
     let mut observations = Vec::new();
-    for name in ["once", "twice", "sixteen", "large", "too_large"] {
+    for name in [
+        "once",
+        "twice",
+        "sixteen",
+        "large",
+        "too_large",
+        "bool_twice",
+        "char_twice",
+    ] {
         let definition = find(name);
         let instance = engine
             .resolve_function_item(definition, tcx.mk_args(&[]))
@@ -1440,8 +1452,13 @@ fn check_known_repeats<'tcx>(tcx: TyCtxt<'tcx>, output: &std::path::Path) {
             panic!("actual local Repeat operand");
         };
         let signature = original.local_decls[source.local].ty;
+        let helper = match name {
+            "bool_twice" => "boolean",
+            "char_twice" => "character",
+            _ => "identity",
+        };
         let selected = engine
-            .resolve_function_item(find("identity"), tcx.mk_args(&[]))
+            .resolve_function_item(find(helper), tcx.mk_args(&[]))
             .unwrap();
         let token = engine
             .register_function_pointer(Target::Known {
@@ -1469,7 +1486,7 @@ fn check_known_repeats<'tcx>(tcx: TyCtxt<'tcx>, output: &std::path::Path) {
             };
             let count = match name {
                 "once" => 1,
-                "twice" => 2,
+                "twice" | "bool_twice" | "char_twice" => 2,
                 "sixteen" => 16,
                 "large" => 128,
                 "too_large" => unreachable!(),
@@ -1517,7 +1534,7 @@ fn check_known_repeats<'tcx>(tcx: TyCtxt<'tcx>, output: &std::path::Path) {
         observations.push(format!(
             "{name}: actual Repeat/cached identity/refusal controls"
         ));
-        if name != "twice" {
+        if !matches!(name, "twice" | "bool_twice" | "char_twice") {
             continue;
         }
         for count in [0, 1, 16, 128, 129] {

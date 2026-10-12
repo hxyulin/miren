@@ -123,9 +123,12 @@ impl<'tcx> Engine<'tcx> {
         }
         self.repeat_charge(work, arity + 1)?;
         let result = signature.output();
+        let primitive = arity == 1
+            && signature.inputs()[0] == result
+            && matches!(result.kind(), ty::Bool | ty::Char);
         for original in signature.inputs().iter().chain(std::iter::once(&result)) {
             let selected = self.repeat_type_work(*original, arguments, depth, work)?;
-            if !matches!(selected.kind(), ty::Int(_) | ty::Uint(_)) {
+            if !primitive && !matches!(selected.kind(), ty::Int(_) | ty::Uint(_)) {
                 return Err("known Repeat signature needs exact original integer types".into());
             }
         }

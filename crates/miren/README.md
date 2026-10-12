@@ -1313,3 +1313,11 @@ transport does not issue mutable Float pair authority or extend Float Repeat, mi
 two-argument signatures. Compiler Return faults, genuine helper mutations and dependency omission
 controls are validated. Completed ROOT checks and the four-profile 253-case survey are recorded in
 [Stage223](../../docs/stages.md#stage223-unary-float-function-tables).
+
+Known Repeat arrays of unary same-original Bool and Char function pointers execute actual available
+selected bodies. Construction evaluates its operand once even for zero count, preserving Move
+consumption and all existing admission bounds. Integer Repeat and Float table calls are unchanged;
+Float Repeat remains unsupported. Opaque, generic, ABI, count, dispatch and selected-body controls
+retain conservative refusals. Six appended survey cases are measured across four profiles;
+completed ROOT checks and release comparison are recorded in
+[Stage224](../../docs/stages.md#stage224-unary-bool-and-char-function-pointer-repeat-arrays).

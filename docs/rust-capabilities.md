@@ -11,11 +11,12 @@ execution at O0 and O2, positive/refuted/unknown controls, a source mutation tha
 structured UNKNOWN reporting, and passing repository checks. Completion establishes a repeatable
 baseline. It does not establish full Rust support or a completed memory-model refactor.
 
-The current manifest contains 253 cases across 85 families.
+The current manifest contains 259 cases across 87 families.
 Completed ROOT host/ARM O0/O2 surveys each measure
-103 PROVED, 87 REFUTED and 63 UNKNOWN. Eight Float cases append to the unchanged
-245-case source and manifest prefix. Required checks and fresh release comparison are
-recorded in [Stage223 in the stage history](stages.md#stage223-unary-float-function-tables).
+105 PROVED, 89 REFUTED and 65 UNKNOWN. Six Bool/Char Repeat cases append to the unchanged
+253-case source and manifest prefix. Required checks and fresh release comparison are
+recorded in
+[Stage224](stages.md#stage224-unary-bool-and-char-function-pointer-repeat-arrays).
 These are selected capabilities, not a Rust parity percentage.
 
 Historical Stage217 host/ARM O0/O2 surveys
@@ -2319,3 +2320,13 @@ Float pair authority. Float Repeat, mixed signatures and opaque body grants rema
 Eight new cases preserve the original 245-case objects and literal guest source prefix.
 Actual helper mutations, omitted-body controls, Return faults and completed ROOT checks are
 recorded in [Stage223 in the stage history](stages.md#stage223-unary-float-function-tables).
+
+## Unary Bool and Char function-pointer Repeat arrays
+
+Known Repeat arrays admit exact original unary Bool-to-Bool and Char-to-Char signatures.
+Construction evaluates the operand once, including at zero count, and preserves Move consumption.
+Actual available selected bodies, Unicode validity and current returned Memory remain required.
+Existing integer Repeat and all admission bounds remain unchanged. Opaque, generic, wrong-signature
+and missing-body controls remain UNKNOWN; Float Repeat remains unsupported. Six appended cases
+preserve all 253 prior manifest objects and the literal guest prefix. Completed validation is in
+[Stage224](stages.md#stage224-unary-bool-and-char-function-pointer-repeat-arrays).
