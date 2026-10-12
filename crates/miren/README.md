@@ -1425,3 +1425,18 @@ column; all rejection assertions and production checks remain intact. Earlier te
 preserved. All 2,028 rich queries/models in the 268 unchanged parent roots remain exact under
 qualified appended-source comparisons; actual differing whole Proofs remain distinguished.
 See [Stage229](../../docs/stages.md#stage229-shared-u16u32-niche-semantics).
+
+One private `Engine::new` now serves root verification and fourteen compiler-control wrappers.
+Its 52 production fields retain their prior expressions and order. Options, limits, configuration,
+fresh Context and Solver, timer and initial Proof state stay explicit; root execution and status
+reduction determine the result. Construction adds no success, assumption, law or permission.
+Feature algorithms and mutable State/Return Flow are unchanged. Thirteen test initializers now
+follow production order; this is not a claim of identical test timer or allocation order.
+
+Current host/ARM O0/O2 controls preserve a nondefault step-limit refusal, reject invalid
+startup/async options before entry premises, and reject terms from another Engine context.
+All 24 required checks pass, including 907 outer Rust tests and 91 Python tests. The unchanged
+274-case survey reports 117 PROVED, 93 REFUTED and 64 UNKNOWN in each profile. All 2,044 rich
+queries/models are exact; 1,095 whole Proof pairs are literal FULL and one retains the existing
+query-free fold resource context allowance. No guest fixture, contract or domain is changed.
+See [Stage230](../../docs/stages.md#stage230-one-concrete-engine-constructor).

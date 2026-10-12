@@ -6810,3 +6810,35 @@ not establish full Rust parity.
 Evidence: /tmp/miren-stage229-root-owner-migration-review.json,
 /tmp/miren-stage229-root-validated-full-checks, /tmp/miren-stage229-root-full-checks-audit.json and
 /tmp/miren-stage229-root-survey-proof-audit.json.
+
+
+## Stage230: one concrete Engine constructor
+
+Root verification and fourteen compiler-control wrappers now use one private `Engine::new`.
+The 52 production initializer expressions and their order remain exact. Existing verification
+options, configuration cloning, limits, Context, Solver, timer and initial Proof state stay
+explicit. Root execution and its status reducer remain unchanged; initialization creates no
+verified result, premise, law or access right. Feature algorithms and State/Return Flow are exact.
+Thirteen test wrappers now use production initialization order; no equivalent test timer or
+allocation order is claimed. The old duplicated wrappers and the corrected inline default
+configuration are checked field by field against the actual committed Stage229 parent.
+
+Current compiler controls run in host/ARM O0/O2 callbacks. A nondefault one-step limit produces
+ResourceLimit UNKNOWN, and invalid startup/async options refuse without entry premises. Separate
+Engine contexts reject foreign terms. Eight actual whole Proofs are retained. A focused callback
+capture preserves these new artifacts, which the successful full suite hides through normal
+output capture; its repeated outer test is excluded from the 907-test count.
+
+All 24 required commands pass: formatting, lint, workspace tests, 91 Python tests, release builds,
+dependency policy, documentation, example ARM releases and manual hooks. Rust logs contain
+898 workspace and 9 example outer tests; the nested ticket test is excluded. Fresh surveys each
+report 117 PROVED, 93 REFUTED and 64 UNKNOWN across the same 274 cases and 89 families. Guest
+fixture and manifest bytes are unchanged. All 1,096 previous whole Proof pairs are compared:
+1,095 are literal FULL and one keeps the inherited exact query-free fold resource context
+allowance. All 2,044 rich queries/models remain exact. No historical survey is replayed.
+Final documentation has a separate source association and closure checks.
+
+Evidence: /tmp/miren-stage230-root-owner-migration-review.json,
+/tmp/miren-stage230-root-validated-full-checks, /tmp/miren-stage230-root-constructor-controls,
+/tmp/miren-stage230-root-full-checks-audit.json and
+/tmp/miren-stage230-root-survey-proof-audit.json.

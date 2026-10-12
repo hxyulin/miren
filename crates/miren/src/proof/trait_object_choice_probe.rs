@@ -12,6 +12,7 @@ fn compiler_shared_trait_choices_preserve_sources_and_actual_return_memory() {
             tcx: TyCtxt<'tcx>,
         ) -> rustc_driver::Compilation {
             check_actual_roots(tcx, &self.output);
+            check_constructor_behavior(tcx, &self.output);
             check_source_receipts(tcx);
             check_actual_return_faults(tcx);
             rustc_driver::Compilation::Stop
@@ -74,6 +75,80 @@ fn find<'tcx>(tcx: TyCtxt<'tcx>, name: &str, kind: DefKind) -> DefId {
         })
         .unwrap()
         .to_def_id()
+}
+
+fn check_constructor_behavior(tcx: TyCtxt<'_>, output: &std::path::Path) {
+    let config = miren::ContractConfig::default();
+    let id = find(tcx, "constant", DefKind::Fn);
+    let low_limit = super::super::verify(
+        tcx,
+        id,
+        &config,
+        VerificationOptions {
+            all_failures: false,
+            induction: false,
+            startup: false,
+            isolated_startup: false,
+            async_entry: false,
+            limits: miren::AnalysisLimits {
+                max_steps: 1,
+                ..miren::AnalysisLimits::default()
+            },
+        },
+    );
+    std::fs::write(
+        output.join("constructor-low-step-limit-proof.json"),
+        serde_json::to_vec_pretty(&low_limit).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(low_limit.status, ProofStatus::Unknown);
+    assert!(low_limit.obligations.iter().any(|obligation| {
+        obligation.status == ProofStatus::Unknown
+            && obligation.unknown_category == Some(UnknownCategory::ResourceLimit)
+    }));
+    let invalid_mode = super::super::verify(
+        tcx,
+        id,
+        &config,
+        VerificationOptions {
+            all_failures: false,
+            induction: false,
+            startup: true,
+            isolated_startup: true,
+            async_entry: true,
+            limits: miren::AnalysisLimits::default(),
+        },
+    );
+    std::fs::write(
+        output.join("constructor-invalid-startup-async-proof.json"),
+        serde_json::to_vec_pretty(&invalid_mode).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(invalid_mode.status, ProofStatus::Unknown);
+    assert!(invalid_mode.entry_assumptions.is_empty());
+    assert!(invalid_mode.obligations.iter().any(|obligation| {
+        obligation.status == ProofStatus::Unknown
+            && obligation.detail.starts_with(
+                "async entries cannot inherit executor startup history or use induction",
+            )
+    }));
+    let first = test_engine(tcx);
+    let second = test_engine(tcx);
+    let first_term = first.fresh(Sort::BitVec(8));
+    let second_term = second.fresh(Sort::BitVec(8));
+    assert!(
+        second
+            .terms
+            .apply(Op::Equal, &[first_term, second_term])
+            .is_err()
+    );
+    std::fs::write(
+        output.join("constructor-behavior-controls.txt"),
+        "actual max_steps1 refusal; invalid startup+async refusal without premises; \
+         separate Engine contexts reject foreign terms
+",
+    )
+    .unwrap();
 }
 
 fn check_actual_roots(tcx: TyCtxt<'_>, output: &std::path::Path) {
@@ -372,76 +447,18 @@ fn test_engine(tcx: TyCtxt<'_>) -> Engine<'_> {
     let startup = false;
     let isolated_startup = false;
     let async_entry = false;
-    Engine {
+    Engine::new(
         tcx,
-        terms: Context::default(),
-        next_symbol: std::cell::Cell::new(0),
-        float_encodings: BTreeMap::new(),
-        float_pairs: float_pairs::Registry::default(),
-        abstraction_symbols: std::cell::RefCell::new(BTreeMap::new()),
-        static_views: std::cell::RefCell::new(Vec::new()),
-        static_origins: Default::default(),
-        static_epoch: None,
-        static_roots: None,
-        function_pointers: std::cell::RefCell::new(Vec::new()),
-        static_addresses: std::collections::HashMap::new(),
-        tracked_addresses: Vec::new(),
-        maybe_uninit_types: Vec::new(),
-        scalar_slice_types: Vec::new(),
-        composite_slice_types: Vec::new(),
-        steps: 0,
-        call_chain: Vec::new(),
-        failed_call_chain: None,
-        trait_objects: std::cell::RefCell::new(Vec::new()),
-        trait_object_choice_work: std::cell::Cell::new(0),
-        trait_object_choices_issued: std::cell::Cell::new(false),
-        input_depth: 0,
-        input_values: 0,
-        input_reservations: Vec::new(),
-        owned_projection_certificates: Vec::new(),
-        input_shapes: std::collections::HashMap::new(),
-        zero_sized_inputs: std::collections::HashMap::new(),
-        zero_sized_input_nodes: 0,
-        prefer_lazy_inputs: false,
-        building_mutable_input: false,
-        unknown_causes: std::cell::RefCell::new(BTreeMap::new()),
-        started: std::time::Instant::now(),
-        config: config.clone(),
-        all_failures,
-        induction,
-        startup,
-        isolated_startup,
-        limits,
-        resolved_contracts: BTreeMap::new(),
-        solver: std::cell::RefCell::new(Solver::with_limits(limits)),
-        mutable_u16_frames: Default::default(),
-        mutable_integer_types: Vec::new(),
-        mutable_u16_staging: Default::default(),
-        activation: Default::default(),
-        coroutine_places: Default::default(),
-        owned_box_types: Vec::new(),
-        next_owned_region: 0,
-        owned_box_constructors: Vec::new(),
-        bodies: std::cell::RefCell::new(std::collections::HashMap::new()),
-        call_signatures: std::cell::RefCell::new(std::collections::HashMap::new()),
-        proof: Proof {
-            status: ProofStatus::Proved,
+        &config,
+        VerificationOptions {
+            all_failures,
+            induction,
+            startup,
+            isolated_startup,
             async_entry,
-            assumptions: Vec::new(),
-            entry_assumptions: Vec::new(),
-            inputs: BTreeMap::new(),
-            models: Vec::new(),
-            invariants: Vec::new(),
-            analyzed_bodies: Vec::new(),
-            body_entries: Vec::new(),
-            body_entries_truncated: false,
-            obligations: Vec::new(),
-            trusted_calls: Vec::new(),
-            matched_contracts: Vec::new(),
-            stopped_after_counterexample: false,
-            replay_inputs: None,
+            limits,
         },
-    }
+    )
 }
 
 struct ReturnFaultScope(SharedReturnFault);
