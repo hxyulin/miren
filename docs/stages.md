@@ -6680,3 +6680,46 @@ This refactor adds infrastructure and does not promote unsupported Rust operatio
 Evidence: /tmp/miren-carrier-parent225/execution,
 /tmp/miren-stage226-root-owner-review.json, /tmp/miren-stage226-root-full-checks and
 /tmp/miren-stage226-root-survey-proof-audit.json.
+
+## Stage227: exact NonZero niche slice membership
+
+Read-only `Option<NonZeroU16>` slice membership now uses an admission-local certificate for the
+actual core comparison and transport bodies. The original niche schema, typed descriptor, needle,
+current conditions and Memory are checked before single-use application. Unarmed flow is required
+before issuance and retained on Return. Other widths, custom equality and raw or mutable transport
+remain unsupported by this route; missing dependency bodies remain UNKNOWN.
+
+Graph, private law and application work limits are 131,072, 1,024 and 2,048 respectively.
+All phases retain their charges without resetting or discounts. These host work bounds add no
+guest premises. Earlier graph and application failures remain archived. Sixteen compiler application
+controls measure 551–779 units across host/ARM O0/O2, including symbolic and inactive-payload cases.
+Hostile descriptor, tag, context, certificate and exact limit-boundary controls pass.
+
+The small direct corpus preserves 52 whole Proofs: 24 PROVED, 16 REFUTED and 12 UNKNOWN, with
+40 emitted queries. Twelve unchanged-claim helper mutation roots retain actual entered bodies,
+refuted queries and models. The wrong-empty mutant honestly proves the inverse of its refuted
+original. Genuine retained dependency bodies enter; omitted bodies report MissingCompilerEvidence.
+Four native runs each select one test: originals exit 0 and helper mutants exit 101 at O0/O2.
+Three scoped integration tests pass. Existing whole-membership test expectations were updated
+without changing their guest claims; earlier stale-expectation and fixture parser failures remain
+recorded with their actual exits.
+
+Four fresh ROOT survey profiles each measure 111 PROVED, 90 REFUTED and 63 UNKNOWN across
+264 cases and 88 families. One existing membership root advances from UNKNOWN to PROVED; five
+new P/R/U cases are appended. All old fixture bytes and 258 other old manifest objects
+are preserved.
+The parent survey is reused without replay. Comparing its unchanged 258-root projection yields
+8 literal FULL pairs, 1,021 qualified append-only source fingerprints and 3 source fingerprints
+with the existing exact query-free 30-second fold frame-context allowance. All 1,976 existing
+rich queries and models are unchanged. Actual differing whole Proofs and source hashes are retained;
+qualified pairs are not reported as literal FULL comparisons.
+
+All 24 required ROOT commands pass, including formatting, lint, workspace and Python tests,
+release builds, dependency policy, documentation, example ARM releases and manual hooks.
+Logs contain 889 workspace and 9 example outer Rust tests, 898 total, plus 91 Python tests.
+The nested ticket test is excluded. Final prose is validated under a separate source association.
+This stage establishes the named capability and does not claim full Rust parity.
+
+Evidence: /tmp/miren-niche-membership-parent226/direct-evidence-completed,
+/tmp/miren-stage227-root-owner-review.json, /tmp/miren-stage227-root-full-checks and
+/tmp/miren-stage227-root-survey-proof-audit.json.

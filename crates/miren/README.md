@@ -1353,3 +1353,20 @@ is inventoried before actual instantiation on cache miss. Narrow Armed shape che
 recursive owned values and snapshots before production. Local continuation validation and cloning
 share one bounded pass; backing and array COW costs are charged before detachment.
 This prototype enables no additional hierarchy depth or production arming path.
+
+Exact read-only `Option<NonZeroU16>` slice membership uses a live, admission-local certificate
+for the actual core comparison and transport bodies. The application checks the original niche
+schema, current typed descriptor and needle, applies equality once, and retains current conditions,
+Memory and Unarmed flow. Other widths, custom equality and mutable or raw transport remain
+unsupported by this route. Missing dependency bodies remain `UNKNOWN`.
+
+The cumulative graph, private comparison law and application work limits are 131,072, 1,024 and
+2,048 respectively. These are host work limits and add no guest premises. Every phase retains its
+charges; certificate application is single-use. Compiler controls measured 551–779 application
+units across host and ARM profiles. Earlier graph and application limit failures remain recorded.
+The compiler controls and integration evidence cover successful membership, false claims,
+unchanged-claim helper mutations, unsupported widths and genuine omitted dependency bodies.
+All required repository checks pass. Four shared survey profiles each measure 111 PROVED,
+90 REFUTED and 63 UNKNOWN across 264 cases and 88 families; the original membership entry now
+proves. Validation and conservative limits are recorded in
+[Stage227](../../docs/stages.md#stage227-exact-nonzero-niche-slice-membership).

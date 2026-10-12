@@ -56,7 +56,7 @@ associated calls and original constant-index reads and stores. Exact f32/f64 bac
 preserves NaN payloads and signed-zero bits. Deeper nesting and the dedicated proper-reborrow
 caller remain UNKNOWN. Bounded owned u16 products also support writes through multiple symbolic
 suffix indices, preserving compiler types and current Memory. The validated capability survey
-covers 259 cases across 87 families.
+covers 264 cases across 88 families.
 
 Known local integer function tables support one or two integer arguments, preserving exact
 compiler signatures and executing selected helper bodies. Authenticated MIR Repeat assignments

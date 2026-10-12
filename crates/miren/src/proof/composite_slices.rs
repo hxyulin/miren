@@ -1225,6 +1225,68 @@ fn unrestricted_scalar_range(scalar: Scalar) -> bool {
     valid_range.is_full_for(size)
 }
 
+impl<'tcx> Engine<'tcx> {
+    // Caller prepays the fixed descriptor reads before entering this borrowed service.
+    pub(super) fn niche_membership_descriptor(
+        &self,
+        original: Ty<'tcx>,
+        value: &Value,
+    ) -> Result<&nonzero_niches::Schema, String> {
+        let Value::CompositeSlice { id, .. } = value else {
+            return Err("niche membership descriptor carrier differs".into());
+        };
+        let descriptor = self
+            .composite_slice_types
+            .get(*id)
+            .ok_or("niche membership descriptor is unavailable")?;
+        if descriptor.ty != original
+            || descriptor.bytes != 2
+            || descriptor.leaves.as_slice()
+                != [ScalarSliceElement::Integer {
+                    bits: 16,
+                    signed: false,
+                }]
+        {
+            return Err("niche membership descriptor original extent/column differs".into());
+        }
+        let CompositeShape::NonZeroNiche(schema) = &descriptor.shape else {
+            return Err("niche membership descriptor original shape differs".into());
+        };
+        Ok(schema)
+    }
+
+    #[cfg(test)]
+    pub(super) fn test_niche_descriptor_fault(&mut self, value: &Value, fault: usize) -> Value {
+        let Value::CompositeSlice { id, length, leaves } = value else {
+            unreachable!()
+        };
+        let mut descriptor = self.composite_slice_types[*id].clone();
+        match fault {
+            0 => descriptor.bytes = 4,
+            1 => {
+                descriptor.shape = CompositeShape::Primitive(ScalarSliceElement::Integer {
+                    bits: 16,
+                    signed: false,
+                })
+            }
+            2 => {
+                descriptor.leaves = vec![ScalarSliceElement::Integer {
+                    bits: 32,
+                    signed: false,
+                }]
+            }
+            _ => panic!("unknown descriptor fault"),
+        }
+        let changed = self.composite_slice_types.len();
+        self.composite_slice_types.push(descriptor);
+        Value::CompositeSlice {
+            id: changed,
+            length: length.clone(),
+            leaves: leaves.clone(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     #[test]

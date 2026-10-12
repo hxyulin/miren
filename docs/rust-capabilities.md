@@ -11,11 +11,13 @@ execution at O0 and O2, positive/refuted/unknown controls, a source mutation tha
 structured UNKNOWN reporting, and passing repository checks. Completion establishes a repeatable
 baseline. It does not establish full Rust support or a completed memory-model refactor.
 
-The current manifest contains 259 cases across 87 families.
-Completed ROOT host/ARM O0/O2 surveys each measure 107 PROVED, 89 REFUTED and 63 UNKNOWN.
-The two existing Float Repeat controls now prove; the other 257 case objects and every original
-survey assertion remain unchanged. Required checks and release comparisons are recorded in
-[Stage225](stages.md#stage225-unary-float-function-pointer-repeat-arrays).
+The current manifest contains 264 cases across 88 families.
+Completed ROOT host/ARM O0/O2 surveys each measure 111 PROVED, 90 REFUTED and 63 UNKNOWN.
+Exact read-only `Option<NonZeroU16>` membership now proves the existing membership entry.
+Five new cases cover successful None/Some/empty membership, a false empty claim and an unsupported
+width. The other 258 old case objects and every original survey assertion remain unchanged.
+Required checks, mutation evidence and qualified source-snapshot comparisons are recorded in
+[Stage227](stages.md#stage227-exact-nonzero-niche-slice-membership).
 These are selected capabilities, not a Rust parity percentage.
 
 Historical Stage217 host/ARM O0/O2 surveys

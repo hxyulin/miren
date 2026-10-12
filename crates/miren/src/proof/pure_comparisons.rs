@@ -4,7 +4,7 @@ use rustc_middle::mir::Local;
 use rustc_span::Symbol;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-enum CursorArithmetic {
+pub(super) enum CursorArithmetic {
     AddBelowEnd,
     SubAfterNonzero,
 }
@@ -204,7 +204,7 @@ impl<'tcx> Engine<'tcx> {
         Ok(())
     }
 
-    fn certify_comparison_layout_constants(
+    pub(super) fn certify_comparison_layout_constants(
         &self,
         body: &Body<'tcx>,
         types: &[Ty<'tcx>],
@@ -275,7 +275,10 @@ impl<'tcx> Engine<'tcx> {
         Ok(())
     }
 
-    fn certify_cursor_arithmetic(&self, premise: CursorArithmetic) -> Result<(), String> {
+    pub(super) fn certify_cursor_arithmetic(
+        &self,
+        premise: CursorArithmetic,
+    ) -> Result<(), String> {
         let width = u32::from(self.tcx.sess.target.pointer_width);
         if !matches!(width, 32 | 64) {
             return Err(
@@ -291,7 +294,7 @@ impl<'tcx> Engine<'tcx> {
         Ok(())
     }
 
-    fn validate_pure_comparison_instance(
+    pub(super) fn validate_pure_comparison_instance(
         &self,
         instance: ty::Instance<'tcx>,
         family: super::pure_comparison_templates::PureTemplateFamily,

@@ -1124,9 +1124,7 @@
     {
       "entry": "readonly_nonzero_niche_contains_unknown",
       "family": "readonly_nonzero_niche",
-      "expected": "unknown",
-      "unknown_reason": "whole composite slice membership is unsupported",
-      "unknown_category": "semantics"
+      "expected": "proved"
     },
     {
       "entry": "integer_function_table_pair",
@@ -1424,6 +1422,33 @@
       "expected": "unknown",
       "unknown_reason": "known Repeat refuses opaque or nested Choice targets",
       "unknown_category": "unclassified"
+    },
+    {
+      "entry": "niche_membership_selected_none",
+      "family": "readonly_nonzero_niche_membership",
+      "expected": "proved"
+    },
+    {
+      "entry": "niche_membership_selected_some",
+      "family": "readonly_nonzero_niche_membership",
+      "expected": "proved"
+    },
+    {
+      "entry": "niche_membership_empty",
+      "family": "readonly_nonzero_niche_membership",
+      "expected": "proved"
+    },
+    {
+      "entry": "niche_membership_wrong_empty",
+      "family": "readonly_nonzero_niche_membership",
+      "expected": "refuted"
+    },
+    {
+      "entry": "niche_membership_unsupported_width",
+      "family": "readonly_nonzero_niche_membership",
+      "expected": "unknown",
+      "unknown_reason": "NonZero wrapper original identity mismatch",
+      "unknown_category": "semantics"
     }
   ]
 }

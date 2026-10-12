@@ -3758,3 +3758,48 @@ mod primitive_repeat_native {
         }
     }
 }
+
+#[inline(never)]
+pub fn niche_membership_member(
+    values: &[Option<core::num::NonZeroU16>],
+    needle: Option<core::num::NonZeroU16>,
+) -> bool {
+    values.contains(&needle)
+}
+
+pub fn niche_membership_selected_none(values: &[Option<core::num::NonZeroU16>]) {
+    if !values.is_empty() && values[0].is_none() {
+        assert!(niche_membership_member(values, None));
+    }
+}
+
+pub fn niche_membership_selected_some(
+    values: &[Option<core::num::NonZeroU16>],
+    needle: core::num::NonZeroU16,
+) {
+    if !values.is_empty()
+        && let Some(first) = values[0]
+        && first.get() == needle.get()
+    {
+        assert!(niche_membership_member(values, Some(needle)));
+    }
+}
+
+pub fn niche_membership_empty(values: &[Option<core::num::NonZeroU16>]) {
+    if values.is_empty() {
+        assert!(!niche_membership_member(values, None));
+    }
+}
+
+pub fn niche_membership_wrong_empty(values: &[Option<core::num::NonZeroU16>]) {
+    if values.is_empty() {
+        assert!(niche_membership_member(values, None));
+    }
+}
+
+pub fn niche_membership_unsupported_width(
+    values: &[Option<core::num::NonZeroU32>],
+    needle: Option<core::num::NonZeroU32>,
+) {
+    assert!(values.contains(&needle));
+}

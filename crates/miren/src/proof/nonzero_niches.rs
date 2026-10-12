@@ -1,5 +1,7 @@
 //! Exact bounded readonly for exact zero-only NonZero<u16> niche observations.
 use super::*;
+#[path = "nonzero_niche_comparisons.rs"]
+mod comparisons;
 use rustc_abi::{BackendRepr, FieldIdx, Integer, Primitive, Scalar, TagEncoding, Variants};
 use rustc_middle::mir::Local;
 use rustc_middle::ty::{AdtFlags, CoroutineArgsExt, TypeVisitableExt};
@@ -1841,4 +1843,69 @@ fn check_external_copy_path<'tcx>(
             .nonzero_niche_operand_path(&original, forged)
             .is_err()
     );
+}
+
+impl<'tcx> Engine<'tcx> {
+    pub(super) fn exact_niche_membership(
+        &self,
+        original: Ty<'tcx>,
+        instance: ty::Instance<'tcx>,
+        slice: &Value,
+        needle: &Value,
+        state: &State,
+    ) -> Result<Term, String> {
+        self.checked_niche_membership(original, instance, slice, needle, state)
+    }
+}
+
+impl Schema {
+    pub(super) fn membership_match_work(&self, expected: &Self) -> Result<usize, String> {
+        // Sixteen length/bound/add visits48, two facts services64,
+        // and the remaining tag/width/header comparisons16.
+        let mut work = 128usize;
+        for name in [
+            self.name.as_str(),
+            self.variant_names[0].as_str(),
+            self.variant_names[1].as_str(),
+            self.payload_field.as_str(),
+            self.outer_name.as_str(),
+            self.inner_name.as_str(),
+            self.outer_field.as_str(),
+            self.inner_field.as_str(),
+            expected.name.as_str(),
+            expected.variant_names[0].as_str(),
+            expected.variant_names[1].as_str(),
+            expected.payload_field.as_str(),
+            expected.outer_name.as_str(),
+            expected.inner_name.as_str(),
+            expected.outer_field.as_str(),
+            expected.inner_field.as_str(),
+        ] {
+            if name.len() > 128 {
+                return Err("niche schema name exceeds128 bytes".into());
+            }
+            work = work
+                .checked_add(name.len())
+                .ok_or("niche schema match work overflow")?;
+        }
+        Ok(work)
+    }
+
+    pub(super) fn membership_matches(&self, expected: &Self) -> bool {
+        facts_match(&self.facts)
+            && facts_match(&expected.facts)
+            && self.name == expected.name
+            && self.is_option
+            && expected.is_option
+            && self.variant_names == expected.variant_names
+            && self.payload_field == expected.payload_field
+            && self.outer_name == expected.outer_name
+            && self.inner_name == expected.inner_name
+            && self.outer_field == expected.outer_field
+            && self.inner_field == expected.inner_field
+            && self.payload_variant == expected.payload_variant
+            && self.tags == expected.tags
+            && self.bits == expected.bits
+            && self.signed == expected.signed
+    }
 }

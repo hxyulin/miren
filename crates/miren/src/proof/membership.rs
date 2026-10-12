@@ -89,7 +89,20 @@ impl<'tcx> Engine<'tcx> {
         {
             return Ok(None);
         }
-        self.instantiated_body(instance)?;
+        let exact_niche = matches!(element.kind(), ty::Adt(def, args)
+            if self.tcx.lang_items().get(LangItem::Option) == Some(def.did())
+                && args.len() == 1
+                && matches!(args.type_at(0).kind(), ty::Adt(payload, payload_args)
+                    if self.tcx.is_diagnostic_item(Symbol::intern("NonZero"), payload.did())
+                        && payload_args.len() == 1
+                        && payload_args.type_at(0) == self.tcx.types.u16));
+        if exact_niche {
+            state.flow.require_unarmed()?;
+        }
+        // New niche admission inventories original MIR before selected instantiation.
+        if !exact_niche {
+            self.instantiated_body(instance)?;
+        }
         let [raw_first, raw_second] = raw_values else {
             return Err("slice membership requires two tracked arguments".into());
         };
@@ -107,6 +120,20 @@ impl<'tcx> Engine<'tcx> {
         };
         let slice = slice.materialize()?;
         if matches!(slice, Value::CompositeSlice { .. }) {
+            if exact_niche {
+                let member =
+                    self.exact_niche_membership(*element, instance, &slice, needle, state)?;
+                self.record_model(
+                    callee,
+                    "exact checked core Option<NonZeroU16> slice membership",
+                );
+                return Ok(Some(vec![Return {
+                    value: Value::Bool(member),
+                    conditions: state.conditions.clone(),
+                    memory: state.memory.clone(),
+                    flow: state.flow.clone(),
+                }]));
+            }
             let Some(plan) = self.pure_comparison_shape(*element)? else {
                 return Err(self.categorized_error(
                     UnknownCategory::Semantics,

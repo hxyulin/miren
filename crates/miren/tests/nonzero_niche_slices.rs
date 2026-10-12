@@ -105,10 +105,6 @@ fn verify(
                     UnknownCategory::Semantics,
                     "NonZero niche requires actual niche encoding",
                 ),
-                "whole_membership" => (
-                    UnknownCategory::Semantics,
-                    "whole composite slice membership is unsupported",
-                ),
                 "foreign_selected" => (
                     UnknownCategory::MissingCompilerEvidence,
                     "nonzero_niche_dependency::selected",
@@ -205,7 +201,7 @@ fn exact_nonzero_niches_keep_payloads_guarded_and_conservative_frontiers() {
         ("signed_niche", ProofStatus::Unknown),
         ("over_budget", ProofStatus::Unknown),
         ("expanded_budget", ProofStatus::Unknown),
-        ("whole_membership", ProofStatus::Unknown),
+        ("whole_membership", ProofStatus::Proved),
         ("mutable_niche", ProofStatus::Unknown),
         ("explicit_tag", ProofStatus::Unknown),
         ("paired_columns", ProofStatus::Proved),
