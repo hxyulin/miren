@@ -185,7 +185,9 @@ struct Engine<'tcx> {
     steps: usize,
     call_chain: Vec<DefId>,
     failed_call_chain: Option<Vec<DefId>>,
-    trait_objects: Vec<trait_objects::TraitObject<'tcx>>,
+    trait_objects: std::cell::RefCell<Vec<trait_objects::Witness<'tcx>>>,
+    trait_object_choice_work: std::cell::Cell<usize>,
+    trait_object_choices_issued: std::cell::Cell<bool>,
     input_depth: usize,
     input_values: usize,
     input_reservations: Vec<input_reservations::IssuedInput<'tcx>>,
@@ -263,7 +265,9 @@ pub fn verify(
         steps: 0,
         call_chain: Vec::new(),
         failed_call_chain: None,
-        trait_objects: Vec::new(),
+        trait_objects: std::cell::RefCell::new(Vec::new()),
+        trait_object_choice_work: std::cell::Cell::new(0),
+        trait_object_choices_issued: std::cell::Cell::new(false),
         input_depth: 0,
         input_values: 0,
         input_reservations: Vec::new(),
@@ -1818,6 +1822,32 @@ impl<'tcx> Engine<'tcx> {
                     } else {
                         instance
                     };
+                    if let Some(results) = self.shared_trait_object_call(
+                        instance,
+                        &values,
+                        &state,
+                        &stack,
+                        (id, terminator.source_info.span),
+                    )? {
+                        let target = target.ok_or("shared trait choice has no return edge")?;
+                        for result in results {
+                            let mut continuation = self.adopt_flow_return(
+                                &state,
+                                result.conditions,
+                                result.memory,
+                                result.flow,
+                            )?;
+                            self.store_call_result(
+                                body,
+                                &mut continuation,
+                                *destination,
+                                destination_indices.as_ref(),
+                                result.value,
+                            )?;
+                            queue.push_back((target, continuation, retry_path.clone()));
+                        }
+                        continue;
+                    }
                     let instance = self.resolve_trait_object_call(instance, &mut values, &state)?;
                     if unarmed {
                         self.byte_copy_call_eligibility(instance, false, &mut state);
@@ -2797,7 +2827,7 @@ impl<'tcx> Engine<'tcx> {
                 let narrowed = if let Operand::Copy(place) = operand
                     && retag.no()
                 {
-                    self.shared_dereference_copy(state, *place)?
+                    self.shared_dereference_copy(body, state, *place)?
                 } else {
                     None
                 };

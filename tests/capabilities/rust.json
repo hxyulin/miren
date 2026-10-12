@@ -1449,6 +1449,33 @@
       "expected": "unknown",
       "unknown_reason": "NonZero wrapper original identity mismatch",
       "unknown_category": "semantics"
+    },
+    {
+      "entry": "trait_choice_symbolic",
+      "family": "shared_trait_object_choices",
+      "expected": "proved"
+    },
+    {
+      "entry": "trait_choice_wrong",
+      "family": "shared_trait_object_choices",
+      "expected": "refuted"
+    },
+    {
+      "entry": "trait_choice_returned",
+      "family": "shared_trait_object_choices",
+      "expected": "proved"
+    },
+    {
+      "entry": "trait_choice_repeated",
+      "family": "shared_trait_object_choices",
+      "expected": "proved"
+    },
+    {
+      "entry": "trait_choice_opaque",
+      "family": "shared_trait_object_choices",
+      "expected": "unknown",
+      "unknown_reason": "unsupported argument type dyn",
+      "unknown_category": "semantics"
     }
   ]
 }

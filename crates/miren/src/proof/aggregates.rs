@@ -698,6 +698,18 @@ impl<'tcx> Engine<'tcx> {
         {
             return Ok(selected);
         }
+        if let Some(original) = original
+            && let Some(source) = source
+            && let Some(selected) = self.shared_trait_object_choice(
+                original,
+                elements,
+                index,
+                conditions,
+                source.state,
+            )?
+        {
+            return Ok(selected);
+        }
         symbolic::select_element(&self.terms, elements, index).map_err(|_| {
             "non-scalar array index is not uniquely determined on this path".to_owned()
         })

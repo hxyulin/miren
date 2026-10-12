@@ -1370,3 +1370,31 @@ All required repository checks pass. Four shared survey profiles each measure 11
 90 REFUTED and 63 UNKNOWN across 264 cases and 88 families; the original membership entry now
 proves. Validation and conservative limits are recorded in
 [Stage227](../../docs/stages.md#stage227-exact-nonzero-niche-slice-membership).
+
+
+An actual Stage227 source migration carries finite known shared trait-object selection from local
+fixed arrays and retained slices. The complete receiver backing bundle remains in the value;
+engine receipts authenticate masks and original witnesses. Virtual alternatives execute actual
+compiler-selected bodies and transport each returned Memory. Shared reborrows, caller-backed
+returns and per-candidate supertrait upcasts retain all sources; mutable choices and arbitrary
+incoming objects remain unsupported. Array16, registry512, Repeat128, depth16 and engine execution
+limits remain unchanged. Shared choice work uses a separate cumulative2048 engineering policy; it
+supplies no guest premise or permission. The preceding512 policy stopped the first host callback
+at repeated dispatch. Historical actual226 controls and its small direct corpus validate named
+selection, mutation and retained/omitted bodies under2048. Those artifacts remain scoped to their
+original source; the owner migration preceded the separate ROOT checks described below. Whole
+Proofs are retained before test assertions; test-only fee refusal diagnostics record current work,
+attempt and call site.
+
+The committed activation carrier is preserved. Choice selection and dispatch refuse Armed before
+receipt cloning or fee/type work; validated continuations transport the actual returned Flow.
+
+ROOT Stage228 validates this migration with the full repository checks and fresh host/ARM O0/O2
+surveys. Each survey reports 114 PROVED, 91 REFUTED and 64 UNKNOWN across 269 cases and 89 families.
+Five new shared-choice cases preserve every prior case object and original fixture assertion.
+Current integration tests validate helper mutation/native failures and retained versus omitted
+actual methods; the earlier direct corpus remains explicitly historical. All 1,988 existing rich
+queries and models remain unchanged under qualified source-fingerprint comparisons. Array16,
+registry512, Repeat128, depth16 and cumulative choice2048 bounds remain explicit host limits.
+No guest premise, mutable receiver right or arbitrary incoming dynamic target is supplied.
+See [Stage228](../../docs/stages.md#stage228-finite-shared-trait-object-choices).

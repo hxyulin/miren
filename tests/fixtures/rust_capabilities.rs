@@ -3803,3 +3803,63 @@ pub fn niche_membership_unsupported_width(
 ) {
     assert!(values.contains(&needle));
 }
+
+
+pub trait CapabilityChoiceRead {
+    fn read(&self) -> u8;
+}
+struct CapabilityChoiceMask(u8);
+struct CapabilityChoiceRemainder(u8);
+impl CapabilityChoiceRead for CapabilityChoiceMask {
+    #[inline(never)]
+    fn read(&self) -> u8 { self.0 & 15 }
+}
+impl CapabilityChoiceRead for CapabilityChoiceRemainder {
+    #[inline(never)]
+    fn read(&self) -> u8 { self.0 % 16 }
+}
+#[inline(never)]
+fn capability_choice_invoke(value: &dyn CapabilityChoiceRead) -> u8 { value.read() }
+#[inline(never)]
+fn capability_choice_return<'a>(
+    values: &[&'a dyn CapabilityChoiceRead], index: usize,
+) -> &'a dyn CapabilityChoiceRead { values[index] }
+
+pub fn trait_choice_symbolic(value: u8, index: usize) {
+    if index >= 2 { return; }
+    let first = CapabilityChoiceMask(value);
+    let second = CapabilityChoiceRemainder(value);
+    let values: [&dyn CapabilityChoiceRead; 2] = [&first, &second];
+    assert!(capability_choice_invoke(values[index]) <= 15);
+}
+
+pub fn trait_choice_wrong(value: u8, index: usize) {
+    if index >= 2 { return; }
+    let first = CapabilityChoiceMask(value);
+    let second = CapabilityChoiceRemainder(value);
+    let values: [&dyn CapabilityChoiceRead; 2] = [&first, &second];
+    assert!(capability_choice_invoke(values[index]) == 16);
+}
+
+pub fn trait_choice_returned(value: u8, index: usize) {
+    if index >= 2 { return; }
+    let first = CapabilityChoiceMask(value);
+    let second = CapabilityChoiceRemainder(value);
+    let values: [&dyn CapabilityChoiceRead; 2] = [&first, &second];
+    let selected = capability_choice_return(&values, index);
+    assert!(capability_choice_invoke(selected) <= 15);
+}
+
+pub fn trait_choice_repeated(value: u8, index: usize) {
+    if index >= 2 { return; }
+    let first = CapabilityChoiceMask(value);
+    let second = CapabilityChoiceRemainder(value);
+    let values: [&dyn CapabilityChoiceRead; 2] = [&first, &second];
+    let selected = values[index];
+    assert!(capability_choice_invoke(selected) <= 15);
+    assert!(capability_choice_invoke(selected) <= 15);
+}
+
+pub fn trait_choice_opaque(value: &dyn CapabilityChoiceRead) {
+    assert!(capability_choice_invoke(value) <= 15);
+}

@@ -142,7 +142,12 @@ impl<'tcx> Engine<'tcx> {
                     _ => Err("local atomic snapshot points to unavailable backing".into()),
                 }
             }
-            Value::TraitObject { source, .. } | Value::DebugReference { source, .. } => {
+            Value::TraitObject { source, id, .. } => {
+                self.validate_shared_trait_bundle(source, *id)?;
+                self.snapshot(source, memory, conditions, depth + 1)?;
+                Ok(value.clone())
+            }
+            Value::DebugReference { source, .. } => {
                 self.snapshot(source, memory, conditions, depth + 1)?;
                 Ok(value.clone())
             }
@@ -811,9 +816,19 @@ impl<'tcx> Engine<'tcx> {
 
     pub(super) fn shared_dereference_copy(
         &self,
+        body: &Body<'tcx>,
         state: &State,
         place: Place<'tcx>,
     ) -> Result<Option<Value>, String> {
+        if let ty::Ref(_, object, mutability) = place.ty(&body.local_decls, self.tcx).ty.kind()
+            && !mutability.is_mut()
+            && matches!(object.kind(), ty::Dynamic(..))
+        {
+            // The ordinary operand path authenticates this compiler place and reads it once.
+            // An untyped preliminary read would bypass selection or issue the choice twice.
+            state.flow.require_unarmed()?;
+            return Ok(None);
+        }
         let value = self.place(state, place)?;
         if matches!(value, Value::Reference { mutable: false, .. }) {
             // Further compiler dereference-only copies preserve the already narrowed rights.
@@ -1369,8 +1384,18 @@ impl<'tcx> Engine<'tcx> {
             Value::DebugReference { place: true, .. } => {
                 Err("opaque Debug data cannot escape as an owned value".into())
             }
+            value @ Value::TraitObject { place: false, .. } => {
+                #[cfg(test)]
+                let observed = super::trait_objects::observed_shared_return(&value);
+                #[cfg(test)]
+                let checked = &observed;
+                #[cfg(not(test))]
+                let checked = &value;
+                self.validate_shared_trait_graph(checked, state)?;
+                Self::validate_reference_graph(checked, state, Some(incoming), &mut Vec::new())?;
+                Ok(value)
+            }
             Value::RawSlice { .. }
-            | Value::TraitObject { place: false, .. }
             | Value::DebugReference { place: false, .. }
             | Value::TrackedPointer { .. } => {
                 Self::validate_reference_graph(&value, state, Some(incoming), &mut Vec::new())?;

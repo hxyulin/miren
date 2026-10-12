@@ -7,6 +7,7 @@ impl<'tcx> Engine<'tcx> {
         value: &Value,
         state: &State,
     ) -> Result<(), String> {
+        self.validate_shared_trait_graph(value, state)?;
         Self::validate_reference_graph(value, state, None, &mut Vec::new())?;
         self.validate_static_initialization_graph(value, state, &mut Vec::new())
     }
@@ -27,6 +28,7 @@ impl<'tcx> Engine<'tcx> {
         incoming: usize,
     ) -> Result<(), String> {
         for value in state.memory[..incoming].iter().flatten() {
+            self.validate_shared_trait_graph(value, state)?;
             Self::reference_graph(value, state, Some(incoming), &mut Vec::new(), false)?;
             self.validate_static_initialization_graph(value, state, &mut Vec::new())?;
         }

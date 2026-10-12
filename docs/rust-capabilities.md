@@ -11,12 +11,14 @@ execution at O0 and O2, positive/refuted/unknown controls, a source mutation tha
 structured UNKNOWN reporting, and passing repository checks. Completion establishes a repeatable
 baseline. It does not establish full Rust support or a completed memory-model refactor.
 
-The current manifest contains 264 cases across 88 families.
-Completed ROOT host/ARM O0/O2 surveys each measure 111 PROVED, 90 REFUTED and 63 UNKNOWN.
-Exact read-only `Option<NonZeroU16>` membership now proves the existing membership entry.
-Five new cases cover successful None/Some/empty membership, a false empty claim and an unsupported
-width. The other 258 old case objects and every original survey assertion remain unchanged.
+The current manifest contains 269 cases across 89 families.
+Completed ROOT host/ARM O0/O2 surveys each measure 114 PROVED, 91 REFUTED and 64 UNKNOWN.
+Five new cases cover symbolic shared trait-object selection, caller-backed returns, repeated calls,
+a false claim and an opaque input. All 264 previous case objects and their literal fixture prefix
+remain unchanged. Actual method bodies and complete current backing references remain required.
 Required checks, mutation evidence and qualified source-snapshot comparisons are recorded in
+[Stage228](stages.md#stage228-finite-shared-trait-object-choices).
+Readonly NonZeroU16 membership remains as validated in
 [Stage227](stages.md#stage227-exact-nonzero-niche-slice-membership).
 These are selected capabilities, not a Rust parity percentage.
 

@@ -6723,3 +6723,45 @@ This stage establishes the named capability and does not claim full Rust parity.
 Evidence: /tmp/miren-niche-membership-parent226/direct-evidence-completed,
 /tmp/miren-stage227-root-owner-review.json, /tmp/miren-stage227-root-full-checks and
 /tmp/miren-stage227-root-survey-proof-audit.json.
+
+
+## Stage228: finite shared trait-object choices
+
+Known shared trait objects can be selected from local fixed arrays or retained slices using a
+symbolic index. The value retains every executable backing reference; private Engine receipts
+bind exact original object/concrete types, fixed receiver paths, masks and contexts. Selection,
+upcast, returned handles and repeated dispatch validate complete current backing, including
+infeasible alternatives. Arbitrary incoming objects, mutable choices and unsupported carriers
+remain UNKNOWN.
+
+Every selected alternative is preflighted against its full compiler Instance, actual cached body,
+safe signature and current arguments before effects. Actual callee execution transports returned
+Memory and Flow. Selection and dispatch refuse Armed before issuing or cloning choice authority.
+Existing array16, registry512, Repeat128 and depth16 limits remain; separate cumulative choice2048
+work retains every charged service and supplies no guest assumption or storage permission.
+
+The reviewed actual226 direct corpus remains historical: 16 CLI contexts retain 64 whole Proofs,
+44 PROVED, 8 REFUTED and 12 UNKNOWN, with 122 queried obligations. Helper-mask mutation preserves
+assertions and produces actual Refuted query/model controls; native originals pass and mutants
+fail. Genuine retained external method bodies prove; omitted bodies remain Missing UNKNOWN.
+The actual227 migration preserves all Stage227 niche algorithms and activation fields, adding
+only constructor receipt fields to the two niche probe seams. Current ROOT workspace tests rerun
+the compiler, mutation, native and foreign-body integration controls on the composed source.
+
+Fresh ROOT host/ARM O0/O2 surveys contain 269 cases across 89 families, each reporting
+114 PROVED, 91 REFUTED and 64 UNKNOWN. Five new cases exercise symbolic selection, caller-backed
+returns, repeated calls, a false claim and an opaque input. All 264 old manifest objects and the
+literal old fixture prefix remain exact. Across 1,056 previous whole Proof pairs, 12 compare
+literal FULL; 1,042 qualify only the validated appended source fingerprint, and 2 also retain the
+existing exact query-free 30-second fold context allowance. All 1,988 rich queries and models
+remain unchanged. Actual differing whole Proofs are preserved and are not labeled literal FULL.
+
+All 24 required ROOT commands pass, including formatting, lint, tests, release builds, dependency
+policy, documentation, example ARM releases and manual hooks. Logs contain 894 workspace and
+9 example outer Rust tests, 903 total, plus 91 Python tests; the nested ticket test is excluded.
+A separate four-prose closure associates final documentation with the validated semantic source.
+This stage establishes the named finite domain and does not establish full Rust parity.
+
+Evidence: /tmp/miren-stage228-root-migration-review.json,
+/tmp/miren-stage228-root-trait-owner-review.json, /tmp/miren-stage228-root-full-checks and
+/tmp/miren-stage228-root-survey-proof-audit.json.
