@@ -126,6 +126,10 @@ impl<'tcx> Engine<'tcx> {
                 let Value::MutableU16 { id, .. } = receiver else {
                     return Err("mutable integer length receiver differs".into());
                 };
+                let product_element = self.mutable_product_owner(*id, &state.memory)?;
+                if product_element {
+                    state.flow.require_unarmed()?;
+                }
                 let signature = self
                     .tcx
                     .fn_sig(instance.def_id())
@@ -147,13 +151,15 @@ impl<'tcx> Engine<'tcx> {
                         if *element == self.tcx.types.u16));
                 self.record_model(
                     callee,
-                    if unit_element {
+                    if product_element {
+                        "mutable product metadata-only length; actual body certified"
+                    } else if unit_element {
                         "mutable u16 metadata-only length; actual body certified"
                     } else {
                         "mutable integer metadata-only length; actual body certified"
                     },
                 );
-                return Ok(Some(self.mutable_u16_length(receiver, &state.memory)?));
+                return Ok(Some(self.mutable_owner_length(receiver, state)?));
             }
             self.record_model(callee, "slice length");
             let receiver = receiver.materialize()?;

@@ -69,7 +69,8 @@ impl Drop for TestScalarEnabled {
 
 impl<'tcx> Engine<'tcx> {
     fn issued_metadata_element(&self, original: Ty<'tcx>) -> bool {
-        original == self.tcx.types.u16
+        self.mutable_product_kind(original)
+            || original == self.tcx.types.u16
             || (scalar_enabled()
                 && original != self.tcx.types.u8
                 && matches!(
@@ -301,6 +302,10 @@ impl<'tcx> Engine<'tcx> {
         let [receiver @ Value::MutableU16 { id, role }] = values else {
             return Ok(None);
         };
+        let product_element = self.mutable_product_owner(*id, &state.memory)?;
+        if product_element {
+            state.flow.require_unarmed()?;
+        }
         if !matches!(
             role,
             MutableU16Role::Metadata { .. }
@@ -320,7 +325,7 @@ impl<'tcx> Engine<'tcx> {
                 "issued is_empty original element differs from backing".into(),
             ));
         }
-        let length = self.mutable_u16_length(receiver, &state.memory)?;
+        let length = self.mutable_owner_length(receiver, state)?;
         let (_, bits, signed) = length.integer()?;
         if signed || bits != u32::from(self.tcx.sess.target.pointer_width) {
             return Err(self.categorized_error(
@@ -332,7 +337,9 @@ impl<'tcx> Engine<'tcx> {
         let result = symbolic::binary(&self.terms, "eq", length, zero)?;
         self.record_model(
             instance.def_id(),
-            if matches!(signature.inputs()[0].kind(), ty::Ref(_, inner, _)
+            if product_element {
+                "issued product metadata-only is_empty; actual body certified"
+            } else if matches!(signature.inputs()[0].kind(), ty::Ref(_, inner, _)
                 if matches!(inner.kind(), ty::Slice(element) if *element == self.tcx.types.u16))
             {
                 "issued u16 metadata-only is_empty; actual body certified"

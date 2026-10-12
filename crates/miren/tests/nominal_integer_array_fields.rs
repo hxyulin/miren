@@ -154,7 +154,11 @@ fn verify(
                 )
             } else {
                 match *name {
-                    "vacant_ref" | "vacant_core" | "vacant_pat" | "mutable_root" => (
+                    "mutable_root" => (
+                        UnknownCategory::Unclassified,
+                        "mutable product metadata needs the original direct root",
+                    ),
+                    "vacant_ref" | "vacant_core" | "vacant_pat" => (
                         UnknownCategory::Semantics,
                         "only read-only byte slices and byte arrays are modeled",
                     ),

@@ -11,8 +11,9 @@ execution at O0 and O2, positive/refuted/unknown controls, a source mutation tha
 structured UNKNOWN reporting, and passing repository checks. Completion establishes a repeatable
 baseline. It does not establish full Rust support or a completed memory-model refactor.
 
-The current manifest contains 295 cases across 90 families.
-Completed host/ARM O0/O2 surveys each measure 127 PROVED, 99 REFUTED and 69 UNKNOWN.
+The current manifest contains 316 cases across 91 families.
+Fresh host/ARM O0/O2 surveys each measure 138 PROVED, 103 REFUTED and 75 UNKNOWN.
+The preceding 295-case surveys measured 127 PROVED, 99 REFUTED and 69 UNKNOWN per profile.
 Ten exact readonly `Option<NonZeroU8>` cases cover correlated payload observations, actual Eq/Ne
 helpers, false claims and unsupported domains. Actual observer and equality mutations refute
 unchanged caller claims and fail native execution. Missing dependency bodies remain UNKNOWN.
@@ -2364,3 +2365,19 @@ Two existing survey expectations advance to PROVED without changing guest assert
 premises. Dedicated tests include unchanged-claim helper mutations with solver counterexamples
 and native failures, plus genuine retained and omitted dependencies. Validation is recorded in
 [Stage225](stages.md#stage225-unary-float-function-pointer-repeat-arrays).
+
+## Typed mutable product slices
+
+Pure tuple, bounded array and plain local struct elements use one mutable owner namespace with
+exact compiler types, layout, Copy/Freeze facts and current initialized storage. Primitive columns
+preserve integer, Bool, Char and f32/f64 values; floating stores retain NaN payloads and signed zero.
+Direct metadata and guarded whole-element or constant field/array suffix reads and stores are
+supported. Every replacement is validated before one branch-local storage update.
+
+Dedicated host/ARM O0/O2 tests each record ten PROVED, four REFUTED and seven UNKNOWN outcomes.
+Actual helper and store mutations refute unchanged claims; native originals pass and mutants fail.
+Retained dependency bodies execute; unavailable bodies remain UNKNOWN. Compiler controls cover
+exact original types, Context, initialization, extent, atomic stores and fake metadata pointers.
+One existing nested Float metadata case advances to PROVED without changing its source assertion.
+Product child calls, proper reborrows, symbolic suffixes, contract snapshots, Armed access and
+sum/niche/reference/pointer products remain unsupported. No hardware assumptions are introduced.

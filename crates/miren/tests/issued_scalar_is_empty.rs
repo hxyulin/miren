@@ -202,7 +202,7 @@ fn issued_float_metadata_exact_current_length_and_helper_mutation() {
                     ("float64_metadata", ProofStatus::Proved),
                     ("float32_wrong", ProofStatus::Refuted),
                     ("float64_wrong", ProofStatus::Refuted),
-                    ("float_nested_metadata", ProofStatus::Unknown),
+                    ("float_nested_metadata", ProofStatus::Proved),
                 ],
                 target,
                 optimized,

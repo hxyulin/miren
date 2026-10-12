@@ -80,6 +80,16 @@ impl<'tcx> Engine<'tcx> {
             return Err("memory snapshot nesting limit reached".to_owned());
         }
         match value {
+            Value::MutableU16 { id, role }
+                if !matches!(role, symbolic::MutableU16Role::Ghost { .. })
+                    && self.mutable_product_owner(*id, memory)? =>
+            {
+                if !matches!(role, symbolic::MutableU16Role::Metadata { .. }) {
+                    return Err("mutable product Ghost observations are unsupported".into());
+                }
+                self.mutable_product_length(value, memory, conditions)?;
+                Ok(value.clone())
+            }
             Value::MutableU16 { .. } => self.mutable_u16_snapshot(value, memory),
             Value::OwnedRegion { kind, .. } => {
                 self.validate_owned_region(value, memory)?;

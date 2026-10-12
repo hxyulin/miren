@@ -92,6 +92,11 @@ impl<'tcx> Engine<'tcx> {
     ) -> Result<(), String> {
         flow.charge(memory.mutable_u16.len())?;
         for (id, backing) in memory.mutable_u16.iter().enumerate() {
+            if matches!(backing.data, super::mutable_u16::Storage::Product(_)) {
+                flow.require_unarmed()?;
+                self.mutable_product_backing(id, memory)?;
+                continue;
+            }
             if backing.hierarchy.is_some() {
                 self.mutable_hierarchy_exit(body, arguments, id, memory, flow)?;
                 continue;
@@ -192,9 +197,9 @@ impl<'tcx> Engine<'tcx> {
         }
         self.check_local_initialization(state, place.local.as_usize(), &[])?;
         self.mutable_u16_role_live(id, &role, &state.memory)?;
-        Ok(Some(self.mutable_u16_length(
+        Ok(Some(self.mutable_owner_length(
             &Value::MutableU16 { id, role },
-            &state.memory,
+            state,
         )?))
     }
 

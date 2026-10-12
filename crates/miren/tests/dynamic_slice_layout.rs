@@ -96,7 +96,11 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
         }
         if *expected == ProofStatus::Unknown {
             let (category, reason) = match *name {
-                "mutable_root" | "competing_roots" | "reference_elements" | "refined_elements" => (
+                "mutable_root" => (
+                    UnknownCategory::Semantics,
+                    "mutable u16 roles require selected metadata-only operation",
+                ),
+                "competing_roots" | "reference_elements" | "refined_elements" => (
                     UnknownCategory::Semantics,
                     "only read-only byte slices and byte arrays are modeled",
                 ),

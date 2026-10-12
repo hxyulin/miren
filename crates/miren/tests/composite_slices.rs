@@ -76,7 +76,14 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
         assert!(proof.assumptions.is_empty());
         assert!(proof.trusted_calls.is_empty());
         assert!(proof.entry_assumptions.is_empty());
-        if matches!(*expected, ProofStatus::Proved | ProofStatus::Refuted) {
+        if *name == "mutable_root" {
+            assert!(proof.models.iter().any(|model| {
+                model.contains("mutable product metadata-only length; actual body certified")
+            }));
+        }
+        if matches!(*expected, ProofStatus::Proved | ProofStatus::Refuted)
+            && *name != "mutable_root"
+        {
             assert!(proof.models.iter().any(|model| {
                 model.contains(concat!(
                     "readonly composite slice; exact compiler shape ",
@@ -197,7 +204,7 @@ fn typed_composite_slices_retain_fields_views_and_caller_sources() {
         ("wrong_nested_position", ProofStatus::Refuted),
         ("bounds_at_end", ProofStatus::Refuted),
         ("float_numeric_reflexivity", ProofStatus::Refuted),
-        ("mutable_root", ProofStatus::Unknown),
+        ("mutable_root", ProofStatus::Proved),
         ("competing_roots", ProofStatus::Unknown),
         ("nested_references", ProofStatus::Unknown),
         ("adt_leaf", ProofStatus::Unknown),

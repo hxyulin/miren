@@ -78,8 +78,11 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
         assert!(proof.entry_assumptions.is_empty());
         if *expected == ProofStatus::Unknown {
             let (category, reason) = match *name {
-                "mutable_root" | "competing_roots" | "reference_zero" | "refined_zero"
-                | "drop_zero" => (
+                "mutable_root" => (
+                    UnknownCategory::Unclassified,
+                    "mutable product metadata needs the original direct root",
+                ),
+                "competing_roots" | "reference_zero" | "refined_zero" | "drop_zero" => (
                     UnknownCategory::Semantics,
                     "only read-only byte slices and byte arrays are modeled",
                 ),

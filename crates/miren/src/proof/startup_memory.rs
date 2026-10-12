@@ -132,10 +132,22 @@ impl Memory {
             .saturating_add(
                 self.mutable_u16
                     .iter()
-                    .map(|backing| match &backing.phase {
-                        super::mutable_u16_children::Phase::Active { frames } => frames.len(),
-                        super::mutable_u16_children::Phase::Idle
-                        | super::mutable_u16_children::Phase::Pending { .. } => 0,
+                    .map(|backing| {
+                        let frames = match &backing.phase {
+                            super::mutable_u16_children::Phase::Active { frames } => frames.len(),
+                            super::mutable_u16_children::Phase::Idle
+                            | super::mutable_u16_children::Phase::Pending { .. } => 0,
+                        };
+                        // The existing owner slot covers Scalar's one column and Product's
+                        // first column (or empty owner). Fuse extra columns into this existing
+                        // backing pass; no additional Rust allocation or traversal is created.
+                        let additional = match &backing.data {
+                            super::mutable_u16::Storage::Scalar(_) => 0,
+                            super::mutable_u16::Storage::Product(columns) => {
+                                columns.len().saturating_sub(1)
+                            }
+                        };
+                        frames.saturating_add(additional)
                     })
                     .sum::<usize>(),
             )

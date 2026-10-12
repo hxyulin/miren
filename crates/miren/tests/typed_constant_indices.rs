@@ -97,7 +97,7 @@ fn original_typed_index_paths_keep_their_current_compiler_outcomes() {
         ("parent", ProofStatus::Proved),
         ("proper", ProofStatus::Unknown),
         ("unguarded", ProofStatus::Refuted),
-        ("extra_field", ProofStatus::Unknown),
+        ("extra_field", ProofStatus::Proved),
     ];
     for target in [None, Some("thumbv7em-none-eabihf")] {
         for level in ["0", "2"] {

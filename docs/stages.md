@@ -6916,3 +6916,40 @@ passing targets before the stopped run, the repaired capability target, remainin
 targets and other workspace/doc tests. The stopped stale dynamic-source expectation, temporary
 fixture module-path failure and end-of-file hook correction remain recorded. The guest fixture
 retains its old prefix and is self-contained for mutation tests; application code is unchanged.
+
+## Stage237: typed mutable product roots
+
+Pure tuple, bounded array and plain local struct slice elements use the existing owner namespace
+with exact compiler Copy/Freeze/layout facts and current initialized storage. Direct root metadata,
+whole-element and constant-suffix reads and writes support integer, Bool, Char and f32/f64 leaves.
+Floating columns preserve NaN payloads and signed zero. Every replacement and column update is
+validated before one branch-local commit. Columns add logical storage slots without creating
+allocation ids or raw-access rights. Compiler fake const-pointer temporaries carry metadata only.
+
+The dedicated four-profile matrix records ten PROVED, four REFUTED and seven UNKNOWN cases each.
+Actual helper/store mutants refute eight unchanged caller claims. Retained dependency controls
+produce four PROVED, four REFUTED and four UNKNOWN outcomes. Native originals pass and mutants
+fail at O0/O2. Compiler probes complete 128 accounting, ownership and hostile controls across
+four profiles. The Armed control uses a real scalar helper seed; it does not issue an Armed
+product root. Product child calls, proper intervals, symbolic suffixes, Ghost/contract snapshots,
+Armed access and sum/niche/reference/pointer products remain unsupported.
+
+Fresh host/ARM O0/O2 surveys each report 138 PROVED, 103 REFUTED and 75 UNKNOWN across 316 cases
+and 91 families. One existing nested Float metadata case advances without changing its assertion;
+21 cases are appended. All 294 other old case objects and the literal old fixture prefix remain
+unchanged. Across their 1,176 comparisons, 28 whole Proofs match literally, 1,147 differ only by
+the recorded appended-source fingerprint, and one additionally has the inherited exact query-free
+fold resource-context qualification. All 2,204 old queried obligations and models remain exact.
+Actual differing whole Proofs and paired raw reports are retained.
+
+Formatting, lint, workspace tests, Python tests, release builds, dependency policy, manual hooks
+and documentation pass. Workspace test completion combines a complete no-fail-fast run with
+reruns of eleven repaired targets: six existing cases now prove and five UNKNOWN diagnostics
+advance after product input construction. Four-profile captures precede those exact expectation
+updates; guest assertions remain unchanged. The stopped full commands and probe setup failures
+remain archived. No single green full-workspace invocation is claimed.
+
+Evidence: /tmp/miren-nested-mutable-products-phase2-bounded-validation/summary.json,
+/tmp/miren-stage237-byte-boundary-migration-review.json,
+/tmp/miren-stage237-root-final-checks/workspace-test-closure.json and
+/tmp/miren-stage237-root-survey-proof-audit.json.

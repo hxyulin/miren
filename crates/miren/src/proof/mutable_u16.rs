@@ -120,10 +120,10 @@ impl Storage {
 
 #[derive(Clone, Debug)]
 pub(super) struct IntegerCertificate<'tcx> {
-    original: Ty<'tcx>,
-    codec: ElementCodec<'tcx>,
-    bytes: u64,
-    alignment: u64,
+    pub(super) original: Ty<'tcx>,
+    pub(super) codec: ElementCodec<'tcx>,
+    pub(super) bytes: u64,
+    pub(super) alignment: u64,
 }
 
 #[derive(Clone, Debug)]
@@ -142,7 +142,7 @@ impl<'tcx> Engine<'tcx> {
     pub(super) fn mutable_u16_type(&self, original: Ty<'tcx>) -> bool {
         matches!(original.kind(), ty::Ref(_, inner, mutability)
             if mutability.is_mut() && matches!(inner.kind(), ty::Slice(element)
-                if self.mutable_integer_element(*element)))
+                if self.mutable_integer_element(*element) || self.mutable_product_kind(*element)))
     }
 
     fn mutable_integer_element(&self, original: Ty<'tcx>) -> bool {
@@ -211,10 +211,19 @@ impl<'tcx> Engine<'tcx> {
         mutable: bool,
     ) -> Result<bool, String> {
         let backing = self.mutable_u16_backing(id, memory)?;
-        let certificate = self.mutable_integer_certificate(backing.certificate)?;
+        let expected = match &backing.data {
+            Storage::Scalar(_) => {
+                self.mutable_integer_certificate(backing.certificate)?
+                    .original
+            }
+            Storage::Product(_) => {
+                self.mutable_product_certificate(backing.certificate)?
+                    .original
+            }
+        };
         Ok(matches!(original.kind(), ty::Ref(_, inner, mutability)
             if mutability.is_mut() == mutable && matches!(inner.kind(), ty::Slice(element)
-                if *element == certificate.original)))
+                if *element == expected)))
     }
 
     pub(super) fn mutable_u16_float_domain(
@@ -241,6 +250,9 @@ impl<'tcx> Engine<'tcx> {
         memory: &mut Memory,
         conditions: &mut Vec<Term>,
     ) -> Result<Value, String> {
+        if self.mutable_product_kind(original) {
+            return self.mutable_product_input(original, memory, conditions);
+        }
         if memory.storage_slots().saturating_add(2) > MAX_INPUT_VALUES
             || self.input_values.saturating_add(2) > MAX_INPUT_VALUES
         {
@@ -325,6 +337,11 @@ impl<'tcx> Engine<'tcx> {
             .mutable_u16
             .get(id)
             .ok_or("mutable u16 root identity was not issued")?;
+        if matches!(self.mutable_integer_types.get(backing.certificate),
+            Some(certificate) if self.mutable_product_kind(certificate.original))
+        {
+            return self.mutable_product_backing(id, memory);
+        }
         if backing.hierarchy.is_some() && memory.mutable_hierarchy != Some(id) {
             return Err("hierarchy backing has no authenticated Memory namespace".into());
         }
@@ -387,6 +404,9 @@ impl<'tcx> Engine<'tcx> {
             | MutableU16Role::HierarchyMetadata { .. } => {
                 self.mutable_u16_role_live(*id, role, memory)?;
                 let backing = self.mutable_u16_backing(*id, memory)?;
+                if matches!(backing.data, Storage::Product(_)) {
+                    return Err("mutable product length requires current path conditions".into());
+                }
                 Ok(backing
                     .interval
                     .as_ref()
@@ -493,6 +513,9 @@ impl<'tcx> Engine<'tcx> {
     ) -> Result<Option<Value>, String> {
         if state.memory.mutable_u16.is_empty() {
             return Ok(None);
+        }
+        if let Some(value) = self.mutable_product_read(body, state, place)? {
+            return Ok(Some(value));
         }
         let value = self.raw_local(state, place.local.as_usize())?;
         let Value::MutableU16 { id, role } = value else {
@@ -659,6 +682,9 @@ impl<'tcx> Engine<'tcx> {
         if state.memory.mutable_u16.is_empty() {
             return Ok(false);
         }
+        if self.mutable_product_store(body, state, place, replacement)? {
+            return Ok(true);
+        }
         let Ok(root) = self.raw_local(state, place.local.as_usize()) else {
             return Ok(false);
         };
@@ -738,7 +764,7 @@ impl<'tcx> Engine<'tcx> {
         Ok(true)
     }
 
-    fn mutable_scalar_replacement(
+    pub(super) fn mutable_scalar_replacement(
         &self,
         certificate: &IntegerCertificate<'tcx>,
         replacement: &Value,
@@ -818,6 +844,9 @@ impl<'tcx> Engine<'tcx> {
         if state.memory.mutable_u16.is_empty() {
             return Ok(None);
         }
+        if let Some(value) = self.mutable_product_metadata(body, state, place)? {
+            return Ok(Some(value));
+        }
         let root = self.raw_local(state, place.local.as_usize())?;
         let Value::MutableU16 { id, role } = root else {
             return Ok(None);
@@ -880,6 +909,9 @@ impl<'tcx> Engine<'tcx> {
         value: &Value,
     ) -> Result<(), String> {
         if state.memory.mutable_u16.is_empty() {
+            return Ok(());
+        }
+        if self.mutable_product_store_role(body, state, place, value)? {
             return Ok(());
         }
         if self.mutable_u16_contains(value, &state.memory)?
@@ -1001,7 +1033,8 @@ impl<'tcx> Engine<'tcx> {
             || signature.inputs().len() != 1
             || !matches!(signature.inputs()[0].kind(), ty::Ref(_, inner, mutability)
                 if !mutability.is_mut() && matches!(inner.kind(), ty::Slice(element)
-                    if self.mutable_integer_element(*element)))
+                    if self.mutable_integer_element(*element)
+                        || self.mutable_product_shape(*element)?.is_some()))
         {
             return Err("mutable u16 SliceLen has a different original signature".into());
         }

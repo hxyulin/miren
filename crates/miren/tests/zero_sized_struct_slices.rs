@@ -76,7 +76,14 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
         assert!(proof.assumptions.is_empty());
         assert!(proof.trusted_calls.is_empty());
         assert!(proof.entry_assumptions.is_empty());
-        if matches!(*expected, ProofStatus::Proved | ProofStatus::Refuted) {
+        if *name == "mutable_root" {
+            assert!(proof.models.iter().any(|model| {
+                model.contains("mutable product metadata-only length; actual body certified")
+            }));
+        }
+        if matches!(*expected, ProofStatus::Proved | ProofStatus::Refuted)
+            && *name != "mutable_root"
+        {
             assert!(proof.models.iter().any(|model| model.contains(concat!(
                 "readonly composite slice; exact compiler shape ",
                 "and independent primitive leaf arrays"
@@ -251,7 +258,7 @@ fn nominal_zero_sized_struct_slices_preserve_values_lengths_and_sources() {
         ("bounds_at_end", ProofStatus::Refuted),
         ("clone_panics", ProofStatus::Refuted),
         ("custom_eq_refutes", ProofStatus::Refuted),
-        ("mutable_root", ProofStatus::Unknown),
+        ("mutable_root", ProofStatus::Proved),
         ("competing_roots", ProofStatus::Unknown),
         ("reference_under_zero", ProofStatus::Unknown),
         ("core_under_zero", ProofStatus::Unknown),

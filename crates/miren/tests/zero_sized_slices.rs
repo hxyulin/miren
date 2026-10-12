@@ -76,7 +76,14 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
         assert!(proof.assumptions.is_empty());
         assert!(proof.trusted_calls.is_empty());
         assert!(proof.entry_assumptions.is_empty());
-        if matches!(*expected, ProofStatus::Proved | ProofStatus::Refuted) {
+        if *name == "mutable_root" {
+            assert!(proof.models.iter().any(|model| {
+                model.contains("mutable product metadata-only length; actual body certified")
+            }));
+        }
+        if matches!(*expected, ProofStatus::Proved | ProofStatus::Refuted)
+            && *name != "mutable_root"
+        {
             assert!(proof.models.iter().any(|model| model.contains(concat!(
                 "readonly composite slice; exact compiler shape ",
                 "and independent primitive leaf arrays"
@@ -86,6 +93,7 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
             && !matches!(
                 *name,
                 "bounds_at_end"
+                    | "mutable_root"
                     | "falsely_isize_bounded"
                     | "maximum_length_reachable"
                     | "unsupported_size_of_val"
@@ -209,7 +217,7 @@ fn zero_sized_slices_preserve_full_lengths_and_sources() {
         ("bounds_at_end", ProofStatus::Refuted),
         ("wrong_remaining", ProofStatus::Refuted),
         ("unsupported_size_of_val", ProofStatus::Proved),
-        ("mutable_root", ProofStatus::Unknown),
+        ("mutable_root", ProofStatus::Proved),
         ("competing_roots", ProofStatus::Unknown),
         ("empty_reference", ProofStatus::Unknown),
         ("empty_adt", ProofStatus::Unknown),

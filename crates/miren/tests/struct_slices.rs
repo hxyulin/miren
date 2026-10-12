@@ -74,7 +74,14 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
         assert!(proof.assumptions.is_empty());
         assert!(proof.trusted_calls.is_empty());
         assert!(proof.entry_assumptions.is_empty());
-        if matches!(*expected, ProofStatus::Proved | ProofStatus::Refuted) {
+        if *name == "mutable_root" {
+            assert!(proof.models.iter().any(|model| {
+                model.contains("mutable product metadata-only length; actual body certified")
+            }));
+        }
+        if matches!(*expected, ProofStatus::Proved | ProofStatus::Refuted)
+            && *name != "mutable_root"
+        {
             let expected_model = if *name == "enum_field" {
                 "readonly tagged slice; legal tag and correlated latent payload columns"
             } else {
@@ -215,7 +222,7 @@ fn local_struct_slices_preserve_fields_layout_and_source_rights() {
         ("wrong_padding", ProofStatus::Refuted),
         ("bounds_at_end", ProofStatus::Refuted),
         ("float_reflexivity", ProofStatus::Refuted),
-        ("mutable_root", ProofStatus::Unknown),
+        ("mutable_root", ProofStatus::Proved),
         ("competing_roots", ProofStatus::Unknown),
         ("reference_field", ProofStatus::Unknown),
         ("raw_field", ProofStatus::Unknown),

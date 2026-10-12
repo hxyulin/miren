@@ -52,9 +52,9 @@ pub(super) struct CompositeVariant {
 #[derive(Clone, Debug)]
 pub(super) struct CompositeType<'tcx> {
     pub(super) ty: Ty<'tcx>,
-    shape: CompositeShape,
-    leaves: Vec<ScalarSliceElement>,
-    bytes: u64,
+    pub(super) shape: CompositeShape,
+    pub(super) leaves: Vec<ScalarSliceElement>,
+    pub(super) bytes: u64,
 }
 
 fn ordinary_struct_flags(flags: AdtFlags) -> bool {
@@ -110,7 +110,7 @@ impl<'tcx> Engine<'tcx> {
         self.composite_shape_with_sums(ty, true)
     }
 
-    fn composite_shape_with_sums(
+    pub(super) fn composite_shape_with_sums(
         &self,
         ty: Ty<'tcx>,
         allow_sums: bool,
@@ -985,7 +985,7 @@ impl CompositeShape {
         }
     }
 
-    fn observe(
+    pub(super) fn observe(
         &self,
         context: &Context,
         leaves: &[Term],

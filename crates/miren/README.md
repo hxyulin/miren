@@ -54,10 +54,26 @@ and unsupported operations remain UNKNOWN.
 ## Mutable backing representation
 
 Mutable slice owners distinguish scalar storage from typed product leaf columns in one owner and
-role namespace. Representation conversions issue no certificate, allocation or lease. Product
-issuance remains closed; scalar observations, snapshots and child paths refuse product payloads.
-This representation refactor preserves the existing scalar domains and their compiler, current
-Memory, generation and floating raw-bit checks. Nested mutable product slices remain UNKNOWN.
+role namespace. Pure tuple, bounded array and plain local struct elements retain exact compiler
+Copy/Freeze/layout facts, target-usize extent and current initialized Memory. Direct root metadata,
+guarded whole-element operations and constant field/array suffix observations and writes use
+logical primitive columns. Floating leaves preserve f32/f64 raw bits, including NaN payloads and
+signed zero; stores require exact producer pairs and valid Char leaves before updating columns.
+Other columns, indices and branches retain their original storage.
+
+Representation conversions issue no certificate, allocation or lease. The owner marker occupies
+one allocation; the backing slot covers the scalar/first product column, and further columns add
+storage slots within the existing backing accounting pass. Columns create no new allocation ids,
+addresses or physical access rights. Existing scalar counts and Armed fee expressions are retained.
+
+Product owner child calls, proper intervals, symbolic suffix indices, Armed access, Ghost/contract
+snapshots, replay of arbitrary original payloads, and sum/niche/pointer/reference products remain
+unsupported. Unbound entry diagnostics record a live owner id; they never expose current payload
+as frozen original inputs. Copied primitive/product values may enter actual available helpers.
+Dedicated four-profile positive, negative and unknown controls pass. Actual helper/store changes
+refute unchanged caller claims; native originals pass and mutants fail at O0/O2. Missing dependency
+bodies remain UNKNOWN. The compiler probe includes original-type, Context, initialization, extent,
+atomic Char/Float and actual fake-pointer metadata controls.
 
 ## Compiler integration
 

@@ -1517,9 +1517,7 @@
     {
       "entry": "issued_scalar_nested_float_unknown",
       "family": "issued_scalar_metadata",
-      "expected": "unknown",
-      "unknown_category": "semantics",
-      "unknown_reason": "only read-only byte slices and byte arrays are modeled: [[f32; 2_usize]]"
+      "expected": "proved"
     },
     {
       "entry": "local_byte_copy_positive",
@@ -1617,6 +1615,125 @@
       "expected": "unknown",
       "unknown_reason": "only read-only byte slices and byte arrays are modeled",
       "unknown_category": "semantics"
+    },
+    {
+      "entry": "mutable_product_survey::copied_helper",
+      "family": "mutable_product_slice",
+      "expected": "proved"
+    },
+    {
+      "entry": "mutable_product_survey::integer_pair",
+      "family": "mutable_product_slice",
+      "expected": "proved"
+    },
+    {
+      "entry": "mutable_product_survey::metadata32",
+      "family": "mutable_product_slice",
+      "expected": "proved"
+    },
+    {
+      "entry": "mutable_product_survey::metadata64",
+      "family": "mutable_product_slice",
+      "expected": "proved"
+    },
+    {
+      "entry": "mutable_product_survey::niche_product",
+      "family": "mutable_product_slice",
+      "expected": "unknown",
+      "unknown_category": "semantics",
+      "unknown_reason": "mutable product input requires exact pure tuple/array/local struct"
+    },
+    {
+      "entry": "mutable_product_survey::outer_retention",
+      "family": "mutable_product_slice",
+      "expected": "proved"
+    },
+    {
+      "entry": "mutable_product_survey::oversized",
+      "family": "mutable_product_slice",
+      "expected": "unknown",
+      "unknown_category": "resource_limit",
+      "unknown_reason": "composite slice type array exceeds the 128-element shape budget"
+    },
+    {
+      "entry": "mutable_product_survey::pointer_product",
+      "family": "mutable_product_slice",
+      "expected": "unknown",
+      "unknown_category": "semantics",
+      "unknown_reason": "mutable product input requires exact pure tuple/array/local struct"
+    },
+    {
+      "entry": "mutable_product_survey::proper_reborrow",
+      "family": "mutable_product_slice",
+      "expected": "unknown",
+      "unknown_category": "semantics",
+      "unknown_reason": "mutable u16 child needs direct abort-only Rust body"
+    },
+    {
+      "entry": "mutable_product_survey::reference_product",
+      "family": "mutable_product_slice",
+      "expected": "unknown",
+      "unknown_category": "semantics",
+      "unknown_reason": "mutable product input requires exact pure tuple/array/local struct"
+    },
+    {
+      "entry": "mutable_product_survey::store_nan",
+      "family": "mutable_product_slice",
+      "expected": "proved"
+    },
+    {
+      "entry": "mutable_product_survey::struct_fields",
+      "family": "mutable_product_slice",
+      "expected": "proved"
+    },
+    {
+      "entry": "mutable_product_survey::symbolic_suffix",
+      "family": "mutable_product_slice",
+      "expected": "unknown",
+      "unknown_category": "unclassified",
+      "unknown_reason": "mutable product symbolic suffix index is unsupported"
+    },
+    {
+      "entry": "mutable_product_survey::tuple_pair",
+      "family": "mutable_product_slice",
+      "expected": "proved"
+    },
+    {
+      "entry": "mutable_product_survey::unguarded",
+      "family": "mutable_product_slice",
+      "expected": "refuted"
+    },
+    {
+      "entry": "mutable_product_survey::unsupported_child",
+      "family": "mutable_product_slice",
+      "expected": "unknown",
+      "unknown_category": "unclassified",
+      "unknown_reason": "mutable product root identity/phase/column inventory differs"
+    },
+    {
+      "entry": "mutable_product_survey::whole64",
+      "family": "mutable_product_slice",
+      "expected": "proved"
+    },
+    {
+      "entry": "mutable_product_survey::wrong_metadata",
+      "family": "mutable_product_slice",
+      "expected": "refuted"
+    },
+    {
+      "entry": "mutable_product_survey::wrong_stored_bits",
+      "family": "mutable_product_slice",
+      "expected": "refuted"
+    },
+    {
+      "entry": "mutable_product_survey::wrong_untouched_leaf",
+      "family": "mutable_product_slice",
+      "expected": "refuted"
+    },
+    {
+      "entry": "mutable_product_survey::zero_inner",
+      "family": "mutable_product_slice",
+      "expected": "proved"
     }
   ]
 }

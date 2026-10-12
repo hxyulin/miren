@@ -76,6 +76,7 @@ mod mutable_interval;
 #[cfg(test)]
 mod mutable_lease_probe;
 mod mutable_metadata;
+mod mutable_products;
 mod mutable_slice_ranges;
 mod mutable_u16;
 mod mutable_u16_children;
@@ -544,8 +545,9 @@ impl<'tcx> Engine<'tcx> {
                 &conditions,
             )?;
         }
-        let snapshots = self.snapshots(&arguments, &memory, &conditions)?;
         let instance = ty::Instance::new_raw(id, ty::GenericArgs::identity_for_item(self.tcx, id));
+        let snapshots =
+            self.mutable_product_entry_observations(instance, &arguments, &memory, &conditions)?;
         let bindings = self.configured_bindings(body, &snapshots, instance)?;
         for (name, value) in &bindings {
             self.input_binding(name, value)?;
@@ -565,7 +567,10 @@ impl<'tcx> Engine<'tcx> {
                 "entry preconditions are inconsistent; refusing a vacuous proof".to_owned(),
             );
         }
-        if memory.len() + 2 > MAX_INPUT_VALUES {
+        if memory.len() + 2 > MAX_INPUT_VALUES
+            || (self.mutable_product_arguments(&arguments, &memory)?
+                && memory.storage_slots().saturating_add(2) > MAX_INPUT_VALUES)
+        {
             return Err("memory allocation budget reached before reserving static state".into());
         }
         self.static_epoch = Some(memory.len());
@@ -607,6 +612,8 @@ impl<'tcx> Engine<'tcx> {
                 } = role
                 {
                     format!("single incoming mutable f{bits} root {id}; full typed extent")
+                } else if matches!(role, symbolic::MutableU16Role::Root) {
+                    format!("live mutable owner {id}; original product payload replay unsupported")
                 } else {
                     format!("single incoming mutable integer root {id}; full typed extent")
                 }
@@ -1289,7 +1296,11 @@ impl<'tcx> Engine<'tcx> {
             .args_iter()
             .map(|local| body.local_decls[local].ty)
             .collect();
-        let snapshots = if matches!(flow, activation_flow::Flow::Unarmed) {
+        let snapshots = if self.mutable_product_arguments(&arguments, &memory)? {
+            flow.require_unarmed()?;
+            self.mutable_product_unbound_contracts(instance)?;
+            Vec::new()
+        } else if matches!(flow, activation_flow::Flow::Unarmed) {
             self.typed_coroutine_snapshots(&argument_types, &arguments, &memory, &conditions)?
         } else {
             // Armed contracts are rejected above. These unused observations would create
@@ -3161,7 +3172,7 @@ impl<'tcx> Engine<'tcx> {
                         }
                     )
                 {
-                    return self.mutable_u16_length(&value, &state.memory);
+                    return self.mutable_owner_length(&value, state);
                 }
                 let value = if matches!(operation, UnOp::PtrMetadata) {
                     self.snapshot(&value, &state.memory, &state.conditions, 0)?
