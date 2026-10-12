@@ -3905,3 +3905,20 @@ pub fn niche_membership_wrong_empty_u32(values: &[Option<core::num::NonZeroU32>]
 pub fn niche_membership_byte_frontier(values: &[Option<core::num::NonZeroU8>]) {
     let _ = values.contains(&None);
 }
+
+
+pub fn issued_scalar_f64_metadata(values: &mut [f64]) {
+    assert!(issued_scalar_metadata_boolean(values.is_empty()) == (values.len() == 0));
+}
+
+pub fn issued_scalar_f32_wrong_empty(values: &mut [f32]) {
+    assert!(issued_scalar_metadata_boolean(values.is_empty()) != (values.len() == 0));
+}
+
+pub fn issued_scalar_f64_wrong_empty(values: &mut [f64]) {
+    assert!(issued_scalar_metadata_boolean(values.is_empty()) != (values.len() == 0));
+}
+
+pub fn issued_scalar_nested_float_unknown(values: &mut [[f32; 2]]) {
+    assert!(values.is_empty() == (values.len() == 0));
+}

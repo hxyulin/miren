@@ -95,12 +95,15 @@ fn compiler_issued_is_empty_requires_exact_metadata_body_and_live_original_role(
                 IS_EMPTY_ENABLED
             );
             let _enabled = TestEnabled::enable();
+            check_actual_float_metadata(tcx, &mut engine);
             for element in [tcx.types.bool, tcx.types.char, tcx.types.f32, tcx.types.u8] {
                 let other = engine
                     .resolve_function_item(selected.def_id(), tcx.mk_args(&[element.into()]))
                     .unwrap();
-                let admitted =
-                    SCALAR_IS_EMPTY_ENABLED && matches!(element.kind(), ty::Bool | ty::Char);
+                let admitted = SCALAR_IS_EMPTY_ENABLED
+                    && (matches!(element.kind(), ty::Bool | ty::Char)
+                        || (super::super::float_pairs::ENABLE_MUTABLE_FLOAT
+                            && matches!(element.kind(), ty::Float(ty::FloatTy::F32))));
                 assert_eq!(engine.issued_is_empty_candidate(other), admitted);
                 assert_eq!(engine.mutable_metadata_operation(other), admitted);
             }
@@ -236,12 +239,10 @@ fn compiler_issued_is_empty_requires_exact_metadata_body_and_live_original_role(
                     assert!(engine.certify_issued_is_empty(scalar).is_err());
                     engine.bodies.borrow_mut().insert(scalar, original);
                 }
-                for element in [tcx.types.u8, tcx.types.f32, tcx.types.f64] {
-                    let other = engine
-                        .resolve_function_item(selected.def_id(), tcx.mk_args(&[element.into()]))
-                        .unwrap();
-                    assert!(!engine.issued_is_empty_candidate(other));
-                }
+                let byte = engine
+                    .resolve_function_item(selected.def_id(), tcx.mk_args(&[tcx.types.u8.into()]))
+                    .unwrap();
+                assert!(!engine.issued_is_empty_candidate(byte));
             }
             assert!(!engine.issued_is_empty_candidate(ty::Instance::mono(tcx, id)));
             let closure_body = tcx
@@ -561,6 +562,10 @@ fn compiler_issued_is_empty_requires_exact_metadata_body_and_live_original_role(
         format!(
             concat!(
                 "{}\n",
+                "pub fn float_root32(values:&mut [f32]) {{",
+                " assert!(values.is_empty()==(values.len()==0)); }}\n",
+                "pub fn float_root64(values:&mut [f64]) {{",
+                " assert!(values.is_empty()==(values.len()==0)); }}\n",
                 "pub fn closure_guard(value:u16)->u16 {{",
                 " let callback=|word:u16|word; callback(value) }}\n",
                 "#[inline(never)] pub fn intermediate(values: &mut [u16], value: u16) {{",
@@ -592,6 +597,200 @@ fn compiler_issued_is_empty_requires_exact_metadata_body_and_live_original_role(
             }
             rustc_driver::run_compiler(&args, &mut Capture);
         }
+    }
+}
+
+fn check_actual_float_metadata<'tcx>(tcx: TyCtxt<'tcx>, engine: &mut Engine<'tcx>) {
+    // The envelope comes from the existing actual scalar body, not an assertion-heavy
+    // unsupported caller or a fabricated Float activation frame.
+    let id = tcx
+        .mir_keys(())
+        .iter()
+        .copied()
+        .find(|id| {
+            tcx.def_kind(id.to_def_id()) == DefKind::Fn
+                && tcx.item_name(id.to_def_id()).as_str() == "word"
+        })
+        .unwrap()
+        .to_def_id();
+    let root = ty::Instance::mono(tcx, id);
+    let root_body = engine.instantiated_body(root).unwrap();
+    for (name, element) in [
+        ("float_root32", tcx.types.f32),
+        ("float_root64", tcx.types.f64),
+    ] {
+        let id = tcx
+            .mir_keys(())
+            .iter()
+            .copied()
+            .find(|id| {
+                tcx.def_kind(id.to_def_id()) == DefKind::Fn
+                    && tcx.item_name(id.to_def_id()).as_str() == name
+            })
+            .unwrap();
+        let caller = engine
+            .instantiated_body(ty::Instance::mono(tcx, id.to_def_id()))
+            .unwrap();
+        let instance = caller
+            .basic_blocks
+            .iter()
+            .find_map(|block| {
+                let TerminatorKind::Call { func, .. } = &block.terminator().kind else {
+                    return None;
+                };
+                let ty::FnDef(id, args) = func.ty(&caller.local_decls, tcx).kind() else {
+                    return None;
+                };
+                if tcx.item_name(*id).as_str() != "is_empty" {
+                    return None;
+                }
+                Some(
+                    engine
+                        .resolve_function_item(*id, args.skip_binder())
+                        .unwrap(),
+                )
+            })
+            .unwrap();
+        assert!(engine.issued_float_is_empty_candidate(instance));
+        engine.certify_issued_is_empty(instance).unwrap();
+        let mut memory = Memory::default();
+        let mut conditions = Vec::new();
+        let input = engine
+            .mutable_u16_input(element, &mut memory, &mut conditions)
+            .unwrap();
+        let id = memory.mutable_u16.len() - 1;
+        let state = State {
+            flow: activation_flow::Flow::Unarmed,
+            locals: Vec::new(),
+            missing_places: Default::default(),
+            conditions,
+            addresses: Vec::new(),
+            memory,
+        };
+        let metadata = Value::MutableU16 {
+            id,
+            role: MutableU16Role::Metadata { generation: 0 },
+        };
+        let data = state.memory.mutable_u16[id].data.clone();
+        let length = state.memory.mutable_u16[id].length.clone();
+        let before_conditions = state.conditions.clone();
+        let result = engine
+            .mutable_slice_is_empty(instance, std::slice::from_ref(&metadata), &state)
+            .unwrap()
+            .unwrap();
+        let bits = u32::from(tcx.sess.target.pointer_width);
+        let expected = symbolic::binary(
+            &engine.terms,
+            "eq",
+            length.clone(),
+            symbolic::integer(&engine.terms, 0, bits, false),
+        )
+        .unwrap();
+        assert_eq!(result.boolean().unwrap(), expected.boolean().unwrap());
+        assert_eq!(state.conditions, before_conditions);
+        assert_eq!(state.memory.mutable_u16[id].data, data);
+        assert_eq!(
+            state.memory.mutable_u16[id].length.integer().unwrap(),
+            length.integer().unwrap()
+        );
+        assert_eq!(state.memory.mutable_u16[id].generation, 0);
+        let stale = Value::MutableU16 {
+            id,
+            role: MutableU16Role::Metadata { generation: 1 },
+        };
+        assert!(
+            engine
+                .mutable_slice_is_empty(instance, &[stale], &state)
+                .is_err()
+        );
+        assert!(
+            engine
+                .mutable_slice_is_empty(instance, std::slice::from_ref(&input), &state)
+                .is_err()
+        );
+        let ghost = engine.mutable_u16_snapshot(&input, &state.memory).unwrap();
+        assert!(
+            engine
+                .mutable_slice_is_empty(instance, &[ghost], &state)
+                .is_err()
+        );
+        let mut masked = state.clone();
+        masked
+            .memory
+            .missing_places
+            .consume(masked.memory.mutable_u16[id].allocation, vec![])
+            .unwrap();
+        assert!(
+            engine
+                .mutable_slice_is_empty(instance, std::slice::from_ref(&metadata), &masked)
+                .is_err()
+        );
+        let mut dead = state.clone();
+        std::rc::Rc::make_mut(&mut dead.memory.mutable_u16).clear();
+        assert!(
+            engine
+                .mutable_slice_is_empty(instance, std::slice::from_ref(&metadata), &dead)
+                .is_err()
+        );
+        let mut foreign = state.clone();
+        std::rc::Rc::make_mut(&mut foreign.memory.mutable_u16)[id].length =
+            symbolic::integer(&Context::default(), 0, bits, false);
+        assert!(
+            engine
+                .mutable_slice_is_empty(instance, std::slice::from_ref(&metadata), &foreign)
+                .is_err()
+        );
+        let mut wrong_length = state.clone();
+        std::rc::Rc::make_mut(&mut wrong_length.memory.mutable_u16)[id].length =
+            symbolic::integer(&engine.terms, 0, bits, true);
+        assert!(
+            engine
+                .mutable_slice_is_empty(instance, std::slice::from_ref(&metadata), &wrong_length)
+                .is_err()
+        );
+        let other = if element == tcx.types.f32 {
+            tcx.types.f64
+        } else {
+            tcx.types.f32
+        };
+        let different = engine
+            .resolve_function_item(instance.def_id(), tcx.mk_args(&[other.into()]))
+            .unwrap();
+        assert!(
+            engine
+                .mutable_slice_is_empty(different, std::slice::from_ref(&metadata), &state)
+                .is_err()
+        );
+        let body = engine.instantiated_body(instance).unwrap();
+        let mut forged = (*body).clone();
+        forged.local_decls[rustc_middle::mir::Local::from_usize(1)].ty =
+            Ty::new_imm_ref(tcx, tcx.lifetimes.re_erased, Ty::new_slice(tcx, other));
+        engine
+            .bodies
+            .borrow_mut()
+            .insert(instance, std::rc::Rc::new(forged));
+        assert!(engine.certify_issued_is_empty(instance).is_err());
+        engine.bodies.borrow_mut().insert(instance, body);
+        let armed = engine.activation_test_root(root, &root_body).unwrap();
+        let mut armed_state = state.clone();
+        armed_state.flow = armed;
+        let cache = engine.bodies.borrow().len();
+        let obligations = engine.proof.obligations.len();
+        let before = engine.terms.bit_vector(0x51ee_3011, 64).unwrap();
+        assert!(
+            matches!(engine.activation_armed_call_route(&armed_state.flow, instance),
+            Err(reason) if reason == "armed Float metadata adapter is not implemented")
+        );
+        assert!(
+            matches!(engine.mutable_slice_is_empty(instance, &[metadata], &armed_state),
+            Err(reason) if reason == "armed activation adapter is not implemented")
+        );
+        let after = engine.terms.bit_vector(0x51ee_3012, 64).unwrap();
+        assert_eq!(after.id(), before.id() + 1);
+        assert_eq!(engine.proof.obligations.len(), obligations);
+        assert_eq!(engine.bodies.borrow().len(), cache);
+        assert_eq!(armed_state.memory.mutable_u16[id].data, data);
+        eprintln!("actual issued Float metadata {name}: current length only; Armed refused early");
     }
 }
 

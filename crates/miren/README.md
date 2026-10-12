@@ -1440,3 +1440,32 @@ All 24 required checks pass, including 907 outer Rust tests and 91 Python tests.
 queries/models are exact; 1,095 whole Proof pairs are literal FULL and one retains the existing
 query-free fold resource context allowance. No guest fixture, contract or domain is changed.
 See [Stage230](../../docs/stages.md#stage230-one-concrete-engine-constructor).
+
+Issued original f32/f64 mutable-slice roles support exact metadata-only is_empty.
+The exact actual core body must compare current pointer metadata with target-usize zero; the
+current live backing, original scalar/layout certificate and metadata-only role remain required.
+No Float payload or NaN encoding is read, changed or certified by this Boolean relation. Existing
+Float producer-pair authority and all other metadata operations retain their separate checks.
+Armed Float is_empty is explicitly refused before body certification or terms. Ordinary Unarmed
+flow is preserved, without new child, proper-slice, snapshot or activation rights.
+
+The archived private Stage228 plus frozen Stage229 prototype completed four compiler callbacks
+covering both widths and early Armed refusal. Its focused 52-Proof corpus measured 24 Proved,
+16 Refuted and 12 Unknown, with 16 queried obligations, unchanged helper-mutation assertions,
+genuine retained/omitted external bodies and four exact native tests (original0/mutant101).
+The unchanged float_excluded and issued_scalar_float_unknown claims were Proved in four profiles
+each. The integration expectation for float_excluded now records that measured result. Nested
+Float remains Unknown at input admission; no body, metadata relation or payload support is claimed
+for it. These private measurements retain their original source association.
+
+ROOT Stage231 validates the composition with all 24 required commands, including
+909 outer Rust tests and 91 Python tests. Fresh surveys each report 119 PROVED,
+95 REFUTED and 64 UNKNOWN across 278 cases and 89 families. The old Float metadata root advances
+from UNKNOWN to PROVED; four new cases retain metadata counterexamples and nested input refusal.
+All 273 other old case objects and assertions remain exact. Whole Proof pairs retain actual
+source-fingerprint differences; existing rich queries/models remain exact. Three stale guarded
+Float-store expectations were corrected only after twelve current safety Proofs. Separate helper
+store mutations preserve assertions and are REFUTED in all four profiles; native O0/O2 originals
+pass and mutants fail. The preceding test101 and synthetic target-setup failures remain recorded.
+Armed, nested and payload boundaries retain their independent checks and UNKNOWN outcomes.
+See [Stage231](../../docs/stages.md#stage231-issued-float-slice-emptiness).

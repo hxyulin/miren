@@ -1239,9 +1239,7 @@
     {
       "entry": "issued_scalar_float_unknown",
       "family": "issued_scalar_metadata",
-      "expected": "unknown",
-      "unknown_category": "semantics",
-      "unknown_reason": "mutable u16 roles require selected metadata-only operation"
+      "expected": "proved"
     },
     {
       "entry": "float_hierarchy_selected",
@@ -1501,6 +1499,28 @@
       "expected": "unknown",
       "unknown_reason": "NonZero wrapper original identity mismatch",
       "unknown_category": "semantics"
+    },
+    {
+      "entry": "issued_scalar_f64_metadata",
+      "family": "issued_scalar_metadata",
+      "expected": "proved"
+    },
+    {
+      "entry": "issued_scalar_f32_wrong_empty",
+      "family": "issued_scalar_metadata",
+      "expected": "refuted"
+    },
+    {
+      "entry": "issued_scalar_f64_wrong_empty",
+      "family": "issued_scalar_metadata",
+      "expected": "refuted"
+    },
+    {
+      "entry": "issued_scalar_nested_float_unknown",
+      "family": "issued_scalar_metadata",
+      "expected": "unknown",
+      "unknown_category": "semantics",
+      "unknown_reason": "only read-only byte slices and byte arrays are modeled: [[f32; 2_usize]]"
     }
   ]
 }

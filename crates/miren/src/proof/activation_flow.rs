@@ -386,6 +386,9 @@ impl<'tcx> Engine<'tcx> {
         {
             return Err("armed activation contract adapter is not implemented".into());
         }
+        if self.issued_float_is_empty_candidate(instance) {
+            return Err("armed Float metadata adapter is not implemented".into());
+        }
         if self.mutable_metadata_operation(instance) {
             return Ok(true);
         }

@@ -1,4 +1,4 @@
-//! Exact metadata-to-Boolean relation for issued original u16 slice roles.
+//! Exact metadata-to-Boolean relation for issued original scalar slice roles.
 use super::*;
 use crate::symbolic::MutableU16Role;
 
@@ -76,6 +76,12 @@ impl<'tcx> Engine<'tcx> {
                     original.kind(),
                     ty::Bool | ty::Char | ty::Int(_) | ty::Uint(_)
                 ))
+            || (scalar_enabled()
+                && super::float_pairs::ENABLE_MUTABLE_FLOAT
+                && matches!(
+                    original.kind(),
+                    ty::Float(ty::FloatTy::F32 | ty::FloatTy::F64)
+                ))
     }
 
     fn issued_is_empty_candidate(&self, instance: ty::Instance<'tcx>) -> bool {
@@ -107,6 +113,21 @@ impl<'tcx> Engine<'tcx> {
                 if matches!(original.kind(), ty::Ref(_, inner, rustc_hir::Mutability::Not)
                     if matches!(inner.kind(), ty::Slice(element)
                         if self.issued_metadata_element(*element))))
+    }
+
+    pub(super) fn issued_float_is_empty_candidate(&self, instance: ty::Instance<'tcx>) -> bool {
+        if !self.issued_is_empty_candidate(instance) {
+            return false;
+        }
+        let signature = self
+            .tcx
+            .fn_sig(instance.def_id())
+            .instantiate(self.tcx, instance.args)
+            .skip_binder();
+        matches!(signature.inputs(), [receiver]
+            if matches!(receiver.kind(), ty::Ref(_, inner, rustc_hir::Mutability::Not)
+                if matches!(inner.kind(), ty::Slice(element)
+                    if matches!(element.kind(), ty::Float(ty::FloatTy::F32 | ty::FloatTy::F64)))))
     }
 
     // This routes metadata only. The complete body/type certificate still precedes the result.
@@ -271,6 +292,11 @@ impl<'tcx> Engine<'tcx> {
     ) -> Result<Option<Value>, String> {
         if !self.issued_is_empty_candidate(instance) {
             return Ok(None);
+        }
+        // Float metadata adds no armed transport or payload authority. Refuse before
+        // body/cache certification and before constructing any Boolean term.
+        if self.issued_float_is_empty_candidate(instance) {
+            state.flow.require_unarmed()?;
         }
         let [receiver @ Value::MutableU16 { id, role }] = values else {
             return Ok(None);

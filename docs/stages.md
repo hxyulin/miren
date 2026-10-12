@@ -6842,3 +6842,49 @@ Evidence: /tmp/miren-stage230-root-owner-migration-review.json,
 /tmp/miren-stage230-root-validated-full-checks, /tmp/miren-stage230-root-constructor-controls,
 /tmp/miren-stage230-root-full-checks-audit.json and
 /tmp/miren-stage230-root-survey-proof-audit.json.
+
+
+## Stage231: issued Float slice emptiness
+
+Original f32/f64 mutable-slice metadata requires the exact actual core is_empty body, full
+Instance/signature/cache identity, original scalar/layout certificate and current live backing.
+The body must compare target-usize pointer metadata with zero. This Boolean relation supplies no
+Float payload, NaN encoding, child, proper-slice or activation authority. Existing producer-pair
+checks govern Float access. Armed calls refuse before certification or term construction; nested
+Float input remains UNKNOWN before entry. Ordinary Unarmed behavior stays conservative.
+
+The private historical prototype measured four compiler callbacks and a focused 52-Proof corpus
+with unchanged helper-mutation assertions, retained/omitted dependency bodies and native failures.
+ROOT adopted only reviewed hunks onto actual Stage230; constructor, carrier, trait and niche
+controls remain intact. Current full checks rerun the relevant compiler and integration controls.
+
+The first ROOT full-check attempt stopped at tests101: a legacy guarded Float store expected
+UNKNOWN after is_empty had become supported. Three exact old guarded-store roots subsequently
+measured twelve PROVED safety Proofs in four profiles. Existing store/pair implementation bytes
+remain unchanged. Separate readback controls produce four PROVED results, while changing the
+actual helper store from 1.0 to 2.0 retains assertions and yields four REFUTED body/query/model
+witnesses. Native O0/O2 originals each pass one test and mutants each fail one. Only the three
+stale expectations and their obsolete reason rows changed; repository guest assertions are exact.
+Reader-schema and synthetic no_std setup failures are preserved with their original raw exits.
+
+Fresh host/ARM O0/O2 surveys each report 119 PROVED, 95 REFUTED and 64 UNKNOWN across 278 cases
+in 89 families. One old Float metadata root advances from UNKNOWN to PROVED; four P/R/U cases
+are appended. All 273 other old manifest objects and the literal old fixture prefix remain exact.
+The 1,092 unchanged whole Proof pairs contain 16 literal FULL, 1075 qualified appended source
+fingerprints, 0 standalone fold contexts and 1 source fingerprints with the inherited exact
+query-free fold resource context allowance. All 2,044 rich queries/models remain exact. Actual
+DIFFERENT whole Proofs and paired raw data remain retained; no historical survey is replayed.
+Two inherited JSON key/value folds were restored before the successful validation run, preserving
+all parsed case objects and keeping newly changed lines within 100 columns.
+
+All 24 required commands pass, including formatting, lint, workspace/Python tests, release builds,
+dependency policy, documentation, example ARM releases and manual hooks. Logs contain 900
+workspace and 9 example outer Rust tests, 909 total, plus 91 Python tests; the nested ticket
+test is excluded. Final prose has a separate source association and closure checks. These selected
+capabilities do not establish full Rust parity or hardware validity.
+
+Evidence: /tmp/miren-stage231-root-owner-migration-review.json,
+/tmp/miren-stage231-root-validated-full-checks/failure-seal.json,
+/tmp/miren-stage231-root-float-store-review.json, /tmp/miren-stage231-root-corrected-full-checks,
+/tmp/miren-stage231-root-full-checks-audit.json and
+/tmp/miren-stage231-root-survey-proof-audit.json.

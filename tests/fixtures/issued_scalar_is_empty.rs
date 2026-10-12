@@ -118,3 +118,43 @@ mod tests {
         super::boolean_helper(true);
     }
 }
+
+
+pub fn float32_metadata(values: &mut [f32]) {
+    assert!(metadata_boolean(values.is_empty()) == (values.len() == 0));
+}
+
+pub fn float64_metadata(values: &mut [f64]) {
+    assert!(metadata_boolean(values.is_empty()) == (values.len() == 0));
+}
+
+pub fn float32_wrong(values: &mut [f32]) {
+    assert!(metadata_boolean(values.is_empty()) != (values.len() == 0));
+}
+
+pub fn float64_wrong(values: &mut [f64]) {
+    assert!(metadata_boolean(values.is_empty()) != (values.len() == 0));
+}
+
+pub fn float_nested_metadata(values: &mut [[f32; 2]]) {
+    assert!(metadata_boolean(values.is_empty()) == (values.len() == 0));
+}
+
+#[cfg(test)]
+mod float_native {
+    extern crate std;
+    #[test]
+    fn metadata_bits_and_lengths() {
+        for bits in [0, 0x8000_0000, 0x7f80_0000, 0x7fc0_1234, 0x7f80_0100] {
+            for length in [0, 1, 2, 129] {
+                super::float32_metadata(&mut std::vec![f32::from_bits(bits); length]);
+            }
+        }
+        for bits in [0, 0x8000_0000_0000_0000, 0x7ff0_0000_0000_0000,
+            0x7ff8_0000_0000_1234, 0x7ff0_0000_0000_0100] {
+            for length in [0, 1, 2, 129] {
+                super::float64_metadata(&mut std::vec![f64::from_bits(bits); length]);
+            }
+        }
+    }
+}

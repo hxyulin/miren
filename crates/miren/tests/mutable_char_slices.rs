@@ -166,8 +166,8 @@ fn logical_char_stores_and_actual_child_bodies_cover_four_profiles() {
         ("raw", U),
         ("escape", U),
         ("nested", P),
-        ("float64_unknown", U),
-        ("float_unknown", U),
+        ("float64_unknown", P),
+        ("float_unknown", P),
         ("u8_unknown", P),
     ];
     for target in [None, Some("thumbv7em-none-eabihf")] {
@@ -196,14 +196,6 @@ fn logical_char_stores_and_actual_child_bodies_cover_four_profiles() {
                 (
                     "reached_panic",
                     "ancestor admits only direct scalar Rust frames",
-                ),
-                (
-                    "float64_unknown",
-                    "mutable u16 roles require selected metadata-only operation",
-                ),
-                (
-                    "float_unknown",
-                    "mutable u16 roles require selected metadata-only operation",
                 ),
             ] {
                 let proof = report
