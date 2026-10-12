@@ -3863,3 +3863,45 @@ pub fn trait_choice_repeated(value: u8, index: usize) {
 pub fn trait_choice_opaque(value: &dyn CapabilityChoiceRead) {
     assert!(capability_choice_invoke(value) <= 15);
 }
+
+#[inline(never)]
+pub fn niche_membership_member_u32(
+    values: &[Option<core::num::NonZeroU32>],
+    needle: Option<core::num::NonZeroU32>,
+) -> bool {
+    values.contains(&needle)
+}
+
+pub fn niche_membership_selected_none_u32(values: &[Option<core::num::NonZeroU32>]) {
+    if !values.is_empty() && values[0].is_none() {
+        assert!(niche_membership_member_u32(values, None));
+    }
+}
+
+pub fn niche_membership_selected_some_u32(
+    values: &[Option<core::num::NonZeroU32>],
+    needle: core::num::NonZeroU32,
+) {
+    if !values.is_empty()
+        && let Some(first) = values[0]
+        && first.get() == needle.get()
+    {
+        assert!(niche_membership_member_u32(values, Some(needle)));
+    }
+}
+
+pub fn niche_membership_empty_u32(values: &[Option<core::num::NonZeroU32>]) {
+    if values.is_empty() {
+        assert!(!niche_membership_member_u32(values, None));
+    }
+}
+
+pub fn niche_membership_wrong_empty_u32(values: &[Option<core::num::NonZeroU32>]) {
+    if values.is_empty() {
+        assert!(niche_membership_member_u32(values, None));
+    }
+}
+
+pub fn niche_membership_byte_frontier(values: &[Option<core::num::NonZeroU8>]) {
+    let _ = values.contains(&None);
+}

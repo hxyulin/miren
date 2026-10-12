@@ -95,7 +95,8 @@ impl<'tcx> Engine<'tcx> {
                 && matches!(args.type_at(0).kind(), ty::Adt(payload, payload_args)
                     if self.tcx.is_diagnostic_item(Symbol::intern("NonZero"), payload.did())
                         && payload_args.len() == 1
-                        && payload_args.type_at(0) == self.tcx.types.u16));
+                        && nonzero_options::readonly_niche_unsigned_bits(payload_args.type_at(0))
+                            .is_some()));
         if exact_niche {
             state.flow.require_unarmed()?;
         }
@@ -125,7 +126,14 @@ impl<'tcx> Engine<'tcx> {
                     self.exact_niche_membership(*element, instance, &slice, needle, state)?;
                 self.record_model(
                     callee,
-                    "exact checked core Option<NonZeroU16> slice membership",
+                    if matches!(element.kind(), ty::Adt(_, args)
+                        if matches!(args.type_at(0).kind(), ty::Adt(_, payload)
+                            if payload.type_at(0) == self.tcx.types.u16))
+                    {
+                        "exact checked core Option<NonZeroU16> slice membership"
+                    } else {
+                        "exact checked core Option<NonZeroU32> slice membership"
+                    },
                 );
                 return Ok(Some(vec![Return {
                     value: Value::Bool(member),

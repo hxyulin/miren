@@ -506,6 +506,7 @@ struct LawTrace<'a, 'tcx> {
     graph: Option<&'a mut GraphBudget<'tcx>>,
     original: Ty<'tcx>,
     payload: Ty<'tcx>,
+    primitive: Ty<'tcx>,
     tags: Option<[usize; 2]>,
     equality: u8,
     completed: Vec<CompletedTrace<'tcx>>,
@@ -851,7 +852,7 @@ impl<'tcx> LawTrace<'_, 'tcx> {
                                 rustc_middle::mir::CastKind::Transmute,
                                 operand,
                                 target,
-                            ) if *target == self.tcx.types.u16 => {
+                            ) if *target == self.primitive => {
                                 let TraceValue::Origin {
                                     original,
                                     side,
@@ -899,7 +900,7 @@ impl<'tcx> LawTrace<'_, 'tcx> {
                                             refs: 0,
                                             ..
                                         },
-                                    ) if a == self.tcx.types.u16 && a == b => {
+                                    ) if a == self.primitive && a == b => {
                                         if x == y {
                                             u8::MAX
                                         } else {
@@ -1550,9 +1551,11 @@ impl<'tcx> Engine<'tcx> {
         if Some(payload_definition.did()) != nonzero
             || payload_arguments.len() != 1
             || !matches!(payload_arguments.first().map(|arg| arg.kind()),
-                Some(ty::GenericArgKind::Type(original)) if original == self.tcx.types.u16)
+                Some(ty::GenericArgKind::Type(original))
+                    if super::super::nonzero_options::readonly_niche_unsigned_bits(original)
+                        .is_some())
         {
-            return Err("niche Option payload is not exact original NonZeroU16".into());
+            return Err("niche Option payload is not an admitted original unsigned NonZero".into());
         }
         if outer.def_id().krate != definition.did().krate {
             return Err("niche outer is not original core".into());
@@ -1575,7 +1578,8 @@ impl<'tcx> Engine<'tcx> {
         // Caller-visible bounded schema services: six purity queries, five layouts,
         // three field instantiations, anchored inner normalization, two variant scans,
         // and the fixed NicheFacts field copy. Compiler-internal complexity is not claimed.
-        budget.phase(GraphPhase::Schema, 6 + 5 + 3 + 1 + 2 + 32)?;
+        // Old schema fees remain; extra copies4 and two bounded width/range services48.
+        budget.phase(GraphPhase::Schema, 6 + 5 + 3 + 1 + 2 + 32 + 4 + 48)?;
         let schema = certify(self.tcx, original)?;
         if schema.payload_variant != 1 || schema.tags != [0, 1] || !facts_match(&schema.facts) {
             return Err("niche membership exact original schema mismatch".into());
@@ -1608,7 +1612,7 @@ impl<'tcx> Engine<'tcx> {
         budget.charge(2)?;
         let primitive_args = self
             .tcx
-            .mk_args(&[self.tcx.types.u16.into(), self.tcx.types.u16.into()]);
+            .mk_args(&[schema.primitive.into(), schema.primitive.into()]);
         budget.arguments(self.tcx, primitive_args)?;
         budget.charge(2)?;
         let primitive = self.resolve_function_item(eq, primitive_args)?;
@@ -1637,7 +1641,7 @@ impl<'tcx> Engine<'tcx> {
             }
             let signature = self.call_signature(instance)?;
             let receiver = if instance == primitive {
-                self.tcx.types.u16
+                schema.primitive
             } else if instance == payload_eq {
                 schema.nonzero
             } else {
@@ -1659,7 +1663,7 @@ impl<'tcx> Engine<'tcx> {
             budget.charge(1)?;
             budget.insert_body(&mut bodies, instance, body)?;
         }
-        let types = [original, schema.nonzero, self.tcx.types.u16];
+        let types = [original, schema.nonzero, schema.primitive];
         budget.charge(types.len() + 1)?;
         budget.charge(NICHE_PENDING * 2)?;
         let mut pending = Vec::new();
@@ -1747,8 +1751,10 @@ impl<'tcx> Engine<'tcx> {
             if instance == outer && element != Some(original) {
                 return Err("niche membership outer original element mismatch".into());
             }
-            if family == templates::PureTemplateFamily::ContainsBytes && schema.facts.size != 2 {
-                return Err("niche bytewise transport requires exact original size2".into());
+            if family == templates::PureTemplateFamily::ContainsBytes && schema.facts.size == 1 {
+                return Err(
+                    "niche byte-sized transport needs a separate available-body certificate".into(),
+                );
             }
             budget.phase(GraphPhase::Edges, inventory)?;
             for block in body.basic_blocks.iter() {
@@ -1792,7 +1798,7 @@ impl<'tcx> Engine<'tcx> {
                             | "DefId(core::slice::memchr::memchr)"
                     )
                 {
-                    // Full matched caller + original size2 prove its SIZE == 1 edge unreachable.
+                    // Full matched caller + certified non-byte size prove SIZE == 1 unreachable.
                     continue;
                 }
                 let arithmetic = if family == templates::PureTemplateFamily::IterAny
@@ -1831,7 +1837,7 @@ impl<'tcx> Engine<'tcx> {
                 variant: None,
             })
         };
-        budget.charge(3)?;
+        budget.charge(3 + 1)?;
         let (relation, law_work, observed) = {
             let mut law = LawTrace {
                 tcx: self.tcx,
@@ -1839,6 +1845,7 @@ impl<'tcx> Engine<'tcx> {
                 graph: Some(&mut budget),
                 original,
                 payload: schema.nonzero,
+                primitive: schema.primitive,
                 tags: None,
                 equality: 0xaa,
                 completed: Vec::new(),
@@ -1848,10 +1855,9 @@ impl<'tcx> Engine<'tcx> {
                 observed: LawWork::default(),
                 active: [None; 16],
             };
-            for (instance, receiver) in [
-                (primitive, self.tcx.types.u16),
-                (payload_eq, schema.nonzero),
-            ] {
+            for (instance, receiver) in
+                [(primitive, schema.primitive), (payload_eq, schema.nonzero)]
+            {
                 let called = law.call(instance, roots(receiver), 0);
                 let relation = called.map_err(|error| law.failure(error))?;
                 if relation != 0xaa {
@@ -1942,7 +1948,7 @@ impl<'tcx> Engine<'tcx> {
         budget.charge(48)?; // Separate sixteen name length/bound/add validation visits.
         membership_schema.membership_match_work(&membership_schema)?;
         // Move the actual admission-local meter and schema into one-shot application.
-        budget.charge(44)?;
+        budget.charge(44 + 1)?;
         let result = CheckedNicheLaw {
             engine: self,
             original,
@@ -2047,7 +2053,7 @@ impl<'tcx> Engine<'tcx> {
             application.charge(1 + instance.args.len() + 4)?;
         }
         law.validate(self)?;
-        application.charge(12)?;
+        application.charge(12 + 3)?;
         let current_schema = self.niche_membership_descriptor(law.original, slice)?;
         // Pay the separate sixteen name length/bound/add planning visits before evaluation.
         application.charge(48)?;
@@ -2076,7 +2082,10 @@ impl<'tcx> Engine<'tcx> {
             || length.sort() != &Sort::BitVec(bits)
             || !length.belongs_to(&self.terms)
             || column.sort()
-                != &Sort::Array(Box::new(Sort::BitVec(bits)), Box::new(Sort::BitVec(16)))
+                != &Sort::Array(
+                    Box::new(Sort::BitVec(bits)),
+                    Box::new(Sort::BitVec(schema.payload_bits())),
+                )
             || !column.belongs_to(&self.terms)
             || !matches!(bits, 32 | 64)
         {
@@ -2087,7 +2096,10 @@ impl<'tcx> Engine<'tcx> {
         // Actual canonical descriptor is checked; selecting its raw column removes the old
         // nested Value/name reconstruction, and the retained schema removes recertification.
         application.charge(6)?;
-        let maximum = (u128::MAX >> (128 - bits)) / 4;
+        application.charge(3)?;
+        let item_bytes = schema.item_bytes();
+        let denominator = item_bytes.checked_mul(2).ok_or("niche extent overflow")?;
+        let maximum = (u128::MAX >> (128 - bits)) / u128::from(denominator);
         let safe = self.terms.apply(
             Op::BvUnsignedLe,
             &[length.clone(), self.terms.bit_vector(maximum, bits)?],
@@ -2248,7 +2260,7 @@ impl<'tcx> Engine<'tcx> {
                 name,
                 Value::Int {
                     expression,
-                    bits: 16,
+                    bits,
                     signed: false,
                 },
             ),
@@ -2257,7 +2269,10 @@ impl<'tcx> Engine<'tcx> {
             return Err("niche Some scalar shape differs".into());
         };
         self.niche_name_service(application, name, &schema.inner_field)?;
-        if expression.sort() != &Sort::BitVec(16) || !expression.belongs_to(&self.terms) {
+        if *bits != schema.payload_bits()
+            || expression.sort() != &Sort::BitVec(schema.payload_bits())
+            || !expression.belongs_to(&self.terms)
+        {
             return Err("niche Some scalar context differs".into());
         }
         Ok(Some(expression))
@@ -2317,13 +2332,17 @@ impl<'tcx> Engine<'tcx> {
         match needle {
             MembershipNeedle::None => {
                 application.charge(1)?;
-                self.terms.bit_vector(0, 16)
+                self.terms.bit_vector(0, schema.payload_bits())
             }
             MembershipNeedle::Some(raw) => {
                 application.charge(5)?;
-                let zero = self
-                    .terms
-                    .apply(Op::Equal, &[raw.clone(), self.terms.bit_vector(0, 16)?])?;
+                let zero = self.terms.apply(
+                    Op::Equal,
+                    &[
+                        raw.clone(),
+                        self.terms.bit_vector(0, schema.payload_bits())?,
+                    ],
+                )?;
                 self.niche_application_refuse_if(
                     application,
                     conditions,
@@ -2358,9 +2377,13 @@ impl<'tcx> Engine<'tcx> {
                     "niche symbolic tag lacks proved validity",
                 )?;
                 application.charge(8)?;
-                let zero = self
-                    .terms
-                    .apply(Op::Equal, &[raw.clone(), self.terms.bit_vector(0, 16)?])?;
+                let zero = self.terms.apply(
+                    Op::Equal,
+                    &[
+                        raw.clone(),
+                        self.terms.bit_vector(0, schema.payload_bits())?,
+                    ],
+                )?;
                 let invalid_payload = self.terms.apply(Op::And, &[some.clone(), zero])?;
                 self.niche_application_refuse_if(
                     application,
@@ -2369,8 +2392,14 @@ impl<'tcx> Engine<'tcx> {
                     "niche active Some lacks proved nonzero validity",
                 )?;
                 application.charge(5)?;
-                self.terms
-                    .apply(Op::Ite, &[some, raw.clone(), self.terms.bit_vector(0, 16)?])
+                self.terms.apply(
+                    Op::Ite,
+                    &[
+                        some,
+                        raw.clone(),
+                        self.terms.bit_vector(0, schema.payload_bits())?,
+                    ],
+                )
             }
         }
     }

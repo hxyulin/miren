@@ -135,6 +135,7 @@ fn research_trace<'a, 'tcx>(
         graph: Some(graph),
         original,
         payload,
+        primitive: payload_type_argument(payload),
         tags: None,
         equality: 0xaa,
         completed: Vec::new(),
@@ -791,6 +792,7 @@ impl rustc_driver::Callbacks for Graph {
                             graph: Some(&mut graph),
                             original,
                             payload,
+                            primitive: payload_type_argument(payload),
                             tags: Some([left, right]),
                             equality: if equality { u8::MAX } else { 0 },
                             completed: Vec::new(),
@@ -1028,6 +1030,7 @@ impl rustc_driver::Callbacks for Graph {
                 graph: Some(&mut graph),
                 original,
                 payload,
+                primitive: payload_type_argument(payload),
                 tags: None,
                 equality: 0xaa,
                 completed: Vec::new(),
@@ -1487,8 +1490,18 @@ fn public_application_controls<'tcx>(
         )]
         .into(),
     };
-    let some_one = some(symbolic::integer(&target.terms, 1, 16, false));
-    let some_zero = some(symbolic::integer(&target.terms, 0, 16, false));
+    let some_one = some(symbolic::integer(
+        &target.terms,
+        1,
+        schema.payload_bits(),
+        false,
+    ));
+    let some_zero = some(symbolic::integer(
+        &target.terms,
+        0,
+        schema.payload_bits(),
+        false,
+    ));
     let symbolic = |tag: u128, payload: Value| Value::Enum {
         discriminant: Box::new(symbolic::integer(
             &target.terms,
@@ -1548,7 +1561,10 @@ fn public_application_controls<'tcx>(
                     Op::Equal,
                     &[
                         first.clone(),
-                        target.terms.bit_vector(expected_raw, 16).unwrap(),
+                        target
+                            .terms
+                            .bit_vector(expected_raw, schema.payload_bits())
+                            .unwrap(),
                     ],
                 )
                 .unwrap(),
@@ -1720,5 +1736,171 @@ fn public_application_controls<'tcx>(
     eprintln!(
         "public niche actual application handoff/reuse/exhaustion/masks/conditions/\
          descriptor/context/tag controls"
+    );
+}
+
+fn payload_type_argument(original: Ty<'_>) -> Ty<'_> {
+    let ty::Adt(_, args) = original.kind() else {
+        panic!("exact NonZero payload")
+    };
+    assert_eq!(args.len(), 1);
+    args.type_at(0)
+}
+
+#[test]
+fn actual_unsigned_u32_niche_membership_source_control() {
+    struct Check {
+        checked: bool,
+        output: PathBuf,
+    }
+    impl rustc_driver::Callbacks for Check {
+        fn after_analysis<'tcx>(
+            &mut self,
+            _: &rustc_interface::interface::Compiler,
+            tcx: TyCtxt<'tcx>,
+        ) -> rustc_driver::Compilation {
+            let root = tcx
+                .mir_keys(())
+                .iter()
+                .copied()
+                .find(|id| {
+                    tcx.def_kind(*id) == DefKind::Fn
+                        && tcx.item_name(id.to_def_id()).as_str() == "membership_u32"
+                })
+                .unwrap();
+            let signature = tcx.fn_sig(root).instantiate_identity().skip_binder();
+            let ty::Ref(_, slice, _) = signature.inputs()[0].kind() else {
+                panic!("slice")
+            };
+            let ty::Slice(original) = slice.kind() else {
+                panic!("original slice")
+            };
+            let certificate = certify(tcx, *original).unwrap();
+            assert_eq!(certificate.primitive, tcx.types.u32);
+            assert_eq!(certificate.facts.payload_bits, 32);
+            assert_eq!(certificate.facts.size, 4);
+            check_metadata_mutations(&certificate.facts);
+            check_observation(&certificate, u32::from(tcx.sess.target.pointer_width));
+            let selected = engine(tcx);
+            let body = tcx.optimized_mir(root.to_def_id());
+            std::fs::write(self.output.join("membership_u32.mir"), format!("{body:#?}")).unwrap();
+            let mut actual_calls = String::new();
+            for block in body.basic_blocks.iter() {
+                let TerminatorKind::Call { func, .. } = &block.terminator().kind else {
+                    continue;
+                };
+                let ty::FnDef(id, args) = func.ty(&body.local_decls, tcx).kind() else {
+                    continue;
+                };
+                let instance = selected.resolve_function_item(*id, args.skip_binder());
+                actual_calls.push_str(&format!("actual Call {id:?} {args:?}: {instance:?}\n"));
+            }
+            std::fs::write(self.output.join("actual-calls.txt"), actual_calls).unwrap();
+            let outer = body
+                .basic_blocks
+                .iter()
+                .find_map(|block| {
+                    let TerminatorKind::Call { func, .. } = &block.terminator().kind else {
+                        return None;
+                    };
+                    let ty::FnDef(id, args) = func.ty(&body.local_decls, tcx).kind() else {
+                        return None;
+                    };
+                    if !matches!(tcx.item_name(*id).as_str(), "contains" | "slice_contains") {
+                        return None;
+                    }
+                    Some(
+                        selected
+                            .resolve_function_item(*id, args.skip_binder())
+                            .unwrap(),
+                    )
+                })
+                .unwrap();
+            let actual_key =
+                super::super::super::pure_comparison_templates::definition_key(outer.def_id());
+            assert!(matches!(
+                actual_key.as_str(),
+                "DefId(core::slice::{impl#0}::contains)"
+                    | "DefId(core::slice::cmp::{impl#18}::slice_contains)"
+            ));
+            let law = selected
+                .check_niche_comparison_law(*original, outer)
+                .unwrap();
+            law.validate(&selected).unwrap();
+            assert_eq!(law.relation, 0x83);
+            public_application_controls(tcx, *original, outer);
+            assert!(
+                super::super::super::nonzero_options::readonly_niche_unsigned_bits(tcx.types.u8)
+                    .is_none()
+            );
+            assert!(
+                super::super::super::nonzero_options::readonly_niche_unsigned_bits(tcx.types.i32)
+                    .is_none()
+            );
+            assert!(
+                super::super::super::nonzero_options::readonly_niche_unsigned_bits(tcx.types.char)
+                    .is_none()
+            );
+            eprintln!(
+                "actual u32 niche source control: graph={} law={}",
+                law.graph_work, law.law_work
+            );
+            self.checked = true;
+            rustc_driver::Compilation::Stop
+        }
+    }
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let directory = PathBuf::from(format!(
+        "/tmp/miren-niche-u32-prototype/compiler-{}-{nonce}",
+        std::process::id()
+    ));
+    std::fs::create_dir_all(&directory).unwrap();
+    let source = directory.join("guest.rs");
+    std::fs::write(
+        &source,
+        "#![no_std]\n#![forbid(unsafe_code)]\n\
+        pub fn membership_u32(v:&[Option<core::num::NonZeroU32>],\n\
+        n:Option<core::num::NonZeroU32>)->bool{v.contains(&n)}\n",
+    )
+    .unwrap();
+    let sysroot = std::process::Command::new("rustc")
+        .args(["--print", "sysroot"])
+        .output()
+        .unwrap();
+    assert!(sysroot.status.success());
+    let sysroot = String::from_utf8(sysroot.stdout).unwrap();
+    for target in [None, Some("thumbv7em-none-eabihf")] {
+        for opt in [0, 2] {
+            let output = directory.join(format!("{}-{opt}", target.unwrap_or("host")));
+            std::fs::create_dir(&output).unwrap();
+            let mut args = vec![
+                "rustc".into(),
+                source.to_str().unwrap().into(),
+                "--crate-type=lib".into(),
+                "--edition=2024".into(),
+                "-Cpanic=abort".into(),
+                format!("-Copt-level={opt}"),
+                "--sysroot".into(),
+                sysroot.trim().into(),
+                "--out-dir".into(),
+                output.to_str().unwrap().into(),
+            ];
+            if let Some(target) = target {
+                args.extend(["--target".into(), target.into()]);
+            }
+            let mut check = Check {
+                checked: false,
+                output: output.clone(),
+            };
+            rustc_driver::run_compiler(&args, &mut check);
+            assert!(check.checked);
+        }
+    }
+    eprintln!(
+        "actual u32 niche control directory: {}",
+        directory.display()
     );
 }

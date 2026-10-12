@@ -45,18 +45,18 @@ This is an experimental side project. It requires a pinned nightly compiler, sup
 Rust, and has not completed a soundness audit. Unsupported operations and unfinished proofs return
 UNKNOWN. A solver counterexample is not automatically a confirmed runtime panic.
 
-Readonly `Option<NonZero<u16>>` slices and exact local empty/payload enums retain the compiler's
-zero-only niche, with correlated tags and guarded payload observations. Original type, body,
-lifetime and resource checks remain required; pointer niches, mutable niches and whole-slice
-comparison are separate unsupported domains. See the [capability
-evidence](docs/rust-capabilities.md).
+Readonly `Option<NonZeroU16>` and `Option<NonZeroU32>` slices, plus exact local u16 empty/payload
+enums, retain the compiler's zero-only niche with correlated tags and guarded payload observations.
+Original type, body, lifetime and resource checks remain required; pointer niches, mutable niches
+and whole-slice comparison are separate unsupported domains. See the
+[capability evidence](docs/rust-capabilities.md).
 
 Mutable scalar slices support bounded whole-child helpers, scalar returns, local static
 associated calls and original constant-index reads and stores. Exact f32/f64 backing
 preserves NaN payloads and signed-zero bits. Deeper nesting and the dedicated proper-reborrow
 caller remain UNKNOWN. Bounded owned u16 products also support writes through multiple symbolic
 suffix indices, preserving compiler types and current Memory. The validated capability survey
-covers 269 cases across 89 families.
+covers 274 cases across 89 families.
 
 Finite known shared trait objects can be selected from local fixed arrays and retained slices.
 Selected alternatives execute actual method bodies, preserving their backing references and

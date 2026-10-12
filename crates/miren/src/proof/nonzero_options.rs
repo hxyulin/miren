@@ -318,7 +318,12 @@ impl<'tcx> Engine<'tcx> {
     }
 }
 
-fn nonzero_integer_scalar(repr: BackendRepr, bits: u32, signed: bool, start: u128) -> bool {
+pub(super) fn nonzero_integer_scalar(
+    repr: BackendRepr,
+    bits: u32,
+    signed: bool,
+    start: u128,
+) -> bool {
     let max = if bits == 128 {
         u128::MAX
     } else {
@@ -328,4 +333,14 @@ fn nonzero_integer_scalar(repr: BackendRepr, bits: u32, signed: bool, start: u12
         value: Primitive::Int(integer, actual_signed), valid_range,
     }) if integer.size().bits() == u64::from(bits) && actual_signed == signed
         && valid_range.start == start && valid_range.end == max)
+}
+
+// Exact original primitive admission for the readonly niche prototype. Char/Pat and other
+// same-width types are not certificates. Byte-sized membership remains a separate body route.
+pub(super) fn readonly_niche_unsigned_bits(original: Ty<'_>) -> Option<u32> {
+    match original.kind() {
+        ty::Uint(ty::UintTy::U16) => Some(16),
+        ty::Uint(ty::UintTy::U32) => Some(32),
+        _ => None,
+    }
 }

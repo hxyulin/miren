@@ -11,14 +11,18 @@ execution at O0 and O2, positive/refuted/unknown controls, a source mutation tha
 structured UNKNOWN reporting, and passing repository checks. Completion establishes a repeatable
 baseline. It does not establish full Rust support or a completed memory-model refactor.
 
-The current manifest contains 269 cases across 89 families.
-Completed ROOT host/ARM O0/O2 surveys each measure 114 PROVED, 91 REFUTED and 64 UNKNOWN.
-Five new cases cover symbolic shared trait-object selection, caller-backed returns, repeated calls,
-a false claim and an opaque input. All 264 previous case objects and their literal fixture prefix
-remain unchanged. Actual method bodies and complete current backing references remain required.
-Required checks, mutation evidence and qualified source-snapshot comparisons are recorded in
+The current manifest contains 274 cases across 89 families.
+Completed ROOT host/ARM O0/O2 surveys each measure 117 PROVED, 93 REFUTED and 64 UNKNOWN.
+Five new cases cover u32 niche membership, a false empty-slice claim and the unsupported byte path.
+The unchanged old unconditional u32 assertion advances from UNKNOWN to REFUTED. The other 268 old
+case objects and the literal old fixture prefix remain unchanged. Original compiler primitive,
+range, layout, backing and actual body certificates remain required. Required checks and qualified
+source-snapshot comparisons are recorded in
+[Stage229](stages.md#stage229-shared-u16u32-niche-semantics).
+The historical Stage228 survey measured 269 cases across 89 families: 114 PROVED, 91 REFUTED and
+64 UNKNOWN per profile, including the shared trait-object choices described in
 [Stage228](stages.md#stage228-finite-shared-trait-object-choices).
-Readonly NonZeroU16 membership remains as validated in
+Readonly NonZeroU16 membership was validated in
 [Stage227](stages.md#stage227-exact-nonzero-niche-slice-membership).
 These are selected capabilities, not a Rust parity percentage.
 

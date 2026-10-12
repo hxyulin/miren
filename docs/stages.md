@@ -6765,3 +6765,48 @@ This stage establishes the named finite domain and does not establish full Rust 
 Evidence: /tmp/miren-stage228-root-migration-review.json,
 /tmp/miren-stage228-root-trait-owner-review.json, /tmp/miren-stage228-root-full-checks and
 /tmp/miren-stage228-root-survey-proof-audit.json.
+
+
+## Stage229: shared u16/u32 niche semantics
+
+Readonly `Option<NonZeroU32>` uses the same original compiler primitive, zero-only range and layout
+services as the existing u16 route. Schema payload width and byte extent remain distinct from tag
+and target-usize index widths. Getter, Eq/Ne and non-byte membership transport require actual full
+Instances, current cached bodies, descriptors, contexts and Unarmed Flow. Original u16 local enum
+support remains; new-width local enums, signed/other widths and the u8 byte/memchr route remain
+unsupported. No runtime input-length cap, guest premise or pointer/mutable access right is added.
+Graph131072, LAW1024 and application2048 bounds retain old charges plus the new services.
+
+The archived provisional u16 foundation measured 16 synthetic u32 applications in four compiler
+callbacks, a focused 52-Proof corpus of 20 PROVED, 20 REFUTED and 12 UNKNOWN, and 44 emitted
+queries. Actual helper mutations retain original assertions and Refuted body/query/model evidence;
+selected native originals pass and mutants fail. Genuine retained external bodies prove and
+omitted bodies remain UNKNOWN. These archives are historical, not current-parent measurements.
+The unchanged guarded zero-length u32 array claim measured PROVED in four separate profiles.
+Its precise expectation was updated; the guest claim and existing whole-membership assertions stay
+unchanged. ROOT current-parent tests rerun relevant compiler, mutation, native and body controls.
+
+Two ROOT full-check attempts stopped with actual tests101 at stale private width controls: the
+new u32 certificate was paired with the old external u16 wrapper, then a supposed malformed column
+had the now-valid u32 width. Three cfg(test) hunks supply an actual external u32 wrapper and the
+opposite malformed width. All authentication/rejection assertions remain. The exact compiler test
+passes before the separate completed full-check run; failures and source associations are retained.
+
+Fresh ROOT host/ARM O0/O2 surveys each report 117 PROVED, 93 REFUTED and 64 UNKNOWN across
+274 cases in 89 families. One old unconditional u32 membership assertion advances from UNKNOWN
+to REFUTED; five P/R/U cases are appended. All 268 other old manifest objects and the literal old
+fixture prefix are exact. The 1,072 unchanged parent whole Proof pairs contain 12 literal FULL,
+1,058 qualified appended source fingerprints and 2 source fingerprints with the existing exact
+query-free 30-second fold context allowance. All 2,028 rich queries/models remain unchanged;
+actual differing whole Proof pairs are retained and are not called literal FULL. The four new
+counterexamples and 20 new case Proofs are retained separately. No historical survey is replayed.
+
+All 24 required ROOT commands pass, including formatting, lint, tests, release builds, dependency
+policy, documentation, example ARM releases and manual hooks. Logs contain 898 workspace and
+9 example outer Rust tests, 907 total, plus 91 Python tests; the nested ticket test is excluded.
+Final prose has a separate source association. This extends a named finite Rust domain and does
+not establish full Rust parity.
+
+Evidence: /tmp/miren-stage229-root-owner-migration-review.json,
+/tmp/miren-stage229-root-validated-full-checks, /tmp/miren-stage229-root-full-checks-audit.json and
+/tmp/miren-stage229-root-survey-proof-audit.json.

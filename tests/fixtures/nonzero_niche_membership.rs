@@ -49,3 +49,42 @@ mod native {
         super::empty(&[]);
     }
 }
+
+#[inline(never)]
+pub fn member_u32(values: &[Option<NonZeroU32>], needle: Option<NonZeroU32>) -> bool {
+    values.contains(&needle)
+}
+
+pub fn selected_none_u32(values: &[Option<NonZeroU32>]) {
+    if !values.is_empty() && values[0].is_none() { assert!(member_u32(values,None)); }
+}
+
+pub fn selected_some_u32(values: &[Option<NonZeroU32>], needle: NonZeroU32) {
+    if !values.is_empty() && let Some(first)=values[0] && first.get()==needle.get() {
+        assert!(member_u32(values,Some(needle)));
+    }
+}
+
+pub fn empty_u32(values: &[Option<NonZeroU32>]) {
+    if values.is_empty() { assert!(!member_u32(values,None)); }
+}
+
+pub fn wrong_empty_u32(values: &[Option<NonZeroU32>]) {
+    if values.is_empty() { assert!(member_u32(values,None)); }
+}
+
+pub fn unsupported_byte_niche(values: &[Option<core::num::NonZeroU8>]) {
+    let _ = values.contains(&None);
+}
+
+#[cfg(test)]
+mod native_u32 {
+    #[test]
+    fn genuine_claims() {
+        let high=super::NonZeroU32::new(0x8000_0000).unwrap();
+        let maximum=super::NonZeroU32::new(u32::MAX).unwrap();
+        super::selected_none_u32(&[Some(high),None]);
+        super::selected_some_u32(&[Some(maximum),Some(high)],maximum);
+        super::empty_u32(&[]);
+    }
+}

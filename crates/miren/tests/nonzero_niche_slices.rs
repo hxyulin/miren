@@ -97,7 +97,7 @@ fn verify(
                     UnknownCategory::ResourceLimit,
                     "composite slice type array exceeds the 128-element shape budget",
                 ),
-                "signed_niche" | "unsupported_zero" => (
+                "signed_niche" => (
                     UnknownCategory::Semantics,
                     "NonZero wrapper original identity mismatch",
                 ),
@@ -197,7 +197,7 @@ fn exact_nonzero_niches_keep_payloads_guarded_and_conservative_frontiers() {
         ("wrong_none", ProofStatus::Refuted),
         ("wrong_bounds", ProofStatus::Refuted),
         ("zero_max", ProofStatus::Proved),
-        ("unsupported_zero", ProofStatus::Unknown),
+        ("unsupported_zero", ProofStatus::Proved),
         ("signed_niche", ProofStatus::Unknown),
         ("over_budget", ProofStatus::Unknown),
         ("expanded_budget", ProofStatus::Unknown),

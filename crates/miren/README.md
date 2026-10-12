@@ -1398,3 +1398,30 @@ queries and models remain unchanged under qualified source-fingerprint compariso
 registry512, Repeat128, depth16 and cumulative choice2048 bounds remain explicit host limits.
 No guest premise, mutable receiver right or arbitrary incoming dynamic target is supplied.
 See [Stage228](../../docs/stages.md#stage228-finite-shared-trait-object-choices).
+
+Readonly u16/u32 zero-only niches share compiler primitive/range and layout services.
+Payload width stays distinct from discriminant/index width; size and alignment come from the
+original compiler primitive layout. Actual getter and Eq/Ne Instances, same-live cached bodies,
+current descriptors and Unarmed flow remain required. The u32 membership route admits only
+certified non-byte transport; u8's byte/memchr path remains UNKNOWN pending a separate actual-body
+certificate. Other widths and signed types remain excluded. Metadata services are prepaid;
+application2048, graph131072, LAW1024 and existing type/string limits are unchanged.
+
+The archived provisional source completed four compiler callbacks and 16 synthetic applications
+within application2048. Its focused 52-Proof corpus measured 20 Proved, 20 Refuted and 12 Unknown,
+with genuine helper mutations, native failures and retained/omitted external bodies. The unchanged
+unconditional u32 assertion is Refuted, and the guarded zero-array legacy claim is Proved in all
+four measured profiles. That source-only Stage228 composition preserved those exact
+expectation edits;
+its current-parent validation was pending at that checkpoint.
+
+ROOT Stage229 validates the composed ordinary u16/u32 implementation with all 24 required commands.
+Four fresh host/ARM O0/O2 surveys each measure 117 PROVED, 93 REFUTED and 64 UNKNOWN across
+274 cases in 89 families. The old unconditional u32 membership claim is now REFUTED; five new
+u32/byte-frontier cases are appended without changing old guest assertions. Current compiler,
+mutation, native and missing-body integration controls pass. Two stale private width controls
+were corrected to use an actual u32 external wrapper and an actually malformed opposite-width
+column; all rejection assertions and production checks remain intact. Earlier test101 runs are
+preserved. All 2,028 rich queries/models in the 268 unchanged parent roots remain exact under
+qualified appended-source comparisons; actual differing whole Proofs remain distinguished.
+See [Stage229](../../docs/stages.md#stage229-shared-u16u32-niche-semantics).

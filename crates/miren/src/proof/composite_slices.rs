@@ -954,10 +954,7 @@ impl CompositeShape {
 
     fn leaves(&self, output: &mut Vec<ScalarSliceElement>) {
         match self {
-            Self::NonZeroNiche(_) => output.push(ScalarSliceElement::Integer {
-                bits: 16,
-                signed: false,
-            }),
+            Self::NonZeroNiche(schema) => output.push(schema.payload_element()),
             Self::Sum {
                 bits,
                 signed,
@@ -1239,19 +1236,15 @@ impl<'tcx> Engine<'tcx> {
             .composite_slice_types
             .get(*id)
             .ok_or("niche membership descriptor is unavailable")?;
-        if descriptor.ty != original
-            || descriptor.bytes != 2
-            || descriptor.leaves.as_slice()
-                != [ScalarSliceElement::Integer {
-                    bits: 16,
-                    signed: false,
-                }]
-        {
-            return Err("niche membership descriptor original extent/column differs".into());
-        }
         let CompositeShape::NonZeroNiche(schema) = &descriptor.shape else {
             return Err("niche membership descriptor original shape differs".into());
         };
+        if descriptor.ty != original
+            || descriptor.bytes != schema.item_bytes()
+            || descriptor.leaves.as_slice() != [schema.payload_element()]
+        {
+            return Err("niche membership descriptor original extent/column differs".into());
+        }
         Ok(schema)
     }
 
@@ -1262,7 +1255,7 @@ impl<'tcx> Engine<'tcx> {
         };
         let mut descriptor = self.composite_slice_types[*id].clone();
         match fault {
-            0 => descriptor.bytes = 4,
+            0 => descriptor.bytes = if descriptor.bytes == 2 { 4 } else { 2 },
             1 => {
                 descriptor.shape = CompositeShape::Primitive(ScalarSliceElement::Integer {
                     bits: 16,
@@ -1270,8 +1263,19 @@ impl<'tcx> Engine<'tcx> {
                 })
             }
             2 => {
+                let width = if matches!(
+                    descriptor.leaves.as_slice(),
+                    [ScalarSliceElement::Integer {
+                        bits: 32,
+                        signed: false
+                    }]
+                ) {
+                    16
+                } else {
+                    32
+                };
                 descriptor.leaves = vec![ScalarSliceElement::Integer {
-                    bits: 32,
+                    bits: width,
                     signed: false,
                 }]
             }

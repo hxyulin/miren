@@ -49,7 +49,9 @@ impl<'tcx> Engine<'tcx> {
         {
             return Ok(None);
         }
-        if nonzero_niches::ENABLE_RUNTIME && signature.output() == self.tcx.types.u16 {
+        if nonzero_niches::ENABLE_RUNTIME
+            && nonzero_options::readonly_niche_unsigned_bits(signature.output()).is_some()
+        {
             self.nonzero_get_body_certificate(instance, *receiver)?;
             let [value] = values else {
                 return Err("nonzero getter argument count mismatch".into());
