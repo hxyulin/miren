@@ -297,11 +297,13 @@ fn controls<'tcx>(tcx: TyCtxt<'tcx>, root: DefId) {
     };
     assert!(observe(&engine, &width_call, &changed, &state).is_err());
     // Observed origins are deliberately disconnected from helper semantic authority.
-    assert!(
-        engine
-            .exact_niche_membership(original, selected, &slice, &needle, &state)
-            .unwrap_err()
-            .contains("niche byte-sized transport needs a separate available-body certificate")
+    let error = engine
+        .exact_niche_membership(original, selected, &slice, &needle, &state)
+        .unwrap_err();
+    assert_eq!(error, "byte source statement debug payload is unsupported");
+    assert_eq!(
+        engine.unknown_causes.borrow().get(&error),
+        Some(&UnknownCategory::Semantics)
     );
     eprintln!(
         "readonly byte origin: moved carrier, current Call/storage, hostile scope/context controls"

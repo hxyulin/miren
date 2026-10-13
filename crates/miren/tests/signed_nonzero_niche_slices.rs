@@ -150,7 +150,7 @@ fn actual_signed_readonly_niches_preserve_tags_negative_payloads_and_refusals() 
             (
                 "signed_byte_unknown",
                 U,
-                Some("niche byte-sized transport needs a separate available-body certificate"),
+                Some("byte source statement debug payload is unsupported"),
             ),
         ],
     );

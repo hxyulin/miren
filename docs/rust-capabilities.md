@@ -2724,3 +2724,30 @@ deeper-chain and unbounded-recursion controls remain UNKNOWN ResourceLimit; indi
 foreign, shim,
 owner-transport and missing-body calls remain UNKNOWN. Dedicated compiler controls authenticate a
 real function-pointer shim separately from the feature-free survey closure control.
+
+
+## Byte-search source and word predicates
+
+Available original core MIR has an operation-local source certificate with exact full signatures,
+current-body equality and registry read guards. Raw original type inventory preserves bounded core
+associated projections; normalized bodies and signatures retain the closed alias-free domain.
+Scalar optimized-MIR user-type hints remain part of source equality and grant no type authority.
+Typed Call occurrences pay for actual type, constant, region and Place planning before erasure.
+
+An isolated word predicate authenticates the actual zero-byte helper and wrapping subtraction body,
+then checks equivalence in a separate mathematical Context. It grants no slice, pointer, alignment,
+initialization or full-search rights. Consuming the word fact still returns UNKNOWN for byte search.
+Source authentication uses its explicit 512-helper/depth16 policy, retains the comparison graph's
+nine-body limit and accounts for prior work within the shared cumulative source budget.
+
+Retained-core controls separately exercise actual raw metadata projections, normalized alias
+refusal, same-width type and hint mutations, word arithmetic/mask mutations and restored sources.
+Restoration after a rejected cache operation is a separate diagnostic service; its work count
+excludes that failed operation. Ordinary missing compiler bodies remain UNKNOWN. Full helper-path,
+raw-access precondition, provenance and loop evidence is still required before application support.
+
+
+The current byte-membership controls reach source authentication and refuse unsupported statement
+debug metadata. This measured Semantics UNKNOWN replaces the former blanket transport refusal;
+queried obligations and models remain unchanged. The current Root retained-core controls also
+validate raw metadata projections and isolated word equivalence without full-search credit.

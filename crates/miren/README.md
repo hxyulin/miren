@@ -1881,3 +1881,51 @@ at the default 8192 steps; raising diagnostic limits does not give default capab
 Indirect, foreign, shim, missing-body and owner-transport callees remain UNKNOWN. Compiler controls
 cover all primitive domains, genuine nested helper mutations, contracts, missing dependencies and
 hostile ancestor/cache/edge/Context/mask/escape state on host and ARM at O0/O2.
+
+## Byte-search source observation foundation
+
+A private source-observation service authenticates available original/current core MIR, exact full
+signatures, typed CFG/local/scope metadata and direct helper inventories. Actual Body/signature
+registry read guards retain its operation-local source identity. This grants no raw/reference
+permission and exposes no verified search result. Byte-sized niche membership still refuses an
+unproved search certificate; missing bodies, changed source and unsupported shapes remain UNKNOWN.
+
+The byte source operation has an explicit new 512-helper-record/depth16 policy. It preserves the
+comparison graph's nine-body rule and shares its 131072 cumulative work budget, including already
+performed comparison work. Every inventory pass retains the 8192 limit; visited nodes, cloning,
+normalization, record growth, signature comparisons and guard consumption are prepaid. Retained
+core configuration remains opt-in. Available compiler inventory does not prove aligned search,
+loop invariants, pointer preconditions or source/needle provenance.
+
+A byte word-helper source certificate additionally recognizes the complete actual two-block
+zero-byte predicate and its one-block wrapping subtraction helper. It authenticates original and
+current core MIR, target-sized constants and signatures before querying word equivalence in a
+separate mathematical Context. Its private operation-local certificate freezes actual source
+registries and grants no pointer, storage, alignment or search-loop rights. Consuming a word fact
+still returns UNKNOWN for full byte search. Default prebuilt-core missing helper bodies remain
+UNKNOWN. Explicit retained-core compiler controls are separate from ordinary application support;
+full aligned-search correctness and byte/needle provenance remain unfinished.
+
+Byte source inventory accepts bounded original core associated-type projections while planning
+raw helper signatures and original MIR. It checks their core trait/associated identity and complete
+argument inventory, then independently visits the compiler-normalized signature under the
+existing closed type domain. Original and current body types retain their strict rules. This
+observation grants no reference, view, pointer or search permission; missing bodies and unfinished
+search correctness remain UNKNOWN.
+
+Byte source Call typing uses an independent bounded type/constant/region planner for each actual
+operand, formal parameter, destination and result. It prepays signature binding and Place projection
+steps before compiler type access and erasure. Full body, source, clone, mirror and edge checks
+remain required; cumulative source limits do not reset. This is performed-work accounting, with
+no claim that a complete search certificate fits or that source inventory establishes membership.
+
+Optimized-MIR function-item constants retain their scalar user-type hint in source equality.
+Inventory accounts for copying that index; it grants no type or runtime authority. Owned body
+annotation vectors remain unsupported, and raw slice construction still requires separate
+semantic and provenance evidence before any search result can be supported.
+
+Original byte-search MIR and normalized MIR use explicit source inventory phases. Original core
+associated projections retain their full Instance argument inventory before cloning; normalized
+bodies and signatures still refuse aliases. This authenticates source only and grants no raw
+pointer, reference, byte-search or application proof authority. Retained-core analysis remains an
+explicit configuration; ordinary unavailable bodies remain UNKNOWN.

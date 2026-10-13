@@ -7751,3 +7751,44 @@ obligations and counterexample models match exactly, with no unexplained differe
 validation passes 1,000 outer Rust tests and 91 Python tests, formatting, lint, release builds,
 dependency checks, manual hooks, documentation build and the four-profile survey. Only this measured
 documentation summary and wording corrections follow the unchanged 1,050-file full-check candidate.
+
+
+## Stage256: byte-search source authentication foundation
+
+Original/current core source, full signatures and typed Call occurrences are authenticated without
+issuing a byte-search result. Raw original associated projections and scalar constant hints remain
+bounded metadata; normalized bodies/signatures refuse aliases. An isolated actual word predicate
+checks zero-byte equivalence, with no storage or raw-reference authority. Full search remains
+UNKNOWN.
+
+Private PhaseV1 controls run three exact test targets across all host/ARM O0/O2 profiles. Actual
+raw Pointee metadata inventory passes; normalized aliases, same-width cached type changes and scalar
+hint changes refuse. Word predicates pass four isolated equivalence queries, reject twelve actual
+source mutations and still refuse full search. Default missing-body controls remain UNKNOWN.
+Restored metadata observations are separate diagnostic services excluding failed-service work.
+Root integrates six exact code/fixture paths and merges the crate documentation with the current
+helper stages. The application fixture and all outcome expectations remain unchanged.
+
+The first full Root run preserved four failed test targets. Concurrent compiler probes shared a
+process-only temporary directory; an atomic sequence now gives each probe its own directory.
+Three test targets still expected the former blanket byte-transport refusal. Twelve direct compiler
+runs measure the new statement-debug-metadata refusal for unsigned/signed byte membership and both
+survey controls on every profile. Exact expectations and two UNKNOWN reason strings follow that
+measurement; categories remain Semantics, with no new query, model or success from the refusal.
+Full Root validation and retained-proof audit remain required before commit.
+
+
+Final validation covers 1,005 outer Rust tests: 775 unchanged successful tests retained from the
+first frozen full run, plus all 230 unit and affected integration tests repeated after test-only
+and expectation corrections. Production code and the application fixture remain identical between
+those candidates. All ten successor checks pass, including 91 Python tests, formatting, lint,
+release builds, dependency checks, hooks, documentation build and the four-profile release survey.
+Two additional exact current-Root retained-core targets pass eight compiler callbacks with full
+source, tool and artifact guards, renewing word equivalence and actual metadata/type mutations.
+
+The survey remains 591 cases across 107 families, measuring 322 PROVED, 163 REFUTED and 106 UNKNOWN
+on every profile. No supported outcome is added by this source foundation. All 2,364 retained Proof
+comparisons match after separately recording eight measured UNKNOWN-reason changes and two
+query-free fold timeout contexts. All 5,232 retained queried obligations and counterexample models
+match exactly, with no unexplained differences. Only this measured documentation successor follows
+the unchanged 1,055-file final-check candidate; original failed check evidence remains preserved.

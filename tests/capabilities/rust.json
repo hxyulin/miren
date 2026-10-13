@@ -1568,7 +1568,7 @@
       "entry": "asserted_contains8",
       "family": "readonly_nonzero_niche",
       "expected": "unknown",
-      "unknown_reason": "niche byte-sized transport needs a separate available-body certificate",
+      "unknown_reason": "byte source statement debug payload is unsupported",
       "unknown_category": "semantics"
     },
     {
@@ -2137,7 +2137,7 @@
       "entry": "signed_nonzero_niche_survey::signed_byte_unknown",
       "family": "signed_nonzero_niche",
       "expected": "unknown",
-      "unknown_reason": "niche byte-sized transport needs a separate available-body certificate",
+      "unknown_reason": "byte source statement debug payload is unsupported",
       "unknown_category": "semantics"
     },
     {

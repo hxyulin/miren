@@ -1,5 +1,12 @@
 //! Exact admission-local core niche comparison law and readonly membership application.
 use super::*;
+
+#[path = "nonzero_niche_comparisons/byte_search_source.rs"]
+mod byte_search_source;
+#[cfg(test)]
+#[path = "nonzero_niche_comparisons/byte_search_source_probe.rs"]
+mod byte_search_source_probe;
+
 use rustc_abi::VariantIdx;
 use rustc_middle::mir::visit::Visitor;
 use rustc_middle::mir::{Location, Terminator};
@@ -1764,10 +1771,9 @@ impl<'tcx> Engine<'tcx> {
                 return Err("niche membership outer original element mismatch".into());
             }
             if family == templates::PureTemplateFamily::ContainsBytes && schema.facts.size == 1 {
-                return Err(self.categorized_error(
-                    UnknownCategory::Semantics,
-                    "niche byte-sized transport needs a separate available-body certificate".into(),
-                ));
+                return byte_search_source::observe(self, instance, 0, budget.work)?
+                    .reject_unverified_search()
+                    .and_then(|()| Err("byte search semantic certificate is unavailable".into()));
             }
             budget.phase(GraphPhase::Edges, inventory)?;
             for block in body.basic_blocks.iter() {

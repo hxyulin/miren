@@ -66,9 +66,7 @@ fn exact_option8_observations_comparisons_and_boundaries() {
                 .unwrap();
             assert!(proof.obligations.iter().any(|obligation| {
                 obligation.unknown_category == Some(miren::UnknownCategory::Semantics)
-                    && obligation
-                        .detail
-                        .contains("niche byte-sized transport needs")
+                    && obligation.detail == "byte source statement debug payload is unsupported"
             }));
         }
     }

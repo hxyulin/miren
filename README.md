@@ -66,6 +66,8 @@ release and preserve offset writes and sibling storage. Deeper whole scalar call
 owner lineage and returned storage. Bounded owned u16 products support writes through multiple
 symbolic suffix indices, preserving compiler types and current Memory. The capability manifest
 covers 591 cases across 107 families, including concrete and symbolic local byte-copy controls.
+Available byte-search source and isolated word predicates have separate authentication checks.
+Full aligned search remains UNKNOWN pending source metadata, storage, precondition and loop proofs.
 
 Fixed-array partial moves preserve initialization and execute remaining destructors in compiler
 order. Nested destruction and covering assignments retain actual destructor effects. The exact
