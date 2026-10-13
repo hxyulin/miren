@@ -94,7 +94,7 @@ pub enum MutableU16Role {
 pub enum Value {
     OwnedArrayIterator {
         identity: crate::proof::array_iterator_constructors::Identity,
-        payload: Option<Elements>,
+        payload: Option<crate::proof::array_iterator_constructors::Payload>,
     },
     MutableU16 {
         id: usize,

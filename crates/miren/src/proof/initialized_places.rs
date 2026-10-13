@@ -254,6 +254,16 @@ impl<'tcx> Engine<'tcx> {
                 "ownership array type issuance requires an actual owned element path".into(),
             );
         }
+        self.preflight_owned_type_storage(body, state, place)
+    }
+
+    pub(super) fn preflight_owned_type_storage(
+        &self,
+        body: &Body<'tcx>,
+        state: &State,
+        place: Place<'tcx>,
+    ) -> Result<(), String> {
+        state.flow.require_unarmed()?;
         let original = body.local_decls[place.local].ty;
         let allocation = state.addresses[place.local.as_usize()];
         if let Some(allocation) = allocation {
@@ -307,6 +317,16 @@ impl<'tcx> Engine<'tcx> {
                 "ownership array type issuance requires an actual owned element path".into(),
             );
         }
+        self.bind_owned_type_storage(body, state, place)
+    }
+
+    pub(super) fn bind_owned_type_storage(
+        &self,
+        body: &Body<'tcx>,
+        state: &mut State,
+        place: Place<'tcx>,
+    ) -> Result<(), String> {
+        self.preflight_owned_type_storage(body, state, place)?;
         let allocation = state.addresses[place.local.as_usize()]
             .ok_or("ownership array type issuance requires actual addressed owner")?;
         let original = body.local_decls[place.local].ty;

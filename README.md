@@ -69,8 +69,9 @@ order. Nested destruction and covering assignments retain actual destructor effe
 compiler array/slice DropGlue protocol is authenticated separately; general slice destruction and
 remaining iterator destruction with elements needing Drop remains UNKNOWN.
 Authenticated non-inlined array iterator constructors preserve owning payloads through actual Rust
-bodies and ordinary returns. Iterator element transfer and incoming iterator arguments remain
-UNKNOWN.
+bodies and ordinary returns. Direct owners also pass through local helpers with unused observations.
+Element transfer executes at an explicitly larger analysis budget; default next and remaining
+iterator destruction remain UNKNOWN.
 
 Shared fixed-array views of local Drop structs support guarded scalar field observations and
 ordinary scalar accessor calls, including authenticated lazy input arrays. Original types, current

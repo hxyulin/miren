@@ -1736,13 +1736,15 @@ Exact non-inlined core array `IntoIterator::into_iter` calls for retained plain 
 execute their actual constructor body and preserve a single payload through the normal return and
 caller destination. Internal constructor Copy operands transport authenticated metadata; they do
 not duplicate executable ownership. Fresh compiler certificates preserve the original `[T; N]`,
-`MaybeUninit`, inner wrapper and iterator types. This is constructor transport coverage only:
-`next`, `next_back` and remaining-element iterator destruction stay UNKNOWN. Inlined constructor
+`MaybeUninit`, inner wrapper and iterator types. Direct completed owners may move through local
+Rust helpers when their argument observations are unused. Required configured contract views,
+including configured no-panic observations, remain UNKNOWN. Inlined constructor
 transmute paths outside the normal mir-opt-level=0 pipeline stay UNKNOWN pending separate original
 caller occurrence support.
 General MaybeUninit, transmute and raw-access admission is unchanged. Private iterator contract
-observations, reference-bearing/interior-mutable payloads and incoming iterator arguments remain
-unsupported. Caller-side constructor preconditions use the same checker as ordinary function calls;
+observations and reference-bearing/interior-mutable payloads remain unsupported. Nested or nonlocal
+helper transport remains conservative. Caller-side constructor preconditions use the ordinary
+function checker;
 unsupported result contract views stay UNKNOWN. Partial constructor metadata requires the actual
 invocation and cannot pass ordinary operand, publication, snapshot or return gates.
 
@@ -1776,3 +1778,30 @@ alignment and offsets remain required. Core Option and earlier u16 routes keep t
 checks. Actual getters remain authenticated; mutable/reference/raw payload authority, non-niche
 layouts, additional variant fields and destructor-bearing enums stay conservative. No limits,
 contracts or assumptions change.
+
+
+The private iterator transfer path follows actual public `next`/`next_back` forwarding bodies and
+core cursor/index/range bodies. The alive cursor changes before the owning raw element read; a
+branch-local pending slot records that interval and transfers the slot exactly once at the checked
+original read occurrence. Ordinary `Option<T>` construction, return, destination publication and
+already-supported element destructor bodies execute normally. The slot vector uses immutable
+shared storage with prepaid copy-on-write updates; front/back, pending and retired state are
+branch-local. General raw operations and private metadata publication receive no new authority.
+
+A pending scalar bounds-helper call executes its actual body and contracts under an invocation-
+bound lease. The lease preserves all owner slots, cursors and the outgoing slot and validates
+normal return; other incoming storage retains the ordinary escape checks. Private observations
+retain original scalar sorts and term contexts. Yielded Char payloads use the existing Unicode
+scalar proof under actual path conditions; invalid constants or unconstrained terms gain no
+validity assumption.
+
+First admission authenticates borrowed original MIR against the instantiated current body, paying
+for planning, performed clone/fold work and streamed comparisons separately. Immutable evidence
+caches contain no execution or ownership facts and reject replaced current body handles. Original
+operands, places, constants, source scopes and debug metadata remain checked. Diagnostic compiler
+tests explicitly use 30,000 steps for real front/back transfer, repeated/mixed exhaustion, empty
+and zero-sized iterators, helper transport and taken-element Drop mutations. The unchanged default
+8,192-step limit currently refuses this transfer admission; these diagnostic successes do not add
+default iterator coverage. Remaining-element iterator Drop and the inherited `mem::forget`
+boundary remain UNKNOWN. Full iterator lifecycle support requires that actual remaining-slice Drop
+chain.

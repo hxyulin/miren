@@ -42,6 +42,49 @@ impl<'tcx> Engine<'tcx> {
         Ok(())
     }
 
+    pub(super) fn validate_incoming_frame_escape_with_iterator(
+        &self,
+        state: &State,
+        incoming: usize,
+        authorized: usize,
+    ) -> Result<(), String> {
+        for (allocation, value) in state.memory[..incoming].iter().enumerate() {
+            let Some(value) = value else { continue };
+            self.validate_shared_trait_graph(value, state)?;
+            if allocation == authorized {
+                let Value::OwnedArrayIterator {
+                    payload: Some(payload),
+                    ..
+                } = value
+                else {
+                    return Err("IntoIter bounds lease original storage was replaced".into());
+                };
+                for value in payload.iter() {
+                    Self::reference_graph(
+                        value,
+                        state,
+                        Some(incoming),
+                        &mut Vec::new(),
+                        false,
+                        Some(self),
+                    )?;
+                    self.validate_static_initialization_graph(value, state, &mut Vec::new())?;
+                }
+            } else {
+                Self::reference_graph(
+                    value,
+                    state,
+                    Some(incoming),
+                    &mut Vec::new(),
+                    false,
+                    Some(self),
+                )?;
+                self.validate_static_initialization_graph(value, state, &mut Vec::new())?;
+            }
+        }
+        Ok(())
+    }
+
     pub(super) fn validate_typed_reference_graph(
         &self,
         value: &Value,
@@ -114,7 +157,11 @@ impl<'tcx> Engine<'tcx> {
             Value::OwnedArrayIterator { payload, .. } => {
                 let engine = engine.ok_or("IntoIter ownership graph needs compiler evidence")?;
                 engine.array_iterator_return(value)?;
-                for value in payload.as_ref().ok_or("IntoIter metadata cannot escape")? {
+                for value in payload
+                    .as_ref()
+                    .ok_or("IntoIter metadata cannot escape")?
+                    .iter()
+                {
                     Self::reference_graph(
                         value,
                         state,

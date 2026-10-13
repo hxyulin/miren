@@ -189,6 +189,7 @@ struct Engine<'tcx> {
     static_addresses: std::collections::HashMap<DefId, Term>,
     maybe_uninit_types: Vec<Ty<'tcx>>,
     array_iterator_types: Vec<array_iterator_constructors::PhysicalTypes<'tcx>>,
+    array_iterator_step_evidence: Vec<array_iterator_constructors::steps::Evidence<'tcx>>,
     owned_box_types: Vec<owned_boxes::BoxType<'tcx>>,
     next_owned_region: u64,
     owned_box_constructors: Vec<owned_box_constructors::Constructor<'tcx>>,
@@ -309,6 +310,7 @@ impl<'tcx> Engine<'tcx> {
             tracked_addresses: Vec::new(),
             maybe_uninit_types: Vec::new(),
             array_iterator_types: Vec::new(),
+            array_iterator_step_evidence: Vec::new(),
             owned_box_types: Vec::new(),
             next_owned_region: 0,
             owned_box_constructors: Vec::new(),
@@ -1341,7 +1343,20 @@ impl<'tcx> Engine<'tcx> {
             || self
                 .specification(instance)?
                 .is_some_and(|spec| !spec.arguments.is_empty());
-        let snapshots = if self.mutable_product_arguments(&arguments, &memory)? {
+        let snapshots = if self.array_iterator_step_arguments(
+            frame.step_invocation(),
+            &owned_body,
+            &arguments,
+            &memory,
+        )? || self.array_iterator_unused_arguments(
+            instance,
+            body,
+            &arguments,
+            &memory,
+            &conditions,
+        )? {
+            Vec::new()
+        } else if self.mutable_product_arguments(&arguments, &memory)? {
             flow.require_unarmed()?;
             self.mutable_product_unbound_contracts(instance)?;
             Vec::new()
@@ -1468,6 +1483,17 @@ impl<'tcx> Engine<'tcx> {
                 continue;
             }
             for statement_index in 0..body.basic_blocks[block].statements.len() {
+                if self.array_iterator_step_statement(
+                    frame.step_invocation(),
+                    &owned_body,
+                    &mut state,
+                    rustc_middle::mir::Location {
+                        block,
+                        statement_index,
+                    },
+                )? {
+                    continue;
+                }
                 if self.array_iterator_constructor_statement(
                     frame.constructor_invocation(),
                     instance,
@@ -1569,6 +1595,7 @@ impl<'tcx> Engine<'tcx> {
                     } else {
                         self.local(&state, 0)?
                     };
+                    self.array_iterator_step_return(frame.step_invocation(), &owned_body, &state)?;
                     self.validate_array_iterator_value(body.return_ty(), &value)?;
                     self.nonzero_niche_admission(body.return_ty(), &value, &state.conditions)?;
                     self.mutable_u16_exit_with_flow(
@@ -1610,10 +1637,20 @@ impl<'tcx> Engine<'tcx> {
                             &state,
                             incoming_allocations,
                         )?;
-                        self.validate_frame_escape(&value, &state, incoming_allocations)
-                            .map_err(|error| {
-                                format!("return from {}: {error}", self.tcx.def_path_str(id))
-                            })?;
+                        let escape = if self.array_iterator_step_frame_escape(
+                            frame.step_invocation(),
+                            &owned_body,
+                            &value,
+                            &state,
+                            incoming_allocations,
+                        )? {
+                            Ok(())
+                        } else {
+                            self.validate_frame_escape(&value, &state, incoming_allocations)
+                        };
+                        escape.map_err(|error| {
+                            format!("return from {}: {error}", self.tcx.def_path_str(id))
+                        })?;
                     }
                     let mut post_bindings = bindings.clone();
                     let uses_post_state = contracts
@@ -1837,6 +1874,33 @@ impl<'tcx> Engine<'tcx> {
                         },
                     )? {
                         let target = target.ok_or("mutable u16 child has no normal return edge")?;
+                        for result in results {
+                            let mut continuation = self.adopt_flow_return(
+                                &state,
+                                result.conditions,
+                                result.memory,
+                                result.flow,
+                            )?;
+                            self.store_call_result(
+                                body,
+                                &mut continuation,
+                                *destination,
+                                destination_indices.as_ref(),
+                                result.value,
+                            )?;
+                            queue.push_back((target, continuation, retry_path.clone()));
+                        }
+                        continue;
+                    }
+                    if let Some(results) = self.array_iterator_step_call(
+                        frame.step_invocation(),
+                        (caller_instance, block),
+                        &owned_body,
+                        instance,
+                        &mut state,
+                        &stack,
+                    )? {
+                        let target = target.ok_or("IntoIter step lacks normal return edge")?;
                         for result in results {
                             let mut continuation = self.adopt_flow_return(
                                 &state,
@@ -2133,6 +2197,35 @@ impl<'tcx> Engine<'tcx> {
                         &stack,
                     )? {
                         let target = target.ok_or("shared Drop call has no normal return edge")?;
+                        for result in results {
+                            let mut continuation = self.adopt_flow_return(
+                                &state,
+                                result.conditions,
+                                result.memory,
+                                result.flow,
+                            )?;
+                            self.store_call_result(
+                                body,
+                                &mut continuation,
+                                *destination,
+                                destination_indices.as_ref(),
+                                result.value,
+                            )?;
+                            queue.push_back((target, continuation, retry_path.clone()));
+                        }
+                        continue;
+                    }
+                    if unarmed
+                        && let Some(results) = self.array_iterator_ordinary_call(
+                            instance,
+                            &mut values,
+                            &state,
+                            &stack,
+                            (id, terminator.source_info.span),
+                        )?
+                    {
+                        let target =
+                            target.ok_or("IntoIter ordinary helper lacks normal return edge")?;
                         for result in results {
                             let mut continuation = self.adopt_flow_return(
                                 &state,
@@ -3175,6 +3268,10 @@ impl<'tcx> Engine<'tcx> {
                 }
             }
             Rvalue::Ref(_, BorrowKind::Mut { .. }, place) => {
+                if let Some(value) = self.borrow_array_iterator_owner(body, state, *place)? {
+                    return Ok(value);
+                }
+
                 if !state.memory.mutable_u16.is_empty()
                     && matches!(
                         self.raw_local(state, place.local.as_usize())?,

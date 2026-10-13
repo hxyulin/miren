@@ -1,4 +1,4 @@
-//! Bounded owned-structure clone/fold planning for constructor evidence only.
+//! Bounded prepaid clone planning for constructor and iterator-step evidence.
 //! Interned compiler handles clone shallowly; opaque compiler queries are not instruction-counted.
 use super::*;
 use rustc_middle::mir::{AssertKind, ClearCrossCrate, ConstOperand, Terminator};
@@ -82,6 +82,20 @@ impl Plan {
         }
     }
 
+    fn debug_infos(
+        &mut self,
+        engine: &mut Engine<'_>,
+        infos: &rustc_middle::mir::StmtDebugInfos<'_>,
+    ) -> Result<(), String> {
+        self.vector(engine, infos.len())?;
+        for info in infos.as_slice() {
+            match info {
+                rustc_middle::mir::StmtDebugInfo::AssignRef(_, _) => self.node(engine, 2)?,
+                rustc_middle::mir::StmtDebugInfo::InvalidAssign(_) => self.node(engine, 1)?,
+            }
+        }
+        Ok(())
+    }
     fn statement(
         &mut self,
         engine: &mut Engine<'_>,
@@ -191,7 +205,45 @@ impl Plan {
     }
 }
 
+pub(super) fn step_statement(
+    engine: &mut Engine<'_>,
+    statement: &rustc_middle::mir::Statement<'_>,
+) -> Result<usize, String> {
+    let mut plan = Plan { nodes: 0, owned: 0 };
+    plan.statement(engine, &statement.kind)?;
+    plan.debug_infos(engine, &statement.debuginfos)?;
+    Ok(plan.owned)
+}
+pub(super) fn step_terminator(
+    engine: &mut Engine<'_>,
+    terminator: &Terminator<'_>,
+) -> Result<usize, String> {
+    let mut plan = Plan { nodes: 0, owned: 0 };
+    plan.terminator(engine, terminator)?;
+    Ok(plan.owned)
+}
+pub(super) fn step_variable(
+    engine: &mut Engine<'_>,
+    info: &rustc_middle::mir::VarDebugInfo<'_>,
+) -> Result<usize, String> {
+    let mut plan = Plan { nodes: 0, owned: 0 };
+    plan.node(engine, 5)?;
+    if let Some(fragment) = &info.composite {
+        plan.node(engine, 3)?;
+        plan.vector(engine, fragment.projection.len())?;
+    }
+    if let VarDebugInfoContents::Const(value) = &info.value {
+        plan.constant(engine, value)?;
+    }
+    Ok(plan.owned)
+}
 pub(super) fn body(engine: &mut Engine<'_>, body: &Body<'_>) -> Result<usize, String> {
+    body_inner(engine, body, false)
+}
+pub(super) fn step_body(engine: &mut Engine<'_>, body: &Body<'_>) -> Result<usize, String> {
+    body_inner(engine, body, true)
+}
+fn body_inner(engine: &mut Engine<'_>, body: &Body<'_>, step_debug: bool) -> Result<usize, String> {
     let mut plan = Plan { nodes: 0, owned: 0 };
     plan.node(engine, 20)?; // Pinned Body fields plus shallow BasicBlocks cache Arc clone.
     if body.coroutine.is_some()
@@ -239,13 +291,19 @@ pub(super) fn body(engine: &mut Engine<'_>, body: &Body<'_>) -> Result<usize, St
     plan.vector(engine, body.basic_blocks.len())?;
     for block in body.basic_blocks.iter() {
         plan.node(engine, 4)?;
-        if !block.after_last_stmt_debuginfos.is_empty() {
+        if !step_debug && !block.after_last_stmt_debuginfos.is_empty() {
             return Err("IntoIter clone plan block debug payload is unsupported".into());
+        }
+        if step_debug {
+            plan.debug_infos(engine, &block.after_last_stmt_debuginfos)?;
         }
         plan.vector(engine, block.statements.len())?;
         for statement in &block.statements {
-            if !statement.debuginfos.is_empty() {
+            if !step_debug && !statement.debuginfos.is_empty() {
                 return Err("IntoIter clone plan statement debug payload is unsupported".into());
+            }
+            if step_debug {
+                plan.debug_infos(engine, &statement.debuginfos)?;
             }
             plan.statement(engine, &statement.kind)?;
         }

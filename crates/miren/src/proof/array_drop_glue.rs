@@ -320,6 +320,7 @@ pub(super) struct Frame<'tcx> {
     instance: ty::Instance<'tcx>,
     admission: Option<Admission<'tcx>>,
     constructor: Option<array_iterator_constructors::Invocation>,
+    step: Option<array_iterator_constructors::steps::Invocation<'tcx>>,
 }
 struct Admission<'tcx> {
     array: Ty<'tcx>,
@@ -333,6 +334,7 @@ impl<'tcx> Frame<'tcx> {
             instance,
             admission: None,
             constructor: None,
+            step: None,
         }
     }
     pub(super) fn constructor(
@@ -343,7 +345,24 @@ impl<'tcx> Frame<'tcx> {
             instance,
             admission: None,
             constructor: Some(invocation),
+            step: None,
         }
+    }
+    pub(super) fn step(
+        instance: ty::Instance<'tcx>,
+        invocation: array_iterator_constructors::steps::Invocation<'tcx>,
+    ) -> Self {
+        Self {
+            instance,
+            admission: None,
+            constructor: None,
+            step: Some(invocation),
+        }
+    }
+    pub(super) fn step_invocation(
+        &self,
+    ) -> Option<&array_iterator_constructors::steps::Invocation<'tcx>> {
+        self.step.as_ref()
     }
     pub(super) fn constructor_invocation(
         &self,
@@ -407,6 +426,7 @@ impl<'tcx> Engine<'tcx> {
         let certified = Frame {
             instance: slice_glue,
             constructor: None,
+            step: None,
             admission: Some(Admission {
                 array,
                 array_instance: instance,

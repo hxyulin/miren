@@ -5,6 +5,13 @@ use std::rc::Rc;
 #[derive(Clone, Debug, Default)]
 pub struct Elements(Rc<Vec<Value>>);
 
+impl Elements {
+    /// Host COW bookkeeping only; this observation grants no guest ownership or access.
+    pub(crate) fn is_shared(&self) -> bool {
+        Rc::strong_count(&self.0) > 1
+    }
+}
+
 impl Deref for Elements {
     type Target = Vec<Value>;
 

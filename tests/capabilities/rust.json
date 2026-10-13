@@ -2572,16 +2572,14 @@
     {
       "entry": "array_iterator_constructors_survey::helper_argument_unknown",
       "family": "owned_array_iterator_constructor",
-      "expected": "unknown",
-      "unknown_reason": "IntoIter owner requires a private frame-bound metadata snapshot",
-      "unknown_category": "semantics"
+      "expected": "proved"
     },
     {
       "entry": "array_iterator_constructors_survey::next_unknown",
       "family": "owned_array_iterator_constructor",
       "expected": "unknown",
-      "unknown_reason": "owned array iterator element destructors are not modeled",
-      "unknown_category": "semantics"
+      "unknown_reason": "IntoIter shared execution step limit reached",
+      "unknown_category": "resource_limit"
     },
     {
       "entry": "array_iterator_constructors_survey::remaining_drop_unknown",

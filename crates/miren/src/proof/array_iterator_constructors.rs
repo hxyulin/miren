@@ -1,13 +1,62 @@
 //! Exact real-call IntoIter constructor frames with one owned payload and private metadata.
 //! Normal return and destination publication use existing typed owned-value storage services.
-//! Iterator reads, remaining destruction and inlined constructor occurrences remain unsupported.
+//! Actual element transfer needs an explicit larger budget; remaining Drop and inlining stay open.
 use super::*;
 use rustc_middle::mir::{BasicBlock, CastKind, Local, MirPhase, RuntimePhase};
 use std::rc::Rc;
 #[path = "array_iterator_clone_work.rs"]
 mod clone_work;
+pub(super) mod steps;
 
 const MAX_ELEMENTS: u64 = 128;
+
+/// Sole branch-local owned storage; immutable compiler identity is held separately.
+#[derive(Clone, Debug)]
+pub struct Payload {
+    pub(super) slots: Rc<Vec<Option<Value>>>,
+    pub(super) front: usize,
+    pub(super) back: usize,
+    pub(super) pending: Option<steps::Pending>,
+    pub(super) retired: bool,
+}
+impl Payload {
+    fn new(elements: symbolic::Elements) -> Self {
+        let back = elements.len();
+        Self {
+            slots: Rc::new(elements.into_iter().map(Some).collect()),
+            front: 0,
+            back,
+            pending: None,
+            retired: false,
+        }
+    }
+    pub(super) fn len(&self) -> usize {
+        self.slots.len()
+    }
+    pub(super) fn iter(&self) -> impl Iterator<Item = &Value> {
+        self.slots.iter().filter_map(Option::as_ref)
+    }
+    pub(super) fn validate(&self, count: usize, allow_pending: bool) -> Result<(), String> {
+        if self.retired || self.slots.len() != count || self.front > self.back || self.back > count
+        {
+            return Err("IntoIter owned cursor/slot cardinality or retirement differs".into());
+        }
+        if self.pending.is_some() && !allow_pending {
+            return Err("IntoIter pending yield cannot leave its actual invocation".into());
+        }
+        for (index, slot) in self.slots.iter().enumerate() {
+            let alive = (self.front..self.back).contains(&index);
+            let pending = self
+                .pending
+                .as_ref()
+                .is_some_and(|pending| pending.index == index);
+            if alive && pending || slot.is_some() != (alive || pending) {
+                return Err("IntoIter initialized slots differ from alive/pending interval".into());
+            }
+        }
+        Ok(())
+    }
+}
 
 pub(super) struct PhysicalTypes<'tcx> {
     identity: Rc<()>,
@@ -84,6 +133,30 @@ fn source_identity<'tcx>(body: &Body<'tcx>, instance: ty::Instance<'tcx>) -> Res
     Ok(())
 }
 
+fn step_debug_equal<'tcx>(
+    engine: &mut Engine<'_>,
+    a: &rustc_middle::mir::StmtDebugInfos<'tcx>,
+    b: &rustc_middle::mir::StmtDebugInfos<'tcx>,
+) -> Result<bool, String> {
+    pay(engine, 1 + a.len())?;
+    if a.len() != b.len() {
+        return Ok(false);
+    }
+    Ok(a.as_slice()
+        .iter()
+        .zip(b.as_slice())
+        .all(|(a, b)| match (a, b) {
+            (
+                rustc_middle::mir::StmtDebugInfo::AssignRef(a, ap),
+                rustc_middle::mir::StmtDebugInfo::AssignRef(b, bp),
+            ) => a == b && ap == bp,
+            (
+                rustc_middle::mir::StmtDebugInfo::InvalidAssign(a),
+                rustc_middle::mir::StmtDebugInfo::InvalidAssign(b),
+            ) => a == b,
+            _ => false,
+        }))
+}
 impl<'tcx> BodyEvidence<'tcx> {
     fn load(engine: &mut Engine<'tcx>, instance: ty::Instance<'tcx>) -> Result<Self, String> {
         pay(engine, 2)?;
@@ -717,6 +790,7 @@ pub struct Identity {
     seal: Rc<()>,
     entry: Rc<()>,
     original: TransportType,
+    view: Option<steps::View>,
 }
 
 pub(super) struct Invocation {
@@ -765,6 +839,9 @@ impl<'tcx> Engine<'tcx> {
             return Ok(());
         };
         let certificate = self.array_iterator_certificate(identity)?;
+        if identity.view.is_some() {
+            return Err("IntoIter private step view requires its actual invocation".into());
+        }
         if identity.original != TransportType::Iterator {
             let invocation =
                 invocation.ok_or("IntoIter partial transport requires actual invocation")?;
@@ -791,6 +868,16 @@ impl<'tcx> Engine<'tcx> {
                 .is_some_and(|data| data.len() != certificate.count)
         {
             return Err("IntoIter transport original type or payload cardinality differs".into());
+        }
+        if let Some(data) = payload {
+            data.validate(certificate.count, false)?;
+            if identity.original == TransportType::Storage
+                && (data.front != 0 || data.back != certificate.count)
+            {
+                return Err(
+                    "IntoIter constructor storage must retain every initialized slot".into(),
+                );
+            }
         }
         Ok(())
     }
@@ -971,6 +1058,7 @@ impl<'tcx> Engine<'tcx> {
             seal: certificate.identity.clone(),
             entry: invocation.entry.clone(),
             original,
+            view: None,
         };
         if ordinal != 1 {
             let (source, expected) = match ordinal {
@@ -986,7 +1074,8 @@ impl<'tcx> Engine<'tcx> {
             else {
                 return Err("IntoIter internal transport source is unavailable".into());
             };
-            if current.original != expected
+            if current.view.is_some()
+                || current.original != expected
                 || current.certificate != invocation.certificate
                 || !Rc::ptr_eq(&current.entry, &invocation.entry)
             {
@@ -1004,7 +1093,18 @@ impl<'tcx> Engine<'tcx> {
             masks.consume(1, Vec::new())?;
             state.missing_places = masks;
             state.locals[1] = None;
-            Some(data)
+            if data.is_shared() {
+                let mut owned = 1_usize;
+                let mut nodes = 0_usize;
+                for value in &data {
+                    owned = owned
+                        .checked_add(steps::value_clone_work(self, value, 0, &mut nodes)?)
+                        .ok_or("IntoIter source payload clone work overflow")?;
+                }
+                pay(self, owned)?;
+            }
+            pay(self, data.len() + 2)?;
+            Some(Payload::new(data))
         } else if ordinal == 9 {
             self.check_local_initialization(state, 2, &[])?;
             let Some(Value::OwnedArrayIterator {
@@ -1014,7 +1114,9 @@ impl<'tcx> Engine<'tcx> {
             else {
                 return Err("IntoIter constructor sole payload was lost".into());
             };
-            if !Rc::ptr_eq(&current.entry, &invocation.entry)
+            if current.view.is_some()
+                || current.original != TransportType::Storage
+                || !Rc::ptr_eq(&current.entry, &invocation.entry)
                 || current.certificate != invocation.certificate
             {
                 return Err("IntoIter constructor payload belongs to another frame".into());
@@ -1119,13 +1221,18 @@ impl Engine<'_> {
             return Err("expected an authenticated IntoIter owner".into());
         };
         let certificate = self.array_iterator_certificate(identity)?;
-        if identity.original != TransportType::Iterator
+        if identity.view.is_some()
+            || identity.original != TransportType::Iterator
             || payload
                 .as_ref()
                 .is_none_or(|data| data.len() != certificate.count)
         {
             return Err("IntoIter constructor metadata cannot return or escape".into());
         }
+        payload
+            .as_ref()
+            .unwrap()
+            .validate(certificate.count, false)?;
         if certificate
             .data_offset
             .checked_add(

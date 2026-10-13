@@ -7612,3 +7612,43 @@ retained queried obligations and their models match exactly. Full checks and rel
 unchanged 1,028-file Root source snapshot; the final documentation-only successor wraps one long
 line and records these measured results. No compiler, guest, contract or analysis code changes
 follow that validation.
+
+
+## Stage252: actual owning array iterator transfer
+
+An authoritative immutable slot vector supports prepaid copy-on-write updates with branch-local
+cursors and pending transfer state. Actual public and inner next/next_back bodies execute; the
+cursor updates before the authenticated raw element read consumes its slot. Normal `Option<T>`
+construction, return and taken-element destruction retain ordinary typed storage handling.
+Original/raw/current body authentication, source scopes, auxiliary metadata, scalar Context and
+Char validity remain checked. Immutable evidence caches retain no runtime ownership facts.
+
+Ordinary available local helpers transport direct completed owners through unused observations.
+A narrow scalar helper lease preserves the exact owner, parent Call, helper Instance, invocation,
+cursors and pending slot; other storage retains ordinary escape validation. Required whole-owner
+contract views, nested/foreign transport, remaining iterator Drop and mem::forget remain UNKNOWN.
+No general raw access, assumed validity, placeholder return or missing-body success is introduced.
+
+Frozen source is `/tmp/miren-intoiter-transfer-frozen-v1/source.json`. Independent review verifies
+544 sealed artifacts, complete source/archive guards and twelve strict raw reports. Default
+controls measure 3 PROVED, 1 REFUTED and 2 UNKNOWN per profile. Explicit 30,000-step diagnostic
+controls measure 6 PROVED, 1 REFUTED and 2 UNKNOWN; destructor mutations measure 3 PROVED and
+6 REFUTED. First admission still exceeds the unchanged 8,192-step default. Only the existing helper
+case advances to PROVED; existing next remains UNKNOWN with its actual ResourceLimit cause.
+
+Root composition preserves shared Drop receiver and integer niche stages. It retains both call
+routes and their normal continuations, and keeps contract binding setup before snapshot selection.
+Two stale module comments are corrected. Full Root checks and retained-proof audit are required
+before committing; no default next or remaining-destruction coverage is credited.
+
+The final release survey retains 529 cases across 104 families. Every host/ARM O0/O2 profile
+measures 274 PROVED, 158 REFUTED and 97 UNKNOWN: 432 supported cases, one more than Stage251.
+The main capability fixture remains byte-identical. All 527 unaffected case objects remain
+literal; 2,105 retained Proof comparisons match fully. Three query-free fold deadline contexts
+are qualified separately, while all 4,376 retained queried obligations and models match exactly.
+
+Full code validation passes 985 outer Rust tests and 91 Python tests, formatting, lint, release
+builds, dependency checks and manual hooks. The first documentation build rejected an unquoted
+Option type in this stage's prose. A documentation-only successor quotes that type and passes
+formatting, manual hooks, documentation build, diff checks and the release survey. Failed build
+evidence is preserved; no code, fixture or manifest changed after full code validation.

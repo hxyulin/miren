@@ -2663,3 +2663,13 @@ Readonly local two-variant Copy/Freeze enums support empty/NonZero payloads acro
 integer types, including target-sized integers and both variant orders. Exact original nominal
 types, compiler zero-only niche layouts, signed payloads and current getter bodies remain checked.
 Pointers, references, mutable niche storage and dropping enums remain separate unsupported domains.
+
+
+## Owning iterator transfer and budget scope
+
+Authenticated owning array iterator next/next_back bodies execute actual cursor updates and
+transfer each initialized element slot once. Typed ordinary Option returns and taken-element Drop
+remain on their normal execution paths. Local direct-owner helpers may omit unused observations;
+required contract views and nested or nonlocal transport remain UNKNOWN. Diagnostic controls use
+30,000 steps; the unchanged 8,192-step default refuses first transfer admission. Remaining iterator
+Drop and mem::forget remain unsupported. No general raw-memory authority or assumptions are added.

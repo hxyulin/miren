@@ -74,11 +74,11 @@ fn actual_calls_preserve_constructor_returns_across_profiles() {
             {
                 let proof = function.proof.as_ref().unwrap();
                 let expected = match function.name.as_str() {
-                    "constructor" | "constructor_move" => ProofStatus::Proved,
-                    "constructor_wrong" => ProofStatus::Refuted,
-                    "remaining_drop_unknown" | "next_unknown" | "helper_argument_unknown" => {
-                        ProofStatus::Unknown
+                    "constructor" | "constructor_move" | "helper_argument_unknown" => {
+                        ProofStatus::Proved
                     }
+                    "constructor_wrong" => ProofStatus::Refuted,
+                    "remaining_drop_unknown" | "next_unknown" => ProofStatus::Unknown,
                     name => panic!("unexpected selected function {name}"),
                 };
                 assert_eq!(proof.status, expected, "{}: {proof:?}", function.name);
@@ -106,32 +106,31 @@ fn actual_calls_preserve_constructor_returns_across_profiles() {
                     );
                 }
                 if function.name == "helper_argument_unknown" {
-                    assert!(proof.obligations.iter().any(|obligation| {
-                        obligation
-                            .detail
-                            .contains("private frame-bound metadata snapshot")
-                    }));
                     assert!(
                         proof
                             .body_entries
                             .iter()
-                            .all(|entry| entry.function != "pass")
+                            .any(|entry| entry.function == "pass")
                     );
                 }
                 if expected == ProofStatus::Unknown {
-                    let expected_detail = match function.name.as_str() {
-                        "next_unknown" | "remaining_drop_unknown" => {
-                            "owned array iterator element destructors are not modeled"
-                        }
-                        "helper_argument_unknown" => {
-                            "IntoIter owner requires a private frame-bound metadata snapshot"
-                        }
+                    let (category, detail) = match function.name.as_str() {
+                        "next_unknown" => (
+                            miren::UnknownCategory::ResourceLimit,
+                            "IntoIter shared execution step limit reached",
+                        ),
+                        "remaining_drop_unknown" => (
+                            miren::UnknownCategory::Semantics,
+                            "owned array iterator element destructors are not modeled",
+                        ),
                         name => panic!("unexpected Unknown root {name}"),
                     };
                     assert!(proof.obligations.iter().any(|obligation| obligation.status
                         == ProofStatus::Unknown
-                        && obligation.unknown_category == Some(miren::UnknownCategory::Semantics)
-                        && obligation.detail == expected_detail));
+                        && obligation.unknown_category == Some(category)
+                        && obligation.detail == detail
+                        && obligation.query.is_none()
+                        && obligation.model.is_none()));
                 }
             }
         }
@@ -219,6 +218,83 @@ fn unavailable_constructor_wrapper_does_not_gain_a_body_or_success() {
                     .iter()
                     .all(|entry| !entry.function.ends_with("::build"))
             );
+        }
+    }
+    std::fs::remove_dir_all(scratch).unwrap();
+}
+
+#[test]
+fn required_iterator_contract_observations_stay_unknown_without_placeholders() {
+    let fixture = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/fixtures/array_iterator_constructors.rs");
+    let scratch = std::env::temp_dir().join(format!(
+        "miren-intoiter-contract-observations-{}",
+        std::process::id()
+    ));
+    std::fs::create_dir_all(&scratch).unwrap();
+    for specification in [
+        serde_json::json!({"no_panic":true}),
+        serde_json::json!({"arguments":["iterator"],"requires":["true"]}),
+        serde_json::json!({"arguments":["iterator"],"ensures":["true"]}),
+    ] {
+        let mut specification = specification;
+        specification["function"] = "array_iterator_constructors::pass".into();
+        let config = serde_json::json!({"schema_version":1,"functions":[specification]});
+        let config_path = scratch.join("contracts.json");
+        std::fs::write(&config_path, serde_json::to_vec(&config).unwrap()).unwrap();
+        for target in [None, Some("thumbv7em-none-eabihf")] {
+            for level in [0, 2] {
+                let mut command = Command::new(env!("CARGO_BIN_EXE_miren"));
+                command
+                    .args(["--verify", "--json", "--quiet", "--contracts"])
+                    .arg(&config_path)
+                    .args([
+                        "--entry",
+                        "helper_argument_unknown",
+                        "--",
+                        "--crate-type=lib",
+                        "--edition=2024",
+                        "-Cpanic=abort",
+                        "-Coverflow-checks=yes",
+                    ])
+                    .arg(format!("-Copt-level={level}"))
+                    .arg(&fixture)
+                    .arg("--out-dir")
+                    .arg(&scratch);
+                if let Some(target) = target {
+                    command.args(["--target", target]);
+                }
+                let output = command.output().unwrap();
+                assert_eq!(output.status.code(), Some(1));
+                let report: Report = serde_json::from_slice(&output.stdout).unwrap();
+                let selected = report
+                    .functions
+                    .iter()
+                    .filter(|function| function.proof.is_some())
+                    .collect::<Vec<_>>();
+                assert_eq!(selected.len(), 1);
+                assert_eq!(selected[0].name, "helper_argument_unknown");
+                let proof = selected[0].proof.as_ref().unwrap();
+                assert_eq!(proof.status, ProofStatus::Unknown);
+                assert!(
+                    proof.assumptions.is_empty()
+                        && proof.entry_assumptions.is_empty()
+                        && proof.trusted_calls.is_empty()
+                );
+                assert!(
+                    proof
+                        .body_entries
+                        .iter()
+                        .all(|entry| entry.function != "pass")
+                );
+                assert!(proof.obligations.iter().any(|obligation| obligation.status
+                    == ProofStatus::Unknown
+                    && obligation.unknown_category == Some(miren::UnknownCategory::Semantics)
+                    && obligation.detail
+                        == "IntoIter owner requires a private frame-bound metadata snapshot"
+                    && obligation.query.is_none()
+                    && obligation.model.is_none()));
+            }
         }
     }
     std::fs::remove_dir_all(scratch).unwrap();
