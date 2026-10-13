@@ -1309,6 +1309,9 @@ impl<'tcx> Engine<'tcx> {
             self.activation_prepare_body(&flow, instance)?
         };
         let body = &owned_body;
+        if let Some(helper) = frame.retained_helper_invocation() {
+            helper.check(self, &owned_body, &memory)?;
+        }
         let name = format!("{} {:?}", self.tcx.def_path_str(id), instance.args);
         if !self.proof.analyzed_bodies.contains(&name) {
             self.proof.analyzed_bodies.push(name);
@@ -1485,7 +1488,9 @@ impl<'tcx> Engine<'tcx> {
                 }
                 continue;
             }
-            for statement_index in 0..body.basic_blocks[block].statements.len() {
+            for (statement_index, statement) in
+                body.basic_blocks[block].statements.iter().enumerate()
+            {
                 if self.array_iterator_step_statement(
                     frame.step_invocation(),
                     &owned_body,
@@ -1507,6 +1512,14 @@ impl<'tcx> Engine<'tcx> {
                         statement_index,
                     },
                 )? {
+                    continue;
+                }
+                let statement = &statement.kind;
+                if let Some(helper) = frame.retained_helper_invocation()
+                    && let StatementKind::StorageDead(local) = statement
+                {
+                    helper.scope(self, &owned_body, &state.memory)?;
+                    self.storage_lifetime(&mut state, *local)?;
                     continue;
                 }
                 self.receipt_statement(
@@ -1601,12 +1614,23 @@ impl<'tcx> Engine<'tcx> {
                     self.array_iterator_step_return(frame.step_invocation(), &owned_body, &state)?;
                     self.validate_array_iterator_value(body.return_ty(), &value)?;
                     self.nonzero_niche_admission(body.return_ty(), &value, &state.conditions)?;
-                    self.mutable_u16_exit_with_flow(
-                        body,
-                        &mutable_u16_arguments,
-                        &state.memory,
-                        &state.flow,
-                    )?;
+                    if let Some(helper) = frame.retained_helper_invocation() {
+                        let permit = helper.check_return(self, &owned_body, &state, &value)?;
+                        self.mutable_u16_exit_with_helper(
+                            body,
+                            &mutable_u16_arguments,
+                            &state.memory,
+                            &state.flow,
+                            Some(&permit),
+                        )?;
+                    } else {
+                        self.mutable_u16_exit_with_flow(
+                            body,
+                            &mutable_u16_arguments,
+                            &state.memory,
+                            &state.flow,
+                        )?;
+                    }
                     self.owned_box_type_value(body.return_ty(), &value, &state.memory)?;
                     self.validate_owned_exit(
                         &state.memory,
@@ -1737,6 +1761,10 @@ impl<'tcx> Engine<'tcx> {
                     target,
                     ..
                 } => {
+                    if let Some(helper) = frame.retained_helper_invocation() {
+                        helper.scope(self, &owned_body, &state.memory)?;
+                        self.retained_helper_nested_call(body, func)?;
+                    }
                     let destination_indices =
                         self.capture_call_destination(body, &state, *destination)?;
                     self.reject_call_move_overlap(
@@ -1813,6 +1841,42 @@ impl<'tcx> Engine<'tcx> {
                         );
                     }
                     let callee = instance.def_id();
+                    if unarmed
+                        && let Some(results) = self.retained_primitive_helper_call(
+                            caller_instance,
+                            &owned_body,
+                            &mut state,
+                            mutable_u16_children::ChildCall {
+                                body,
+                                block,
+                                instance,
+                                args,
+                                destination: *destination,
+                                target: *target,
+                                stack: &stack,
+                                site: (id, terminator.source_info.span),
+                            },
+                        )?
+                    {
+                        let target = target.ok_or("retained helper lacks normal continuation")?;
+                        for result in results {
+                            let mut continuation = self.adopt_flow_return(
+                                &state,
+                                result.conditions,
+                                result.memory,
+                                result.flow,
+                            )?;
+                            self.store_call_result(
+                                body,
+                                &mut continuation,
+                                *destination,
+                                destination_indices.as_ref(),
+                                result.value,
+                            )?;
+                            queue.push_back((target, continuation, retry_path.clone()));
+                        }
+                        continue;
+                    }
                     if unarmed
                         && let Some((target, continuation)) = self.mutable_retained_call(
                             &state,
@@ -2666,14 +2730,7 @@ impl<'tcx> Engine<'tcx> {
                 if matches!(statement, StatementKind::StorageDead(_)) {
                     self.mutable_retained_release(body, state, *local, statement)?;
                 }
-                state.constant_receipts.invalidate(Place::from(*local));
-                state.missing_places.initialize(local.as_usize(), &[]);
-                if let Some(allocation) = state.addresses[local.as_usize()].take() {
-                    state.memory.retire_initialized_owner(allocation);
-                    state.memory[allocation] = None;
-                }
-                state.locals[local.as_usize()] = None;
-                Ok(())
+                self.storage_lifetime(state, *local)
             }
             StatementKind::Nop
             | StatementKind::ConstEvalCounter
@@ -2682,6 +2739,22 @@ impl<'tcx> Engine<'tcx> {
             | StatementKind::BackwardIncompatibleDropHint { .. } => Ok(()),
             other => Err(format!("unsupported statement {other:?}")),
         }
+    }
+
+    // Shared by ordinary frames and a checked helper whose caller release remains suspended.
+    fn storage_lifetime(
+        &self,
+        state: &mut State,
+        local: rustc_middle::mir::Local,
+    ) -> Result<(), String> {
+        state.constant_receipts.invalidate(Place::from(local));
+        state.missing_places.initialize(local.as_usize(), &[]);
+        if let Some(allocation) = state.addresses[local.as_usize()].take() {
+            state.memory.retire_initialized_owner(allocation);
+            state.memory[allocation] = None;
+        }
+        state.locals[local.as_usize()] = None;
+        Ok(())
     }
 
     fn store_assignment_value(

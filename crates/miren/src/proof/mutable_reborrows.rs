@@ -5,6 +5,8 @@ use rustc_middle::mir::{BasicBlock, Local};
 use std::rc::{Rc, Weak};
 use symbolic::MutableU16Role;
 
+pub(super) mod helpers;
+
 #[derive(Clone)]
 pub(super) struct Certificate<'tcx> {
     body: Weak<Body<'tcx>>,

@@ -2867,9 +2867,7 @@
     {
       "entry": "retained_mutable_views_survey::scalar_helper_unknown",
       "family": "retained_mutable_views",
-      "expected": "unknown",
-      "unknown_category": "semantics",
-      "unknown_reason": "scalar helper transport is unsupported"
+      "expected": "proved"
     },
     {
       "entry": "retained_mutable_views_survey::nested_unknown",
@@ -2898,6 +2896,123 @@
       "expected": "unknown",
       "unknown_category": "semantics",
       "unknown_reason": "retained issuance has another executable carrier"
+    },
+    {
+      "entry": "retained_primitive_helpers_survey::integer_u8",
+      "family": "retained_primitive_helpers",
+      "expected": "proved"
+    },
+    {
+      "entry": "retained_primitive_helpers_survey::integer_u16",
+      "family": "retained_primitive_helpers",
+      "expected": "proved"
+    },
+    {
+      "entry": "retained_primitive_helpers_survey::integer_u32",
+      "family": "retained_primitive_helpers",
+      "expected": "proved"
+    },
+    {
+      "entry": "retained_primitive_helpers_survey::integer_u64",
+      "family": "retained_primitive_helpers",
+      "expected": "proved"
+    },
+    {
+      "entry": "retained_primitive_helpers_survey::integer_u128",
+      "family": "retained_primitive_helpers",
+      "expected": "proved"
+    },
+    {
+      "entry": "retained_primitive_helpers_survey::integer_usize",
+      "family": "retained_primitive_helpers",
+      "expected": "proved"
+    },
+    {
+      "entry": "retained_primitive_helpers_survey::integer_i8",
+      "family": "retained_primitive_helpers",
+      "expected": "proved"
+    },
+    {
+      "entry": "retained_primitive_helpers_survey::integer_i16",
+      "family": "retained_primitive_helpers",
+      "expected": "proved"
+    },
+    {
+      "entry": "retained_primitive_helpers_survey::integer_i32",
+      "family": "retained_primitive_helpers",
+      "expected": "proved"
+    },
+    {
+      "entry": "retained_primitive_helpers_survey::integer_i64",
+      "family": "retained_primitive_helpers",
+      "expected": "proved"
+    },
+    {
+      "entry": "retained_primitive_helpers_survey::integer_i128",
+      "family": "retained_primitive_helpers",
+      "expected": "proved"
+    },
+    {
+      "entry": "retained_primitive_helpers_survey::integer_isize",
+      "family": "retained_primitive_helpers",
+      "expected": "proved"
+    },
+    {
+      "entry": "retained_primitive_helpers_survey::scalar",
+      "family": "retained_primitive_helpers",
+      "expected": "proved"
+    },
+    {
+      "entry": "retained_primitive_helpers_survey::product",
+      "family": "retained_primitive_helpers",
+      "expected": "proved"
+    },
+    {
+      "entry": "retained_primitive_helpers_survey::boolean",
+      "family": "retained_primitive_helpers",
+      "expected": "proved"
+    },
+    {
+      "entry": "retained_primitive_helpers_survey::character",
+      "family": "retained_primitive_helpers",
+      "expected": "proved"
+    },
+    {
+      "entry": "retained_primitive_helpers_survey::float32",
+      "family": "retained_primitive_helpers",
+      "expected": "proved"
+    },
+    {
+      "entry": "retained_primitive_helpers_survey::float64",
+      "family": "retained_primitive_helpers",
+      "expected": "proved"
+    },
+    {
+      "entry": "retained_primitive_helpers_survey::unit",
+      "family": "retained_primitive_helpers",
+      "expected": "proved"
+    },
+    {
+      "entry": "retained_primitive_helpers_survey::associated",
+      "family": "retained_primitive_helpers",
+      "expected": "proved"
+    },
+    {
+      "entry": "retained_primitive_helpers_survey::mixed",
+      "family": "retained_primitive_helpers",
+      "expected": "proved"
+    },
+    {
+      "entry": "retained_primitive_helpers_survey::wrong",
+      "family": "retained_primitive_helpers",
+      "expected": "refuted"
+    },
+    {
+      "entry": "retained_primitive_helpers_survey::nested_unknown",
+      "family": "retained_primitive_helpers",
+      "expected": "unknown",
+      "unknown_category": "semantics",
+      "unknown_reason": "nested scalar calls are unsupported"
     }
   ]
 }

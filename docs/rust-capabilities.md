@@ -2685,6 +2685,25 @@ observations only. No real raw-pointer authority or unchecked metadata transport
 
 The alias inventory refuses an earlier executable parent/child carrier before publishing the view.
 The captured staging-parent regression remains UNKNOWN rather than producing a false
-counterexample. Nested views, early NLL parent reuse, scalar helper transport and other codecs
-remain unsupported. Source, Context, masks and original occurrence witnesses are checked under
+counterexample. Nested views, early NLL parent reuse and other codecs remain unsupported. Primitive
+helper
+transport is supported within the scope below. Source, Context, masks and original occurrence
+witnesses are checked under
 unchanged resource limits.
+
+
+## Primitive helpers with retained mutable views
+
+Local direct Rust helpers with integer, Bool, Char, float or unit arguments and primitive or unit
+results execute actual bodies while a checked mutable Range carrier remains live. Static associated
+calls and mixed primitive signatures use the same path. The caller owner remains suspended and its
+storage is preserved through normal return; contracts check actual preconditions and postconditions.
+
+Full original compiler signatures, source bodies, Context, initialized storage and live carrier
+witnesses remain required. Missing bodies, nested helper calls, owner transport, foreign ABIs and
+unsupported signature graphs remain UNKNOWN. The default resource limits are unchanged.
+
+The capability matrix adds all twelve integer primitives, Bool, Char, both floats, unit, associated
+and mixed calls, with a wrong-claim REFUTED control and a nested-call UNKNOWN control. Dedicated
+integration tests also cover missing dependency bodies, genuine helper mutations, native execution
+and contract failures on all four profiles.

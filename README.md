@@ -57,12 +57,14 @@ Mutable scalar slices support bounded whole-child helpers, scalar returns, local
 calls and original constant-index reads and stores. Exact f32/f64 backing preserves NaN payloads and
 signed-zero bits. Typed mutable tuple, array and plain local struct slices support direct metadata
 and guarded whole-element, constant-suffix and symbolic fixed-array suffix reads and stores. Whole
-product helpers execute actual bodies and preserve returned storage. Nested owner calls remain
-UNKNOWN. Guarded local u16 and `[f32; 2]` Range views retain the parent owner through lexical
+product helpers execute actual bodies and preserve returned storage. Primitive helpers with a
+retained Range view execute actual bodies, preserving live owner
+storage and checked primitive signatures. Nested owner calls remain UNKNOWN. Guarded local u16 and
+`[f32; 2]` Range views retain the parent owner through lexical
 release and preserve offset writes and sibling storage. Deeper whole scalar calls preserve checked
 owner lineage and returned storage. Bounded owned u16 products support writes through multiple
 symbolic suffix indices, preserving compiler types and current Memory. The capability manifest
-covers 539 cases across 105 families, including concrete and symbolic local byte-copy controls.
+covers 562 cases across 106 families, including concrete and symbolic local byte-copy controls.
 
 Fixed-array partial moves preserve initialization and execute remaining destructors in compiler
 order. Nested destruction and covering assignments retain actual destructor effects. The exact

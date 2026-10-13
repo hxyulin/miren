@@ -21,7 +21,7 @@ fn actual_typed_retained_views_preserve_current_owner_and_sibling_storage() {
                     ("wrong_write", R),
                     ("wrong_extent", R),
                     ("invalid_range", R),
-                    ("scalar_helper_unknown", U),
+                    ("scalar_helper_unknown", P),
                     ("nested_unknown", U),
                     ("nll_unknown", U),
                     ("unsupported_codec", U),
@@ -49,10 +49,6 @@ fn actual_typed_retained_views_preserve_current_owner_and_sibling_storage() {
                 assert!(proof.assumptions.is_empty() && proof.trusted_calls.is_empty());
             }
             for (entry, reason) in [
-                (
-                    "scalar_helper_unknown",
-                    "scalar helper transport is unsupported",
-                ),
                 ("nested_unknown", "reborrow requires exact current carrier"),
                 ("nll_unknown", "current carrier witness"),
                 ("unsupported_codec", "direct abort-only Rust body"),

@@ -102,6 +102,17 @@ impl<'tcx> Engine<'tcx> {
         memory: &Memory,
         flow: &activation_flow::Flow,
     ) -> Result<(), String> {
+        self.mutable_u16_exit_with_helper(body, arguments, memory, flow, None)
+    }
+
+    pub(super) fn mutable_u16_exit_with_helper(
+        &self,
+        body: &Body<'tcx>,
+        arguments: &[Value],
+        memory: &Memory,
+        flow: &activation_flow::Flow,
+        helper: Option<&mutable_reborrows::helpers::ReturnedOwner<'_, 'tcx>>,
+    ) -> Result<(), String> {
         flow.charge(memory.mutable_u16.len())?;
         for (id, backing) in memory.mutable_u16.iter().enumerate() {
             if matches!(backing.data, super::mutable_u16::Storage::Product(_)) {
@@ -121,6 +132,10 @@ impl<'tcx> Engine<'tcx> {
             }
             match &backing.phase {
                 Phase::Retained { .. } => {
+                    if helper.is_some_and(|permit| permit.matches(id, body, memory)) {
+                        flow.require_unarmed()?;
+                        continue; // The permit proves this exact normal Return observation.
+                    }
                     return Err(self.mutable_u16_child_error(
                         "retained mutable view cannot escape its original local scope",
                     ));

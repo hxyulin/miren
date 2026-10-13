@@ -7695,3 +7695,30 @@ confirmed its exact zero-query scope before the final audit; no analyzer or proo
 All 4,376 retained queried obligations and models match exactly, with no unexplained differences.
 These checks use the unchanged 1,040-file source candidate; only this measured documentation
 summary follows full code validation.
+
+
+## Stage254: primitive helpers with retained mutable views
+
+Checked retained carriers survive local primitive helper calls through actual Rust bodies and
+normal returns. Full original compiler signatures are authenticated independently before using
+cached metadata. Caller storage, Context and carrier witnesses remain checked throughout execution.
+No owner is copied into the helper and no missing body or unsupported nested call becomes success.
+
+Frozen private V2 controls measure 25 PROVED, 8 REFUTED and 6 UNKNOWN on every host/ARM O0/O2
+profile, including helper mutations, contracts and missing dependency bodies. Root adds 23 survey
+controls and advances the existing scalar-helper case. Full Root checks and retained-proof audit
+remain required before committing this stage.
+
+The final release survey has 562 cases across 106 families. Every host/ARM O0/O2 profile measures
+299 PROVED, 162 REFUTED and 101 UNKNOWN: 461 supported outcomes, 23 more than Stage253. The old
+scalar-helper control advances to PROVED; 23 new controls add 21 PROVED, one REFUTED and
+one UNKNOWN.
+All 538 unaffected old case objects and the prior guest prefix remain literal. Full code checks
+and the strict retained-proof audit pass before this documentation-only successor.
+
+All 2,152 retained comparisons match after recording the actual appended guest fingerprint; one
+query-free optimized ARM fold deadline context is qualified separately. All 4,524 retained queried
+obligations and counterexample models match exactly. Full validation passes 994 outer Rust tests
+and 91 Python tests, formatting, lint, release builds, dependency checks, manual hooks,
+documentation build and the four-profile survey. Four overlong documentation lines are wrapped in
+a final documentation-only successor; code, fixtures and manifest retain the full-check hashes.

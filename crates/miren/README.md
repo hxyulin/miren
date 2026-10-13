@@ -1814,8 +1814,8 @@ Parent authority stays suspended. Typed child indices check the view extent and 
 same full backing; direct writes and checked lexical release preserve caller and sibling storage.
 The original product representation and integer interval gates stay distinct. Release requires
 an actual StorageDead with no other executable child carrier. Parent reuse before that endpoint
-remains UNKNOWN without a remaining-control-flow use proof. Scalar helper transport, nested
-retained views, other codecs, raw authority and reference escape remain UNKNOWN. Descriptor and
+remains UNKNOWN without a remaining-control-flow use proof. Nested or indirect helper transport,
+retained views of other codecs, raw authority and reference escape remain UNKNOWN. Descriptor and
 carrier scans keep existing node/storage/certificate caps, and Armed transport remains refused.
 
 Retained validation prepays header, registry, block and statement walks before visiting them.
@@ -1835,3 +1835,25 @@ metadata copying and parent reuse before the lexical release remain unsupported.
 staging-parent regression is UNKNOWN before any shortened parent observation can be interpreted.
 Witness inventory and original occurrence services have separate semantic node budgets; they pay
 actual walks and retain the existing application step, storage and activation fee limits.
+
+
+A direct available Rust primitive helper can execute while one retained local Range owner remains
+suspended. The helper receives original primitive arguments and executes its actual authenticated
+body and ordinary Requires/Ensures checks. Every integer width, Bool, Char, f32/f64 and Unit uses
+existing typed scalar checks; Char requires actual Unicode scalar validity and floats retain their
+checked storage encoding without acquiring mutable float producer authority.
+
+An invocation-local lease binds the current caller and callee bodies, original Call/normal edge,
+carrier, generation, extent, metadata witnesses, typed backing data and owner masks. The retained
+phase remains unchanged. A checked normal return admits only that exact suspended owner at the
+mutable-owner exit; all incoming storage keeps ordinary escape checks. The Unit backing anchor
+needs no fabricated reference or private-role graph exemption. Caller lexical-release authority
+cannot be invoked by a callee's coincidentally numbered local; normal callee storage cleanup still
+executes. Nested ordinary helpers, indirect calls, missing bodies, private returns and trusted
+adapters remain UNKNOWN. Existing caps and execution fees are unchanged.
+
+The retained primitive helper independently normalizes the original complete compiler signature
+and compares its full binder and flags against the call cache before using safety, ABI or types.
+A poisoned signature cache refuses. Original signature graphs are bounded before normalization:
+flat primitive/Unit types and primitive type parameters are admitted; bound-variable or const
+parameter signatures and other type graphs remain unsupported in this helper route.

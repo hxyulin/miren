@@ -321,6 +321,7 @@ pub(super) struct Frame<'tcx> {
     admission: Option<Admission<'tcx>>,
     constructor: Option<array_iterator_constructors::Invocation>,
     step: Option<array_iterator_constructors::steps::Invocation<'tcx>>,
+    retained_helper: Option<mutable_reborrows::helpers::Invocation<'tcx>>,
 }
 struct Admission<'tcx> {
     array: Ty<'tcx>,
@@ -335,6 +336,7 @@ impl<'tcx> Frame<'tcx> {
             admission: None,
             constructor: None,
             step: None,
+            retained_helper: None,
         }
     }
     pub(super) fn constructor(
@@ -346,6 +348,7 @@ impl<'tcx> Frame<'tcx> {
             admission: None,
             constructor: Some(invocation),
             step: None,
+            retained_helper: None,
         }
     }
     pub(super) fn step(
@@ -357,7 +360,25 @@ impl<'tcx> Frame<'tcx> {
             admission: None,
             constructor: None,
             step: Some(invocation),
+            retained_helper: None,
         }
+    }
+    pub(super) fn retained_helper(
+        instance: ty::Instance<'tcx>,
+        invocation: mutable_reborrows::helpers::Invocation<'tcx>,
+    ) -> Self {
+        Self {
+            instance,
+            admission: None,
+            constructor: None,
+            step: None,
+            retained_helper: Some(invocation),
+        }
+    }
+    pub(super) fn retained_helper_invocation(
+        &self,
+    ) -> Option<&mutable_reborrows::helpers::Invocation<'tcx>> {
+        self.retained_helper.as_ref()
     }
     pub(super) fn step_invocation(
         &self,
@@ -427,6 +448,7 @@ impl<'tcx> Engine<'tcx> {
             instance: slice_glue,
             constructor: None,
             step: None,
+            retained_helper: None,
             admission: Some(Admission {
                 array,
                 array_instance: instance,

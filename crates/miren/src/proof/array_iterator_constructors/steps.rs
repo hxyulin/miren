@@ -1493,5 +1493,13 @@ impl<'tcx> Engine<'tcx> {
         }
     }
 }
+// Reuse complete paid original/current MIR authentication; this grants source evidence only.
+pub(in crate::proof) fn authenticated_helper_body<'tcx>(
+    engine: &mut Engine<'tcx>,
+    instance: ty::Instance<'tcx>,
+) -> Result<Rc<Body<'tcx>>, String> {
+    Ok(load_evidence(engine, instance)?.current)
+}
+
 #[cfg(test)]
 mod tests;
