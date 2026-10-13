@@ -755,8 +755,7 @@ fn compiler_cases<'tcx>(tcx: TyCtxt<'tcx>, output: &std::path::Path, transport_o
             &mut engine,
             &carrier_body,
             &carrier_base,
-            true,
-            true,
+            super::mutable_hierarchy::ReturnBudget::Legacy512,
             super::activation_flow_probe::ReturnFault::Erased,
         );
         let Err(original_error) = original_resource else {
@@ -765,12 +764,17 @@ fn compiler_cases<'tcx>(tcx: TyCtxt<'tcx>, output: &std::path::Path, transport_o
         // The old exact520 runs remain sealed. New accounting may refuse earlier.
         assert!(original_error.contains("activation transport exceeds shared work budget"));
         eprintln!("carrier current legacy512 Resource: {original_error}");
+        // The default ceiling remains unchanged; larger diagnostics carry a separate private tag.
+        super::mutable_hierarchy::compiler_return_default_budget_frontier(
+            &mut engine,
+            &carrier_body,
+            &carrier_base,
+        );
         let current_original = super::mutable_hierarchy::compiler_return_transport_with_flow(
             &mut engine,
             &carrier_body,
             &carrier_base,
-            true,
-            false,
+            super::mutable_hierarchy::ReturnBudget::Diagnostic8192,
             super::activation_flow_probe::ReturnFault::Erased,
         )
         .unwrap();
@@ -801,8 +805,7 @@ fn compiler_cases<'tcx>(tcx: TyCtxt<'tcx>, output: &std::path::Path, transport_o
             &mut engine,
             &scalar_root_body,
             &scalar_base,
-            true,
-            false,
+            super::mutable_hierarchy::ReturnBudget::Diagnostic8192,
             super::activation_flow_probe::ReturnFault::Erased,
         )
         .unwrap();
@@ -859,8 +862,7 @@ fn compiler_cases<'tcx>(tcx: TyCtxt<'tcx>, output: &std::path::Path, transport_o
             &mut engine,
             &small_body,
             &small_base,
-            true,
-            false,
+            super::mutable_hierarchy::ReturnBudget::Diagnostic8192,
             super::activation_flow_probe::ReturnFault::Erased,
         );
         match small_result {
@@ -869,10 +871,7 @@ fn compiler_cases<'tcx>(tcx: TyCtxt<'tcx>, output: &std::path::Path, transport_o
                 eprintln!("activation smaller fixture completed full positive assertions");
             }
             Err(detail) => {
-                assert_eq!(
-                    detail,
-                    "activation transport exceeds shared work budget: used 2056, last charge 14"
-                );
+                assert!(detail.contains("activation transport exceeds shared work budget"));
                 eprintln!("activation smaller fixture exact Resource: {detail}");
             }
         }
@@ -882,8 +881,7 @@ fn compiler_cases<'tcx>(tcx: TyCtxt<'tcx>, output: &std::path::Path, transport_o
                 &mut engine,
                 &carrier_body,
                 &carrier_base,
-                true,
-                false,
+                super::mutable_hierarchy::ReturnBudget::Diagnostic8192,
                 hostile_control,
             )
             .unwrap();

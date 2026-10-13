@@ -2514,3 +2514,45 @@ host/ARM O0/O2 profile. Fourteen new cases add ten supported outcomes; three unc
 legacy cases also prove with actual destructor body entries. All 424 old manifest objects and
 3,708 retained queried obligations/models remain exact. The full workspace run passes 961 Rust
 tests and 91 Python tests, with release, dependency, hook and documentation checks passing.
+
+
+## Bounded deeper whole-scalar calls
+
+Whole scalar helper calls share one checked owner lineage across deeper nesting. Each handoff
+validates its current parent lease, caller and callee bodies, pending occurrence and original
+storage. Normal returns compare the complete saved prefix and preserve updated storage. The existing
+16-frame and 512-node limits remain; interval and product origins keep their separate restrictions.
+
+Optimized MIR may move an original mutable-slice reference into the first helper. This transfer
+requires a dormant scalar origin and a bounded scan rejecting another live executable carrier.
+The ordinary move consumes the caller local; returning updated storage does not restore that local.
+Structured carriers are conservatively refused by this transfer path. No assumptions are added.
+
+Compiler controls exercise real depth-three and depth-four returns in host/ARM O0/O2, including
+optimized moved-root consumption, stale lineage, initialization, namespace and body identities.
+Seven scalar-domain claims, wrong claims, genuine helper mutations, native executions and missing
+helper bodies are tested separately. The capability survey appends 19 cases; six unchanged deeper
+entries now prove. Proper reborrows, mutable product nesting and owning iterator execution remain
+separate frontiers.
+
+
+Backing validation combines structural lineage and live-frame checks in one pass. Depth-only
+observations sum the immediately validated immutable backing instead of repeating its structural
+checks. Fresh handoff and return validation remains; no reusable authority is cached.
+
+Armed transport invariants use an explicitly tagged, test-only 8192-unit diagnostic policy.
+Ordinary transport retains its 2048-unit ceiling, and the unchanged nested control still reaches
+that limit. The diagnostic constructor and policy field are absent from release builds. Diagnostic
+Return controls establish host invariants, not ordinary-budget fit or application proof outcomes.
+
+The final four-profile release survey has 457 cases across 100 families: 229 PROVED, 137 REFUTED
+and 91 UNKNOWN per profile. Six unchanged entries advance from UNKNOWN to PROVED; nineteen new
+cases add seventeen supported outcomes. This is 23 more supported cases than Stage246. The full
+workspace run passes 965 outer Rust tests and 91 Python tests. Formatting, lint, release builds,
+dependency checks, manual hooks and documentation checks all pass.
+
+All 432 unchanged old case objects and the complete old guest fixture prefix remain literal.
+Across 1,728 retained Proof comparisons, 60 are literal and 1,665 differ only by the actual appended
+fixture fingerprint. Three query-free fold deadline contexts are recorded separately, rather than
+called FULL. All 3,776 retained queried obligations and models match exactly. No assumptions,
+trusted boundaries or missing-body success are introduced.

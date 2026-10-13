@@ -378,7 +378,7 @@ impl<'tcx> Engine<'tcx> {
         if backing.hierarchy.is_some() && memory.mutable_hierarchy != Some(id) {
             return Err("hierarchy backing has no authenticated Memory namespace".into());
         }
-        self.mutable_hierarchy_disabled_backing(backing)?;
+        self.mutable_hierarchy_scope_backing(backing)?;
         memory.check_projection_initialization(backing.allocation, &[])?;
         if !matches!(memory.get(backing.allocation), Some(Some(Value::Unit))) {
             return Err(self.mutable_u16_error("mutable u16 root backing is unavailable"));

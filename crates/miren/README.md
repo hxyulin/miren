@@ -1688,3 +1688,32 @@ zero slots, height1 and matching Context seed authenticate that case. The readon
 current owner identity and initialization masks without decoding or copying a whole Drop owner.
 A Unit or arbitrary zero-sized value does not supply this evidence. Actual nonempty destructors
 and their helper calls still execute normally, including missing-body and mutation controls.
+
+Whole-scalar mutable helper chains share an authenticated owner lineage under the existing total
+frame-depth and storage limits. The former two-owner restriction is replaced by exact parent/lease,
+issued-generation, live frame, current pending-tip and top-owner checks. Descendant calls suspend
+ancestors; actual normal Return restores the complete original owner/frame prefix, with monotonic
+issuer and metadata epochs. Whole integer/Bool/Char/Float and local static associated helpers reuse
+this protocol and retain their original type, initialization, source Body and value-validity checks.
+
+Ticket prefix cloning and Return prefix equality have separate variable-depth payments, including
+all Vec frame contents. Actual owner publication/reserve and new lineage traversals are paid too;
+existing clone/transport fees and all caps remain. These payments supply no resource discount or
+promise of Armed execution fit. Proper intervals and product nested owners retain their explicit
+unsupported gates until exact issued-view and typed storage-origin representations exist.
+Compiler controls follow actual depth-three/depth-four Calls and Returns in all four profiles.
+
+Optimized whole-scalar Root Move requires one dormant origin and a bounded current-carrier scan.
+Another executable role or a structured/reference carrier is refused. The actual Move consumes the
+caller local before child execution; normal returned storage does not restore that local. Alias,
+consumed-source, original-type and post-return controls cover this transport separately.
+
+
+Backing validation combines structural lineage and live-frame checks in one pass. Depth-only
+observations sum the immediately validated immutable backing instead of repeating its structural
+checks. Fresh handoff and return validation remains; no reusable authority is cached.
+
+Armed transport invariants use an explicitly tagged, test-only 8192-unit diagnostic policy.
+Ordinary transport retains its 2048-unit ceiling, and the unchanged nested control still reaches
+that limit. The diagnostic constructor and policy field are absent from release builds. Diagnostic
+Return controls establish host invariants, not ordinary-budget fit or application proof outcomes.

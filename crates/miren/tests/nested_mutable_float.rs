@@ -93,8 +93,9 @@ fn float_hierarchy_checks_actual_bodies_raw_returns_and_bounded_depth() {
             .map(move |entry| {
                 let expected = match entry {
                     "wrong" => ProofStatus::Refuted,
-                    "deeper" => ProofStatus::Unknown,
-                    "selected" | "sibling" | "scalar_return" | "sequential" => ProofStatus::Proved,
+                    "selected" | "sibling" | "scalar_return" | "sequential" | "deeper" => {
+                        ProofStatus::Proved
+                    }
                     _ => unreachable!(),
                 };
                 (format!("{module}::{entry}"), expected)

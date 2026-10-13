@@ -131,7 +131,7 @@ const MODULES: [&str; 11] = [
 
 #[test]
 fn original_integer_hierarchy_compiler_frontiers() {
-    use ProofStatus::{Proved as P, Refuted as R, Unknown as U};
+    use ProofStatus::{Proved as P, Refuted as R};
     let mut names = Vec::new();
     for module in MODULES {
         for (entry, active) in [
@@ -142,7 +142,7 @@ fn original_integer_hierarchy_compiler_frontiers() {
             ("cast", P),
             ("wrong", R),
             ("bounds", R),
-            ("deeper", U),
+            ("deeper", P),
         ] {
             names.push((format!("{module}::{entry}"), active));
         }

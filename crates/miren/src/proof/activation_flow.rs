@@ -40,8 +40,18 @@ struct Receipt {
     epoch: u64,
 }
 
+// Explicit host invariant diagnostics; this policy is absent from production builds.
+#[cfg(test)]
+#[derive(Debug)]
+enum WorkPolicy {
+    Ordinary,
+    ReturnDiagnostic,
+}
+
 #[derive(Debug)]
 struct Work {
+    #[cfg(test)]
+    policy: WorkPolicy,
     used: usize,
     limit: usize,
     checked: Vec<Rc<()>>,
@@ -49,7 +59,16 @@ struct Work {
 
 impl Work {
     fn charge(&mut self, count: usize) -> Result<(), String> {
-        if self.limit == 0 || self.limit > ACTIVATION_STRUCTURAL_WORK_LIMIT {
+        #[cfg(not(test))]
+        let valid_policy = self.limit > 0 && self.limit <= ACTIVATION_STRUCTURAL_WORK_LIMIT;
+        #[cfg(test)]
+        let valid_policy = match self.policy {
+            WorkPolicy::Ordinary => {
+                self.limit > 0 && self.limit <= ACTIVATION_STRUCTURAL_WORK_LIMIT
+            }
+            WorkPolicy::ReturnDiagnostic => self.limit == 8192,
+        };
+        if !valid_policy {
             return Err("activation structural policy is invalid".into());
         }
         self.used = self
@@ -843,14 +862,35 @@ impl<'tcx> Engine<'tcx> {
     }
 
     #[cfg(test)]
+    pub(super) fn activation_test_return_diagnostic_root(
+        &self,
+        instance: ty::Instance<'tcx>,
+        body: &Rc<Body<'tcx>>,
+    ) -> Result<Flow, String> {
+        self.activation_test_root_policy(instance, body, 8192, WorkPolicy::ReturnDiagnostic)
+    }
+
+    #[cfg(test)]
     fn activation_test_root_limit(
         &self,
         instance: ty::Instance<'tcx>,
         body: &Rc<Body<'tcx>>,
         limit: usize,
     ) -> Result<Flow, String> {
+        self.activation_test_root_policy(instance, body, limit, WorkPolicy::Ordinary)
+    }
+
+    #[cfg(test)]
+    fn activation_test_root_policy(
+        &self,
+        instance: ty::Instance<'tcx>,
+        body: &Rc<Body<'tcx>>,
+        limit: usize,
+        policy: WorkPolicy,
+    ) -> Result<Flow, String> {
         let engine = self.activation.borrow().identity.clone();
         let work = Rc::new(RefCell::new(Work {
+            policy,
             used: 0,
             limit,
             checked: Vec::new(),
@@ -1187,6 +1227,7 @@ impl<'tcx> Engine<'tcx> {
             super::activation_flow_probe::ReturnFault::OtherWork => {
                 let mut forged = original.clone();
                 forged.work = Rc::new(RefCell::new(Work {
+                    policy: WorkPolicy::Ordinary,
                     used: 0,
                     limit: ACTIVATION_STRUCTURAL_WORK_LIMIT,
                     checked: Vec::new(),
@@ -1255,6 +1296,7 @@ impl<'tcx> Engine<'tcx> {
 #[cfg(test)]
 pub(super) fn test_work_controls() {
     let mut work = Work {
+        policy: WorkPolicy::Ordinary,
         used: MAX_INPUT_VALUES - 1,
         limit: MAX_INPUT_VALUES,
         checked: Vec::new(),
@@ -1262,6 +1304,7 @@ pub(super) fn test_work_controls() {
     work.charge(1).unwrap();
     assert!(work.charge(1).is_err());
     let mut outer = Work {
+        policy: WorkPolicy::Ordinary,
         used: ACTIVATION_STRUCTURAL_WORK_LIMIT - 1,
         limit: ACTIVATION_STRUCTURAL_WORK_LIMIT,
         checked: Vec::new(),
@@ -1269,11 +1312,31 @@ pub(super) fn test_work_controls() {
     outer.charge(1).unwrap();
     assert!(outer.charge(1).is_err());
     let mut work = Work {
+        policy: WorkPolicy::Ordinary,
         used: usize::MAX,
         limit: ACTIVATION_STRUCTURAL_WORK_LIMIT,
         checked: Vec::new(),
     };
     assert!(work.charge(1).is_err());
+    let mut invalid = Work {
+        policy: WorkPolicy::Ordinary,
+        used: 0,
+        limit: 8192,
+        checked: Vec::new(),
+    };
+    assert_eq!(
+        invalid.charge(0).unwrap_err(),
+        "activation structural policy is invalid"
+    );
+    let mut diagnostic = Work {
+        policy: WorkPolicy::ReturnDiagnostic,
+        used: 8191,
+        limit: 8192,
+        checked: Vec::new(),
+    };
+    diagnostic.charge(1).unwrap();
+    assert!(diagnostic.charge(1).is_err());
+    assert!(diagnostic.charge(0).is_err());
     assert!(Flow::Unarmed.charge(usize::MAX).is_ok());
     let terms = Context::default();
     let ghost = Value::MutableU16 {

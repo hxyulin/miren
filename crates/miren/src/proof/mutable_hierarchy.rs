@@ -1,8 +1,11 @@
-//! Checked single nested whole-u16 child hierarchy with persistent generation and epoch.
+//! Checked bounded whole-scalar owner lineage with persistent generation and epoch.
 use super::*;
 use rustc_middle::mir::PlaceElem;
 use rustc_middle::mir::visit::{PlaceContext, Visitor};
 use std::rc::Rc;
+#[cfg(test)]
+#[path = "mutable_deeper_scope_probe.rs"]
+mod deeper_probe;
 
 // Only the new associated route uses this borrowed inventory. No selected body is cloned here.
 struct AssociatedBodyWork<'a, 'tcx> {
@@ -559,7 +562,93 @@ pub(super) struct Hierarchy {
     pending: Option<Pending>,
 }
 
+// Temporary structural accumulator; it carries no executable role or reusable permission.
+struct Lineage {
+    parent: u64,
+    depth: usize,
+}
+
+impl Lineage {
+    fn new() -> Self {
+        Self {
+            parent: 0,
+            depth: 0,
+        }
+    }
+
+    fn observe(&mut self, owner: &Owner, issued: u64) -> Result<(), TransitionError> {
+        if owner.lease == 0
+            || owner.lease > issued
+            || owner.lease <= self.parent
+            || owner.parent != self.parent
+            || owner.frames.is_empty()
+        {
+            return Err("hierarchy owner parent/lease/frame lineage differs".into());
+        }
+        self.depth = self.depth.saturating_add(owner.frames.len());
+        if self.depth > MAX_INPUT_DEPTH {
+            return Err(TransitionError::Resource(
+                "hierarchy cumulative budget/depth",
+            ));
+        }
+        self.parent = owner.lease;
+        Ok(())
+    }
+}
+
 impl Hierarchy {
+    fn validate_pending(&self, parent: u64) -> Result<(), TransitionError> {
+        if self.pending.as_ref().is_some_and(|pending| {
+            pending.lease != self.issued
+                || pending.lease <= pending.parent
+                || pending.parent != parent
+                || self.epoch == 0
+                || pending.tip.local == 0
+                || pending.tip.statement == 0
+        }) {
+            return Err("hierarchy pending parent/lease/tip differs".into());
+        }
+        Ok(())
+    }
+
+    fn lineage_depth(&self) -> Result<usize, TransitionError> {
+        let mut lineage = Lineage::new();
+        for owner in &self.owners {
+            lineage.observe(owner, self.issued)?;
+        }
+        self.validate_pending(lineage.parent)?;
+        Ok(lineage.depth)
+    }
+
+    fn activation_charge_lineage(&self, flow: &activation_flow::Flow) -> Result<(), String> {
+        // Fixed header/pending services plus actual owner field/check/sum visits.
+        flow.charge(12usize.saturating_add(self.owners.len().saturating_mul(10)))
+    }
+
+    fn activation_charge_owner_publication(
+        &self,
+        flow: &activation_flow::Flow,
+    ) -> Result<(), String> {
+        let relocation = if self.owners.len() == self.owners.capacity() {
+            self.owners.len()
+        } else {
+            0
+        };
+        // Capacity check/reserve, new owner fields/one-frame Vec, push, and possible outer moves.
+        // Moving Owner moves its Vec header, not its separately allocated frame contents.
+        flow.charge(9usize.saturating_add(relocation.saturating_mul(5)))
+    }
+
+    fn activation_charge_ticket_clone(&self, flow: &activation_flow::Flow) -> Result<(), String> {
+        // Distinct planning visit, origin Rc clone and ticket/header/outer Vec allocation.
+        flow.charge(8usize.saturating_add(self.owners.len()))?;
+        for owner in &self.owners {
+            // Two copied lease fields, cloned Vec header/allocation, all actual frame IDs.
+            flow.charge(6usize.saturating_add(owner.frames.len()))?;
+        }
+        Ok(())
+    }
+
     fn activation_charge_clone(&self, flow: &super::activation_flow::Flow) -> Result<(), String> {
         if matches!(flow, super::activation_flow::Flow::Unarmed) {
             return Ok(());
@@ -670,6 +759,7 @@ impl<'tcx> Engine<'tcx> {
             .as_ref()
             .ok_or("activation depth namespace disappeared")?;
         flow.charge(hierarchy.owners.len())?;
+        // The borrowed backing was just validated; only its bounded depth sum is needed here.
         Ok(hierarchy
             .owners
             .iter()
@@ -887,19 +977,13 @@ impl<'tcx> Engine<'tcx> {
         Ok(())
     }
 
-    pub(super) fn mutable_hierarchy_disabled_backing(
+    pub(super) fn mutable_hierarchy_scope_backing(
         &self,
         backing: &super::mutable_u16::Backing,
     ) -> Result<(), String> {
         let Some(hierarchy) = &backing.hierarchy else {
             return Ok(());
         };
-        if hierarchy.owners.len() > 2 {
-            return Err(self.categorized_error(
-                UnknownCategory::Semantics,
-                "hierarchy exceeds the single nested-child scope".into(),
-            ));
-        }
         if backing.interval.is_some()
             || backing.phase != super::mutable_u16_children::Phase::Idle
             || hierarchy.origin.certificate != backing.certificate
@@ -913,39 +997,28 @@ impl<'tcx> Engine<'tcx> {
         {
             return Err("disabled hierarchy original owner differs".into());
         }
-        let mut parent = 0;
-        let mut depth = 0usize;
+        let mut lineage = Lineage::new();
         for owner in &hierarchy.owners {
-            depth = depth.saturating_add(owner.frames.len());
-            if owner.lease == 0
-                || owner.lease > hierarchy.issued
-                || owner.lease <= parent
-                || owner.parent != parent
-                || owner.frames.is_empty()
-                || depth > MAX_INPUT_DEPTH
-                || owner.frames.iter().any(|id| {
-                    self.mutable_u16_frames
-                        .borrow()
-                        .get(*id)
-                        .is_none_or(|weak| weak.upgrade().is_none())
-                })
-            {
+            lineage
+                .observe(owner, hierarchy.issued)
+                .map_err(|error| self.mutable_hierarchy_transition_error(error))?;
+            if owner.frames.iter().any(|id| {
+                self.mutable_u16_frames
+                    .borrow()
+                    .get(*id)
+                    .is_none_or(|weak| weak.upgrade().is_none())
+            }) {
                 return Err("disabled hierarchy lineage differs".into());
             }
-            parent = owner.lease;
         }
+        hierarchy
+            .validate_pending(lineage.parent)
+            .map_err(|error| self.mutable_hierarchy_transition_error(error))?;
         if hierarchy.pending.as_ref().is_some_and(|pending| {
-            pending.lease != hierarchy.issued
-                || pending.lease <= pending.parent
-                || pending.parent != parent
-                || hierarchy.epoch == 0
-                || pending.tip.local == 0
-                || pending.tip.statement == 0
-                || self
-                    .mutable_u16_frames
-                    .borrow()
-                    .get(pending.tip.frame)
-                    .is_none_or(|weak| weak.upgrade().is_none())
+            self.mutable_u16_frames
+                .borrow()
+                .get(pending.tip.frame)
+                .is_none_or(|weak| weak.upgrade().is_none())
         }) {
             return Err("disabled hierarchy pending identity differs".into());
         }
@@ -1038,6 +1111,20 @@ impl<'tcx> Engine<'tcx> {
 }
 
 impl<'tcx> Engine<'tcx> {
+    fn mutable_hierarchy_issue(
+        &self,
+        hierarchy: &mut Hierarchy,
+        parent: u64,
+        tip: Tip,
+        slots: usize,
+        flow: &activation_flow::Flow,
+    ) -> Result<u64, String> {
+        hierarchy.activation_charge_lineage(flow)?;
+        hierarchy
+            .issue(parent, tip, slots)
+            .map_err(|error| self.mutable_hierarchy_transition_error(error))
+    }
+
     fn mutable_hierarchy_transition_error(&self, error: TransitionError) -> String {
         match error {
             TransitionError::Semantics(reason) => {
@@ -2229,10 +2316,10 @@ impl<'tcx> Engine<'tcx> {
         ) {
             return Err("hierarchy source is not original whole u16".into());
         }
-        if matches!(role, MutableU16Role::Root) && matches!(args[position].node, Operand::Move(_)) {
-            return Err("hierarchy moved original Root is deferred".into());
-        }
         let backing = self.mutable_u16_backing(id, &state.memory)?;
+        if matches!(role, MutableU16Role::Root) && matches!(args[position].node, Operand::Move(_)) {
+            self.mutable_hierarchy_move_root(state, place, id, backing)?;
+        }
         if backing.interval.is_some() {
             return Err("hierarchy intervals are deferred".into());
         }
@@ -2253,30 +2340,25 @@ impl<'tcx> Engine<'tcx> {
             local: place.local.as_usize(),
         };
         let lease = match role {
-            MutableU16Role::Root => hierarchy
-                .issue(
-                    0,
-                    tip.clone(),
-                    state
-                        .memory
-                        .activation_storage_slots(&state.flow)?
-                        .saturating_add(usize::from(backing.hierarchy.is_none()) * 6),
-                )
-                .map_err(|error| self.mutable_hierarchy_transition_error(error))?,
+            MutableU16Role::Root => self.mutable_hierarchy_issue(
+                &mut hierarchy,
+                0,
+                tip.clone(),
+                state
+                    .memory
+                    .activation_storage_slots(&state.flow)?
+                    .saturating_add(usize::from(backing.hierarchy.is_none()) * 6),
+                &state.flow,
+            )?,
             MutableU16Role::Child { .. } => {
                 if backing.hierarchy.is_some() {
                     return Err("legacy child cannot migrate".into());
                 }
-                hierarchy
-                    .issue(
-                        0,
-                        tip.clone(),
-                        state
-                            .memory
-                            .activation_storage_slots(&state.flow)?
-                            .saturating_add(hierarchy.storage_slots()),
-                    )
-                    .map_err(|error| self.mutable_hierarchy_transition_error(error))?
+                let slots = state
+                    .memory
+                    .activation_storage_slots(&state.flow)?
+                    .saturating_add(hierarchy.storage_slots());
+                self.mutable_hierarchy_issue(&mut hierarchy, 0, tip.clone(), slots, &state.flow)?
             }
             MutableU16Role::HierarchyChild { lease } => {
                 if let Some(pending) = &hierarchy.pending {
@@ -2296,13 +2378,13 @@ impl<'tcx> Engine<'tcx> {
                 } else {
                     let owner = hierarchy.owners.last().ok_or("hierarchy owner missing")?;
                     self.mutable_u16_frame_top(body, &owner.frames)?;
-                    hierarchy
-                        .issue(
-                            lease,
-                            tip.clone(),
-                            state.memory.activation_storage_slots(&state.flow)?,
-                        )
-                        .map_err(|error| self.mutable_hierarchy_transition_error(error))?
+                    self.mutable_hierarchy_issue(
+                        &mut hierarchy,
+                        lease,
+                        tip.clone(),
+                        state.memory.activation_storage_slots(&state.flow)?,
+                        &state.flow,
+                    )?
                 }
             }
             MutableU16Role::Metadata { .. }
@@ -2313,6 +2395,9 @@ impl<'tcx> Engine<'tcx> {
             }
         };
         let selected_frame = self.activation_register_frame(&selected, &state.flow)?;
+        hierarchy.activation_charge_lineage(&state.flow)?;
+        hierarchy.activation_charge_ticket_clone(&state.flow)?;
+        hierarchy.activation_charge_owner_publication(&state.flow)?;
         let ticket = hierarchy
             .enter(
                 &tip,
@@ -2393,11 +2478,15 @@ impl<'tcx> Engine<'tcx> {
             if self.mutable_u16_contains(&result.value, &result.memory)? {
                 return Err("hierarchy returned executable role".into());
             }
+            #[cfg(test)]
+            deeper_probe::actual_return_controls(self, &selected, id, &ticket, result);
             self.activation_charge_backing_cow(&result.flow, &result.memory)?;
             let h = Rc::make_mut(&mut result.memory.mutable_u16)[id]
                 .hierarchy
                 .as_mut()
                 .ok_or("returned hierarchy disappeared")?;
+            h.activation_charge_lineage(&result.flow)?;
+            ticket.activation_charge_prefix_equality(&result.flow)?;
             h.release(&ticket)?;
             self.activation_observe(&mut result.flow, &result.memory)?;
             // Original masks and current updated data remain untouched on release.
@@ -2707,6 +2796,113 @@ impl<'tcx> Engine<'tcx> {
         Ok(())
     }
 
+    fn mutable_hierarchy_move_root(
+        &self,
+        state: &State,
+        place: Place<'tcx>,
+        id: usize,
+        backing: &super::mutable_u16::Backing,
+    ) -> Result<(), String> {
+        // The actual Call already authenticated original local/signature types and initialization.
+        // This extra scan rejects hidden carriers instead of granting them alias permissions.
+        let locals = state.locals.len();
+        let allocations = state.memory.len();
+        let statics = state.memory.startup_values.len();
+        if locals.saturating_add(allocations).saturating_add(statics) > MAX_INPUT_VALUES {
+            return Err(self.categorized_error(
+                UnknownCategory::ResourceLimit,
+                "hierarchy moved Root carrier inventory exceeds existing node budget".into(),
+            ));
+        }
+        let masks = state.missing_places.entries();
+        state.flow.charge(
+            20_usize
+                .saturating_add(locals.saturating_mul(4))
+                .saturating_add(locals.saturating_mul(masks.len()).saturating_mul(3))
+                .saturating_add(allocations.saturating_add(statics).saturating_mul(3)),
+        )?;
+        if !place.projection.is_empty()
+            || state.addresses[place.local.as_usize()].is_some()
+            || !matches!(state.locals[place.local.as_usize()],
+                Some(Value::MutableU16 { id: other, role: symbolic::MutableU16Role::Root })
+                if other == id)
+            || !matches!(backing.phase, super::mutable_u16_children::Phase::Idle)
+            || backing.interval.is_some()
+            || backing.data.scalar().is_err()
+            || backing
+                .hierarchy
+                .as_ref()
+                .is_some_and(|h| !h.owners.is_empty() || h.pending.is_some())
+            || state.memory.mutable_u16.len() != 1
+            || !state.memory.owned_regions.is_empty()
+        {
+            return Err("hierarchy moved Root lacks dormant unique scalar origin".into());
+        }
+        self.check_local_initialization(state, place.local.as_usize(), &[])?;
+        for (local, value) in state.locals.iter().enumerate() {
+            if local == place.local.as_usize()
+                || masks
+                    .iter()
+                    .any(|(owner, fields)| *owner == local && fields.is_empty())
+            {
+                continue;
+            }
+            if let Some(value) = value {
+                self.mutable_hierarchy_move_carrier(value)?;
+            }
+        }
+        for value in state
+            .memory
+            .iter()
+            .flatten()
+            .chain(state.memory.startup_values.values())
+        {
+            self.mutable_hierarchy_move_carrier(value)?;
+        }
+        Ok(())
+    }
+
+    fn mutable_hierarchy_move_carrier(&self, value: &Value) -> Result<(), String> {
+        match value {
+            Value::Input(_)
+            | Value::Bool(_)
+            | Value::Int { .. }
+            | Value::Float { .. }
+            | Value::Unit
+            | Value::Uninitialized => Ok(()),
+            Value::MutableU16 { .. } => {
+                Err("hierarchy moved Root has another executable carrier".into())
+            }
+            Value::Tuple(_)
+            | Value::Elements(_)
+            | Value::Adt { .. }
+            | Value::Enum { .. }
+            | Value::Reference { .. }
+            | Value::Cell { .. }
+            | Value::LocalAtomic { .. }
+            | Value::StaticSlice { .. }
+            | Value::SliceIterator { .. }
+            | Value::RawSlice { .. }
+            | Value::OwnedSnapshot(_)
+            | Value::MetadataPointer(_)
+            | Value::TraitObject { .. }
+            | Value::DebugReference { .. }
+            | Value::TrackedPointer { .. }
+            | Value::MaybeUninit { .. }
+            | Value::OwnedRegion { .. }
+            | Value::Bytes { .. }
+            | Value::CompositeSlice { .. }
+            | Value::ScalarSlice { .. }
+            | Value::StaticView { .. }
+            | Value::RawPointer { .. }
+            | Value::Atomic { .. }
+            | Value::StaticText
+            | Value::FormatArguments
+            | Value::FunctionPointer { .. }
+            | Value::Function => Err("hierarchy moved Root has unsupported live carrier".into()),
+        }
+    }
+
     fn mutable_hierarchy_bootstrap(
         &self,
         body: &Body<'tcx>,
@@ -2851,12 +3047,13 @@ impl<'tcx> Engine<'tcx> {
             } else if lease != 0 {
                 return Err("hierarchy source has no current owner".into());
             }
-            h.issue(
+            self.mutable_hierarchy_issue(
+                &mut h,
                 lease,
                 next,
                 state.memory.activation_storage_slots(&state.flow)?,
-            )
-            .map_err(|error| self.mutable_hierarchy_transition_error(error))?
+                &state.flow,
+            )?
         };
         self.mutable_hierarchy_charge(state, id, &h)?;
         self.activation_charge_backing_cow(&state.flow, &state.memory)?;
@@ -2943,7 +3140,13 @@ impl<'tcx> Engine<'tcx> {
         }
         let owner = before.owners.last().unwrap();
         self.mutable_u16_frame_top(body, &owner.frames)?;
-        let depth = before.owners.iter().map(|o| o.frames.len()).sum::<usize>();
+        state.flow.charge(before.owners.len())?;
+        // This immutable snapshot comes directly from the checked current backing.
+        let depth = before
+            .owners
+            .iter()
+            .map(|owner| owner.frames.len())
+            .sum::<usize>();
         if depth >= MAX_INPUT_DEPTH {
             return Err(self.categorized_error(
                 UnknownCategory::ResourceLimit,
@@ -3372,11 +3575,18 @@ fn compiler_bool_return_probe<'tcx>(
     let frame = engine.mutable_u16_register_frame(root).unwrap();
     let tip = Tip {
         frame,
-        statement: block.as_usize(),
+        statement: std::ptr::from_ref(&root.basic_blocks[block].terminator().kind) as usize,
         local: source,
     };
     let mut next = original.clone();
     let slots = result.memory.storage_slots();
+    let mut invalid_tip = tip.clone();
+    invalid_tip.statement = 0;
+    let mut invalid_pending = original.clone();
+    invalid_pending
+        .issue(0, invalid_tip.clone(), slots)
+        .unwrap();
+    assert!(invalid_pending.enter(&invalid_tip, frame, slots).is_err());
     let lease = next.issue(0, tip.clone(), slots).unwrap();
     assert!(next.access(0).is_err());
     let mut wrong_tip = tip.clone();
@@ -4261,11 +4471,18 @@ fn compiler_char_return_probe<'tcx>(
     let frame = engine.mutable_u16_register_frame(root).unwrap();
     let tip = Tip {
         frame,
-        statement: block.as_usize(),
+        statement: std::ptr::from_ref(&root.basic_blocks[block].terminator().kind) as usize,
         local: source,
     };
     let mut next = original.clone();
     let slots = result.memory.storage_slots();
+    let mut invalid_tip = tip.clone();
+    invalid_tip.statement = 0;
+    let mut invalid_pending = original.clone();
+    invalid_pending
+        .issue(0, invalid_tip.clone(), slots)
+        .unwrap();
+    assert!(invalid_pending.enter(&invalid_tip, frame, slots).is_err());
     let lease = next.issue(0, tip.clone(), slots).unwrap();
     assert!(next.access(0).is_err());
     let mut wrong_tip = tip.clone();
@@ -4461,7 +4678,7 @@ fn compiler_char_scalar_probe<'tcx>(engine: &mut Engine<'tcx>, result: &Return, 
             .unwrap();
         let tip = Tip {
             frame,
-            statement: block.as_usize(),
+            statement: std::ptr::from_ref(&body.basic_blocks[block].terminator().kind) as usize,
             local: source.local.as_usize(),
         };
         hierarchy.issue(0, tip.clone(), slots).unwrap();
@@ -4563,7 +4780,7 @@ fn compiler_char_scalar_probe<'tcx>(engine: &mut Engine<'tcx>, result: &Return, 
             .unwrap();
         let tip = Tip {
             frame,
-            statement: block.as_usize(),
+            statement: std::ptr::from_ref(&body.basic_blocks[block].terminator().kind) as usize,
             local: source.local.as_usize(),
         };
         hierarchy.issue(0, tip.clone(), slots).unwrap();
@@ -4769,11 +4986,44 @@ pub(super) fn compiler_return_transport_probe<'tcx>(
         engine,
         root,
         base,
-        false,
-        false,
+        ReturnBudget::Unarmed,
         super::activation_flow_probe::ReturnFault::Erased,
     )
     .unwrap();
+}
+
+#[cfg(test)]
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(super) enum ReturnBudget {
+    Unarmed,
+    Legacy512,
+    Ordinary2048,
+    Diagnostic8192,
+}
+
+#[cfg(test)]
+pub(super) fn compiler_return_default_budget_frontier<'tcx>(
+    engine: &mut Engine<'tcx>,
+    root: &Rc<Body<'tcx>>,
+    base: &State,
+) {
+    let result = compiler_return_transport_with_flow(
+        engine,
+        root,
+        base,
+        ReturnBudget::Ordinary2048,
+        super::activation_flow_probe::ReturnFault::Erased,
+    );
+    match result {
+        Ok(memory) => {
+            assert!(memory.is_some());
+            eprintln!("carrier ordinary2048 completed full Return assertions");
+        }
+        Err(error) => {
+            assert!(error.contains("activation transport exceeds shared work budget"));
+            eprintln!("carrier ordinary2048 Resource: {error}");
+        }
+    }
 }
 
 #[cfg(test)]
@@ -4781,8 +5031,7 @@ pub(super) fn compiler_return_transport_with_flow<'tcx>(
     engine: &mut Engine<'tcx>,
     root: &Rc<Body<'tcx>>,
     base: &State,
-    armed: bool,
-    legacy512: bool,
+    budget: ReturnBudget,
     hostile_control: super::activation_flow_probe::ReturnFault,
 ) -> Result<Option<Memory>, String> {
     let (block, data) = root
@@ -4807,6 +5056,7 @@ pub(super) fn compiler_return_transport_with_flow<'tcx>(
         .resolve_function_item(*definition, generic.skip_binder())
         .unwrap();
     let mut state = base.clone();
+    let armed = budget != ReturnBudget::Unarmed;
     if armed {
         let root_instance = engine
             .bodies
@@ -4815,10 +5065,13 @@ pub(super) fn compiler_return_transport_with_flow<'tcx>(
             .find(|(_, body)| Rc::ptr_eq(body, root))
             .map(|(instance, _)| *instance)
             .unwrap();
-        state.flow = if legacy512 {
-            engine.activation_test_legacy_root(root_instance, root)?
-        } else {
-            engine.activation_test_root(root_instance, root)?
+        state.flow = match budget {
+            ReturnBudget::Unarmed => unreachable!(),
+            ReturnBudget::Legacy512 => engine.activation_test_legacy_root(root_instance, root)?,
+            ReturnBudget::Ordinary2048 => engine.activation_test_root(root_instance, root)?,
+            ReturnBudget::Diagnostic8192 => {
+                engine.activation_test_return_diagnostic_root(root_instance, root)?
+            }
         };
     }
     let untouched = symbolic::integer(&engine.terms, 43, 16, false);
@@ -4855,7 +5108,10 @@ pub(super) fn compiler_return_transport_with_flow<'tcx>(
             );
         }
     }
-    if armed && !legacy512 && hostile_control == super::activation_flow_probe::ReturnFault::Erased {
+    if armed
+        && budget != ReturnBudget::Legacy512
+        && hostile_control == super::activation_flow_probe::ReturnFault::Erased
+    {
         compiler_activation_pending_count(engine, root, &state);
     }
     let before = state.memory.mutable_u16[0].data.clone();
@@ -5328,6 +5584,21 @@ pub(super) struct Ticket {
     frame: usize,
 }
 
+impl Ticket {
+    fn activation_charge_prefix_equality(
+        &self,
+        flow: &activation_flow::Flow,
+    ) -> Result<(), String> {
+        // Independent planning traversal and fixed origin/floors/length/top checks.
+        flow.charge(12usize.saturating_add(self.prefix.len()))?;
+        for owner in &self.prefix {
+            // Actual lease/parent/frame-length equality and possible frame comparisons.
+            flow.charge(3usize.saturating_add(owner.frames.len()))?;
+        }
+        Ok(())
+    }
+}
+
 #[derive(Clone, Copy)]
 pub(super) struct Metadata {
     lease: u64,
@@ -5430,14 +5701,8 @@ impl Hierarchy {
 
     fn issue(&mut self, parent: u64, tip: Tip, slots: usize) -> Result<u64, TransitionError> {
         self.access(parent)?;
-        if self.owners.len() >= 2 {
-            return Err(TransitionError::Semantics(
-                "hierarchy exceeds the single nested-child scope".into(),
-            ));
-        }
-        if self.owners.iter().map(|o| o.frames.len()).sum::<usize>() >= MAX_INPUT_DEPTH
-            || slots.saturating_add(5) > MAX_INPUT_VALUES
-        {
+        let depth = self.lineage_depth()?;
+        if depth >= MAX_INPUT_DEPTH || slots.saturating_add(5) > MAX_INPUT_VALUES {
             return Err(TransitionError::Resource(
                 "hierarchy cumulative budget/depth",
             ));
@@ -5472,11 +5737,12 @@ impl Hierarchy {
     }
 
     fn enter(&mut self, tip: &Tip, frame: usize, slots: usize) -> Result<Ticket, TransitionError> {
+        let depth = self.lineage_depth()?;
         let pending = self.pending.as_ref().ok_or("pending missing")?;
         if &pending.tip != tip || self.owners.last().map_or(0, |o| o.lease) != pending.parent {
             return Err("current pending handoff differs".into());
         }
-        if slots.saturating_add(3) > MAX_INPUT_VALUES {
+        if depth >= MAX_INPUT_DEPTH || slots.saturating_add(3) > MAX_INPUT_VALUES {
             return Err(TransitionError::Resource(
                 "hierarchy handoff exceeds storage budget",
             ));
@@ -5489,6 +5755,7 @@ impl Hierarchy {
             prefix: self.owners.clone(),
             frame,
         };
+        self.owners.reserve_exact(1);
         self.owners.push(Owner {
             lease: pending.lease,
             parent: pending.parent,
@@ -5499,6 +5766,10 @@ impl Hierarchy {
     }
 
     fn release(&mut self, ticket: &Ticket) -> Result<(), String> {
+        self.lineage_depth().map_err(|error| match error {
+            TransitionError::Semantics(reason) => reason,
+            TransitionError::Resource(reason) => reason.to_owned(),
+        })?;
         if !Rc::ptr_eq(&self.origin, &ticket.origin)
             || self.pending.is_some()
             || self.issued < ticket.issued_floor

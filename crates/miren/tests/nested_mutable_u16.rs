@@ -133,7 +133,7 @@ fn nested_whole_children_preserve_data_and_refuse_other_routes() {
         ("wrong_sibling", R),
         ("bounds", R),
         ("child_assertion", R),
-        ("deeper", U),
+        ("deeper", P),
         ("retained", U),
         ("shared", U),
         ("raw", U),

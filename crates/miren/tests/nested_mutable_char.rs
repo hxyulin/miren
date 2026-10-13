@@ -137,14 +137,14 @@ fn run_native(executable: &Path) -> std::process::Output {
 }
 
 #[test]
-fn char_hierarchy_executes_actual_bodies_and_preserves_deeper_frontiers() {
+fn char_hierarchy_executes_actual_bodies_and_preserves_deeper_effects() {
     let entries = [
         ("character::selected", ProofStatus::Proved),
         ("character::sibling", ProofStatus::Proved),
         ("character::scalar_return", ProofStatus::Proved),
         ("character::wrong", ProofStatus::Refuted),
         ("character::bounds", ProofStatus::Refuted),
-        ("character::deeper", ProofStatus::Unknown),
+        ("character::deeper", ProofStatus::Proved),
     ];
     for target in [None, Some("thumbv7em-none-eabihf")] {
         for optimized in [false, true] {

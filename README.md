@@ -54,14 +54,15 @@ and whole-slice comparison are separate unsupported domains. See the
 [capability evidence](docs/rust-capabilities.md).
 
 Mutable scalar slices support bounded whole-child helpers, scalar returns, local static associated
-calls and original constant-index reads and stores. Exact f32/f64 backing preserves NaN payloads
-and signed-zero bits. Typed mutable tuple, array and plain local struct slices support direct
-metadata and guarded whole-element, constant-suffix and symbolic fixed-array suffix reads and
-stores. Whole product helpers execute actual bodies and preserve returned storage. Nested owner
-calls and proper reborrows remain UNKNOWN. Deeper scalar nesting and the dedicated
-proper-reborrow caller remain UNKNOWN. Bounded owned u16 products support writes through multiple
-symbolic suffix indices, preserving compiler types and current Memory. The capability manifest
-covers 438 cases across 99 families, including concrete and symbolic local byte-copy controls.
+calls and original constant-index reads and stores. Exact f32/f64 backing preserves NaN payloads and
+signed-zero bits. Typed mutable tuple, array and plain local struct slices support direct metadata
+and guarded whole-element, constant-suffix and symbolic fixed-array suffix reads and stores. Whole
+product helpers execute actual bodies and preserve returned storage. Nested owner calls and proper
+reborrows remain UNKNOWN. Deeper whole scalar calls preserve checked owner lineage and returned
+storage; the dedicated proper-reborrow caller remains UNKNOWN. Bounded owned u16 products support
+writes through multiple symbolic suffix indices, preserving compiler types and current Memory. The
+capability manifest covers 457 cases across 100 families, including concrete and symbolic local
+byte-copy controls.
 
 Fixed-array partial moves preserve initialization and execute remaining destructors in compiler
 order. Nested destruction and covering assignments retain actual destructor effects. The exact

@@ -152,9 +152,8 @@ fn bool_and_char_hierarchies_use_actual_bodies() {
             .into_iter()
             .map(move |entry| {
                 let status = match entry {
-                    "selected" | "sibling" | "scalar_return" => ProofStatus::Proved,
+                    "selected" | "sibling" | "scalar_return" | "deeper" => ProofStatus::Proved,
                     "wrong" | "bounds" => ProofStatus::Refuted,
-                    "deeper" => ProofStatus::Unknown,
                     _ => unreachable!(),
                 };
                 (format!("{module}::{entry}"), status)

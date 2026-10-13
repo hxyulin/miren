@@ -7342,3 +7342,81 @@ Evidence: /tmp/miren-stage246-root-corrected-checks/complete.json,
 /tmp/miren-stage246-root-fieldless-evidence-review.json,
 /tmp/miren-stage246-root-adoption-independent-review.json and
 /tmp/miren-stage246-root-survey-proof-audit.json.
+
+
+## Stage247: deeper whole-scalar lineage and optimized root transport
+
+The previous two-owner semantic cutoffs are replaced by one shared lineage validator. Current
+parent/lease/frame/pending identities remain checked at backing validation, issue, enter and normal
+return. Original scalar codecs, callee body execution, ownership masks, Context and namespace checks
+remain in their existing paths. Ticket cloning, owner publication and return-prefix comparison have
+separate prepayments; the original depth16/node512 and shared execution limits are unchanged.
+
+The first compiler control completed host O0 depth-three/depth-four execution, then failed host O2:
+the actual optimized caller passes Move(_1), while O0 passes Copy(_1). Full raw/current MIR showed
+no omitted pre-call statements. A distinct moved-root preflight now requires dormant whole scalar
+storage, no pending owner or interval, one backing and no second live executable carrier among
+current locals, physical allocations or tracked static values. Fully consumed local masks may skip
+a local; structured/reference carriers are conservatively refused. Existing Move consumes the
+caller local, and normal returned Memory does not restore its ownership.
+
+The corrected compiler control passes all four profiles and checks moved caller unavailability in
+both optimized profiles. Root's first validation invocation lacked the virtual-environment solver
+PATH and failed before completing analysis; that actual failure remains archived. The unchanged
+source passes with the recorded Z3 executable on PATH. Earlier private Clippy/probe diagnostic
+failures are preserved; no warning suppression, guest rewrite or runtime assumption was used.
+
+New standalone controls measure nine PROVED, eight REFUTED and two UNKNOWN cases per profile.
+Seven genuine payload-helper mutations refute unchanged claims in every profile; native originals
+pass and all corresponding mutants fail. A real unavailable dependency helper remains UNKNOWN with
+MissingCompilerEvidence. Nineteen unchanged standalone legacy entries measure eighteen PROVED and
+one REFUTED per profile. Six existing capability entries advance from UNKNOWN to PROVED without
+changing their application bodies; nineteen new namespaced cases are appended to the complete old
+fixture prefix. Other original case objects remain identical.
+
+Private evidence: /tmp/miren-deeper-mutable-scopes-source-v3,
+/tmp/miren-stage247-root-private-tcx-corrected, /tmp/miren-stage247-root-private-matrix,
+/tmp/miren-stage247-root-private-controls, /tmp/miren-stage247-root-private-raw and
+/tmp/miren-stage247-root-private-legacy. Root adoption is recorded in
+/tmp/miren-stage247-root-adoption.json. Full Root checks and release survey are required before
+this stage is committed.
+
+
+Full Root validation first completed all other targets but failed one old compiler control. Its
+synthetic pending tip used basic-block zero as a statement identity; four host-only tips now use
+the actual caller terminator identity, with explicit zero-identity rejection controls. A subsequent
+run exposed genuine ordinary2048 work exhaustion. Fresh-engine measurement reproduced that
+frontier before completing both Returns; warming alone is not a general fit remedy.
+
+The final refactor uses one temporary Lineage accumulator for parent/lease/depth and live-frame
+backing validation, removing a duplicate owner pass. Two depth-only observations reuse their
+immediately validated immutable backing. Only charges for removed walks were removed; fresh
+issue/enter/release checks, ticket copying, publication and return-prefix charges remain. Malformed
+host controls may report an earlier weak-frame error before a later structural error; no blanket
+diagnostic equivalence is claimed.
+
+An initial untagged larger diagnostic budget was rejected by the existing structural-policy guard
+and removed. The final host diagnostics have a private cfg(test) WorkPolicy tag requiring exactly
+8192 units. Ordinary tagged work still requires 0 < limit <= 2048; non-test Work layout and policy
+remain unchanged. The ordinary transport control records its genuine Resource frontier. Separate
+explicit Diagnostic8192 invocations execute the original effectful two-return guest and hostile
+Return controls, including engine/work/frame identity and sticky exhaustion. No failed invocation
+or branch has its counter replenished. These controls do not establish ordinary-budget fit or an
+application proof. The generated original effectful guest bodies are unchanged.
+
+Failed Root controls and the fresh-engine measurement remain under /tmp/miren-stage247-root-legacy-*
+and /tmp/miren-stage247-fresh-carrier-capture. The final explicit diagnostic control passed with
+all actual cases reached. Independent source reviews cover the immutable depth extraction, one-pass
+lineage and test-only diagnostic policy. Full final checks and release replay remain required.
+
+The final four-profile release survey has 457 cases across 100 families: 229 PROVED, 137 REFUTED
+and 91 UNKNOWN per profile. Six unchanged entries advance from UNKNOWN to PROVED; nineteen new
+cases add seventeen supported outcomes. This is 23 more supported cases than Stage246. The full
+workspace run passes 965 outer Rust tests and 91 Python tests. Formatting, lint, release builds,
+dependency checks, manual hooks and documentation checks all pass.
+
+All 432 unchanged old case objects and the complete old guest fixture prefix remain literal.
+Across 1,728 retained Proof comparisons, 60 are literal and 1,665 differ only by the actual appended
+fixture fingerprint. Three query-free fold deadline contexts are recorded separately, rather than
+called FULL. All 3,776 retained queried obligations and models match exactly. No assumptions,
+trusted boundaries or missing-body success are introduced.

@@ -1103,9 +1103,7 @@
     {
       "entry": "nested_whole_deeper_unknown",
       "family": "nested_whole_u16",
-      "expected": "unknown",
-      "unknown_reason": "hierarchy exceeds the single nested-child scope",
-      "unknown_category": "semantics"
+      "expected": "proved"
     },
     {
       "entry": "readonly_nonzero_niche_selected",
@@ -1152,9 +1150,7 @@
     {
       "entry": "nested_integer_deeper_unknown",
       "family": "nested_whole_integer",
-      "expected": "unknown",
-      "unknown_reason": "nested_integer_outer bb0: hierarchy exceeds the single nested-child scope",
-      "unknown_category": "semantics"
+      "expected": "proved"
     },
     {
       "entry": "checked_integer_interval",
@@ -1201,9 +1197,7 @@
     {
       "entry": "nested_bool_deeper_unknown",
       "family": "nested_whole_bool",
-      "expected": "unknown",
-      "unknown_reason": "nested_bool_outer bb0: hierarchy exceeds the single nested-child scope",
-      "unknown_category": "semantics"
+      "expected": "proved"
     },
     {
       "entry": "nested_char_child_call",
@@ -1218,9 +1212,7 @@
     {
       "entry": "nested_char_deeper_unknown",
       "family": "nested_whole_char",
-      "expected": "unknown",
-      "unknown_category": "semantics",
-      "unknown_reason": "nested_char_outer bb0: hierarchy exceeds the single nested-child scope"
+      "expected": "proved"
     },
     {
       "entry": "issued_scalar_metadata",
@@ -1250,10 +1242,7 @@
     {
       "entry": "float_hierarchy_deeper_unknown",
       "family": "mutable_float_hierarchy",
-      "expected": "unknown",
-      "unknown_reason":
-        "float_hierarchy_outer bb0: hierarchy exceeds the single nested-child scope",
-      "unknown_category": "semantics"
+      "expected": "proved"
     },
     {
       "entry": "local_associated_hierarchy_selected",
@@ -1268,10 +1257,7 @@
     {
       "entry": "local_associated_hierarchy_deeper_unknown",
       "family": "local_associated_hierarchy",
-      "expected": "unknown",
-      "unknown_reason":
-        "AssociatedHierarchyLocal::outer bb0: hierarchy exceeds the single nested-child scope",
-      "unknown_category": "semantics"
+      "expected": "proved"
     },
     {
       "entry": "owned_suffix_selected",
@@ -2388,6 +2374,105 @@
       "family": "drop_shared_projection",
       "expected": "unknown",
       "unknown_reason": "cannot materialize or copy a non-Copy owner",
+      "unknown_category": "semantics"
+    },
+    {
+      "entry": "deeper_mutable_survey::claim_u16",
+      "family": "deeper_mutable_scopes",
+      "expected": "proved"
+    },
+    {
+      "entry": "deeper_mutable_survey::claim_i32",
+      "family": "deeper_mutable_scopes",
+      "expected": "proved"
+    },
+    {
+      "entry": "deeper_mutable_survey::claim_bool",
+      "family": "deeper_mutable_scopes",
+      "expected": "proved"
+    },
+    {
+      "entry": "deeper_mutable_survey::claim_char",
+      "family": "deeper_mutable_scopes",
+      "expected": "proved"
+    },
+    {
+      "entry": "deeper_mutable_survey::claim_f32",
+      "family": "deeper_mutable_scopes",
+      "expected": "proved"
+    },
+    {
+      "entry": "deeper_mutable_survey::claim_f64",
+      "family": "deeper_mutable_scopes",
+      "expected": "proved"
+    },
+    {
+      "entry": "deeper_mutable_survey::claim_associated",
+      "family": "deeper_mutable_scopes",
+      "expected": "proved"
+    },
+    {
+      "entry": "deeper_mutable_survey::sibling_retention",
+      "family": "deeper_mutable_scopes",
+      "expected": "proved"
+    },
+    {
+      "entry": "deeper_mutable_survey::probe_root",
+      "family": "deeper_mutable_scopes",
+      "expected": "proved"
+    },
+    {
+      "entry": "deeper_mutable_survey::wrong_u16",
+      "family": "deeper_mutable_scopes",
+      "expected": "refuted"
+    },
+    {
+      "entry": "deeper_mutable_survey::wrong_i32",
+      "family": "deeper_mutable_scopes",
+      "expected": "refuted"
+    },
+    {
+      "entry": "deeper_mutable_survey::wrong_bool",
+      "family": "deeper_mutable_scopes",
+      "expected": "refuted"
+    },
+    {
+      "entry": "deeper_mutable_survey::wrong_char",
+      "family": "deeper_mutable_scopes",
+      "expected": "refuted"
+    },
+    {
+      "entry": "deeper_mutable_survey::wrong_f32",
+      "family": "deeper_mutable_scopes",
+      "expected": "refuted"
+    },
+    {
+      "entry": "deeper_mutable_survey::wrong_f64",
+      "family": "deeper_mutable_scopes",
+      "expected": "refuted"
+    },
+    {
+      "entry": "deeper_mutable_survey::wrong_associated",
+      "family": "deeper_mutable_scopes",
+      "expected": "refuted"
+    },
+    {
+      "entry": "deeper_mutable_survey::unchecked_bounds",
+      "family": "deeper_mutable_scopes",
+      "expected": "refuted"
+    },
+    {
+      "entry": "deeper_mutable_survey::interval_unknown",
+      "family": "deeper_mutable_scopes",
+      "expected": "unknown",
+      "unknown_reason": "mutable u16 staging needs a pending child",
+      "unknown_category": "semantics"
+    },
+    {
+      "entry": "deeper_mutable_survey::product_unknown",
+      "family": "deeper_mutable_scopes",
+      "expected": "unknown",
+      "unknown_reason": "mutable product staging needs a pending child",
       "unknown_category": "semantics"
     }
   ]
