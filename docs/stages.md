@@ -7525,3 +7525,51 @@ for prepaid source-ledger cloning, callee-kind eligibility and test-directory un
 final full checks and release audit use the unchanged 1,019-file Root source snapshot. The prior
 compiler crash and failed host test run remain archived; their receipts are not counted as
 successful validation.
+
+
+## Stage250: ordinary shared Drop receiver execution
+
+Ordinary local helpers with one shared local Freeze Drop receiver and a primitive result execute
+actual Rust bodies. Current caller and callee identities, the original Call and receiver type,
+initialized owner storage, masks, bounds and Context remain required. Compiler bound regions are
+instantiated through the existing compiler service while preserving nominal pointee identities.
+
+Readonly whole-record reborrows retain the reference carrier and grant no owning copy. Only exact
+authenticated receivers in Unarmed flow without contract binding consumers omit unused callee
+snapshots. Requires, Ensures, NoPanic and normal return/storage handling remain in the ordinary call
+path. Whole contract views, product returns and mutable/raw authority remain UNKNOWN.
+
+The frozen four-profile controls advance three existing UNKNOWN cases to PROVED and measure four
+PROVED, two REFUTED and three UNKNOWN new cases. Real helper/destructor mutations refute the same
+claims; native originals pass and mutants fail. Actual compiler controls check nominal types,
+bound regions, current bodies, retired/consumed storage and foreign Context. No assumptions or
+missing-body success are introduced. Repeated current candidate validations remain separately
+bounded semantic services under unchanged limits.
+
+Frozen source: `/tmp/miren-shared-drop-calls-parent248-source-v2/source.json`. Independent review
+approves the source and 84 retained Proof controls. Earlier compiler/API, reborrow, binder and
+test-assertion failures remain archived. Root composition preserves the constructor route and
+appends the nine new guest controls; full Root checks are required before the stage commit.
+
+The first Root suite and release survey passed. Its retained-proof audit found twelve renamed
+solver temporaries in existing scalar-helper counterqueries, with unchanged outcomes and models.
+The new route had performed unnecessary Drop candidate walks for scalar pointee signatures.
+Eligibility now shares the original readonly Drop-struct predicate before those walks; all admitted
+receivers retain their complete final validation. Scoped compiler/contract/mutation checks pass,
+and a focused four-profile run verifies the original query bytes. Focused selection has a different
+solver history, so its model choices are recorded separately before fresh full validation.
+
+
+The final release survey has 489 cases across 103 families: 246 PROVED, 146 REFUTED and 97 UNKNOWN
+on each host/ARM O0/O2 profile. Three existing cases advance to PROVED and nine appended controls
+add six supported outcomes, bringing the supported total to 392. Full validation passes 975 outer
+Rust tests and 91 Python tests, plus formatting, lint, release builds, dependency checks, manual
+hooks and documentation checks.
+
+All 477 unaffected old case objects and the old guest fixture prefix remain literal. Across 1,908
+retained Proof comparisons, 60 are literal and 1,848 differ only by the actual appended fixture
+fingerprint. All 4,100 retained queried obligations and their models match exactly. The earlier
+scalar query drift is resolved by the signature eligibility correction; the failed audit remains
+archived. The final full checks and release audit use the unchanged 1,023-file source snapshot.
+Independent review covers the frozen private source, Root composition and the explicit eligibility
+successor. No assumptions, raw authority or missing-body success are added.

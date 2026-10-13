@@ -2331,9 +2331,7 @@
     {
       "entry": "drop_shared_projection_survey::whole_receiver_unknown",
       "family": "drop_shared_projection",
-      "expected": "unknown",
-      "unknown_reason": "cannot materialize or copy a non-Copy owner",
-      "unknown_category": "semantics"
+      "expected": "proved"
     },
     {
       "entry": "drop_shared_projection_survey::mutable_unknown",
@@ -2372,9 +2370,7 @@
     {
       "entry": "drop_shared_projection_survey::fieldless_drop::whole_unknown",
       "family": "drop_shared_projection",
-      "expected": "unknown",
-      "unknown_reason": "cannot materialize or copy a non-Copy owner",
-      "unknown_category": "semantics"
+      "expected": "proved"
     },
     {
       "entry": "deeper_mutable_survey::claim_u16",
@@ -2503,9 +2499,7 @@
     {
       "entry": "incoming_drop_survey::whole_unknown",
       "family": "incoming_drop_array_storage",
-      "expected": "unknown",
-      "unknown_reason": "cannot materialize or copy a non-Copy owner",
-      "unknown_category": "semantics"
+      "expected": "proved"
     },
     {
       "entry": "incoming_drop_survey::mutable_unknown",
@@ -2600,6 +2594,57 @@
       "family": "owned_array_iterator_constructor",
       "expected": "unknown",
       "unknown_reason": "owned array iterator element destructors are not modeled",
+      "unknown_category": "semantics"
+    },
+    {
+      "entry": "shared_drop_calls_survey::claim",
+      "family": "shared_drop_receiver",
+      "expected": "proved"
+    },
+    {
+      "entry": "shared_drop_calls_survey::forwarded",
+      "family": "shared_drop_receiver",
+      "expected": "proved"
+    },
+    {
+      "entry": "shared_drop_calls_survey::lazy",
+      "family": "shared_drop_receiver",
+      "expected": "proved"
+    },
+    {
+      "entry": "shared_drop_calls_survey::codecs",
+      "family": "shared_drop_receiver",
+      "expected": "proved"
+    },
+    {
+      "entry": "shared_drop_calls_survey::wrong",
+      "family": "shared_drop_receiver",
+      "expected": "refuted"
+    },
+    {
+      "entry": "shared_drop_calls_survey::unguarded",
+      "family": "shared_drop_receiver",
+      "expected": "refuted"
+    },
+    {
+      "entry": "shared_drop_calls_survey::mutable_unknown",
+      "family": "shared_drop_receiver",
+      "expected": "unknown",
+      "unknown_reason": "shared Drop projection grants no mutable reference authority",
+      "unknown_category": "semantics"
+    },
+    {
+      "entry": "shared_drop_calls_survey::raw_unknown",
+      "family": "shared_drop_receiver",
+      "expected": "unknown",
+      "unknown_reason": "shared Drop projection grants no raw pointer authority",
+      "unknown_category": "semantics"
+    },
+    {
+      "entry": "shared_drop_calls_survey::product_unknown",
+      "family": "shared_drop_receiver",
+      "expected": "unknown",
+      "unknown_reason": "shared Drop projection cannot materialize or copy a non-Copy owner",
       "unknown_category": "semantics"
     }
   ]

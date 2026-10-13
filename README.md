@@ -61,7 +61,7 @@ product helpers execute actual bodies and preserve returned storage. Nested owne
 reborrows remain UNKNOWN. Deeper whole scalar calls preserve checked owner lineage and returned
 storage; the dedicated proper-reborrow caller remains UNKNOWN. Bounded owned u16 products support
 writes through multiple symbolic suffix indices, preserving compiler types and current Memory. The
-capability manifest covers 480 cases across 102 families, including concrete and symbolic local
+capability manifest covers 489 cases across 103 families, including concrete and symbolic local
 byte-copy controls.
 
 Fixed-array partial moves preserve initialization and execute remaining destructors in compiler
@@ -74,8 +74,10 @@ UNKNOWN.
 
 Shared fixed-array views of local Drop structs support guarded scalar field observations and
 ordinary scalar accessor calls, including authenticated lazy input arrays. Original types, current
-initialized storage and readonly witnesses remain required; actual destructors still execute. Whole
-Drop helper receivers and mutable/raw projection authority remain UNKNOWN.
+initialized storage and readonly witnesses remain required; actual destructors still execute.
+Ordinary helpers with one shared whole Drop receiver and a primitive result execute actual Rust
+bodies. Named whole contract observations, product-return helpers and mutable/raw projection
+authority remain UNKNOWN.
 
 Finite known shared trait objects can be selected from local fixed arrays and retained slices.
 Selected alternatives execute actual method bodies, preserving their backing references and

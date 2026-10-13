@@ -179,7 +179,7 @@ fn actual_drop_borrow_masks_source_identity_and_scalar_boundaries() {
             let carrier = reborrow_place.local.as_usize();
             state.locals[carrier] = Some(view.clone());
             let reborrowed = engine
-                .reborrow_drop_shared_scalar(&body, &state, reborrow_place)
+                .reborrow_drop_shared_view(&body, &state, reborrow_place)
                 .unwrap()
                 .unwrap();
             let Value::Reference {
@@ -199,9 +199,17 @@ fn actual_drop_borrow_masks_source_identity_and_scalar_boundaries() {
                 local: reborrow_place.local,
                 projection: tcx.mk_place_elems(&[ProjectionElem::Deref]),
             };
+            let whole_view = engine
+                .reborrow_drop_shared_view(&body, &state, whole)
+                .unwrap()
+                .unwrap();
+            assert!(matches!(
+                whole_view,
+                Value::Reference { mutable: false, .. }
+            ));
             assert!(
                 engine
-                    .reborrow_drop_shared_scalar(&body, &state, whole)
+                    .reference_value(&whole_view, &state.memory, &state.conditions)
                     .unwrap_err()
                     .contains("cannot materialize or copy a non-Copy owner")
             );
@@ -212,7 +220,7 @@ fn actual_drop_borrow_masks_source_identity_and_scalar_boundaries() {
                 .unwrap();
             assert!(
                 engine
-                    .reborrow_drop_shared_scalar(&body, &stale_carrier, reborrow_place)
+                    .reborrow_drop_shared_view(&body, &stale_carrier, reborrow_place)
                     .is_err()
             );
             let value = engine

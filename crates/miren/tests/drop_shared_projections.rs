@@ -123,7 +123,7 @@ fn genuine_shared_drop_storage_observations_preserve_types_and_refuse_rights() {
                     ("scalar_codecs", P),
                     ("wrong", R),
                     ("unguarded", R),
-                    ("whole_receiver_unknown", U),
+                    ("whole_receiver_unknown", P),
                     ("mutable_unknown", U),
                     ("raw_unknown", U),
                 ],
@@ -136,10 +136,6 @@ fn genuine_shared_drop_storage_observations_preserve_types_and_refuse_rights() {
                 body(&report, entry, "Dropped as core::ops::Drop");
             }
             for (entry, reason) in [
-                (
-                    "whole_receiver_unknown",
-                    "cannot materialize or copy a non-Copy owner",
-                ),
                 ("mutable_unknown", "grants no mutable reference authority"),
                 ("raw_unknown", "grants no raw pointer authority"),
             ] {
@@ -299,7 +295,7 @@ fn fieldless_lazy_views_preserve_original_drop_effects_and_missing_bodies() {
                     ("fieldless_drop::local", P),
                     ("fieldless_drop::wrong", R),
                     ("fieldless_drop::unguarded", R),
-                    ("fieldless_drop::whole_unknown", U),
+                    ("fieldless_drop::whole_unknown", P),
                 ],
                 target,
                 optimized,

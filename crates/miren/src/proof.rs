@@ -50,6 +50,7 @@ mod constant_reference_receipts;
 mod constants;
 mod coroutine_snapshots;
 mod coroutines;
+mod drop_shared_calls;
 mod drop_shared_projections;
 mod enum_tags;
 mod enum_transmutes;
@@ -1333,9 +1334,23 @@ impl<'tcx> Engine<'tcx> {
             .args_iter()
             .map(|local| body.local_decls[local].ty)
             .collect();
+        let contracts = self.configured_contracts(instance)?;
+        let binds_contract_names = contracts
+            .iter()
+            .any(|contract| !matches!(contract.kind, ContractKind::NoPanic))
+            || self
+                .specification(instance)?
+                .is_some_and(|spec| !spec.arguments.is_empty());
         let snapshots = if self.mutable_product_arguments(&arguments, &memory)? {
             flow.require_unarmed()?;
             self.mutable_product_unbound_contracts(instance)?;
+            Vec::new()
+        } else if !binds_contract_names
+            && matches!(flow, activation_flow::Flow::Unarmed)
+            && self.shared_drop_receiver_arguments(instance, &arguments, &memory, &conditions)?
+        {
+            // Actual body execution retains the original arguments and validates its reads.
+            // Unused detached observations need no owning materialization.
             Vec::new()
         } else if matches!(flow, activation_flow::Flow::Unarmed) {
             self.typed_coroutine_snapshots(&argument_types, &arguments, &memory, &conditions)?
@@ -1344,13 +1359,6 @@ impl<'tcx> Engine<'tcx> {
             // detached payloads; omit the actual operation rather than credit its work.
             Vec::new()
         };
-        let contracts = self.configured_contracts(instance)?;
-        let binds_contract_names = contracts
-            .iter()
-            .any(|contract| !matches!(contract.kind, ContractKind::NoPanic))
-            || self
-                .specification(instance)?
-                .is_some_and(|spec| !spec.arguments.is_empty());
         let bindings = if binds_contract_names {
             self.configured_bindings(body, &snapshots, instance)?
         } else {
@@ -2115,6 +2123,32 @@ impl<'tcx> Engine<'tcx> {
                         )?;
                         let target = target.ok_or("owned Box call has no normal return edge")?;
                         queue.push_back((target, state, retry_path.clone()));
+                        continue;
+                    }
+                    if let Some(results) = self.shared_drop_receiver_call(
+                        (caller_instance, &owned_body, block),
+                        instance,
+                        &values,
+                        &mut state,
+                        &stack,
+                    )? {
+                        let target = target.ok_or("shared Drop call has no normal return edge")?;
+                        for result in results {
+                            let mut continuation = self.adopt_flow_return(
+                                &state,
+                                result.conditions,
+                                result.memory,
+                                result.flow,
+                            )?;
+                            self.store_call_result(
+                                body,
+                                &mut continuation,
+                                *destination,
+                                destination_indices.as_ref(),
+                                result.value,
+                            )?;
+                            queue.push_back((target, continuation, retry_path.clone()));
+                        }
                         continue;
                     }
                     let argument_types: Vec<_> = args
@@ -3093,7 +3127,7 @@ impl<'tcx> Engine<'tcx> {
                 // Other snapshot/owned/readonly adapters refuse before construction.
                 state.flow.require_unarmed()?;
                 if let Some(value) = self
-                    .reborrow_drop_shared_scalar(body, state, *place)
+                    .reborrow_drop_shared_view(body, state, *place)
                     .map_err(|reason| self.drop_shared_error(reason))?
                 {
                     return Ok(value);

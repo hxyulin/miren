@@ -66,6 +66,12 @@ fn scalar(original: Ty<'_>) -> bool {
     )
 }
 
+pub(super) fn readonly_drop_struct<'tcx>(tcx: TyCtxt<'tcx>, original: Ty<'tcx>) -> bool {
+    matches!(original.kind(), ty::Adt(def, _) if def.did().is_local()
+        && def.is_struct() && !def.repr().packed() && def.destructor(tcx).is_some()
+        && original.is_freeze(tcx, ty::TypingEnv::fully_monomorphized()))
+}
+
 fn domain<'tcx>(
     tcx: TyCtxt<'tcx>,
     original: Ty<'tcx>,
@@ -954,7 +960,7 @@ impl<'tcx> Engine<'tcx> {
         self.read_drop_shared_reference(&view, &state.memory, &state.conditions)
     }
 
-    pub(super) fn reborrow_drop_shared_scalar(
+    pub(super) fn reborrow_drop_shared_view(
         &self,
         body: &Body<'tcx>,
         state: &State,
@@ -963,7 +969,8 @@ impl<'tcx> Engine<'tcx> {
         let Some(view) = self.drop_shared_deref_view(body, state, place)? else {
             return Ok(None);
         };
-        if !scalar(place.ty(&body.local_decls, self.tcx).ty) {
+        let original = place.ty(&body.local_decls, self.tcx).ty;
+        if !scalar(original) && !readonly_drop_struct(self.tcx, original) {
             return Err(
                 "shared Drop projection cannot materialize or copy a non-Copy owner".into(),
             );
@@ -974,7 +981,7 @@ impl<'tcx> Engine<'tcx> {
             mutable: false,
         } = &view
         else {
-            return Err("shared Drop scalar reborrow lacks its readonly storage view".into());
+            return Err("shared Drop readonly reborrow lacks its storage view".into());
         };
         self.check_drop_shared_reference(
             *allocation,
@@ -1176,6 +1183,57 @@ impl<'tcx> Engine<'tcx> {
             conditions,
         )?;
         Ok(true)
+    }
+
+    pub(super) fn shared_drop_reference_target(
+        &self,
+        reference: &Value,
+        memory: &Memory,
+        conditions: &[Term],
+    ) -> Result<Option<Ty<'tcx>>, String> {
+        let Value::Reference {
+            allocation,
+            projection,
+            mutable,
+        } = reference
+        else {
+            return Ok(None);
+        };
+        let Some((witness, path)) = self.drop_reference_path(*allocation, projection)? else {
+            return Ok(None);
+        };
+        if *mutable {
+            return Err("shared Drop projection grants no mutable reference authority".into());
+        }
+        self.check_drop_shared_reference(*allocation, projection, memory, conditions)?;
+        let value = memory
+            .get(*allocation)
+            .and_then(Option::as_ref)
+            .ok_or("shared Drop receiver owner is not live")?;
+        let candidates = self.drop_projection_candidates(
+            witness.original,
+            value,
+            &path,
+            Some((memory, *allocation)),
+            None,
+            conditions,
+        )?;
+        // Candidate construction rejects an entirely infeasible domain before returning.
+        let original = candidates
+            .first()
+            .ok_or("shared Drop receiver has no feasible candidate")?
+            .original;
+        if candidates
+            .iter()
+            .any(|candidate| candidate.original != original)
+        {
+            return Err("shared Drop receiver candidate original types differ".into());
+        }
+        if readonly_drop_struct(self.tcx, original) {
+            Ok(Some(original))
+        } else {
+            Ok(None)
+        }
     }
 
     pub(super) fn read_drop_shared_reference(

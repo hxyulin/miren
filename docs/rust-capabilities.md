@@ -2635,3 +2635,23 @@ for prepaid source-ledger cloning, callee-kind eligibility and test-directory un
 final full checks and release audit use the unchanged 1,019-file Root source snapshot. The prior
 compiler crash and failed host test run remain archived; their receipts are not counted as
 successful validation.
+
+
+## Ordinary shared Drop receivers
+
+Ordinary local helpers with one shared local Freeze Drop receiver and a primitive result execute
+actual Rust bodies. Current caller and callee identities, the original Call and receiver type,
+initialized owner storage, masks, bounds and Context remain required. Compiler bound regions are
+instantiated through the existing compiler service while preserving nominal pointee identities.
+
+Readonly whole-record reborrows retain the reference carrier and grant no owning copy. Only exact
+authenticated receivers in Unarmed flow without contract binding consumers omit unused callee
+snapshots. Requires, Ensures, NoPanic and normal return/storage handling remain in the ordinary call
+path. Whole contract views, product returns and mutable/raw authority remain UNKNOWN.
+
+The frozen four-profile controls advance three existing UNKNOWN cases to PROVED and measure four
+PROVED, two REFUTED and three UNKNOWN new cases. Real helper/destructor mutations refute the same
+claims; native originals pass and mutants fail. Actual compiler controls check nominal types,
+bound regions, current bodies, retired/consumed storage and foreign Context. No assumptions or
+missing-body success are introduced. Repeated current candidate validations remain separately
+bounded semantic services under unchanged limits.

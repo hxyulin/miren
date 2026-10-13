@@ -41,7 +41,7 @@ fn lazy_drop_scalar_observations_execute_destructors_and_refuse_other_authority(
                     ("nested", P),
                     ("wrong", R),
                     ("unguarded", R),
-                    ("whole_unknown", U),
+                    ("whole_unknown", P),
                     ("mutable_unknown", U),
                     ("raw_unknown", U),
                     ("reserved", P),
@@ -70,10 +70,6 @@ fn lazy_drop_scalar_observations_execute_destructors_and_refuse_other_authority(
                 entered(&report, entry, "release_guard");
             }
             for (entry, reason) in [
-                (
-                    "whole_unknown",
-                    "cannot materialize or copy a non-Copy owner",
-                ),
                 ("mutable_unknown", "grants no mutable reference authority"),
                 ("raw_unknown", "grants no raw pointer authority"),
             ] {

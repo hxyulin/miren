@@ -1756,3 +1756,13 @@ Unsupported incoming iterator snapshots and the existing Drop-element exclusion 
 UNKNOWN. Reference-bearing payloads retain the ordinary Drop-element refusal before consuming their
 source. The existing `partial_array_drops_survey::iterator_claim` remains UNKNOWN with its original
 destructor-exclusion reason; only its previously unclassified category becomes Semantics.
+
+
+Whole shared views of local Freeze Drop records can enter available ordinary Rust helpers with
+one shared receiver and a primitive result. The actual helper and destructor bodies execute against
+current caller storage. The route authenticates the real Call, compiler signature, current bodies,
+original pointee and readonly witness; it never materializes or copies an owning Drop value.
+Readonly whole-record reborrows preserve the original reference carrier. Only unconsumed callee
+snapshots with the existing argument-binding predicate false are omitted, after receiver validation.
+Ordinary NoPanic metadata remains supported. Requires/Ensures needing whole-record observations,
+mutable/raw authority, nonprimitive results and unsupported adapters remain conservative.
