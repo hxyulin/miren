@@ -3675,3 +3675,24 @@ Armed transport invariants use an explicitly tagged, test-only 8192-unit diagnos
 Ordinary transport retains its 2048-unit ceiling, and the unchanged nested control still reaches
 that limit. The diagnostic constructor and policy field are absent from release builds. Diagnostic
 Return controls establish host invariants, not ordinary-budget fit or application proof outcomes.
+
+
+## Lazy incoming Drop-array scalar observations
+
+Readonly scalar observations can follow Engine-issued lazy fixed arrays of local Freeze Drop
+structs with primitive fields. Every service checks the complete original type, exact descriptor
+identity, namespace seed, symbol reservation and Context. Descendant descriptors borrow that
+immutable evidence and derive checked offsets; they carry no whole-owner copying permission.
+Current caller witnesses, guarded bounds and each feasible initialized field path remain required.
+
+Uniform array element types are checked once. Direct traversal creates only feasible candidates;
+primitive leaves decode once after their masks pass and retain validated scalar values for merging.
+The unchanged 512-node service bound counts type and descriptor visits, branch terms, candidate
+construction, field traversal and scalar decoding. It is separate from activation structural work.
+The 64-element symbolic control uses 461 nodes; its constant-index control uses 209. Original root
+validation uses 12 nodes. No execution limit is raised.
+
+Bool, integer and exact f32/f64 lazy fields are supported. Char pressure controls retain eager
+storage because lazy Char descriptors remain unavailable. Whole Drop receivers and mutable/raw
+projection authority remain UNKNOWN. Actual array glue, element destructors and their helpers
+execute normally; unavailable helpers remain UNKNOWN. No external-state assumptions are added.

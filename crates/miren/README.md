@@ -1717,3 +1717,17 @@ Armed transport invariants use an explicitly tagged, test-only 8192-unit diagnos
 Ordinary transport retains its 2048-unit ceiling, and the unchanged nested control still reaches
 that limit. The diagnostic constructor and policy field are absent from release builds. Diagnostic
 Return controls establish host invariants, not ordinary-budget fit or application proof outcomes.
+
+
+Readonly scalar projections also retain Engine-issued lazy fixed-array storage of local Freeze
+Drop structs with primitive fields. Each service authenticates the complete original root type,
+descriptor identity and symbol reservation before deriving bounded descendant offsets. Feasible
+projections still require initialized storage, guarded bounds and current readonly witnesses.
+Uniform fixed arrays validate their identical element type once. Direct index traversal creates
+only feasible candidate carriers, which borrow authenticated descriptors; primitive leaves decode
+once and retain validated scalars. The unchanged 512-node service bound counts visited type and
+descriptor nodes, branch terms and candidates, field traversal and scalar decoding; it is not a
+CPU-instruction counter. Scalar codecs preserve Bool, integer and exact f32/f64 representation. Lazy
+Char inputs
+remain unavailable; eager Char storage retains its existing support. Whole owners, mutable/raw
+projection authority and missing destructor bodies remain unsupported. Destructors execute normally.

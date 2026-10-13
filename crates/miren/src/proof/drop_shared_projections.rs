@@ -3,6 +3,7 @@ use super::*;
 use initialized_places::Step;
 use std::rc::{Rc, Weak};
 use symbolic::MemoryProjection;
+use symbolic::input::{InputKind, InputShape, InputValue};
 
 #[derive(Clone, Debug)]
 pub(super) struct Witness<'tcx> {
@@ -13,15 +14,36 @@ pub(super) struct Witness<'tcx> {
 }
 
 struct Candidate<'a, 'tcx> {
-    value: &'a Value,
+    value: Storage<'a>,
     original: Ty<'tcx>,
     mask: Term,
     fields: Vec<Step>,
 }
 
-struct Work(usize);
+enum Storage<'a> {
+    Physical(&'a Value),
+    Lazy(LazyStorage<'a>),
+    Scalar(Value),
+}
+
+#[derive(Clone, Copy)]
+struct LazyStorage<'a> {
+    shape: &'a Rc<InputShape>,
+    start: u32,
+    seed: &'a Term,
+}
+
+enum ArrayStorage<'a> {
+    Physical(&'a symbolic::Elements),
+    Lazy(LazyStorage<'a>),
+}
+
+// This bounds semantic nodes visited or constructed by one service, not CPU instructions.
+// Type/descriptor nodes and traversed fields cost one. An index branch costs three for
+// equality, guard conjunction and candidate construction. Scalar decoding costs one.
+pub(super) struct Work(usize);
 impl Work {
-    fn charge(&mut self, count: usize) -> Result<(), String> {
+    pub(super) fn charge(&mut self, count: usize) -> Result<(), String> {
         self.0 = self
             .0
             .checked_add(count)
@@ -62,10 +84,9 @@ fn domain<'tcx>(
             if count > 128 {
                 return Err("shared Drop projection exceeds array count128".into());
             }
-            for _ in 0..count.max(1) {
-                domain(tcx, *child, depth + 1, work)?;
-            }
-            Ok(())
+            // Every fixed-array occurrence has the same original element type.
+            // Validate that complete type once, including the zero-length case.
+            domain(tcx, *child, depth + 1, work)
         }
         ty::Adt(def, args)
             if def.did().is_local()
@@ -170,8 +191,99 @@ impl<'tcx> Engine<'tcx> {
         {
             return Ok(false);
         }
-        domain(self.tcx, original, 0, &mut Work(0))?;
+        self.drop_input_domain(original, &mut Work(0))?;
         Ok(true)
+    }
+
+    pub(super) fn drop_input_domain(
+        &self,
+        original: Ty<'tcx>,
+        work: &mut Work,
+    ) -> Result<(), String> {
+        if !matches!(original.kind(), ty::Array(..))
+            || !original.needs_drop(self.tcx, ty::TypingEnv::fully_monomorphized())
+        {
+            return Err("shared Drop lazy storage lacks an original Drop array".into());
+        }
+        domain(self.tcx, original, 0, work)
+    }
+
+    pub(super) fn validate_drop_input_descriptor(
+        &self,
+        original: Ty<'tcx>,
+        shape: &InputShape,
+        work: &mut Work,
+    ) -> Result<(), String> {
+        self.drop_input_descriptor(original, shape, 0, work)
+    }
+
+    fn drop_input_descriptor(
+        &self,
+        original: Ty<'tcx>,
+        shape: &InputShape,
+        depth: usize,
+        work: &mut Work,
+    ) -> Result<(), String> {
+        work.charge(1)?;
+        if depth >= 16 {
+            return Err("shared Drop lazy descriptor exceeds depth16".into());
+        }
+        let (slots, height) = match (original.kind(), &shape.kind) {
+            (ty::Bool, InputKind::Bool) => (1, 1),
+            (ty::Int(_) | ty::Uint(_), InputKind::Integer { bits, signed })
+                if self.integer_type(original) == Some((*bits, *signed)) =>
+            {
+                (1, 1)
+            }
+            (ty::Float(_), InputKind::Float { bits })
+                if self.float_type(original) == Some(*bits) =>
+            {
+                (1, 1)
+            }
+            (ty::Array(child, expected), InputKind::Array { element, count })
+                if expected.try_to_target_usize(self.tcx) == Some(*count as u64)
+                    && *count <= 128 =>
+            {
+                self.drop_input_descriptor(*child, element, depth + 1, work)?;
+                let slots = element
+                    .slots
+                    .checked_mul(*count as u32)
+                    .and_then(|slots| slots.checked_add(1))
+                    .ok_or("shared Drop lazy descriptor slots overflow")?;
+                (slots, element.height + 1)
+            }
+            (ty::Adt(def, args), InputKind::Struct { name, fields })
+                if def.did().is_local()
+                    && def.is_struct()
+                    && !def.repr().packed()
+                    && def.destructor(self.tcx).is_some()
+                    && original.is_freeze(self.tcx, ty::TypingEnv::fully_monomorphized())
+                    && *name == self.tcx.def_path_str(def.did())
+                    && name.len() <= 128
+                    && fields.len() == def.non_enum_variant().fields.len() =>
+            {
+                let mut slots = 1_u32;
+                let mut height = 1;
+                for ((name, shape), field) in fields.iter().zip(&def.non_enum_variant().fields) {
+                    work.charge(1)?;
+                    let original = field.ty(self.tcx, args).skip_norm_wip();
+                    if name.len() > 128 || *name != field.name.as_str() || !scalar(original) {
+                        return Err("shared Drop lazy descriptor original field differs".into());
+                    }
+                    self.drop_input_descriptor(original, shape, depth + 1, work)?;
+                    slots = slots
+                        .checked_add(shape.slots)
+                        .ok_or("shared Drop lazy descriptor slots overflow")?;
+                    height = height.max(shape.height + 1);
+                }
+                (slots, height)
+            }
+            _ => return Err("shared Drop lazy descriptor original type differs".into()),
+        };
+        if shape.slots != slots || shape.height != height {
+            return Err("shared Drop lazy descriptor slots or height differs".into());
+        }
+        Ok(())
     }
 
     fn drop_projection_path(
@@ -273,6 +385,17 @@ impl<'tcx> Engine<'tcx> {
         work: &mut Work,
     ) -> Result<(), String> {
         work.charge(1)?;
+        if let Value::Input(input) = value
+            && input.shape.slots != 0
+        {
+            work.charge(3)?;
+            self.validate_issued_drop_storage(original, input, work)?;
+            if scalar(original) {
+                let value = input.materialize()?;
+                return self.validate_drop_storage(original, &value, conditions, work);
+            }
+            return Ok(());
+        }
         match original.kind() {
             ty::Array(child, count) => {
                 let count = count
@@ -392,9 +515,12 @@ impl<'tcx> Engine<'tcx> {
             return Err("shared Drop projection exceeds depth16".into());
         }
         let mut work = Work(0);
-        domain(self.tcx, original, 0, &mut work)?;
+        if !matches!(value, Value::Input(input) if input.shape.slots != 0) {
+            domain(self.tcx, original, 0, &mut work)?;
+        }
+        let storage = self.drop_storage_candidate(original, value, &mut work)?;
         let mut candidates = vec![Candidate {
-            value,
+            value: storage,
             original,
             mask: self.terms.boolean(true),
             fields: Vec::new(),
@@ -411,14 +537,22 @@ impl<'tcx> Engine<'tcx> {
                         let count = count
                             .try_to_target_usize(self.tcx)
                             .ok_or("shared Drop projection count is not concrete")?;
-                        let Value::Elements(elements) = candidate.value else {
-                            return Err(
-                                "shared Drop projection requires retained physical elements".into(),
-                            );
-                        };
-                        if elements.len() as u64 != count {
-                            return Err("shared Drop projection backing count differs".into());
-                        }
+                        let elements =
+                            match candidate.value {
+                                Storage::Physical(Value::Elements(elements)) => {
+                                    if elements.len() as u64 != count {
+                                        return Err(
+                                            "shared Drop projection backing count differs".into()
+                                        );
+                                    }
+                                    ArrayStorage::Physical(elements)
+                                }
+                                Storage::Lazy(input) => ArrayStorage::Lazy(input),
+                                Storage::Physical(_) | Storage::Scalar(_) => return Err(
+                                    "shared Drop projection requires retained physical elements"
+                                        .into(),
+                                ),
+                            };
                         let (term, bits, signed) = index.integer()?;
                         if signed
                             || bits != u32::from(self.tcx.sess.target.pointer_width)
@@ -439,7 +573,7 @@ impl<'tcx> Engine<'tcx> {
                             &self.iterator_index(u128::from(count)),
                             &active,
                         )?;
-                        for (position, value) in elements.iter().enumerate() {
+                        for position in 0..count as usize {
                             work.charge(3)?;
                             let equal = self.terms.apply(
                                 Op::Equal,
@@ -453,6 +587,35 @@ impl<'tcx> Engine<'tcx> {
                             if !self.feasible(&active)? {
                                 continue;
                             }
+                            let value = match &elements {
+                                ArrayStorage::Physical(elements) => self.drop_storage_candidate(
+                                    *child,
+                                    &elements[position],
+                                    &mut work,
+                                )?,
+                                ArrayStorage::Lazy(input) => {
+                                    let InputKind::Array { element, .. } = &input.shape.kind else {
+                                        return Err(
+                                            "shared Drop lazy projection lacks array".into()
+                                        );
+                                    };
+                                    let start = element
+                                        .slots
+                                        .checked_mul(position as u32)
+                                        .and_then(|offset| {
+                                            input
+                                                .start
+                                                .checked_add(1)
+                                                .and_then(|first| first.checked_add(offset))
+                                        })
+                                        .ok_or("shared Drop lazy projection offset overflow")?;
+                                    Storage::Lazy(LazyStorage {
+                                        shape: element,
+                                        start,
+                                        seed: input.seed,
+                                    })
+                                }
+                            };
                             let mut fields = candidate.fields.clone();
                             fields.push(Step::Element(position));
                             next.push(Candidate {
@@ -474,37 +637,74 @@ impl<'tcx> Engine<'tcx> {
                         let ty::Adt(def, _) = candidate.original.kind() else {
                             unreachable!()
                         };
-                        let Value::Adt {
-                            name,
-                            variant: 0,
-                            is_option: false,
-                            discriminant: 0,
-                            fields,
-                        } = candidate.value
-                        else {
-                            return Err(
-                                "shared Drop projection stored original struct differs".into()
-                            );
+                        let value = match candidate.value {
+                            Storage::Physical(value) => {
+                                let Value::Adt {
+                                    name,
+                                    variant: 0,
+                                    is_option: false,
+                                    discriminant: 0,
+                                    fields,
+                                } = value
+                                else {
+                                    return Err(
+                                        "shared Drop projection stored original struct differs"
+                                            .into(),
+                                    );
+                                };
+                                work.charge(1 + fields.len().saturating_mul(2))?;
+                                if name.len() > 128
+                                    || fields.iter().any(|(name, _)| name.len() > 128)
+                                {
+                                    return Err(
+                                        "shared Drop projection name exceeds128 bytes".into()
+                                    );
+                                }
+                                if *name != self.tcx.def_path_str(def.did())
+                                    || fields.len() != def.non_enum_variant().fields.len()
+                                    || fields
+                                        .iter()
+                                        .zip(&def.non_enum_variant().fields)
+                                        .any(|((name, _), field)| *name != field.name.to_string())
+                                {
+                                    return Err(
+                                        "shared Drop projection physical field inventory differs"
+                                            .into(),
+                                    );
+                                }
+                                self.drop_storage_candidate(child, &fields[*index].1, &mut work)?
+                            }
+                            Storage::Lazy(input) => {
+                                // Field inventory and original types were checked at root issuance.
+                                let InputKind::Struct { fields, .. } = &input.shape.kind else {
+                                    return Err("shared Drop lazy projection lacks struct".into());
+                                };
+                                let mut start = input
+                                    .start
+                                    .checked_add(1)
+                                    .ok_or("shared Drop lazy projection offset overflow")?;
+                                for (_, shape) in &fields[..*index] {
+                                    work.charge(1)?;
+                                    start = start
+                                        .checked_add(shape.slots)
+                                        .ok_or("shared Drop lazy projection offset overflow")?;
+                                }
+                                Storage::Lazy(LazyStorage {
+                                    shape: &fields[*index].1,
+                                    start,
+                                    seed: input.seed,
+                                })
+                            }
+                            Storage::Scalar(_) => {
+                                return Err(
+                                    "shared Drop scalar cannot carry a struct projection".into()
+                                );
+                            }
                         };
-                        work.charge(1 + fields.len().saturating_mul(2))?;
-                        if name.len() > 128 || fields.iter().any(|(name, _)| name.len() > 128) {
-                            return Err("shared Drop projection name exceeds128 bytes".into());
-                        }
-                        if *name != self.tcx.def_path_str(def.did())
-                            || fields.len() != def.non_enum_variant().fields.len()
-                            || fields
-                                .iter()
-                                .zip(&def.non_enum_variant().fields)
-                                .any(|((name, _), field)| *name != field.name.to_string())
-                        {
-                            return Err(
-                                "shared Drop projection physical field inventory differs".into()
-                            );
-                        }
                         let mut keys = candidate.fields;
                         keys.push(Step::Field(*index));
                         next.push(Candidate {
-                            value: &fields[*index].1,
+                            value,
                             original: child,
                             mask: candidate.mask,
                             fields: keys,
@@ -518,18 +718,83 @@ impl<'tcx> Engine<'tcx> {
         if candidates.is_empty() {
             return Err("shared Drop projection has no feasible initialized target".into());
         }
-        for candidate in &candidates {
+        for candidate in &mut candidates {
             work.charge(1)?;
             let mut active = conditions.to_vec();
             active.push(candidate.mask.clone());
-            self.validate_drop_storage(candidate.original, candidate.value, &active, &mut work)?;
+            let decoded = match &candidate.value {
+                Storage::Physical(value) => {
+                    self.validate_drop_storage(candidate.original, value, &active, &mut work)?;
+                    None
+                }
+                Storage::Lazy(input) if scalar(candidate.original) => {
+                    work.charge(1)?;
+                    let value = InputValue {
+                        shape: input.shape.clone(),
+                        start: input.start,
+                        seed: input.seed.clone(),
+                    }
+                    .materialize()?;
+                    self.validate_drop_storage(candidate.original, &value, &active, &mut work)?;
+                    Some(value)
+                }
+                // Complete root descriptor/type validation covers composite descendants.
+                Storage::Lazy(_) => None,
+                Storage::Scalar(_) => return Err("shared Drop scalar was decoded twice".into()),
+            };
             if let Some((memory, allocation)) = memory {
                 memory.missing_places.check(allocation, &candidate.fields)?;
             } else if let Some((state, local)) = local_masks {
                 state.missing_places.check(local, &candidate.fields)?;
             }
+            if let Some(value) = decoded {
+                // Retain a scalar only after original type, active guard and masks all pass.
+                candidate.value = Storage::Scalar(value);
+            }
+        }
+        #[cfg(test)]
+        if matches!(value, Value::Input(_)) {
+            println!(
+                "shared lazy Drop projection: candidates={} nodes={}",
+                candidates.len(),
+                work.0
+            );
         }
         Ok(candidates)
+    }
+
+    fn drop_storage_candidate<'a>(
+        &self,
+        original: Ty<'tcx>,
+        value: &'a Value,
+        work: &mut Work,
+    ) -> Result<Storage<'a>, String> {
+        match value {
+            Value::Input(input) if input.shape.slots != 0 => {
+                self.validate_issued_drop_storage(original, input, work)?;
+                Ok(Storage::Lazy(LazyStorage {
+                    shape: &input.shape,
+                    start: input.start,
+                    seed: &input.seed,
+                }))
+            }
+            _ => Ok(Storage::Physical(value)),
+        }
+    }
+
+    fn drop_storage_scalar(
+        &self,
+        original: Ty<'tcx>,
+        storage: &Storage<'_>,
+    ) -> Result<Value, String> {
+        if !scalar(original) {
+            return Err("shared Drop lazy scalar cannot materialize an owner".into());
+        }
+        match storage {
+            Storage::Physical(value) => Ok((*value).clone()),
+            Storage::Scalar(value) => Ok(value.clone()),
+            Storage::Lazy(_) => Err("shared Drop scalar lacks a validated decode".into()),
+        }
     }
 
     fn drop_projection_scalar(
@@ -546,13 +811,15 @@ impl<'tcx> Engine<'tcx> {
         let shape = self
             .owned_product_shape(first.original)?
             .ok_or("shared Drop projection scalar codec is unsupported")?;
-        let mut result = self.prepare_typed_product(first.original, &shape, first.value, 0)?;
+        let first_value = self.drop_storage_scalar(first.original, &first.value)?;
+        let mut result = self.prepare_typed_product(first.original, &shape, &first_value, 0)?;
         self.validate_owned_product(first.original, &result, conditions)?;
         for candidate in candidates.iter().skip(1) {
             if candidate.original != first.original {
                 return Err("shared Drop projection candidate scalar types differ".into());
             }
-            let value = self.prepare_typed_product(first.original, &shape, candidate.value, 0)?;
+            let physical = self.drop_storage_scalar(candidate.original, &candidate.value)?;
+            let value = self.prepare_typed_product(first.original, &shape, &physical, 0)?;
             self.validate_owned_product(first.original, &value, conditions)?;
             result = match (value, result) {
                 (

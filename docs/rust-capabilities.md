@@ -2556,3 +2556,40 @@ Across 1,728 retained Proof comparisons, 60 are literal and 1,665 differ only by
 fixture fingerprint. Three query-free fold deadline contexts are recorded separately, rather than
 called FULL. All 3,776 retained queried obligations and models match exactly. No assumptions,
 trusted boundaries or missing-body success are introduced.
+
+
+## Lazy incoming Drop-array scalar observations
+
+Readonly scalar observations can follow Engine-issued lazy fixed arrays of local Freeze Drop
+structs with primitive fields. Every service checks the complete original type, exact descriptor
+identity, namespace seed, symbol reservation and Context. Descendant descriptors borrow that
+immutable evidence and derive checked offsets; they carry no whole-owner copying permission.
+Current caller witnesses, guarded bounds and each feasible initialized field path remain required.
+
+Uniform array element types are checked once. Direct traversal creates only feasible candidates;
+primitive leaves decode once after their masks pass and retain validated scalar values for merging.
+The unchanged 512-node service bound counts type and descriptor visits, branch terms, candidate
+construction, field traversal and scalar decoding. It is separate from activation structural work.
+The 64-element symbolic control uses 461 nodes; its constant-index control uses 209. Original root
+validation uses 12 nodes. No execution limit is raised.
+
+Bool, integer and exact f32/f64 lazy fields are supported. Char pressure controls retain eager
+storage because lazy Char descriptors remain unavailable. Whole Drop receivers and mutable/raw
+projection authority remain UNKNOWN. Actual array glue, element destructors and their helpers
+execute normally; unavailable helpers remain UNKNOWN. No external-state assumptions are added.
+
+
+The final release survey has 474 cases across 101 families: 237 PROVED, 143 REFUTED and
+94 UNKNOWN on each host/ARM O0/O2 profile. The seventeen appended cases add fourteen supported
+outcomes; no old manifest expectation changes. The preserved standalone reserved case advances
+from UNKNOWN to PROVED. The full workspace run passes 968 outer Rust tests and 91 Python tests.
+Formatting, lint, release builds, dependency checks, manual hooks and documentation checks pass.
+Root production, probes, integration tests and standalone fixture match the frozen private package.
+Only one new namespaced signature was formatted after composition; existing guest bytes stay exact.
+
+
+All 457 old case objects and the complete old fixture prefix remain literal. Across 1,828 retained
+Proof comparisons, 60 are literal and 1,765 differ only by the appended fixture fingerprint. Three
+query-free fold deadline contexts are recorded separately. All 3,996 retained queried obligations
+and models match exactly. Independent reviews cover both the frozen private source and Root
+composition, including the signature formatting qualification.

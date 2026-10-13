@@ -90,6 +90,98 @@ impl<'tcx> Engine<'tcx> {
         Ok(())
     }
 
+    pub(super) fn validate_issued_drop_storage(
+        &self,
+        original: Ty<'tcx>,
+        input: &InputValue,
+        work: &mut drop_shared_projections::Work,
+    ) -> Result<(), String> {
+        if self.input_reservations.len() > 512 {
+            return Err("shared Drop lazy reservation lookup exceeds 512 entries".into());
+        }
+        let mut found = None;
+        for root in &self.input_reservations {
+            work.charge(1)?;
+            if root.reservation.seed == input.seed {
+                found = Some(root);
+                break;
+            }
+        }
+        let root = found.ok_or("shared Drop lazy storage lacks an issued reservation")?;
+        root.reservation.validate(&self.terms, input)?;
+        self.drop_input_domain(root.original, work)?;
+        self.validate_drop_input_descriptor(root.original, &root.reservation.shape, work)?;
+        let query = ProductQuery {
+            root,
+            expected: original,
+            input,
+        };
+        if !self.issued_drop_path(
+            &query,
+            root.original,
+            &root.reservation.shape,
+            root.reservation.start,
+            0,
+            work,
+        )? {
+            return Err("shared Drop lazy storage descriptor or occurrence differs".into());
+        }
+        Ok(())
+    }
+
+    fn issued_drop_path(
+        &self,
+        query: &ProductQuery<'_, 'tcx>,
+        original: Ty<'tcx>,
+        shape: &Rc<InputShape>,
+        start: u32,
+        depth: usize,
+        work: &mut drop_shared_projections::Work,
+    ) -> Result<bool, String> {
+        work.charge(1)?;
+        if depth >= 16 {
+            return Err("shared Drop lazy storage path exceeds depth16".into());
+        }
+        if query.root.reservation.exact_node(query.input, shape, start) {
+            return Ok(original == query.expected);
+        }
+        let first = start
+            .checked_add(1)
+            .ok_or("shared Drop lazy storage offset overflow")?;
+        match (original.kind(), &shape.kind) {
+            (ty::Array(child, _), InputKind::Array { element, count }) => {
+                let Some(start) =
+                    array_child_start(first, element.slots, *count, query.input.start)?
+                else {
+                    return Ok(false);
+                };
+                self.issued_drop_path(query, *child, element, start, depth + 1, work)
+            }
+            (ty::Adt(def, args), InputKind::Struct { fields, .. }) => {
+                let mut offset = first;
+                for (field, (_, shape)) in def.non_enum_variant().fields.iter().zip(fields) {
+                    work.charge(1)?;
+                    let end = offset
+                        .checked_add(shape.slots)
+                        .ok_or("shared Drop lazy storage field overflow")?;
+                    if (offset..end).contains(&query.input.start) {
+                        return self.issued_drop_path(
+                            query,
+                            field.ty(self.tcx, args).skip_norm_wip(),
+                            shape,
+                            offset,
+                            depth + 1,
+                            work,
+                        );
+                    }
+                    offset = end;
+                }
+                Ok(false)
+            }
+            _ => Ok(false),
+        }
+    }
+
     fn issued_product_path(
         &self,
         query: &ProductQuery<'_, 'tcx>,

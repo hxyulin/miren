@@ -7420,3 +7420,50 @@ Across 1,728 retained Proof comparisons, 60 are literal and 1,665 differ only by
 fixture fingerprint. Three query-free fold deadline contexts are recorded separately, rather than
 called FULL. All 3,776 retained queried obligations and models match exactly. No assumptions,
 trusted boundaries or missing-body success are introduced.
+
+
+## Stage248: authenticated lazy Drop-array scalar projections
+
+The preserved incoming-array control previously failed because the projection path required physical
+elements. Engine-issued lazy descriptors now have a separate readonly storage validator; the
+existing pure-product issuance validator is unchanged. Complete original types, descriptor identity,
+namespace/ranges and Context are checked before deriving readonly descendants. Actual initialization
+masks, bounds, Body/Instance witnesses and typed scalar merge checks remain required.
+
+Review removed an intermediate candidate vector and repeated scalar decoding. Candidates now borrow
+descriptor shape/seed evidence during one immutable service, and selected primitives are retained
+only after their field masks pass. Uniform array type checking visits the identical complete child
+type once, reducing the original control type walk from 193 to 4. Actual node receipts are 12 for
+root authentication, 209 for constant indexing and 461 for 64 feasible symbolic candidates, under
+the unchanged 512-node service limit. This is a semantic node/service bound, not a CPU counter.
+
+Private scoped formatting, Clippy, probes, integration controls and builds pass. The original
+reserved control proves on all four profiles with real destructor and helper body entries. The
+17-case private matrix measures 8 PROVED, 6 REFUTED and 3 UNKNOWN per profile. Genuine accessor and
+destructor mutations refute unchanged reserved/deferred claims on every profile; native originals
+pass and mutants fail. No assumption, whole-owner copy, mutable/raw authority or destructor skip is
+introduced. The initial Char UNKNOWN expectation was corrected after measuring eager PROVED. Earlier
+cleanup syntax and Clippy failures remain archived.
+
+The frozen Parent246 package is /tmp/miren-lazy-drop-parent246-source-v2/source.json; scoped
+receipts are /tmp/miren-lazy-drop-parent246-v10-controls and final raw evidence is
+/tmp/miren-lazy-drop-parent246-final-raw-v2. Root composition preserves all 457 old case objects and the entire old
+guest fixture prefix, appending 17 namespaced controls. An initial manifest punctuation error during
+composition was corrected before validation. Full Root checks, independent review and release replay
+are required before committing this stage.
+
+
+The final release survey has 474 cases across 101 families: 237 PROVED, 143 REFUTED and
+94 UNKNOWN on each host/ARM O0/O2 profile. The seventeen appended cases add fourteen supported
+outcomes; no old manifest expectation changes. The preserved standalone reserved case advances
+from UNKNOWN to PROVED. The full workspace run passes 968 outer Rust tests and 91 Python tests.
+Formatting, lint, release builds, dependency checks, manual hooks and documentation checks pass.
+Root production, probes, integration tests and standalone fixture match the frozen private package.
+Only one new namespaced signature was formatted after composition; existing guest bytes stay exact.
+
+
+All 457 old case objects and the complete old fixture prefix remain literal. Across 1,828 retained
+Proof comparisons, 60 are literal and 1,765 differ only by the appended fixture fingerprint. Three
+query-free fold deadline contexts are recorded separately. All 3,996 retained queried obligations
+and models match exactly. Independent reviews cover both the frozen private source and Root
+composition, including the signature formatting qualification.

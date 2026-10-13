@@ -849,3 +849,261 @@ fn actual_fieldless_lazy_views_check_types_descriptors_context_and_masks() {
     }
     std::fs::remove_dir_all(directory).unwrap();
 }
+
+#[test]
+fn actual_issued_lazy_drop_descriptors_preserve_namespace_and_initialized_paths() {
+    struct Check(bool);
+    impl rustc_driver::Callbacks for Check {
+        fn after_analysis<'tcx>(
+            &mut self,
+            _: &rustc_interface::interface::Compiler,
+            tcx: TyCtxt<'tcx>,
+        ) -> rustc_driver::Compilation {
+            let config = miren::ContractConfig::default();
+            let options = VerificationOptions {
+                all_failures: false,
+                induction: false,
+                startup: false,
+                isolated_startup: false,
+                async_entry: false,
+                limits: miren::AnalysisLimits::default(),
+            };
+            let mut engine = Engine::new(tcx, &config, options);
+            let id = tcx
+                .mir_keys(())
+                .iter()
+                .copied()
+                .find(|id| {
+                    tcx.def_kind(*id) == DefKind::Fn
+                        && tcx.item_name(id.to_def_id()).as_str() == "reserved"
+                })
+                .unwrap()
+                .to_def_id();
+            let body = engine
+                .instantiated_body(ty::Instance::mono(tcx, id))
+                .unwrap();
+            let input_cost = body.args_iter().fold(0_usize, |cost, local| {
+                cost.saturating_add(engine.root_input_cost(body.local_decls[local].ty))
+            });
+            assert!(input_cost > MAX_INPUT_VALUES);
+            engine.prefer_lazy_inputs = input_cost > MAX_INPUT_VALUES;
+            let mut conditions = Vec::new();
+            let mut args = Vec::new();
+            for local in body.args_iter() {
+                args.push(
+                    engine
+                        .argument(id, body.local_decls[local].ty, &mut conditions)
+                        .unwrap(),
+                );
+            }
+            let original = body.local_decls[rustc_middle::mir::Local::from_usize(1)].ty;
+            let Value::Input(input) = &args[0] else {
+                panic!("actual root must be lazy");
+            };
+            assert_eq!(engine.input_reservations.len(), 3);
+            let mut exhausted = Work(511);
+            exhausted.charge(1).unwrap();
+            assert!(exhausted.charge(1).is_err());
+            assert!(exhausted.charge(0).is_err());
+            let mut type_work = Work(0);
+            domain(tcx, original, 0, &mut type_work).unwrap();
+            assert_eq!(type_work.0, 4);
+            println!("uniform array domain: 4 actual type nodes; previous repeated walk used 193");
+            let mut work = Work(0);
+            engine
+                .validate_issued_drop_storage(original, input, &mut work)
+                .unwrap();
+            println!("lazy Drop root actual authentication charge={}", work.0);
+            assert!(engine.validate_issued_product(original, input).is_err());
+            for bad in [
+                InputValue {
+                    shape: Rc::new((*input.shape).clone()),
+                    ..input.clone()
+                },
+                InputValue {
+                    start: input.start + 1,
+                    ..input.clone()
+                },
+                InputValue {
+                    seed: symbolic::Context::default().boolean(false),
+                    ..input.clone()
+                },
+                InputValue {
+                    seed: engine.input_reservations[1].reservation.seed.clone(),
+                    ..input.clone()
+                },
+                InputValue {
+                    start: engine.input_reservations[1].reservation.start,
+                    shape: engine.input_reservations[1].reservation.shape.clone(),
+                    ..input.clone()
+                },
+            ] {
+                assert!(
+                    engine
+                        .validate_issued_drop_storage(original, &bad, &mut Work(0))
+                        .is_err()
+                );
+            }
+            assert!(
+                engine
+                    .validate_issued_drop_storage(tcx.types.u32, input, &mut Work(0))
+                    .is_err()
+            );
+            let mut malformed = (*input.shape).clone();
+            malformed.height += 1;
+            assert!(
+                engine
+                    .validate_drop_input_descriptor(original, &malformed, &mut Work(0))
+                    .is_err()
+            );
+            let InputKind::Array { element, .. } = &input.shape.kind else {
+                unreachable!()
+            };
+            let mut bad_element = (**element).clone();
+            let InputKind::Struct { fields, .. } = &mut bad_element.kind else {
+                unreachable!()
+            };
+            let mut wrong_field = (*fields[0].1).clone();
+            wrong_field.kind = InputKind::Integer {
+                bits: 32,
+                signed: false,
+            };
+            fields[0].1 = Rc::new(wrong_field);
+            let mut wrong_root = (*input.shape).clone();
+            let InputKind::Array { element, .. } = &mut wrong_root.kind else {
+                unreachable!()
+            };
+            *element = Rc::new(bad_element);
+            assert!(
+                engine
+                    .validate_drop_input_descriptor(original, &wrong_root, &mut Work(0))
+                    .is_err()
+            );
+            let saved = std::mem::take(&mut engine.input_reservations);
+            assert!(
+                engine
+                    .validate_issued_drop_storage(original, input, &mut Work(0))
+                    .is_err()
+            );
+            engine.input_reservations = saved;
+            let path = vec![
+                MemoryProjection::Index(Box::new(engine.iterator_index(1))),
+                MemoryProjection::Field(0),
+            ];
+            let candidates = engine
+                .drop_projection_candidates(original, &args[0], &path, None, None, &conditions)
+                .unwrap();
+            assert_eq!(candidates.len(), 1);
+            engine
+                .drop_projection_scalar(&candidates, &conditions)
+                .unwrap();
+            let mut memory = Memory::default();
+            memory.push(Some(args[0].clone()));
+            memory
+                .missing_places
+                .consume(0, vec![Step::Element(1)])
+                .unwrap();
+            assert!(
+                engine
+                    .drop_projection_candidates(
+                        original,
+                        &args[0],
+                        &path,
+                        Some((&memory, 0)),
+                        None,
+                        &conditions,
+                    )
+                    .is_err()
+            );
+            let selected = args[3].clone();
+            conditions.push(
+                symbolic::binary(
+                    &engine.terms,
+                    "lt",
+                    selected.clone(),
+                    engine.iterator_index(64),
+                )
+                .unwrap()
+                .boolean()
+                .unwrap(),
+            );
+            let path = vec![
+                MemoryProjection::Index(Box::new(selected)),
+                MemoryProjection::Field(0),
+            ];
+            let candidates = engine
+                .drop_projection_candidates(original, &args[0], &path, None, None, &conditions)
+                .unwrap();
+            assert_eq!(candidates.len(), 64);
+            engine
+                .drop_projection_scalar(&candidates, &conditions)
+                .unwrap();
+            let char_id = tcx
+                .mir_keys(())
+                .iter()
+                .copied()
+                .find(|id| {
+                    tcx.def_kind(*id) == DefKind::Fn
+                        && tcx.item_name(id.to_def_id()).as_str() == "char_eager_pressure"
+                })
+                .unwrap()
+                .to_def_id();
+            let char_body = engine
+                .instantiated_body(ty::Instance::mono(tcx, char_id))
+                .unwrap();
+            let char_original = char_body.local_decls[rustc_middle::mir::Local::from_usize(1)].ty;
+            let eager = engine
+                .argument(char_id, char_original, &mut Vec::new())
+                .unwrap();
+            assert!(matches!(eager, Value::Elements(_)));
+            let invalid_char = InputShape {
+                kind: InputKind::Integer {
+                    bits: 32,
+                    signed: false,
+                },
+                slots: 1,
+                height: 1,
+            };
+            assert!(
+                engine
+                    .validate_drop_input_descriptor(tcx.types.char, &invalid_char, &mut Work(0),)
+                    .is_err()
+            );
+            println!(
+                "Char retains eager validity; an integer descriptor grants no lazy Char codec"
+            );
+            println!("lazy Drop: 64 feasible initialized scalar candidates checked");
+            self.0 = true;
+            rustc_driver::Compilation::Stop
+        }
+    }
+    let directory =
+        std::env::temp_dir().join(format!("miren-issued-lazy-drop-{}", std::process::id()));
+    std::fs::create_dir_all(&directory).unwrap();
+    let source = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/fixtures/incoming_drop_observations.rs");
+    for target in [None, Some("thumbv7em-none-eabihf")] {
+        for level in [0, 2] {
+            let mut args = vec![
+                "rustc".into(),
+                source.to_str().unwrap().into(),
+                "--crate-type=lib".into(),
+                "--edition=2024".into(),
+                "-Cpanic=abort".into(),
+                "-Zmir-opt-level=0".into(),
+                format!("-Copt-level={level}"),
+                "--out-dir".into(),
+                directory.to_str().unwrap().into(),
+                "--sysroot".into(),
+                env!("MIREN_SYSROOT").into(),
+            ];
+            if let Some(target) = target {
+                args.extend(["--target".into(), target.into()]);
+            }
+            let mut check = Check(false);
+            rustc_driver::run_compiler(&args, &mut check);
+            assert!(check.0);
+        }
+    }
+    std::fs::remove_dir_all(directory).unwrap();
+}

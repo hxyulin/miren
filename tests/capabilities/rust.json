@@ -2474,6 +2474,97 @@
       "expected": "unknown",
       "unknown_reason": "mutable product staging needs a pending child",
       "unknown_category": "semantics"
+    },
+    {
+      "entry": "incoming_drop_survey::borrowed",
+      "family": "incoming_drop_array_storage",
+      "expected": "proved"
+    },
+    {
+      "entry": "incoming_drop_survey::direct",
+      "family": "incoming_drop_array_storage",
+      "expected": "proved"
+    },
+    {
+      "entry": "incoming_drop_survey::nested",
+      "family": "incoming_drop_array_storage",
+      "expected": "proved"
+    },
+    {
+      "entry": "incoming_drop_survey::wrong",
+      "family": "incoming_drop_array_storage",
+      "expected": "refuted"
+    },
+    {
+      "entry": "incoming_drop_survey::unguarded",
+      "family": "incoming_drop_array_storage",
+      "expected": "refuted"
+    },
+    {
+      "entry": "incoming_drop_survey::whole_unknown",
+      "family": "incoming_drop_array_storage",
+      "expected": "unknown",
+      "unknown_reason": "cannot materialize or copy a non-Copy owner",
+      "unknown_category": "semantics"
+    },
+    {
+      "entry": "incoming_drop_survey::mutable_unknown",
+      "family": "incoming_drop_array_storage",
+      "expected": "unknown",
+      "unknown_reason": "grants no mutable reference authority",
+      "unknown_category": "semantics"
+    },
+    {
+      "entry": "incoming_drop_survey::raw_unknown",
+      "family": "incoming_drop_array_storage",
+      "expected": "unknown",
+      "unknown_reason": "grants no raw pointer authority",
+      "unknown_category": "semantics"
+    },
+    {
+      "entry": "incoming_drop_survey::reserved",
+      "family": "incoming_drop_array_storage",
+      "expected": "proved"
+    },
+    {
+      "entry": "incoming_drop_survey::deferred",
+      "family": "incoming_drop_array_storage",
+      "expected": "proved"
+    },
+    {
+      "entry": "incoming_drop_survey::reserved_constant",
+      "family": "incoming_drop_array_storage",
+      "expected": "proved"
+    },
+    {
+      "entry": "incoming_drop_survey::reserved_wrong",
+      "family": "incoming_drop_array_storage",
+      "expected": "refuted"
+    },
+    {
+      "entry": "incoming_drop_survey::deferred_wrong",
+      "family": "incoming_drop_array_storage",
+      "expected": "refuted"
+    },
+    {
+      "entry": "incoming_drop_survey::deferred_unguarded",
+      "family": "incoming_drop_array_storage",
+      "expected": "refuted"
+    },
+    {
+      "entry": "incoming_drop_survey::scalar_codecs",
+      "family": "incoming_drop_array_storage",
+      "expected": "proved"
+    },
+    {
+      "entry": "incoming_drop_survey::scalar_wrong",
+      "family": "incoming_drop_array_storage",
+      "expected": "refuted"
+    },
+    {
+      "entry": "incoming_drop_survey::char_eager_pressure",
+      "family": "incoming_drop_array_storage",
+      "expected": "proved"
     }
   ]
 }
