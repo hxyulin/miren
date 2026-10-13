@@ -2023,6 +2023,68 @@
       "expected": "unknown",
       "unknown_reason": "effect-free Box Drop requires local fieldless unpacked Freeze storage",
       "unknown_category": "semantics"
+    },
+    {
+      "entry": "partial_array_drops_survey::partial_claim",
+      "family": "partial_array_drops",
+      "expected": "proved"
+    },
+    {
+      "entry": "partial_array_drops_survey::nested_claim",
+      "family": "partial_array_drops",
+      "expected": "proved"
+    },
+    {
+      "entry": "partial_array_drops_survey::covering_claim",
+      "family": "partial_array_drops",
+      "expected": "proved"
+    },
+    {
+      "entry": "partial_array_drops_survey::zero_claim",
+      "family": "partial_array_drops",
+      "expected": "proved"
+    },
+    {
+      "entry": "partial_array_drops_survey::partial_wrong",
+      "family": "partial_array_drops",
+      "expected": "refuted"
+    },
+    {
+      "entry": "partial_array_drops_survey::iterator_claim",
+      "family": "partial_array_drops",
+      "expected": "unknown",
+      "unknown_reason": "owned array iterator element destructors are not modeled",
+      "unknown_category": "unclassified"
+    },
+    {
+      "entry": "partial_array_drops_survey::symbolic_partial",
+      "family": "partial_array_drops",
+      "expected": "proved"
+    },
+    {
+      "entry": "partial_array_drops_survey::symbolic_partial_wrong",
+      "family": "partial_array_drops",
+      "expected": "refuted"
+    },
+    {
+      "entry": "partial_array_drops_survey::symbolic_nested",
+      "family": "partial_array_drops",
+      "expected": "proved"
+    },
+    {
+      "entry": "partial_array_drops_survey::symbolic_nested_wrong",
+      "family": "partial_array_drops",
+      "expected": "refuted"
+    },
+    {
+      "entry": "partial_array_drops_survey::symbolic_covering",
+      "family": "partial_array_drops",
+      "expected": "proved"
+    },
+    {
+      "entry": "partial_array_drops_survey::symbolic_covering_wrong",
+      "family": "partial_array_drops",
+      "expected": "refuted"
     }
   ]
 }

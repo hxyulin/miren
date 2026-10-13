@@ -1613,3 +1613,22 @@ Drop and general destructors are separate unsupported domains. Existing Unit and
 routes preserve their original schemas. The new route is ordinary Unarmed execution, with actual
 additional type, body clone/cache, complete encoding and comparison work; it gives no Armed fee
 or resource discount. Existing per-body template and cumulative owner/storage limits remain.
+
+A separate fixed-array destructor path interprets terminal compiler Subslice Drop ranges. The
+current instantiated Body, exact original array/count/field path and initialized selected children
+are checked before effects. Each complete selected element executes actual DropGlue and adopts
+returned Memory before its Element key is consumed. Nested compiler ranges retain their emitted
+order; covering assignment cannot replace old storage before those drops succeed. Ordinary Subslice
+reads/borrows, incomplete element receivers and IntoIter elements needing Drop remain unsupported.
+Host/ARM O0/O2 controls measure actual order and effects, including genuine destructor mutations.
+
+Compiler array DropGlue can use a private complete array/slice protocol when its independent raw
+and current Bodies, source Instances, original types, loop and normal returns match. Its Slice
+call enters the normal frame, retaining argument/snapshot/contract policy, call depth and exit
+checks; only the exact finite element loop is interpreted through tracked child references.
+Real child DropGlue executes and returned Memory carries its effects. Whole-array type evidence
+is issued only by actual Unarmed typed mutable fixed-path borrowing, separate from permissions.
+Ordinary raw-slice/static layout rules and IntoIter destructor exclusions remain unchanged. The
+nested/covering and symbolic order controls pass on host/ARM O0/O2. Wrong claims and real helper
+mutations refute, and native controls corroborate them. Missing dependency bodies stay UNKNOWN.
+The hostile shim/owner compiler callback is measured on host O0 only.

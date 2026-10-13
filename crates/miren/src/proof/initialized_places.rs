@@ -244,7 +244,12 @@ impl<'tcx> Engine<'tcx> {
     ) -> Result<(), String> {
         state.flow.require_unarmed()?;
         let fields = self.owned_field_footprint(body, place)?;
-        if !fields.iter().any(|part| matches!(part, Step::Element(_))) {
+        if !fields.iter().any(|part| matches!(part, Step::Element(_)))
+            && !matches!(
+                place.ty(&body.local_decls, self.tcx).ty.kind(),
+                ty::Array(..)
+            )
+        {
             return Err(
                 "ownership array type issuance requires an actual owned element path".into(),
             );
@@ -292,7 +297,12 @@ impl<'tcx> Engine<'tcx> {
     ) -> Result<(), String> {
         self.preflight_initialized_owner(body, state, place)?;
         let fields = self.owned_field_footprint(body, place)?;
-        if !fields.iter().any(|part| matches!(part, Step::Element(_))) {
+        if !fields.iter().any(|part| matches!(part, Step::Element(_)))
+            && !matches!(
+                place.ty(&body.local_decls, self.tcx).ty.kind(),
+                ty::Array(..)
+            )
+        {
             return Err(
                 "ownership array type issuance requires an actual owned element path".into(),
             );
@@ -355,6 +365,17 @@ impl<'tcx> Engine<'tcx> {
         if let Some(fields) = field_footprint(path) {
             return Ok(Some(fields));
         }
+        Ok(self
+            .typed_memory_evidence(memory, allocation, path)?
+            .map(|(fields, _)| fields))
+    }
+
+    pub(super) fn typed_memory_evidence(
+        &self,
+        memory: &Memory,
+        allocation: usize,
+        path: &[MemoryProjection],
+    ) -> Result<Option<(Vec<Step>, Ty<'tcx>)>, String> {
         let Some((_, owner)) = memory
             .initialized_owners
             .iter()
@@ -453,7 +474,7 @@ impl<'tcx> Engine<'tcx> {
                 | MemoryProjection::Chunks { .. } => return Ok(None),
             }
         }
-        Ok(Some(fields))
+        Ok(Some((fields, original)))
     }
 
     pub(super) fn check_memory_initialization(
@@ -534,7 +555,7 @@ impl<'tcx> Engine<'tcx> {
         Ok(())
     }
 
-    fn check_initialized_owner_type(
+    pub(super) fn check_initialized_owner_type(
         &self,
         memory: &Memory,
         allocation: usize,

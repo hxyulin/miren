@@ -7134,3 +7134,47 @@ Evidence: /tmp/miren-stage242-root-checks/complete.json,
 /tmp/miren-stage242-root-isolated-evidence-review.json,
 /tmp/miren-owned-zst-drop-source-v4/bounded-handoff.json and
 /tmp/miren-stage242-root-survey-proof-audit.json.
+
+
+## Stage243: fixed-array partial destruction and compiler DropGlue
+
+Terminal compiler subslice drops select exact initialized fixed-array elements. Each selected
+child executes its actual DropGlue before its key is consumed, and returned Memory carries
+its effects. Nested ranges retain compiler order. Covering assignment waits for old destruction
+before replacing storage.
+
+A private array/slice protocol authenticates complete independent raw and current compiler Bodies,
+source Instances, types, finite loop and normal returns. The Slice call enters the normal frame
+with argument, snapshot, contract, call-depth and exit checks. Only the exact certified loop is
+interpreted through tracked child references; no general raw-slice permission is issued.
+Successful Unarmed fixed-path mutable array borrowing supplies original type evidence separately
+from access permission. Nested returned destructor masks compact only after successful child drops.
+IntoIter elements requiring Drop, incomplete custom receivers and arbitrary slice glue stay UNKNOWN.
+
+Isolated host/ARM O0/O2 original controls record three PROVED, one REFUTED and one UNKNOWN each.
+Actual destructor-effect mutations refute unchanged claims; a remaining-element-only mutation
+reaches nested and covering protocol returns before refuting their final assertions. Six symbolic
+order controls record three PROVED and three REFUTED per profile, with genuine input assignments
+in each counterexample. Native originals pass and mutations/wrong-order assertions fail at O0/O2.
+The compiler callback validates raw/current schema, source, retag, count and scoped owner controls
+on host O0. Four-profile compiler-mutation coverage is not claimed.
+
+Fresh Root release surveys measure 381 cases across 96 families: 179 PROVED, 116 REFUTED and
+86 UNKNOWN per profile. Twelve new cases add eleven supported outcomes. All 369 old case objects
+and the entire fixture prefix remain unchanged. Of 1,476 old whole Proof pairs, 44 match literally,
+1,431 differ only by appended-source fingerprint, and one also retains the inherited query-free
+fold deadline-context qualification. All 3,396 existing queries and models remain exact.
+
+Workspace verification covers 945 outer Rust tests through the complete no-fail-fast run and six
+corrected exact target runs; no single green full workspace run is claimed. Five old UNKNOWN
+controls now reach dynamic-index or original-owner-liveness refusals after passing an old boundary.
+Unchanged guests are captured across all four profiles before diagnostic expectations change.
+The new iterator case records its measured Unclassified category. Statuses, application assertions,
+resource caps and solver policy do not change. First failed captures remain archived.
+Formatting, lint, 91 Python tests, release builds, dependency policy, manual hooks and documentation
+pass. Final prose checks follow the measured release survey.
+
+Evidence: /tmp/miren-stage243-root-corrected-checks/complete.json,
+/tmp/miren-stage243-root-evidence-review.json,
+/tmp/miren-stage243-diagnostic-correction-independent-review.json and
+/tmp/miren-stage243-root-survey-proof-audit.json.

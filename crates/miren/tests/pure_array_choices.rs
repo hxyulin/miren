@@ -90,7 +90,7 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
                 ),
                 "ambiguous_drop" => (
                     UnknownCategory::Unclassified,
-                    "static views require sized layouts",
+                    "non-scalar array index is not uniquely determined on this path",
                 ),
                 other => panic!("missing expected frontier for {other}"),
             };
@@ -100,10 +100,7 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
                         && obligation.unknown_category == Some(category)
                         && obligation.detail.contains(reason)
                         && (*name != "ambiguous_drop"
-                            || obligation
-                                .call_chain
-                                .iter()
-                                .any(|callee| callee == "core::ptr::drop_glue"))
+                            || obligation.call_chain == ["ambiguous_drop"])
                 }),
                 "wrong frontier for {name}: {:?}",
                 proof.obligations

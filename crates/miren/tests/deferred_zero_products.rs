@@ -93,7 +93,7 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
                 }
                 "drop_zero" => (
                     UnknownCategory::Unclassified,
-                    "core::ptr::drop_glue bb2: static views require sized layouts",
+                    "non-scalar array index is not uniquely determined on this path",
                 ),
                 "oversized" => (
                     UnknownCategory::ResourceLimit,

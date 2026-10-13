@@ -11,15 +11,21 @@ execution at O0 and O2, positive/refuted/unknown controls, a source mutation tha
 structured UNKNOWN reporting, and passing repository checks. Completion establishes a repeatable
 baseline. It does not establish full Rust support or a completed memory-model refactor.
 
-The current manifest contains 369 cases across 95 families.
-The completed Stage242 host/ARM O0/O2 surveys measured 172 PROVED, 112 REFUTED and 85 UNKNOWN.
+The current manifest contains 381 cases across 96 families.
+The completed Stage243 host/ARM O0/O2 surveys measured 179 PROVED, 116 REFUTED and 86 UNKNOWN.
+Fixed-array partial destruction executes actual child DropGlue, including nested and covering
+assignment paths. Symbolic wrapping destructor effects retain compiler order; wrong-order claims
+have genuine counterexamples. The exact compiler array/slice protocol retains normal frame checks.
+All 369 old cases keep their outcomes and all 3,396 existing queries/models remain exact.
+IntoIter elements requiring Drop and general slice destruction remain unsupported.
+The preceding Stage242 host/ARM O0/O2 surveys measured 172 PROVED, 112 REFUTED and 85 UNKNOWN.
 Fieldless local zero-sized Box payloads support certified effect-free custom Drop, preserving
 original/current compiler bodies and exact owner retirement. Effectful and allocating payloads
 remain unsupported. One unchanged old destructor case advances from UNKNOWN to PROVED.
 The preceding Stage241 surveys measured 166 PROVED, 111 REFUTED and 80 UNKNOWN across 357 cases.
 Fixed-array moves retain typed initialization holes, distinguish siblings and nested elements,
 and support covering whole-array repair. Whole reads over holes and invalid indexed MIR remain
-unsupported; partial-array destruction is a separate boundary.
+unsupported; partial-array destruction was a separate boundary at that checkpoint.
 The preceding Stage240 surveys measured 163 PROVED, 109 REFUTED and 80 UNKNOWN across 352 cases.
 Typed mutable products support guarded symbolic fixed-array suffix reads and stores, including
 nested and correlated indices, mixed scalar leaves and selected whole subproducts. Actual helper

@@ -893,10 +893,16 @@ impl<'tcx> Engine<'tcx> {
         place: Place<'tcx>,
         mutable: bool,
     ) -> Result<Value, String> {
-        if place
+        if (place
             .projection
             .iter()
             .any(|part| matches!(part, ProjectionElem::ConstantIndex { .. }))
+            || mutable
+                && matches!(state.flow, activation_flow::Flow::Unarmed)
+                && matches!(
+                    place.ty(&body.local_decls, self.tcx).ty.kind(),
+                    ty::Array(..)
+                ))
             && place.projection.iter().all(|part| {
                 matches!(
                     part,
@@ -1055,10 +1061,24 @@ impl<'tcx> Engine<'tcx> {
             allocation
         };
         if let Some(body) = body
-            && place
+            && (place
                 .projection
                 .iter()
                 .any(|part| matches!(part, ProjectionElem::ConstantIndex { .. }))
+                || mutable
+                    && matches!(state.flow, activation_flow::Flow::Unarmed)
+                    && matches!(
+                        place.ty(&body.local_decls, self.tcx).ty.kind(),
+                        ty::Array(..)
+                    )
+                    && place.projection.iter().all(|part| {
+                        matches!(
+                            part,
+                            ProjectionElem::Field(..)
+                                | ProjectionElem::Downcast(..)
+                                | ProjectionElem::ConstantIndex { .. }
+                        )
+                    }))
             && !place
                 .projection
                 .iter()

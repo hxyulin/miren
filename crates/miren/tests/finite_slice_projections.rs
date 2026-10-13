@@ -68,7 +68,7 @@ fn cases() -> Vec<Case> {
         (
             "dead_empty",
             ProofStatus::Unknown,
-            Some("dead or uninitialized storage"),
+            Some("ownership initialization type belongs to retired allocation"),
         ),
         ("shared_write", ProofStatus::Unknown, Some("shared")),
         (

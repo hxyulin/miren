@@ -102,7 +102,7 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
                 ),
                 "dropped_record" => (
                     UnknownCategory::Unclassified,
-                    "static views require sized layouts",
+                    "non-scalar array index is not uniquely determined on this path",
                 ),
                 "oversized_shape" => (
                     UnknownCategory::ResourceLimit,
@@ -130,11 +130,8 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
                     && obligation.unknown_category == Some(UnknownCategory::Unclassified)
                     && obligation
                         .detail
-                        .contains("static views require sized layouts")
-                    && obligation
-                        .call_chain
-                        .iter()
-                        .any(|call| call == "core::ptr::drop_glue")
+                        .contains("non-scalar array index is not uniquely determined on this path")
+                    && obligation.call_chain == ["dropped_record"]
             }));
         }
         let helper = match *name {

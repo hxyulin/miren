@@ -26,6 +26,7 @@ mod activation_flow_probe;
 mod aggregate_validity;
 mod aggregates;
 mod arm_interrupts;
+mod array_drop_glue;
 mod array_equality;
 mod async_entries;
 mod atomic_intrinsics;
@@ -52,6 +53,7 @@ mod enum_tags;
 mod enum_transmutes;
 mod error_formatting;
 mod external;
+mod fixed_array_drops;
 mod float_pairs;
 mod floating_intrinsics;
 mod foreign_calls;
@@ -1248,6 +1250,26 @@ impl<'tcx> Engine<'tcx> {
         stack: &[DefId],
         flow: activation_flow::Flow,
     ) -> Result<Vec<Return>, String> {
+        self.execute_body_with_protocol(
+            array_drop_glue::Frame::original(instance),
+            arguments,
+            conditions,
+            memory,
+            stack,
+            flow,
+        )
+    }
+
+    fn execute_body_with_protocol(
+        &mut self,
+        frame: array_drop_glue::Frame<'tcx>,
+        arguments: Vec<Value>,
+        conditions: Vec<Term>,
+        memory: Memory,
+        stack: &[DefId],
+        flow: activation_flow::Flow,
+    ) -> Result<Vec<Return>, String> {
+        let instance = frame.instance();
         let id = instance.def_id();
         let caller_instance = instance;
         if stack.len() >= self.limits.max_call_depth {
@@ -1420,6 +1442,15 @@ impl<'tcx> Engine<'tcx> {
                         self.proof.body_entries_truncated = true;
                     }
                 }
+            }
+            if block == START_BLOCK
+                && let Some((target, branches)) =
+                    self.execute_array_drop_glue(&frame, &owned_body, &state, &stack)?
+            {
+                for branch in branches {
+                    queue.push_back((target, branch, retry_path.clone()));
+                }
+                continue;
             }
             for statement_index in 0..body.basic_blocks[block].statements.len() {
                 self.receipt_statement(
@@ -2221,6 +2252,14 @@ impl<'tcx> Engine<'tcx> {
                         continue;
                     }
                     state.flow.require_unarmed()?;
+                    if let Some(results) =
+                        self.drop_fixed_subslice(instance, &owned_body, block, &state, &stack)?
+                    {
+                        for continuation in results {
+                            queue.push_back((*target, continuation, retry_path.clone()));
+                        }
+                        continue;
+                    }
                     let private = self.raw_local(&state, place.local.as_usize())?;
                     if matches!(private, Value::OwnedRegion { .. }) {
                         let value = self.read_place(&state, *place, Some(body))?;
