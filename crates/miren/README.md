@@ -1985,3 +1985,11 @@ signature domains remain UNKNOWN before observations can escape to an unrelated 
 The retained transfer fixture's remaining-element root reaches ResourceLimit at diagnostic 30000
 steps on host O0 after signature authentication charges. Its other three profiles remain supported
 at that budget; the separate Drop matrix records its explicit diagnostic 60000-step outcomes.
+
+Byte-search source can distinguish exact target-usize population-count intrinsics from Rust Body
+records. A body-derived original/current `count_ones` wrapper certificate reuses the existing
+population-count expression and intrinsic recognition, retaining actual source registry guards.
+Its mathematical zero, one, target-word and all-bit facts grant no raw/reference or search rights.
+Complete byte search remains UNKNOWN until source/needle provenance, valid extents, failure edges
+and both search loops are certified. Missing ordinary bodies still refuse; retained-core use is
+explicit, and this source stage changes no comparison body limit or execution assumption.

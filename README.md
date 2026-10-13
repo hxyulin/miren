@@ -66,14 +66,15 @@ release and preserve offset writes and sibling storage. Deeper whole scalar call
 owner lineage and returned storage. Bounded owned u16 products support writes through multiple
 symbolic suffix indices, preserving compiler types and current Memory. The capability manifest
 covers 591 cases across 107 families, including concrete and symbolic local byte-copy controls.
-Available byte-search source and isolated word predicates have separate authentication checks.
+Available byte-search source, isolated word predicates and population-count facts have separate
+authentication checks.
 Full aligned search remains UNKNOWN pending source metadata, storage, precondition and loop proofs.
 
 Fixed-array partial moves preserve initialization and execute remaining destructors in compiler
 order. Nested destruction and covering assignments retain actual destructor effects. The exact
 compiler array/slice DropGlue protocol is authenticated separately. General slice destruction
 remains UNKNOWN. Remaining owning-array iterator destruction executes actual bodies at a larger
-recorded budget. The current stage passes 1,012 Rust tests and preserves all 5,232 retained
+recorded budget. The current stage passes 1,013 Rust tests and preserves all 5,232 retained
 queried obligations and counterexample models across four profiles.
 Authenticated non-inlined array iterator constructors preserve owning payloads through actual Rust
 bodies and ordinary returns. Direct owners also pass through local helpers with unused observations.

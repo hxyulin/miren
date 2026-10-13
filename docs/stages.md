@@ -7829,3 +7829,47 @@ query-free fold deadline contexts are qualified separately. All 5,232 retained q
 and counterexample models match exactly. The four changed remaining-Drop UNKNOWN reports are
 recorded separately, with no assumptions or success added. Only this measured documentation
 successor follows the unchanged 1,061-file full-check candidate.
+
+
+## Stage258: source-linked population-count observations
+
+The reviewed private Population V2 packet authenticates the actual target-usize `count_ones` wrapper
+and exact `ctpop` primitive. Existing builtin recognition and expression construction are shared
+without widening their accepted types. Source records distinguish primitives from available bodies;
+the new mathematical observations still reject full byte search.
+
+The first private compiler callback exposed a wrong test expectation: `leading_zeros` actually
+casts usize to u64 before calling ctlz. V2 uses the genuine same-signature `trailing_zeros`/cttz
+control instead, preserving both failures and all production bytes. Four retained-core targets
+pass sixteen actual compiler callbacks. Native original claims pass and actual helper mutants fail;
+independent original sums are UNSAT and changed sums are SAT with models. These are separate forms
+of evidence and add no full-search result.
+
+Root composition preserves the committed iterator Drop stage, current refusal expectations and
+unique compiler-probe temporary directories.
+
+
+The first full Root run preserves one failed unit target: the new population probe invoked
+retained-only wrapper assertions with ordinary prebuilt core. The production source certificate
+correctly refused its different Call/continuation shape. A test-only successor distinguishes the
+configurations: all four ordinary profiles assert that exact Semantics refusal, while retained
+profiles continue to execute the original positive and mutation controls. Production and corpus
+inputs remain unchanged; renewed full validation and retained evidence are required.
+
+Final frozen successor validation passes all ten checks: 1,013 outer Rust tests, 91 Python tests,
+formatting, lint, release builds, dependency checks, manual hooks, documentation build and the
+four-profile release survey. The original full-run failure is preserved. Ordinary prebuilt-core
+controls assert the exact source-shape refusal on four profiles; renewed retained-core controls
+complete sixteen compiler callbacks with unchanged source, tools and retained artifacts.
+
+Every survey profile retains 322 PROVED, 163 REFUTED and 106 UNKNOWN across 591 cases and 107
+families. All 2,364 retained Proof comparisons match: 2,362 literal full matches and two separately
+qualified query-free fold deadline contexts. All 5,232 retained queried obligations and models
+remain exact. The main corpus has no population-count roots, so a separate audit captures eight
+existing roots across four profiles using the final release binaries. Its 32 complete proofs,
+16 queried obligations and 12 counterexample models match the previous release exactly.
+
+No default supported outcome is added. Only this measured documentation successor follows the
+unchanged 1,062-file final-check candidate; test failures and zero-test observations remain
+preserved without credit. Full transport preconditions, initialized word mapping and both search
+loops are still required before byte-search support.

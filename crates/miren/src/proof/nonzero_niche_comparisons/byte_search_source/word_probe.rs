@@ -15,10 +15,16 @@ fn actual_core_projection_inventory_and_conservative_runtime_frontier() {
     compiler_controls(ProbePhase::Runtime);
 }
 
+#[test]
+fn actual_retained_population_wrapper_semantics_and_conservative_search() {
+    compiler_controls(ProbePhase::Population);
+}
+
 #[derive(Clone, Copy)]
 enum ProbePhase {
     Word,
     Runtime,
+    Population,
 }
 
 fn compiler_controls(phase: ProbePhase) {
@@ -33,6 +39,46 @@ fn compiler_controls(phase: ProbePhase) {
             tcx: TyCtxt<'tcx>,
         ) -> rustc_driver::Compilation {
             let engine = super::super::super::super::super::nonzero_niches::test_engine(tcx);
+            if matches!(self.phase, ProbePhase::Population) {
+                let actual_core_call = |name: &str| {
+                    let id = tcx
+                        .mir_keys(())
+                        .iter()
+                        .copied()
+                        .find(|id| {
+                            tcx.def_kind(*id) == DefKind::Fn
+                                && tcx.item_name(id.to_def_id()).as_str() == name
+                        })
+                        .unwrap();
+                    let body = engine
+                        .instantiated_body(ty::Instance::mono(tcx, id.to_def_id()))
+                        .unwrap();
+                    body.basic_blocks
+                        .iter()
+                        .find_map(|block| {
+                            let TerminatorKind::Call { func, .. } = &block.terminator().kind else {
+                                return None;
+                            };
+                            let ty::FnDef(id, args) = func.ty(&body.local_decls, tcx).kind() else {
+                                return None;
+                            };
+                            Some(
+                                engine
+                                    .resolve_function_item(*id, args.skip_binder())
+                                    .unwrap(),
+                            )
+                        })
+                        .expect("actual word helper Call disappeared")
+                };
+                population::compiler_controls(
+                    &engine,
+                    actual_core_call("population_word"),
+                    actual_core_call("trailing_word"),
+                    self.retained,
+                );
+                eprintln!("POPULATION CALLBACK COMPLETE");
+                return rustc_driver::Compilation::Stop;
+            }
             let root = tcx
                 .mir_keys(())
                 .iter()
@@ -135,7 +181,8 @@ fn compiler_controls(phase: ProbePhase) {
                             for helper in &source.helpers {
                                 eprintln!(
                                     "SEARCH HELPER {:?} available={}",
-                                    helper.selected, helper.available
+                                    helper.selected,
+                                    helper.body_available()
                                 );
                             }
                         }

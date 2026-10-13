@@ -7,7 +7,61 @@ pub(super) enum FloatBitsOperation {
     Construct(u32),
 }
 
+// Exact existing intrinsic expression; recognition grants no Memory or reference authority.
+fn population_count_terms(
+    context: &Context,
+    expression: &Term,
+    bits: u32,
+) -> Result<Vec<Term>, String> {
+    let mut terms = (0..bits)
+        .map(|bit| {
+            let value = context.apply(
+                Op::Extract {
+                    high: bit,
+                    low: bit,
+                },
+                std::slice::from_ref(expression),
+            )?;
+            context.apply(Op::ZeroExtend(31), &[value])
+        })
+        .collect::<Result<Vec<_>, String>>()?;
+    while terms.len() > 1 {
+        terms = terms
+            .chunks(2)
+            .map(|pair| match pair {
+                [left, right] => context.apply(Op::BvAdd, &[left.clone(), right.clone()]),
+                [only] => Ok(only.clone()),
+                _ => unreachable!("pairs have one or two elements"),
+            })
+            .collect::<Result<Vec<_>, String>>()?;
+    }
+    Ok(terms)
+}
+
+pub(super) fn population_count_expression(
+    context: &Context,
+    expression: &Term,
+    bits: u32,
+) -> Result<Term, String> {
+    population_count_terms(context, expression, bits)?
+        .pop()
+        .ok_or_else(|| "empty population count operand".to_owned())
+}
+
 impl<'tcx> Engine<'tcx> {
+    pub(super) fn population_count_type(
+        &self,
+        callee: DefId,
+        signature: ty::FnSig<'tcx>,
+    ) -> Option<(u32, bool)> {
+        if !self.tcx.is_intrinsic(callee, Symbol::intern("ctpop")) || signature.inputs().len() != 1
+        {
+            return None;
+        }
+        let integer = self.integer_type(signature.inputs()[0])?;
+        (signature.output() == self.tcx.types.u32).then_some(integer)
+    }
+
     // Recognition grants no memory rights; the original builtin still validates values.
     pub(super) fn float_bits_operation(
         &self,
@@ -308,39 +362,12 @@ impl<'tcx> Engine<'tcx> {
         if let Some(value) = self.floating_intrinsic(callee, signature, values)? {
             return Ok(Some(value));
         }
-        if self.tcx.is_intrinsic(callee, Symbol::intern("ctpop"))
-            && signature.inputs().len() == 1
-            && self.integer_type(signature.inputs()[0]).is_some()
-            && signature.output() == self.tcx.types.u32
-        {
+        if self.population_count_type(callee, signature).is_some() {
             let [value] = values else {
                 return Err("population count requires one modeled integer".to_owned());
             };
             let (expression, bits, _) = value.integer()?;
-            let mut terms = (0..bits)
-                .map(|bit| {
-                    let value = self.terms.apply(
-                        Op::Extract {
-                            high: bit,
-                            low: bit,
-                        },
-                        std::slice::from_ref(&expression),
-                    )?;
-                    self.terms.apply(Op::ZeroExtend(31), &[value])
-                })
-                .collect::<Result<Vec<_>, String>>()?;
-            while terms.len() > 1 {
-                terms = terms
-                    .chunks(2)
-                    .map(|pair| match pair {
-                        [left, right] => {
-                            self.terms.apply(Op::BvAdd, &[left.clone(), right.clone()])
-                        }
-                        [only] => Ok(only.clone()),
-                        _ => unreachable!("pairs have one or two elements"),
-                    })
-                    .collect::<Result<Vec<_>, String>>()?;
-            }
+            let mut terms = population_count_terms(&self.terms, &expression, bits)?;
             self.record_model(callee, "exact integer population count");
             return Ok(Some(Value::Int {
                 expression: terms.pop().ok_or("empty population count operand")?,

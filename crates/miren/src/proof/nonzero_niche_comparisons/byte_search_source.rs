@@ -1,6 +1,8 @@
 //! Authenticated source observation only: there is no verified search constructor here.
 use super::*;
 
+#[path = "byte_search_source/population.rs"]
+mod population;
 #[path = "byte_search_source/word.rs"]
 mod word;
 use std::cell::Ref;
@@ -772,10 +774,26 @@ fn checked_signature<'tcx>(
     Ok(expected)
 }
 
+#[derive(Clone, Copy)]
+enum HelperKind {
+    RustBody(bool),
+    PopulationCount,
+}
+
 struct Helper<'tcx> {
     selected: ty::Instance<'tcx>,
     signature: ty::PolyFnSig<'tcx>,
-    available: bool,
+    kind: HelperKind,
+}
+
+#[cfg(test)]
+impl Helper<'_> {
+    fn body_available(&self) -> bool {
+        match self.kind {
+            HelperKind::RustBody(available) => available,
+            HelperKind::PopulationCount => false,
+        }
+    }
 }
 
 // Holding both actual registry guards freezes source authority only. No Memory/raw rights exist.
@@ -791,7 +809,7 @@ pub(super) struct SourceObservation<'a, 'tcx> {
 
 impl SourceObservation<'_, '_> {
     pub(super) fn reject_unverified_search(self) -> Result<(), String> {
-        word::reject(self)
+        population::reject(self)
     }
 
     fn reject_without_word(self) -> Result<(), String> {
@@ -807,7 +825,7 @@ impl SourceObservation<'_, '_> {
             if self.signatures.get(&helper.selected) != Some(&helper.signature) {
                 return Err("byte source helper signature changed during observation".into());
             }
-            if !helper.available {
+            if matches!(helper.kind, HelperKind::RustBody(false)) {
                 return Err(self.engine.missing_body_reason(helper.selected.def_id()));
             }
         }
@@ -1108,17 +1126,40 @@ fn observe_inner<'a, 'tcx>(
         };
         work.charge(4 + arguments.skip_binder().len())?;
         let selected = engine.resolve_function_item(*id, arguments.skip_binder())?;
-        if selected.def_id().krate != core
-            || !matches!(selected.def, ty::InstanceKind::Item(_))
-            || !matches!(
-                engine.tcx.def_kind(selected.def_id()),
-                DefKind::Fn | DefKind::AssocFn
-            )
-            || engine.tcx.intrinsic(selected.def_id()).is_some()
-        {
-            return Err(
-                "byte source helper needs a separate intrinsic/foreign/callable rule".into(),
-            );
+        work.charge(2)?; // Added primitive classification and ordinary-route branch.
+        let primitive = matches!(selected.def, ty::InstanceKind::Intrinsic(_));
+        if !primitive {
+            if selected.def_id().krate != core
+                || !matches!(selected.def, ty::InstanceKind::Item(_))
+                || !matches!(
+                    engine.tcx.def_kind(selected.def_id()),
+                    DefKind::Fn | DefKind::AssocFn
+                )
+                || engine.tcx.intrinsic(selected.def_id()).is_some()
+            {
+                return Err(
+                    "byte source helper needs a separate intrinsic/foreign/callable rule".into(),
+                );
+            }
+        } else {
+            work.charge(16 + selected.args.len())?;
+            if selected.def_id().krate != core
+                || selected.args.len() != 1
+                || !selected
+                    .args
+                    .first()
+                    .is_some_and(|argument| match argument.kind() {
+                        ty::GenericArgKind::Type(original) => original == engine.tcx.types.usize,
+                        ty::GenericArgKind::Lifetime(_) | ty::GenericArgKind::Const(_) => false,
+                    })
+                || !engine
+                    .tcx
+                    .is_intrinsic(selected.def_id(), rustc_span::Symbol::intern("ctpop"))
+            {
+                return Err(
+                    "byte source primitive is not exact original target-usize ctpop".into(),
+                );
+            }
         }
         work.charge(helpers.len())?;
         let mut duplicate = false;
@@ -1130,6 +1171,20 @@ fn observe_inner<'a, 'tcx>(
             }
         }
         let signature = checked_signature(engine, selected, &mut work)?;
+        if primitive {
+            work.charge(18)?;
+            let concrete = signature.skip_binder();
+            if engine.population_count_type(selected.def_id(), concrete)
+                != Some((u32::from(engine.tcx.sess.target.pointer_width), false))
+                || concrete.inputs() != [engine.tcx.types.usize]
+                || concrete.output() != engine.tcx.types.u32
+                || concrete.safety() != rustc_hir::Safety::Safe
+                || concrete.abi() != rustc_abi::ExternAbi::Rust
+                || concrete.c_variadic()
+            {
+                return Err("byte source population primitive signature differs".into());
+            }
+        }
         check_occurrence(
             engine,
             &current,
@@ -1145,16 +1200,22 @@ fn observe_inner<'a, 'tcx>(
             return Err("byte source distinct helper records exceed new512 policy".into());
         }
         work.charge(5 + 5 * helpers.len() + selected.args.len())?;
+        work.charge(1)?; // Actual Body/primitive record construction dispatch.
         helpers
             .try_reserve_exact(1)
             .map_err(|_| "byte source helper allocation failed")?;
         helpers.push(Helper {
             selected,
             signature,
-            available: engine.tcx.is_mir_available(selected.def_id()),
+            kind: if primitive {
+                HelperKind::PopulationCount
+            } else {
+                HelperKind::RustBody(engine.tcx.is_mir_available(selected.def_id()))
+            },
         });
     }
     work.charge(6 + helpers.len())?;
+    work.charge(helpers.len())?; // Additional Body/primitive consumption dispatch.
     work.charge(1)?; // Preserve the actual issuing edge depth in operation-local evidence.
     for helper in &helpers {
         work.charge(3 + helper.selected.args.len())?;

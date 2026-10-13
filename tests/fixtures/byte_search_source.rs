@@ -22,3 +22,33 @@ pub trait ForeignProjection {
 }
 
 pub fn foreign_projection<I: ForeignProjection>(_: I::Output) {}
+
+#[inline(never)]
+pub fn population_word(value: usize) -> u32 {
+    value.count_ones()
+}
+
+#[inline(never)]
+pub fn leading_word(value: usize) -> u32 {
+    value.leading_zeros()
+}
+
+pub fn population_claims() {
+    assert_eq!(population_word(0), 0);
+    assert_eq!(population_word(1), 1);
+    assert_eq!(population_word(core::mem::size_of::<usize>()), 1);
+    assert_eq!(population_word(usize::MAX), usize::BITS);
+}
+
+#[cfg(test)]
+mod population_native {
+    #[test]
+    fn original_claims() {
+        super::population_claims();
+    }
+}
+
+#[inline(never)]
+pub fn trailing_word(value: usize) -> u32 {
+    value.trailing_zeros()
+}

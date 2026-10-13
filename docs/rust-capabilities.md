@@ -2778,3 +2778,26 @@ Root validation passes 1,012 Rust tests and 91 Python tests. The four-profile de
 322 PROVED, 163 REFUTED and 106 UNKNOWN per profile; the remaining-Drop control now reaches the
 shared execution limit instead of the former unsupported-destructor frontier. All 5,232 retained
 queried obligations and counterexample models remain exact.
+
+
+## Byte-search population-count facts
+
+An exact original/current target-usize `count_ones` wrapper authenticates its actual `ctpop` Call,
+complete signature and normal continuation. The source inventory distinguishes this exact
+primitive from available Rust bodies. A separate mathematical Context checks zero, one, target-word
+and all-bit observations using the existing population-count expression. Its certificate grants no
+memory, raw-reference, alignment or full-search rights. Ordinary missing bodies remain UNKNOWN.
+
+Compiler controls cover both target widths and optimization profiles, actual source/type
+mutations, signature registry guards and restored conservative search outcomes. Native helper
+mutations
+and mathematical sum mutations provide separate negative evidence. Existing intrinsic acceptance,
+query expression construction and model recording remain unchanged by the shared helper refactor.
+All new source dispatch work is charged within the existing limits.
+
+Root population-count validation passes 1,013 Rust tests and 91 Python tests. All four survey
+profiles retain 322 PROVED, 163 REFUTED and 106 UNKNOWN. All 5,232 retained queried obligations
+and counterexample models remain exact. A separate eight-root, four-profile population-count audit
+compares 32 complete proofs, 16 queried obligations and 12 counterexample models against the
+previous release; all match exactly using the final current release binaries. This adds no default
+or full-search supported outcome.
