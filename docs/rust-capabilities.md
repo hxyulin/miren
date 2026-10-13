@@ -2822,3 +2822,25 @@ targets complete sixteen profile callbacks, preserving the configured probe dist
 default four-profile corpus remains 322 PROVED, 163 REFUTED and 106 UNKNOWN; all 5,232 retained
 queried obligations and counterexample models match the previous release exactly. No new default
 supported outcome is added by this relation.
+
+
+## Byte caller source and exact NonZeroU8 fields
+
+The live byte relation authenticates available original caller MIR, bounded normalization, complete
+current MIR and the full original compiler signature. It holds both current source registries
+through the relation so replacement or conflicting registry borrows cannot alter its authority.
+Caller analysis uses a separate local source entry and carries all its work into the existing
+source budget. Missing bodies and unsupported caller metadata remain UNKNOWN.
+
+Exact core NonZeroU8 associated field projections and scalar patterns retain their compiler-bound
+identity, layout and validity. A genuine initialized Some payload encodes through the existing
+codec; an active zero payload refuses. This is a narrow binding for the actual nested core fields,
+with no general alias or pattern normalization authority.
+
+Four current-checkout compiler targets complete sixteen host/ARM O0/O2 callbacks with unchanged
+source, tool and retained-artifact guards. They cover original/current caller and signature mutants,
+registry exclusions, anchored fields, Some validity and existing encoding controls. Full validation
+passes 1,013 Rust and 91 Python tests. Every survey profile retains 322 PROVED, 163 REFUTED and
+106 UNKNOWN across 591 cases and 107 families. All 5,232 queried obligations and counterexample
+models match the previous release exactly. No raw reference, full search proof or new default
+supported outcome is claimed.

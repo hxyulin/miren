@@ -800,6 +800,120 @@ impl Helper<'_> {
     }
 }
 
+// Separate original caller source evidence. It publishes no helper graph or Memory authority.
+pub(in crate::proof) struct CallerSource<'a, 'tcx> {
+    engine: &'a Engine<'tcx>,
+    instance: ty::Instance<'tcx>,
+    current: &'a Rc<Body<'tcx>>,
+    signature: ty::PolyFnSig<'tcx>,
+    bodies: Ref<'a, HashMap<ty::Instance<'tcx>, Rc<Body<'tcx>>>>,
+    signatures: Ref<'a, HashMap<ty::Instance<'tcx>, ty::PolyFnSig<'tcx>>>,
+}
+
+pub(in crate::proof) fn caller_source<'a, 'tcx>(
+    engine: &'a Engine<'tcx>,
+    instance: ty::Instance<'tcx>,
+    current: &'a Rc<Body<'tcx>>,
+    work: &mut Work,
+) -> Result<CallerSource<'a, 'tcx>, Failure> {
+    work.depth(0)?;
+    work.charge(8 + instance.args.len())?;
+    if !matches!(instance.def, ty::InstanceKind::Item(_))
+        || !matches!(
+            engine.tcx.def_kind(instance.def_id()),
+            DefKind::Fn | DefKind::AssocFn
+        )
+        || engine.tcx.intrinsic(instance.def_id()).is_some()
+        || instance.args.len() != engine.tcx.generics_of(instance.def_id()).count()
+    {
+        return Err("byte caller lacks its ordinary full original Instance".into());
+    }
+    if !engine.tcx.is_mir_available(instance.def_id()) {
+        return Err(Failure {
+            category: UnknownCategory::MissingCompilerEvidence,
+            reason: engine.missing_body_reason(instance.def_id()),
+        });
+    }
+    let raw = engine.tcx.instance_mir(instance.def);
+    work.charge(4)?;
+    if raw.source.instance != instance.def
+        || raw.source.promoted.is_some()
+        || raw.phase
+            != rustc_middle::mir::MirPhase::Runtime(rustc_middle::mir::RuntimePhase::Optimized)
+    {
+        return Err("byte caller original Body identity/phase differs".into());
+    }
+    let raw_work = inventory(engine, instance, raw, SourcePhase::Raw, work)?;
+    work.charge(3 * raw_work + 4)?;
+    let expected = instance
+        .try_instantiate_mir_and_normalize_erasing_regions(
+            engine.tcx,
+            ty::TypingEnv::fully_monomorphized(),
+            ty::EarlyBinder::bind(engine.tcx, raw.clone()),
+        )
+        .map_err(|_| "byte caller original MIR normalization failed")?;
+    let expected_work = inventory(engine, instance, &expected, SourcePhase::Normalized, work)?;
+    let current_work = inventory(engine, instance, current, SourcePhase::Normalized, work)?;
+    work.charge(2 * (expected_work + current_work))?;
+    mirror(current, &expected, work)?;
+    let signature = checked_signature(engine, instance, work)?;
+    work.charge(4)?;
+    if signature.skip_binder().safety() != rustc_hir::Safety::Safe
+        || signature.skip_binder().abi() != rustc_abi::ExternAbi::Rust
+        || signature.skip_binder().c_variadic()
+    {
+        return Err("byte caller original signature is not safe Rust".into());
+    }
+    work.charge(8)?;
+    let bodies = engine
+        .bodies
+        .try_borrow()
+        .map_err(|_| "byte caller Body registry is borrowed")?;
+    let signatures = engine
+        .call_signatures
+        .try_borrow()
+        .map_err(|_| "byte caller signature registry is borrowed")?;
+    if !bodies
+        .get(&instance)
+        .is_some_and(|body| Rc::ptr_eq(body, current))
+        || signatures.get(&instance) != Some(&signature)
+    {
+        return Err("byte caller lost its exact current source registries".into());
+    }
+    Ok(CallerSource {
+        engine,
+        instance,
+        current,
+        signature,
+        bodies,
+        signatures,
+    })
+}
+
+impl<'tcx> CallerSource<'_, 'tcx> {
+    pub(in crate::proof) fn check(
+        &self,
+        engine: &Engine<'tcx>,
+        instance: ty::Instance<'tcx>,
+        current: &Rc<Body<'tcx>>,
+        work: &mut Work,
+    ) -> Result<(), Failure> {
+        work.charge(8)?;
+        if !std::ptr::eq(self.engine, engine)
+            || self.instance != instance
+            || !Rc::ptr_eq(self.current, current)
+            || !self
+                .bodies
+                .get(&instance)
+                .is_some_and(|body| Rc::ptr_eq(body, current))
+            || self.signatures.get(&instance) != Some(&self.signature)
+        {
+            return Err("byte caller witness belongs to another original/current source".into());
+        }
+        Ok(())
+    }
+}
+
 // Holding both actual registry guards freezes source authority only. No Memory/raw rights exist.
 pub(super) struct SourceObservation<'a, 'tcx> {
     engine: &'a Engine<'tcx>,

@@ -126,17 +126,11 @@ fn controls<'tcx>(tcx: TyCtxt<'tcx>, root: DefId) {
             .unwrap_err()
             .contains("another invocation")
     );
-    engine
-        .bodies
-        .borrow_mut()
-        .insert(caller, Rc::new((*body).clone()));
-    assert!(
-        origin
-            .validate_current(&engine, &call, &state)
-            .unwrap_err()
-            .contains("replaced or unavailable")
-    );
-    engine.bodies.borrow_mut().insert(caller, body.clone());
+    // Original caller evidence holds both actual registry guards through this invocation.
+    assert!(engine.bodies.try_borrow_mut().is_err());
+    assert!(engine.call_signatures.try_borrow_mut().is_err());
+    drop(origin);
+
     // This asserts only the new live relation. It grants no search, pointer or helper theorem.
     let relation = observe(&engine, &call, &inputs, &state)
         .unwrap()
@@ -168,31 +162,42 @@ fn controls<'tcx>(tcx: TyCtxt<'tcx>, root: DefId) {
             .unwrap_err()
             .contains("another live invocation")
     );
-    let relation = observe(&engine, &call, &inputs, &state)
-        .unwrap()
-        .relation()
-        .unwrap();
+    let guarded = observe(&engine, &call, &inputs, &state).unwrap();
+    assert!(engine.bodies.try_borrow_mut().is_err());
+    assert!(engine.call_signatures.try_borrow_mut().is_err());
+    drop(guarded);
+    let mut changed_body = (*body).clone();
+    changed_body.local_decls[rustc_middle::mir::Local::from_usize(0)].ty = tcx.types.u8;
+    let changed_body = Rc::new(changed_body);
     engine
         .bodies
         .borrow_mut()
-        .insert(caller, Rc::new((*body).clone()));
+        .insert(caller, changed_body.clone());
+    let changed_call = CallOccurrence::new(caller, &changed_body, block, &raw);
     assert!(
-        relation
-            .into_work(&engine, original, selected, &slice, &needle, &state)
-            .unwrap_err()
-            .contains("Body was replaced or unavailable")
-    );
-    engine.bodies.borrow_mut().insert(caller, body.clone());
-    let guarded = observe(&engine, &call, &inputs, &state).unwrap();
-    let exclusive = engine.bodies.borrow_mut();
-    assert!(
-        guarded
-            .relation()
+        observe(&engine, &changed_call, &inputs, &state)
             .err()
             .unwrap()
-            .contains("registry is mutably borrowed")
+            .contains("differs from original compiler")
     );
-    drop(exclusive);
+    engine.bodies.borrow_mut().insert(caller, body.clone());
+    let original_signature = engine.call_poly_signature(caller).unwrap();
+    let changed_signature =
+        original_signature.map_bound(|signature| signature.set_safety(rustc_hir::Safety::Unsafe));
+    engine
+        .call_signatures
+        .borrow_mut()
+        .insert(caller, changed_signature);
+    assert!(
+        observe(&engine, &call, &inputs, &state)
+            .err()
+            .unwrap()
+            .contains("differs from original compiler signature")
+    );
+    engine
+        .call_signatures
+        .borrow_mut()
+        .insert(caller, original_signature);
     let mut excessive = observe(&engine, &call, &inputs, &state).unwrap();
     excessive.offset = engine
         .terms
@@ -211,8 +216,6 @@ fn controls<'tcx>(tcx: TyCtxt<'tcx>, root: DefId) {
     eprintln!(
         "byte relation: live encoding/extent, carried work, foreign invocation/extent refusal"
     );
-    drop(origin);
-
     let bits = u32::from(tcx.sess.target.pointer_width);
     let mut projected_raw = raw.clone();
     let Value::Reference { projection, .. } = &mut projected_raw[source_index] else {
@@ -276,11 +279,16 @@ fn controls<'tcx>(tcx: TyCtxt<'tcx>, root: DefId) {
     let swapped = Rc::new(swapped);
     engine.bodies.borrow_mut().insert(caller, swapped.clone());
     let swapped_call = CallOccurrence::new(caller, &swapped, block, &raw);
-    assert!(
-        observe(&engine, &swapped_call, &inputs, &state)
-            .err()
-            .unwrap()
-            .contains("not a Rust slice")
+    let swapped_error = observe(&engine, &swapped_call, &inputs, &state)
+        .err()
+        .unwrap();
+    assert_eq!(
+        swapped_error,
+        "byte source current CFG differs from original compiler CFG"
+    );
+    assert_eq!(
+        engine.unknown_causes.borrow().get(&swapped_error),
+        Some(&UnknownCategory::Semantics)
     );
     engine.bodies.borrow_mut().insert(caller, body.clone());
 
@@ -380,6 +388,97 @@ fn controls<'tcx>(tcx: TyCtxt<'tcx>, root: DefId) {
         ..inputs
     };
     assert!(observe(&engine, &width_call, &changed, &state).is_err());
+    // Genuine typed Some is constructed by the existing original layout-bound transmute helper.
+    let generated = engine
+        .integer_nonzero_option_transmute(
+            tcx.types.u8,
+            original,
+            &symbolic::integer(&engine.terms, 1, 8, false),
+        )
+        .unwrap()
+        .unwrap();
+    let Value::Enum { variants, .. } = generated else {
+        panic!("original niche enum")
+    };
+    let some = variants[1].clone();
+    let mut some_state = state.clone();
+    some_state.memory[1] = Some(some.clone());
+    let some_inputs = Inputs {
+        needle: &some,
+        ..inputs
+    };
+    let relation = observe(&engine, &call, &some_inputs, &some_state)
+        .unwrap()
+        .relation()
+        .unwrap();
+    assert_eq!(relation.encoding, engine.terms.bit_vector(1, 8).unwrap());
+    relation
+        .into_work(&engine, original, selected, &slice, &some, &some_state)
+        .unwrap();
+    let generated_zero = engine
+        .integer_nonzero_option_transmute(
+            tcx.types.u8,
+            original,
+            &symbolic::integer(&engine.terms, 0, 8, false),
+        )
+        .unwrap()
+        .unwrap();
+    let Value::Enum { variants, .. } = generated_zero else {
+        unreachable!()
+    };
+    let invalid_some = variants[1].clone();
+    let mut invalid_state = state.clone();
+    invalid_state.memory[1] = Some(invalid_some.clone());
+    let invalid_inputs = Inputs {
+        needle: &invalid_some,
+        ..inputs
+    };
+    assert!(
+        observe(&engine, &call, &invalid_inputs, &invalid_state)
+            .unwrap()
+            .relation()
+            .err()
+            .unwrap()
+            .contains("Some lacks proved nonzero validity")
+    );
+    let mut missing_some = some_state.clone();
+    missing_some
+        .memory
+        .missing_places
+        .consume(1, vec![])
+        .unwrap();
+    assert!(observe(&engine, &call, &some_inputs, &missing_some).is_err());
+    let ty::Adt(_, arguments) = original.kind() else {
+        unreachable!()
+    };
+    let nonzero = arguments.type_at(0);
+    let ty::Adt(definition, arguments) = nonzero.kind() else {
+        unreachable!()
+    };
+    let actual_field = definition.non_enum_variant().fields[rustc_abi::FieldIdx::from_usize(0)]
+        .ty(tcx, arguments)
+        .skip_norm_wip();
+    let mut binding_work = nonzero_niches::ByteWork::new(0).unwrap();
+    let binding = engine
+        .byte_needle_fields(original, &mut binding_work)
+        .unwrap();
+    assert_ne!(
+        binding.field(nonzero, 0, actual_field).unwrap(),
+        actual_field
+    );
+    assert!(
+        binding
+            .field(nonzero, 0, tcx.types.u16)
+            .unwrap_err()
+            .contains("associated original FieldTy differs")
+    );
+    assert_eq!(
+        binding.field(tcx.types.bool, 0, actual_field).unwrap(),
+        actual_field
+    );
+    eprintln!(
+        "byte caller/Some controls: original Body/PolyFnSig guards, anchored FieldTy, validity/mask"
+    );
     // Observed origins are deliberately disconnected from helper semantic authority.
     let error = engine
         .exact_niche_membership(original, selected, &slice, &needle, &state)

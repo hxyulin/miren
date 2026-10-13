@@ -7913,3 +7913,37 @@ qualified query-free fold deadline contexts. All 5,232 retained queried obligati
 counterexample models match exactly, with no unexplained differences. No default supported outcome
 is added. Only the measured documentation successor follows the unchanged 1,062-file full-check
 candidate; original private failed callbacks remain preserved without completion credit.
+
+
+## Stage 260: authenticate byte callers and exact Some field bindings
+
+The live byte relation now retains complete available original/current caller source and original
+full-signature evidence. Both source registries remain borrowed throughout the relation. Caller
+inventory, normalization and comparison are charged before observation and carried into the
+existing cumulative source budget. The core helper source policy remains separate.
+
+The actual core NonZeroU8 associated inner field and scalar pattern are bound through their exact
+compiler identities. Genuine initialized Some(1) reaches the existing byte codec; active Some(0),
+foreign field types and invalid masks refuse. No broad Alias/Pat normalization or search permission
+is introduced.
+
+The private first callback failed because a swapped-call mutation now hits the stronger original
+CFG guard before the older operand-type guard. Four diagnostic profiles measured the exact earlier
+Semantics reason. The only successor edit changes that negative assertion and checks its category;
+production remains literal. The complete private successor then passed all four compiler profiles.
+The failed callback remains preserved without completion credit.
+
+Root composes six changed paths and preserves eight private unchanged paths against the committed
+live-origin stage. Current population probes, nonce handling, iterator Drop and retained helper
+code remain unchanged. Four renewed compiler targets pass sixteen actual profile callbacks with
+full source, tool and retained-artifact guards. All ten final frozen checks pass, including
+1,013 outer Rust tests and 91 Python tests. The two nested native controls are counted separately;
+one is the expected genuine mutant failure.
+Raw-parts preconditions, initialized word mapping and complete search loops remain unfinished.
+
+The four-profile release survey retains 322 PROVED, 163 REFUTED and 106 UNKNOWN per profile,
+across the unchanged 591 cases and 107 families. All 2,364 retained Proof comparisons match:
+2,363 literal full matches and one separately qualified query-free fold deadline context. All
+5,232 retained queried obligations and counterexample models are exact, with no unresolved
+differences. No default supported outcome is added. The final four-document successor preserves
+all 1,058 code, fixture, manifest and other files from the frozen full-check candidate.

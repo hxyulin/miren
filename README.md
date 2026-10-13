@@ -69,7 +69,8 @@ covers 591 cases across 107 families, including concrete and symbolic local byte
 Available byte-search source, isolated word predicates and population-count facts have separate
 authentication checks. A live byte relation checks current origin, projected extent and needle
 encoding before carrying its work into source analysis. The relation issues no raw-reference or
-search certificate.
+search certificate. Available original caller MIR and full signatures are authenticated before
+input observations. Exact compiler-bound NonZeroU8 fields preserve initialized Some payloads.
 Full aligned search remains UNKNOWN pending source metadata, storage, precondition and loop proofs.
 
 Fixed-array partial moves preserve initialization and execute remaining destructors in compiler

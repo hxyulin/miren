@@ -2031,7 +2031,7 @@ impl MembershipApplication<'_> {
 }
 
 // Work backends are counters only, never original-body, source or Memory authority.
-pub(in crate::proof) use byte_search_source::Work as ByteWork;
+pub(in crate::proof) use byte_search_source::{CallerSource, Work as ByteWork, caller_source};
 
 enum EncodingWork<'a, 'tcx> {
     Application(&'a mut MembershipApplication<'tcx>),

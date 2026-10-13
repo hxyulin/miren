@@ -2000,3 +2000,11 @@ including active NonZero validity, then carries its paid work into the existing 
 service. It creates no raw pointer, reference, graph certificate or search result. Original
 associated-field type refusals remain conservative. Full byte-search semantics remain unsupported;
 retained-core scalar facts and live input relations do not prove the search loop.
+
+Byte origin checks also authenticate available original caller MIR and the full compiler signature
+before observing its current safe shared operands. Exact compiler-bound NonZeroU8 associated fields
+and scalar patterns retain their original layout and validity checks; unrelated aliases and patterns
+remain unsupported. Caller source guards freeze current registries through the live relation. These
+input checks grant no raw access or complete transport/search theorem. Isolated compiler controls
+pass on host/ARM O0/O2. Full current validation passes 1,013 Rust and 91 Python tests, preserving
+all 5,232 retained queried obligations and counterexample models.

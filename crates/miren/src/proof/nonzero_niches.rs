@@ -3,7 +3,7 @@ use super::*;
 use crate::symbolic::ScalarSliceElement;
 #[path = "nonzero_niche_comparisons.rs"]
 mod comparisons;
-pub(super) use comparisons::ByteWork;
+pub(super) use comparisons::{ByteWork, CallerSource, caller_source};
 #[cfg(test)]
 #[path = "nonzero_full_integer_probe.rs"]
 mod full_integer_probe;
@@ -103,6 +103,106 @@ struct Certificate<'tcx> {
     bits: u32,
     signed: bool,
     facts: NicheFacts,
+}
+
+// Exact compiler-bound field steps, never general Alias/Pat normalization authority.
+pub(super) struct ByteNeedleFields<'tcx> {
+    nonzero: Ty<'tcx>,
+    inner: Ty<'tcx>,
+    projection: Ty<'tcx>,
+    pattern: Ty<'tcx>,
+    primitive: Ty<'tcx>,
+}
+
+impl<'tcx> ByteNeedleFields<'tcx> {
+    pub(super) fn field(
+        &self,
+        parent: Ty<'tcx>,
+        index: usize,
+        original: Ty<'tcx>,
+    ) -> Result<Ty<'tcx>, String> {
+        if parent == self.nonzero && index == 0 {
+            if original != self.projection {
+                return Err("byte needle associated original FieldTy differs".into());
+            }
+            Ok(self.inner)
+        } else if parent == self.inner && index == 0 {
+            if original != self.pattern {
+                return Err("byte needle original scalar Pat differs".into());
+            }
+            Ok(self.primitive)
+        } else {
+            Ok(original)
+        }
+    }
+}
+
+impl<'tcx> Engine<'tcx> {
+    pub(super) fn byte_needle_fields(
+        &self,
+        original: Ty<'tcx>,
+        work: &mut ByteWork,
+    ) -> Result<ByteNeedleFields<'tcx>, String> {
+        work.charge(8)
+            .map_err(|error| self.categorized_error(error.category, error.reason))?;
+        let ty::Adt(option, args) = original.kind() else {
+            return Err("byte needle binding requires original core Option".into());
+        };
+        if self.tcx.lang_items().get(LangItem::Option) != Some(option.did()) || args.len() != 1 {
+            return Err("byte needle binding original Option identity differs".into());
+        }
+        let ty::Adt(nonzero, parameters) = args.type_at(0).kind() else {
+            return Err("byte needle binding requires original NonZero".into());
+        };
+        if !self
+            .tcx
+            .is_diagnostic_item(rustc_span::Symbol::intern("NonZero"), nonzero.did())
+            || parameters.len() != 1
+            || parameters.type_at(0) != self.tcx.types.u8
+        {
+            return Err("byte needle binding original unsigned byte differs".into());
+        }
+        // Retain fixed purity/layout/field/normalization/facts services and bounded returned names.
+        work.charge(6 + 5 + 3 + 1 + 2 + 32 + 4 + 48 + 6 + 5 * 129 + 24)
+            .map_err(|error| self.categorized_error(error.category, error.reason))?;
+        let certificate = certify(self.tcx, original)?;
+        if !facts_match(&certificate.facts)
+            || certificate.primitive != self.tcx.types.u8
+            || certificate.facts.size != 1
+            || certificate.facts.align != 1
+            || certificate.tags != [0, 1]
+            || certificate.payload_variant != 1
+            || [
+                &certificate.inner_name,
+                &certificate.outer_name,
+                &certificate.inner_field,
+                &certificate.outer_field,
+                &certificate.payload_field,
+            ]
+            .iter()
+            .any(|name| name.len() > 128)
+        {
+            return Err("byte needle binding lacks its exact zero-only byte schema".into());
+        }
+        work.charge(12)
+            .map_err(|error| self.categorized_error(error.category, error.reason))?;
+        let ty::Adt(inner, inner_args) = certificate.inner.kind() else {
+            return Err("byte needle binding original inner ADT differs".into());
+        };
+        let projection = nonzero.non_enum_variant().fields[FieldIdx::from_usize(0)]
+            .ty(self.tcx, parameters)
+            .skip_norm_wip();
+        let pattern = inner.non_enum_variant().fields[FieldIdx::from_usize(0)]
+            .ty(self.tcx, inner_args)
+            .skip_norm_wip();
+        Ok(ByteNeedleFields {
+            nonzero: certificate.nonzero,
+            inner: certificate.inner,
+            projection,
+            pattern,
+            primitive: certificate.primitive,
+        })
+    }
 }
 
 fn layout<'tcx>(

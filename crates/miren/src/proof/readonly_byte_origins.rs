@@ -74,6 +74,8 @@ pub(super) struct Origin<'a, 'tcx> {
     needle_allocation: usize,
     offset: Term,
     capacity: Term,
+    caller_source: nonzero_niches::CallerSource<'a, 'tcx>,
+    source_work: Option<nonzero_niches::ByteWork>,
 }
 
 fn usize_term(engine: &Engine<'_>, value: &Value) -> Result<Term, String> {
@@ -143,7 +145,11 @@ fn same_needle<'tcx>(
     left: &Value,
     right: &Value,
     depth: usize,
+    fields: &nonzero_niches::ByteNeedleFields<'tcx>,
+    work: &mut nonzero_niches::ByteWork,
 ) -> Result<(), String> {
+    work.charge(2)
+        .map_err(|error| engine.categorized_error(error.category, error.reason))?;
     if depth >= MAX_INPUT_DEPTH {
         return Err("readonly byte origin needle exceeds the existing depth16 limit".into());
     }
@@ -195,7 +201,7 @@ fn same_needle<'tcx>(
             return Err("readonly byte origin needle tag or Context differs".into());
         }
         for (a, b) in first.iter().zip(second) {
-            same_needle(engine, original, a, b, depth + 1)?;
+            same_needle(engine, original, a, b, depth + 1, fields, work)?;
         }
         return Ok(());
     }
@@ -244,17 +250,19 @@ fn same_needle<'tcx>(
             "readonly byte origin needle original fields or variant metadata differ".into(),
         );
     }
-    for ((a, left), ((b, right), field)) in first.iter().zip(second.iter().zip(&variant.fields)) {
+    for (index, ((a, left), ((b, right), field))) in first
+        .iter()
+        .zip(second.iter().zip(&variant.fields))
+        .enumerate()
+    {
         if a != b || a != field.name.as_str() {
             return Err("readonly byte origin needle original FieldTy/name differs".into());
         }
-        same_needle(
-            engine,
-            field.ty(engine.tcx, args).skip_norm_wip(),
-            left,
-            right,
-            depth + 1,
-        )?;
+        work.charge(4)
+            .map_err(|error| engine.categorized_error(error.category, error.reason))?;
+        let original_field = field.ty(engine.tcx, args).skip_norm_wip();
+        let bound = fields.field(original, index, original_field)?;
+        same_needle(engine, bound, left, right, depth + 1, fields, work)?;
     }
     Ok(())
 }
@@ -324,6 +332,11 @@ pub(super) fn observe<'a, 'tcx>(
     state: &'a State,
 ) -> Result<Origin<'a, 'tcx>, String> {
     state.flow.require_unarmed()?;
+    let mut source_work = nonzero_niches::ByteWork::new(0)
+        .map_err(|error| engine.categorized_error(error.category, error.reason))?;
+    let caller_source =
+        nonzero_niches::caller_source(engine, call.caller, call.body, &mut source_work)
+            .map_err(|error| engine.categorized_error(error.category, error.reason))?;
     let args = current_call(engine, call, inputs.selected)?;
     if !std::ptr::eq(call.evaluated, inputs.raw) {
         return Err(
@@ -457,7 +470,16 @@ pub(super) fn observe<'a, 'tcx>(
     same_slice(engine, &current, inputs.slice)?;
     let current = storage_locations::StorageLocation::tracked(needle_allocation, false)
         .read(&state.memory)?;
-    same_needle(engine, *original, current, inputs.needle, 0)?;
+    let needle_fields = engine.byte_needle_fields(*original, &mut source_work)?;
+    same_needle(
+        engine,
+        *original,
+        current,
+        inputs.needle,
+        0,
+        &needle_fields,
+        &mut source_work,
+    )?;
     Ok(Origin {
         engine,
         call,
@@ -472,6 +494,8 @@ pub(super) fn observe<'a, 'tcx>(
         needle_allocation,
         offset,
         capacity,
+        caller_source,
+        source_work: Some(source_work),
     })
 }
 
@@ -522,9 +546,17 @@ pub(super) struct Relation<'a, 'tcx> {
 }
 
 impl<'a, 'tcx> Origin<'a, 'tcx> {
-    pub(super) fn relation(self) -> Result<Relation<'a, 'tcx>, String> {
+    pub(super) fn relation(mut self) -> Result<Relation<'a, 'tcx>, String> {
         let engine = self.engine;
-        let mut work = nonzero_niches::ByteWork::new(0)
+        let mut work = self
+            .source_work
+            .take()
+            .ok_or("byte origin caller source work was already consumed")?;
+        // Retain the previous relation initialization fee and pay the actual Option handoff.
+        work.charge(3 + 2)
+            .map_err(|error| engine.categorized_error(error.category, error.reason))?;
+        self.caller_source
+            .check(engine, self.call.caller, self.call.body, &mut work)
             .map_err(|error| engine.categorized_error(error.category, error.reason))?;
         // Hold the actual current caller cache guard through all live relation observations.
         work.charge(4)
