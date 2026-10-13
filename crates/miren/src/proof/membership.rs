@@ -96,7 +96,8 @@ impl<'tcx> Engine<'tcx> {
                 && matches!(args.type_at(0).kind(), ty::Adt(payload, payload_args)
                     if self.tcx.is_diagnostic_item(Symbol::intern("NonZero"), payload.did())
                         && payload_args.len() == 1
-                        && nonzero_options::readonly_niche_integer_type(payload_args.type_at(0))
+                        && nonzero_options::readonly_niche_integer_type(
+                            self.tcx, payload_args.type_at(0))
                             .is_some()));
         if exact_niche {
             state.flow.require_unarmed()?;

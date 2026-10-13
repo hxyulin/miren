@@ -347,11 +347,28 @@ pub(super) fn readonly_niche_unsigned_bits(original: Ty<'_>) -> Option<u32> {
 }
 
 /// Exact readonly payload domains; discriminant and index signedness are separate facts.
-pub(super) fn readonly_niche_integer_type(original: Ty<'_>) -> Option<(u32, bool)> {
+pub(super) fn readonly_niche_integer_type(
+    tcx: TyCtxt<'_>,
+    original: Ty<'_>,
+) -> Option<(u32, bool)> {
     match original.kind() {
         ty::Int(ty::IntTy::I8) => Some((8, true)),
         ty::Int(ty::IntTy::I16) => Some((16, true)),
         ty::Int(ty::IntTy::I32) => Some((32, true)),
+        ty::Int(ty::IntTy::I64) => Some((64, true)),
+        ty::Int(ty::IntTy::I128) => Some((128, true)),
+        ty::Uint(ty::UintTy::U64) => Some((64, false)),
+        ty::Uint(ty::UintTy::U128) => Some((128, false)),
+        ty::Int(ty::IntTy::Isize) => readonly_niche_pointer_bits(tcx).map(|bits| (bits, true)),
+        ty::Uint(ty::UintTy::Usize) => readonly_niche_pointer_bits(tcx).map(|bits| (bits, false)),
         _ => readonly_niche_unsigned_bits(original).map(|bits| (bits, false)),
+    }
+}
+
+fn readonly_niche_pointer_bits(tcx: TyCtxt<'_>) -> Option<u32> {
+    match tcx.sess.target.pointer_width {
+        32 => Some(32),
+        64 => Some(64),
+        _ => None,
     }
 }

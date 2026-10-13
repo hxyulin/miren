@@ -1649,3 +1649,15 @@ Pat values remain unsupported. The separate signed primitive dispatcher leaves t
 helper and its accepted set intact. Existing fees/caps remain, with additional performed metadata
 checks paid in their actual membership phases. No source review, type inventory or recorded
 constant origin alone supplies execution, reference authority or a completed proof.
+
+
+Readonly integer niche admission includes original core Option<NonZeroU64>,
+Option<NonZeroU128>, Option<NonZeroUsize>, Option<NonZeroI64>, Option<NonZeroI128> and
+Option<NonZeroIsize>. Target-sized payload width follows the actual compiler target's 32/64-bit
+pointer width; discriminants and indices keep separate compiler metadata. Exact original primitive,
+initialized zero-only ranges, alignment, fields, core anchors, inner Pat, readonly storage and
+current Body/Context checks remain mandatory. Wide and target-sized getters authenticate original
+and current bodies before modeling. The original unsigned 8/16/32 helper stays unchanged.
+128-bit range maxima retain the existing u128::MAX branch for compiler-admitted widths. Local enums,
+mutable/pointer niches and arbitrary Pat payloads retain their separate conservative domains.
+Source inventory and compiler control declarations are not behavioral coverage evidence.

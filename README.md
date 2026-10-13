@@ -45,7 +45,8 @@ This is an experimental side project. It requires a pinned nightly compiler, sup
 Rust, and has not completed a soundness audit. Unsupported operations and unfinished proofs return
 UNKNOWN. A solver counterexample is not automatically a confirmed runtime panic.
 
-Readonly `Option<NonZero<T>>` slices support u8/u16/u32 and i8/i16/i32 payloads. These and exact
+Readonly `Option<NonZero<T>>` slices support every Rust integer primitive on 32-bit and 64-bit
+targets, including target-sized `usize`/`isize`. These and exact
 local u16 empty/payload enums retain the compiler's zero-only niche with correlated tags and guarded
 payload observations. Signed payloads preserve negative and minimum values.
 Original type, body, lifetime and resource checks remain required; pointer niches, mutable niches
@@ -60,7 +61,7 @@ stores. Whole product helpers execute actual bodies and preserve returned storag
 calls and proper reborrows remain UNKNOWN. Deeper scalar nesting and the dedicated
 proper-reborrow caller remain UNKNOWN. Bounded owned u16 products support writes through multiple
 symbolic suffix indices, preserving compiler types and current Memory. The capability manifest
-covers 396 cases across 97 families, including concrete and symbolic local byte-copy controls.
+covers 424 cases across 98 families, including concrete and symbolic local byte-copy controls.
 
 Fixed-array partial moves preserve initialization and execute remaining destructors in compiler
 order. Nested destruction and covering assignments retain actual destructor effects. The exact

@@ -198,14 +198,18 @@ fn actual_signed_niche_layout_negative_payload_and_current_body_controls() {
                 super::super::nonzero_options::readonly_niche_unsigned_bits(tcx.types.i16),
                 None
             );
-            for refused in [
-                tcx.types.bool,
-                tcx.types.char,
-                tcx.types.i64,
-                tcx.types.isize,
-            ] {
+            for refused in [tcx.types.bool, tcx.types.char, tcx.types.f32, tcx.types.f64] {
                 assert!(
-                    super::super::nonzero_options::readonly_niche_integer_type(refused).is_none()
+                    super::super::nonzero_options::readonly_niche_integer_type(tcx, refused)
+                        .is_none()
+                );
+            }
+            for old_unsigned_refusal in [tcx.types.i64, tcx.types.isize] {
+                assert!(
+                    super::super::nonzero_options::readonly_niche_unsigned_bits(
+                        old_unsigned_refusal
+                    )
+                    .is_none()
                 );
             }
             let member = tcx

@@ -7232,3 +7232,50 @@ Evidence: /tmp/miren-stage244-root-corrected-checks/complete.json,
 /tmp/miren-stage244-root-isolated-evidence-review.json,
 /tmp/miren-stage244-root-release-rebuild/outcome.json and
 /tmp/miren-stage244-root-survey-proof-audit.json.
+
+
+## Stage245: readonly wide and target-sized NonZero niches
+
+Readonly core `Option<NonZero<T>>` covers every Rust integer primitive on 32/64-bit targets.
+Original core identity,
+primitive type, inner Pat type, zero-only niche layout and current initialized readonly storage
+must agree. Wide payloads retain all 64 or 128 bits. Target-sized payloads use the actual compiler
+target width, with a separate type identity check against same-width fixed integers. Signed payloads
+remain distinct from unsigned discriminants and indices. The old unsigned small-integer helper
+remains unchanged. Reference niches, mutable niches and wide local enums remain UNKNOWN.
+
+New getter and comparison paths authenticate complete available raw/current bodies and exact
+Instances before cache reuse. Target identity validation has an explicit membership fee; previous
+fees and resource caps remain intact. Host/ARM O0/O2 compiler callbacks test original layout,
+minimum and maximum bits, malformed metadata, foreign Context, current bodies and same-width type
+substitution. No inventory or unavailable body becomes proof evidence.
+
+The dedicated four-profile application matrix retains 112 full Proofs: 76 PROVED, 24 REFUTED and
+12 UNKNOWN, with 204 queried obligations and 24 models. Getter and equality helper mutations refute
+eight unchanged caller claims, with 24 queries and eight models. Native originals pass at O0/O2;
+both actual helper mutants fail the unchanged native claims. Two old signed integer entries prove
+on every profile before their expectations change. The original reference entry remains UNKNOWN.
+No assumptions or trusted calls are introduced.
+
+The first application matrix stopped on the new reference case's diagnostic expectation. Its
+UNKNOWN/Semantics status and actual original reference type were captured on all four profiles
+before correcting only that diagnostic fragment. Original source assertions and production code
+remain unchanged by the correction; the failed capture is retained.
+
+Fresh Root release surveys measure 424 cases across 98 families: 208 PROVED, 125 REFUTED and
+91 UNKNOWN per profile. The 28 new cases add 25 supported outcomes; two unchanged old integer
+entries advance to PROVED. The 394 other old case objects and entire old fixture prefix remain
+literal. Of 1,576 retained old Proof pairs, 48 match fully, 1,527 differ only by the appended-source
+fingerprint, and one also retains the inherited query-free fold deadline-context qualification.
+All 3,488 old queried obligations and models remain exact. Eight actual old UNKNOWN/new PROVED
+pairs are retained separately without normalizing their semantic differences.
+
+Formatting, lint, the complete workspace run of 954 Rust tests, 91 Python tests, actual release
+recompilation, dependency policy, manual hooks and documentation pass. Adoption refreshes source
+mtimes, and the release survey records the actual rebuilt binary. Final prose checks follow the
+measured survey. No guest rewrites, unsafe assumptions or solver-policy changes are introduced.
+
+Evidence: /tmp/miren-stage245-root-checks/complete.json,
+/tmp/miren-stage245-root-isolated-evidence-review.json,
+/tmp/miren-stage245-root-checks-association.json and
+/tmp/miren-stage245-root-survey-proof-audit.json.

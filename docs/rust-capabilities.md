@@ -2466,3 +2466,25 @@ queried obligations and models remain exact. No deadline-context difference is c
 Formatting, lint, a complete workspace run of 924 outer Rust tests, 91 Python tests, release builds,
 dependency policy, manual hooks and documentation pass. The initial producer-tag and composition
 initializer failures remain archived. This stage adds no application rewrites or hardware premises.
+
+
+## Readonly wide and target-sized integer niches
+
+Readonly core `Option<NonZero<T>>` storage covers all Rust integer primitives on 32/64-bit targets.
+Wide payloads
+retain their original 64-bit or 128-bit representation; `usize` and `isize` use the actual compiler
+target width. Signed minimum values and unsigned maximum values remain exact. Target-sized types
+cannot borrow a certificate for a same-width fixed integer type.
+
+Guarded getters, equality and selected membership require the original core Option and NonZero
+types, zero-only niche layout, current initialized readonly storage and Context. New getter and
+comparison paths authenticate available raw and current bodies before cached evidence can be used.
+Target identity work has an explicit membership charge; previous fees and limits remain intact.
+The old unsigned small-integer helper is unchanged. Reference niches, mutable niches and local
+wide enums remain UNKNOWN. No hardware or external-state assumptions are added.
+
+The four-profile release survey has 424 cases across 98 families: 208 PROVED, 125 REFUTED and
+91 UNKNOWN each. This stage adds 25 supported new cases and advances two unchanged old integer
+cases. Its three new refusal controls explain the net increase of one UNKNOWN. Compiler controls
+and actual getter/equality mutations pass; native originals pass and mutants fail. The complete
+workspace run passes 954 Rust tests and 91 Python tests.

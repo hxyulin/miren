@@ -1548,11 +1548,21 @@ impl<'tcx> Engine<'tcx> {
         let nonzero = self
             .tcx
             .get_diagnostic_item(rustc_span::Symbol::intern("NonZero"));
+        // Additional original target-sized primitive dispatch is performed, not discounted.
+        budget.phase(GraphPhase::Schema, 1)?;
+        if matches!(payload_arguments.first().map(|arg| arg.kind()),
+            Some(ty::GenericArgKind::Type(original))
+                if matches!(original.kind(), ty::Int(ty::IntTy::Isize)
+                    | ty::Uint(ty::UintTy::Usize)))
+        {
+            budget.phase(GraphPhase::Schema, 2)?;
+        }
         if Some(payload_definition.did()) != nonzero
             || payload_arguments.len() != 1
             || !matches!(payload_arguments.first().map(|arg| arg.kind()),
                 Some(ty::GenericArgKind::Type(original))
-                    if super::super::nonzero_options::readonly_niche_integer_type(original)
+                    if super::super::nonzero_options::readonly_niche_integer_type(
+                        self.tcx, original)
                         .is_some())
         {
             return Err("niche Option payload is not an admitted original integer NonZero".into());

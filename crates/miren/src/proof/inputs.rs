@@ -50,7 +50,7 @@ impl<'tcx> Engine<'tcx> {
             return Ok(None);
         }
         if nonzero_niches::ENABLE_RUNTIME
-            && nonzero_options::readonly_niche_integer_type(signature.output()).is_some()
+            && nonzero_options::readonly_niche_integer_type(self.tcx, signature.output()).is_some()
         {
             self.nonzero_get_body_certificate(instance, *receiver)?;
             let [value] = values else {

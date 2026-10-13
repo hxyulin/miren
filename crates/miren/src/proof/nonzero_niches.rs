@@ -1,8 +1,11 @@
-//! Exact bounded readonly zero-only NonZero<u8/u16/u32> niche observations.
+//! Exact bounded readonly zero-only integer NonZero niche observations.
 use super::*;
 use crate::symbolic::ScalarSliceElement;
 #[path = "nonzero_niche_comparisons.rs"]
 mod comparisons;
+#[cfg(test)]
+#[path = "nonzero_full_integer_probe.rs"]
+mod full_integer_probe;
 #[cfg(test)]
 use rustc_abi::Integer;
 use rustc_abi::{BackendRepr, FieldIdx, Primitive, Scalar, TagEncoding, Variants};
@@ -55,7 +58,7 @@ impl NicheFacts {
 
 fn facts_match(facts: &NicheFacts) -> bool {
     let signed = facts.payload_signed();
-    matches!(facts.payload_bits, 8 | 16 | 32)
+    matches!(facts.payload_bits, 8 | 16 | 32 | 64 | 128)
         && facts.untagged < 2
         && facts.niche_first == 1 - facts.untagged
         && facts.niche_last == facts.niche_first
@@ -181,7 +184,7 @@ fn certify<'tcx>(tcx: TyCtxt<'tcx>, original: Ty<'tcx>) -> Result<Certificate<'t
             .is_none_or(|sized| sized.krate != anchor.krate)
         || !nonzero.is_struct()
         || nz_args.len() != 1
-        || super::nonzero_options::readonly_niche_integer_type(nz_args.type_at(0)).is_none()
+        || super::nonzero_options::readonly_niche_integer_type(tcx, nz_args.type_at(0)).is_none()
         || nonzero.non_enum_variant().fields.len() != 1
         || !nonzero_ty.is_freeze(tcx, env)
         || !tcx.type_is_copy_modulo_regions(env, nonzero_ty)
@@ -191,7 +194,7 @@ fn certify<'tcx>(tcx: TyCtxt<'tcx>, original: Ty<'tcx>) -> Result<Certificate<'t
     }
     let primitive = nz_args.type_at(0);
     let (payload_bits, payload_signed) =
-        super::nonzero_options::readonly_niche_integer_type(primitive)
+        super::nonzero_options::readonly_niche_integer_type(tcx, primitive)
             .ok_or("NonZero readonly primitive is not admitted")?;
     // Preserve the old local enum domain; the new width is exact original Option only.
     if !option && primitive != tcx.types.u16 {
@@ -1035,7 +1038,8 @@ impl<'tcx> Engine<'tcx> {
         if args.len() != 1 {
             return Err("NonZero niche standalone original argument count mismatch".into());
         }
-        if super::nonzero_options::readonly_niche_integer_type(args.type_at(0)).is_none() {
+        if super::nonzero_options::readonly_niche_integer_type(self.tcx, args.type_at(0)).is_none()
+        {
             return Ok(());
         }
         self.nonzero_niche_checked_value(original, value, conditions)?;
@@ -1088,7 +1092,8 @@ impl<'tcx> Engine<'tcx> {
         if !matches!(self.tcx.def_kind(parent), DefKind::Impl { of_trait: false })
             || !matches!(receiver.kind(), ty::Adt(def, args)
                 if def.did() == anchor && args.len() == 1
-                    && super::nonzero_options::readonly_niche_integer_type(args.type_at(0))
+                    && super::nonzero_options::readonly_niche_integer_type(
+                        self.tcx, args.type_at(0))
                         .is_some())
             || self
                 .tcx
@@ -1114,16 +1119,13 @@ impl<'tcx> Engine<'tcx> {
             return Err("NonZero getter requires exact safe instantiated signature".into());
         }
         // Availability is checked by instantiated_body; preserve MissingCompilerEvidence.
-        if super::nonzero_options::readonly_niche_integer_type(primitive)
-            .is_some_and(|(_, signed)| signed)
-            && !self.tcx.is_mir_available(callee)
-        {
+        let original_body_required =
+            super::nonzero_options::readonly_niche_unsigned_bits(primitive).is_none();
+        if original_body_required && !self.tcx.is_mir_available(callee) {
             return Err(self.missing_body_reason(callee));
         }
         let body = self.instantiated_body(instance)?;
-        if super::nonzero_options::readonly_niche_integer_type(primitive)
-            .is_some_and(|(_, signed)| signed)
-        {
+        if original_body_required {
             if body.source.instance != instance.def || body.source.promoted.is_some() {
                 return Err("signed NonZero getter current source Instance mismatch".into());
             }
@@ -1482,7 +1484,7 @@ fn contains_nonzero16<'tcx>(
         ty::Adt(def, args) => {
             if tcx.is_diagnostic_item(rustc_span::Symbol::intern("NonZero"), def.did()) {
                 return Ok(args.len() == 1
-                    && super::nonzero_options::readonly_niche_integer_type(args.type_at(0))
+                    && super::nonzero_options::readonly_niche_integer_type(tcx, args.type_at(0))
                         .is_some());
             }
             for variant in def.variants() {
@@ -1622,7 +1624,7 @@ fn nonzero16_terminal<'tcx>(tcx: TyCtxt<'tcx>, mut original: Ty<'tcx>) -> bool {
             ty::Adt(def, args) => {
                 return tcx.is_diagnostic_item(rustc_span::Symbol::intern("NonZero"), def.did())
                     && args.len() == 1
-                    && super::nonzero_options::readonly_niche_integer_type(args.type_at(0))
+                    && super::nonzero_options::readonly_niche_integer_type(tcx, args.type_at(0))
                         .is_some();
             }
             _ => return false,

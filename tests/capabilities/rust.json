@@ -2151,22 +2151,165 @@
     {
       "entry": "signed_nonzero_niche_survey::pointer_unknown",
       "family": "signed_nonzero_niche",
-      "expected": "unknown",
-      "unknown_reason": "NonZero wrapper original identity mismatch",
-      "unknown_category": "semantics"
+      "expected": "proved"
     },
     {
       "entry": "signed_nonzero_niche_survey::width64_unknown",
       "family": "signed_nonzero_niche",
-      "expected": "unknown",
-      "unknown_reason": "NonZero wrapper original identity mismatch",
-      "unknown_category": "semantics"
+      "expected": "proved"
     },
     {
       "entry": "signed_nonzero_niche_survey::signed_byte_unknown",
       "family": "signed_nonzero_niche",
       "expected": "unknown",
       "unknown_reason": "niche byte-sized transport needs a separate available-body certificate",
+      "unknown_category": "semantics"
+    },
+    {
+      "entry": "full_integer_nonzero_niche_survey::niche_u64",
+      "family": "full_integer_nonzero_niche",
+      "expected": "proved"
+    },
+    {
+      "entry": "full_integer_nonzero_niche_survey::wrong_u64",
+      "family": "full_integer_nonzero_niche",
+      "expected": "refuted"
+    },
+    {
+      "entry": "full_integer_nonzero_niche_survey::same_u64",
+      "family": "full_integer_nonzero_niche",
+      "expected": "proved"
+    },
+    {
+      "entry": "full_integer_nonzero_niche_survey::member_u64",
+      "family": "full_integer_nonzero_niche",
+      "expected": "proved"
+    },
+    {
+      "entry": "full_integer_nonzero_niche_survey::niche_u128",
+      "family": "full_integer_nonzero_niche",
+      "expected": "proved"
+    },
+    {
+      "entry": "full_integer_nonzero_niche_survey::wrong_u128",
+      "family": "full_integer_nonzero_niche",
+      "expected": "refuted"
+    },
+    {
+      "entry": "full_integer_nonzero_niche_survey::same_u128",
+      "family": "full_integer_nonzero_niche",
+      "expected": "proved"
+    },
+    {
+      "entry": "full_integer_nonzero_niche_survey::member_u128",
+      "family": "full_integer_nonzero_niche",
+      "expected": "proved"
+    },
+    {
+      "entry": "full_integer_nonzero_niche_survey::niche_usize",
+      "family": "full_integer_nonzero_niche",
+      "expected": "proved"
+    },
+    {
+      "entry": "full_integer_nonzero_niche_survey::wrong_usize",
+      "family": "full_integer_nonzero_niche",
+      "expected": "refuted"
+    },
+    {
+      "entry": "full_integer_nonzero_niche_survey::same_usize",
+      "family": "full_integer_nonzero_niche",
+      "expected": "proved"
+    },
+    {
+      "entry": "full_integer_nonzero_niche_survey::member_usize",
+      "family": "full_integer_nonzero_niche",
+      "expected": "proved"
+    },
+    {
+      "entry": "full_integer_nonzero_niche_survey::niche_i64",
+      "family": "full_integer_nonzero_niche",
+      "expected": "proved"
+    },
+    {
+      "entry": "full_integer_nonzero_niche_survey::wrong_i64",
+      "family": "full_integer_nonzero_niche",
+      "expected": "refuted"
+    },
+    {
+      "entry": "full_integer_nonzero_niche_survey::same_i64",
+      "family": "full_integer_nonzero_niche",
+      "expected": "proved"
+    },
+    {
+      "entry": "full_integer_nonzero_niche_survey::member_i64",
+      "family": "full_integer_nonzero_niche",
+      "expected": "proved"
+    },
+    {
+      "entry": "full_integer_nonzero_niche_survey::niche_i128",
+      "family": "full_integer_nonzero_niche",
+      "expected": "proved"
+    },
+    {
+      "entry": "full_integer_nonzero_niche_survey::wrong_i128",
+      "family": "full_integer_nonzero_niche",
+      "expected": "refuted"
+    },
+    {
+      "entry": "full_integer_nonzero_niche_survey::same_i128",
+      "family": "full_integer_nonzero_niche",
+      "expected": "proved"
+    },
+    {
+      "entry": "full_integer_nonzero_niche_survey::member_i128",
+      "family": "full_integer_nonzero_niche",
+      "expected": "proved"
+    },
+    {
+      "entry": "full_integer_nonzero_niche_survey::niche_isize",
+      "family": "full_integer_nonzero_niche",
+      "expected": "proved"
+    },
+    {
+      "entry": "full_integer_nonzero_niche_survey::wrong_isize",
+      "family": "full_integer_nonzero_niche",
+      "expected": "refuted"
+    },
+    {
+      "entry": "full_integer_nonzero_niche_survey::same_isize",
+      "family": "full_integer_nonzero_niche",
+      "expected": "proved"
+    },
+    {
+      "entry": "full_integer_nonzero_niche_survey::member_isize",
+      "family": "full_integer_nonzero_niche",
+      "expected": "proved"
+    },
+    {
+      "entry": "full_integer_nonzero_niche_survey::extremes",
+      "family": "full_integer_nonzero_niche",
+      "expected": "proved"
+    },
+    {
+      "entry": "full_integer_nonzero_niche_survey::local_unknown",
+      "family": "full_integer_nonzero_niche",
+      "expected": "unknown",
+      "unknown_reason": "NonZero new readonly width requires original core Option",
+      "unknown_category": "semantics"
+    },
+    {
+      "entry": "full_integer_nonzero_niche_survey::mutable_unknown",
+      "family": "full_integer_nonzero_niche",
+      "expected": "unknown",
+      "unknown_reason": "only read-only byte slices and byte arrays are modeled",
+      "unknown_category": "semantics"
+    },
+    {
+      "entry": "full_integer_nonzero_niche_survey::pointer_unknown",
+      "family": "full_integer_nonzero_niche",
+      "expected": "unknown",
+      "unknown_reason":
+        "only read-only byte slices and byte arrays are modeled: [core::option::Option<&",
       "unknown_category": "semantics"
     }
   ]

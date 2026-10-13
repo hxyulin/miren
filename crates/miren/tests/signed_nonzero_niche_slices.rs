@@ -149,16 +149,8 @@ fn actual_signed_readonly_niches_preserve_tags_negative_payloads_and_refusals() 
                 U,
                 Some("only read-only byte slices and byte arrays are modeled"),
             ),
-            (
-                "pointer_unknown",
-                U,
-                Some("NonZero wrapper original identity mismatch"),
-            ),
-            (
-                "width64_unknown",
-                U,
-                Some("NonZero wrapper original identity mismatch"),
-            ),
+            ("pointer_unknown", P, None),
+            ("width64_unknown", P, None),
             (
                 "signed_byte_unknown",
                 U,
