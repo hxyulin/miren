@@ -2801,3 +2801,24 @@ and counterexample models remain exact. A separate eight-root, four-profile popu
 compares 32 complete proofs, 16 queried obligations and 12 counterexample models against the
 previous release; all match exactly using the final current release binaries. This adds no default
 or full-search supported outcome.
+
+
+## Live byte origin, extent and encoding relation
+
+Readonly byte membership consumes one live invocation relation before source analysis. The relation
+retains actual shared operands, initialized storage and caller cache identity. It checks projected
+offset and length against the current allocation, and uses the existing exact niche codec for both
+the input needle and its initialized current storage. Their encodings must match. The relation
+returns only spent work, carried into the existing cumulative graph/source policy.
+
+The shared codec keeps existing validations and adds explicit work for each meter dispatch. Non-byte
+membership uses its existing application policy. The relation issues no raw pointer, reference,
+search certificate or successful application result. Existing associated FieldTy refusals remain.
+Independent original caller/source and full-signature evidence, raw-parts preconditions, initialized
+word mapping and complete search loops remain required before full byte-search support.
+
+Root transport validation passes 1,013 Rust tests and 91 Python tests. Four renewed compiler
+targets complete sixteen profile callbacks, preserving the configured probe distinctions. The
+default four-profile corpus remains 322 PROVED, 163 REFUTED and 106 UNKNOWN; all 5,232 retained
+queried obligations and counterexample models match the previous release exactly. No new default
+supported outcome is added by this relation.

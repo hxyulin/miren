@@ -14,9 +14,9 @@ const SOURCE_HELPERS: usize = 512;
 const SOURCE_DEPTH: usize = 16;
 
 #[derive(Clone, Debug)]
-struct Failure {
-    category: UnknownCategory,
-    reason: String,
+pub(in crate::proof) struct Failure {
+    pub(in crate::proof) category: UnknownCategory,
+    pub(in crate::proof) reason: String,
 }
 
 impl From<String> for Failure {
@@ -34,14 +34,14 @@ impl From<&str> for Failure {
     }
 }
 
-struct Work {
+pub(in crate::proof) struct Work {
     used: usize,
     body: usize,
     failed: Option<Failure>,
 }
 
 impl Work {
-    fn new(prior_work: usize) -> Result<Self, Failure> {
+    pub(in crate::proof) fn new(prior_work: usize) -> Result<Self, Failure> {
         let mut work = Self {
             used: prior_work,
             body: 0,
@@ -51,7 +51,7 @@ impl Work {
         Ok(work)
     }
 
-    fn charge(&mut self, amount: usize) -> Result<(), Failure> {
+    pub(in crate::proof) fn charge(&mut self, amount: usize) -> Result<(), Failure> {
         if let Some(error) = &self.failed {
             return Err(error.clone());
         }
@@ -68,6 +68,10 @@ impl Work {
             return Err(error);
         }
         Ok(())
+    }
+
+    pub(in crate::proof) fn used(&self) -> usize {
+        self.used
     }
 
     fn node(&mut self, amount: usize) -> Result<(), Failure> {

@@ -7873,3 +7873,43 @@ No default supported outcome is added. Only this measured documentation successo
 unchanged 1,062-file final-check candidate; test failures and zero-test observations remain
 preserved without credit. Full transport preconditions, initialized word mapping and both search
 loops are still required before byte-search support.
+
+
+## Stage259: live byte relation and shared exact needle codec
+
+A private one-use relation binds the actual shared invocation to its current storage, projected
+extent and exact compiler-derived needle encoding. It carries its paid work into source analysis
+without issuing a raw-reference, graph or search permit. Existing codec validation and work charges
+are shared through two concrete backends; new dispatch services add work rather than replacing
+existing charges. Non-byte membership retains its original graph initialization.
+
+Private V1 controls reached the relation before an obsolete inherited refusal assertion failed.
+V2 measured and corrected that exact Semantics frontier, then exposed a locator assumption about
+argument order. Actual optimized MIR retains a needle-first Call. V3 follows both original operand
+types and preserves that real evaluation order; no compiler setting or guest rewrite substitutes
+for the occurrence. All failures and the corrected preliminary diagnosis remain preserved.
+
+Four private targets complete sixteen compiler callbacks across host/ARM O0/O2, with source, tool
+and retained-artifact guards unchanged. These check live origin/encoding/extent, hostile current
+State and caller registries, carried work, and existing u8/u16/u32 codec controls. They emit no
+application Proof report or standalone relation feasibility-query archive. No full-search or
+default supported outcome is claimed. Original caller/full-signature and precondition/loop
+evidence remain future obligations; associated FieldTy refusals stay unchanged.
+
+Root composes eight changed paths against the current population-count commit and preserves six
+private unchanged paths, including the committed nonce and default/retained probe distinction.
+The only conflict is resolved with the existing exact refusal/category assertion. Iterator Drop
+and retained-helper code remain literal.
+
+Final frozen Root validation passes all ten checks, including 1,013 outer Rust tests, 91 Python
+tests, formatting, lint, release builds, dependency checks, manual hooks, documentation build and
+the four-profile release survey. Two nested native controls are counted separately, including the
+expected genuine mutant failure. Four current-Root compiler targets renew sixteen profile groups
+with full source, tool and retained-artifact guards.
+
+Each survey profile retains 322 PROVED, 163 REFUTED and 106 UNKNOWN across 591 cases and 107
+families. All 2,364 retained Proof comparisons match: 2,362 literal full matches and two separately
+qualified query-free fold deadline contexts. All 5,232 retained queried obligations and
+counterexample models match exactly, with no unexplained differences. No default supported outcome
+is added. Only the measured documentation successor follows the unchanged 1,062-file full-check
+candidate; original private failed callbacks remain preserved without completion credit.

@@ -1529,9 +1529,18 @@ impl<'tcx> Engine<'tcx> {
         original: Ty<'tcx>,
         outer: ty::Instance<'tcx>,
     ) -> Result<CheckedNicheLaw<'engine, 'tcx>, String> {
+        self.check_niche_comparison_law_with_work(original, outer, 0)
+    }
+
+    fn check_niche_comparison_law_with_work<'engine>(
+        &'engine self,
+        original: Ty<'tcx>,
+        outer: ty::Instance<'tcx>,
+        prior_work: usize,
+    ) -> Result<CheckedNicheLaw<'engine, 'tcx>, String> {
         use super::super::pure_comparison_templates as templates;
         use super::super::pure_comparisons::CursorArithmetic;
-        let mut budget = GraphBudget::new(0)?;
+        let mut budget = GraphBudget::new(prior_work)?;
         budget.phase(GraphPhase::Schema, 16)?;
         let ty::Adt(definition, _) = original.kind() else {
             return Err("niche membership original is not Option".into());
@@ -2019,9 +2028,33 @@ impl MembershipApplication<'_> {
         self.work = next;
         Ok(())
     }
+}
+
+// Work backends are counters only, never original-body, source or Memory authority.
+pub(in crate::proof) use byte_search_source::Work as ByteWork;
+
+enum EncodingWork<'a, 'tcx> {
+    Application(&'a mut MembershipApplication<'tcx>),
+    Source(&'a Engine<'tcx>, &'a mut ByteWork),
+}
+
+impl EncodingWork<'_, '_> {
+    fn charge(&mut self, count: usize) -> Result<(), String> {
+        match self {
+            Self::Application(application) => {
+                application.charge(2)?; // Actual new dispatch and separate payment call.
+                application.charge(count)
+            }
+            Self::Source(engine, work) => {
+                work.charge(2)
+                    .map_err(|error| engine.categorized_error(error.category, error.reason))?;
+                work.charge(count)
+                    .map_err(|error| engine.categorized_error(error.category, error.reason))
+            }
+        }
+    }
 
     fn condition_copy(&mut self, count: usize) -> Result<(), String> {
-        // One allocation, one existing-condition traversal and one predicate append.
         self.charge(
             count
                 .checked_add(2)
@@ -2037,6 +2070,28 @@ enum MembershipNeedle<'a> {
 }
 
 impl<'tcx> Engine<'tcx> {
+    // Original compiler descriptor plus exact codec; no law/source/Memory permit is issued.
+    pub(in crate::proof) fn readonly_byte_encoding(
+        &self,
+        original: Ty<'tcx>,
+        slice: &Value,
+        needle: &Value,
+        conditions: &[Term],
+        work: &mut ByteWork,
+    ) -> Result<Term, String> {
+        work.charge(16)
+            .map_err(|error| self.categorized_error(error.category, error.reason))?;
+        let schema = self.niche_membership_descriptor(original, slice)?;
+        if schema.payload_bits() != 8 || schema.item_bytes() != 1 || schema.payload_signed() {
+            return Err("byte relation requires its exact unsigned byte encoding".into());
+        }
+        work.charge(3)
+            .map_err(|error| self.categorized_error(error.category, error.reason))?;
+        let mut meter = EncodingWork::Source(self, work);
+        let parsed = self.parse_niche_needle(&mut meter, schema, needle)?;
+        self.encode_niche_needle(&mut meter, schema, parsed, conditions)
+    }
+
     pub(super) fn checked_niche_membership(
         &self,
         original: Ty<'tcx>,
@@ -2047,6 +2102,21 @@ impl<'tcx> Engine<'tcx> {
     ) -> Result<Term, String> {
         state.flow.require_unarmed()?;
         let mut law = self.check_niche_comparison_law(original, instance)?;
+        self.apply_niche_membership(&mut law, slice, needle, state)
+    }
+
+    pub(super) fn checked_byte_membership(
+        &self,
+        relation: super::super::readonly_byte_origins::Relation<'_, 'tcx>,
+        original: Ty<'tcx>,
+        instance: ty::Instance<'tcx>,
+        slice: &Value,
+        needle: &Value,
+        state: &State,
+    ) -> Result<Term, String> {
+        state.flow.require_unarmed()?;
+        let prior_work = relation.into_work(self, original, instance, slice, needle, state)?;
+        let mut law = self.check_niche_comparison_law_with_work(original, instance, prior_work)?;
         self.apply_niche_membership(&mut law, slice, needle, state)
     }
 
@@ -2111,7 +2181,12 @@ impl<'tcx> Engine<'tcx> {
             return Err("niche current length/column context differs".into());
         }
         self.niche_memory_clone_service(&mut application, state)?;
-        let parsed = self.parse_niche_needle(&mut application, schema, needle)?;
+        application.charge(2)?; // Actual temporary encoding meter construction.
+        let parsed = self.parse_niche_needle(
+            &mut EncodingWork::Application(&mut application),
+            schema,
+            needle,
+        )?;
         // Actual canonical descriptor is checked; selecting its raw column removes the old
         // nested Value/name reconstruction, and the retained schema removes recertification.
         application.charge(6)?;
@@ -2125,14 +2200,20 @@ impl<'tcx> Engine<'tcx> {
         )?;
         application.charge(2)?;
         let outside = self.terms.apply(Op::Not, &[safe])?;
+        application.charge(2)?;
         self.niche_application_refuse_if(
-            &mut application,
+            &mut EncodingWork::Application(&mut application),
             &state.conditions,
             outside,
             "niche current length lacks original allocation extent",
         )?;
-        let encoded =
-            self.encode_niche_needle(&mut application, schema, parsed, &state.conditions)?;
+        application.charge(2)?; // Actual separate encoding meter construction.
+        let encoded = self.encode_niche_needle(
+            &mut EncodingWork::Application(&mut application),
+            schema,
+            parsed,
+            &state.conditions,
+        )?;
         // Index, Select, equality, in-range, conjunction and existential service; argument
         // copies are included in their fixed small caller-visible node services.
         application.charge(21)?;
@@ -2156,7 +2237,7 @@ impl<'tcx> Engine<'tcx> {
 
     fn niche_application_refuse_if(
         &self,
-        application: &mut MembershipApplication<'tcx>,
+        application: &mut EncodingWork<'_, 'tcx>,
         conditions: &[Term],
         invalid: Term,
         reason: &str,
@@ -2197,7 +2278,7 @@ impl<'tcx> Engine<'tcx> {
 
     fn niche_name_service(
         &self,
-        application: &mut MembershipApplication<'tcx>,
+        application: &mut EncodingWork<'_, 'tcx>,
         actual: &str,
         expected: &str,
     ) -> Result<(), String> {
@@ -2213,7 +2294,7 @@ impl<'tcx> Engine<'tcx> {
 
     fn parse_niche_variant<'a>(
         &self,
-        application: &mut MembershipApplication<'tcx>,
+        application: &mut EncodingWork<'_, 'tcx>,
         schema: &Schema,
         value: &'a Value,
         expected: usize,
@@ -2301,7 +2382,7 @@ impl<'tcx> Engine<'tcx> {
 
     fn parse_niche_needle<'a>(
         &self,
-        application: &mut MembershipApplication<'tcx>,
+        application: &mut EncodingWork<'_, 'tcx>,
         schema: &Schema,
         value: &'a Value,
     ) -> Result<MembershipNeedle<'a>, String> {
@@ -2345,7 +2426,7 @@ impl<'tcx> Engine<'tcx> {
 
     fn encode_niche_needle(
         &self,
-        application: &mut MembershipApplication<'tcx>,
+        application: &mut EncodingWork<'_, 'tcx>,
         schema: &Schema,
         needle: MembershipNeedle<'_>,
         conditions: &[Term],

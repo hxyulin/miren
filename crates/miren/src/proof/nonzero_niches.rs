@@ -3,6 +3,7 @@ use super::*;
 use crate::symbolic::ScalarSliceElement;
 #[path = "nonzero_niche_comparisons.rs"]
 mod comparisons;
+pub(super) use comparisons::ByteWork;
 #[cfg(test)]
 #[path = "nonzero_full_integer_probe.rs"]
 mod full_integer_probe;
@@ -1928,6 +1929,18 @@ fn check_external_copy_path<'tcx>(
 }
 
 impl<'tcx> Engine<'tcx> {
+    pub(super) fn exact_byte_membership(
+        &self,
+        relation: super::readonly_byte_origins::Relation<'_, 'tcx>,
+        original: Ty<'tcx>,
+        instance: ty::Instance<'tcx>,
+        slice: &Value,
+        needle: &Value,
+        state: &State,
+    ) -> Result<Term, String> {
+        self.checked_byte_membership(relation, original, instance, slice, needle, state)
+    }
+
     pub(super) fn exact_niche_membership(
         &self,
         original: Ty<'tcx>,

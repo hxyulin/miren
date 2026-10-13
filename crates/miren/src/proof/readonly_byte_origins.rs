@@ -512,6 +512,144 @@ impl<'tcx> Origin<'_, 'tcx> {
     }
 }
 
+// A live safe-origin/encoding relation, not a transport theorem or a raw-access permit.
+// The original borrowed occurrence, input values and State cannot be replaced during this service.
+pub(super) struct Relation<'a, 'tcx> {
+    origin: Origin<'a, 'tcx>,
+    length: Term,
+    encoding: Term,
+    work: nonzero_niches::ByteWork,
+}
+
+impl<'a, 'tcx> Origin<'a, 'tcx> {
+    pub(super) fn relation(self) -> Result<Relation<'a, 'tcx>, String> {
+        let engine = self.engine;
+        let mut work = nonzero_niches::ByteWork::new(0)
+            .map_err(|error| engine.categorized_error(error.category, error.reason))?;
+        // Hold the actual current caller cache guard through all live relation observations.
+        work.charge(4)
+            .map_err(|error| engine.categorized_error(error.category, error.reason))?;
+        let bodies = engine
+            .bodies
+            .try_borrow()
+            .map_err(|_| "byte relation current caller registry is mutably borrowed")?;
+        if !bodies
+            .get(&self.call.caller)
+            .is_some_and(|body| Rc::ptr_eq(body, self.call.body))
+        {
+            return Err("byte relation current caller Body was replaced or unavailable".into());
+        }
+        // Exact current length/extent/context reads, arithmetic, predicate nodes and term copies.
+        work.charge(24)
+            .map_err(|error| engine.categorized_error(error.category, error.reason))?;
+        let Value::CompositeSlice { length, .. } = self.inputs.slice else {
+            return Err("byte relation lacks its original live slice".into());
+        };
+        let length = usize_term(engine, length)?;
+        let offset_outside = engine.terms.apply(
+            Op::BvUnsignedGt,
+            &[self.offset.clone(), self.capacity.clone()],
+        )?;
+        let remaining = engine
+            .terms
+            .apply(Op::BvSub, &[self.capacity.clone(), self.offset.clone()])?;
+        let length_outside = engine
+            .terms
+            .apply(Op::BvUnsignedGt, &[length.clone(), remaining])?;
+        let outside = engine
+            .terms
+            .apply(Op::Or, &[offset_outside, length_outside])?;
+        // Subtraction is guarded by offset<=capacity; this does not assume wrapping addition safe.
+        work.charge(
+            self.state
+                .conditions
+                .len()
+                .checked_add(3)
+                .ok_or("byte relation condition work overflow")?,
+        )
+        .map_err(|error| engine.categorized_error(error.category, error.reason))?;
+        let mut conditions = self.state.conditions.clone();
+        conditions.push(outside);
+        if engine.feasible(&conditions)? {
+            return Err("byte relation projected extent exceeds its current allocation".into());
+        }
+        let encoding = engine.readonly_byte_encoding(
+            self.original,
+            self.inputs.slice,
+            self.inputs.needle,
+            &self.state.conditions,
+            &mut work,
+        )?;
+        // Observe the initialized needle again and validate its own exact compiler-derived codec.
+        // Origin checked carrier identity; encoding equality is an additional requirement.
+        work.charge(3)
+            .map_err(|error| engine.categorized_error(error.category, error.reason))?;
+        let current = storage_locations::StorageLocation::tracked(self.needle_allocation, false)
+            .read(&self.state.memory)?;
+        let current_encoding = engine.readonly_byte_encoding(
+            self.original,
+            self.inputs.slice,
+            current,
+            &self.state.conditions,
+            &mut work,
+        )?;
+        work.charge(2)
+            .map_err(|error| engine.categorized_error(error.category, error.reason))?;
+        if current_encoding != encoding {
+            return Err("byte relation needle encoding differs from current storage".into());
+        }
+        Ok(Relation {
+            origin: self,
+            length,
+            encoding,
+            work,
+        })
+    }
+}
+
+impl<'tcx> Relation<'_, 'tcx> {
+    pub(super) fn into_work(
+        mut self,
+        engine: &Engine<'tcx>,
+        original: Ty<'tcx>,
+        selected: ty::Instance<'tcx>,
+        slice: &Value,
+        needle: &Value,
+        state: &State,
+    ) -> Result<usize, String> {
+        self.work
+            .charge(10)
+            .map_err(|error| engine.categorized_error(error.category, error.reason))?;
+        if !std::ptr::eq(self.origin.engine, engine)
+            || !std::ptr::eq(self.origin.state, state)
+            || !std::ptr::eq(self.origin.inputs.slice, slice)
+            || !std::ptr::eq(self.origin.inputs.needle, needle)
+            || self.origin.original != original
+            || self.origin.inputs.selected != selected
+            || !self.length.belongs_to(&engine.terms)
+            || !self.encoding.belongs_to(&engine.terms)
+        {
+            return Err("byte relation belongs to another live invocation".into());
+        }
+        self.work
+            .charge(4)
+            .map_err(|error| engine.categorized_error(error.category, error.reason))?;
+        let bodies = engine
+            .bodies
+            .try_borrow()
+            .map_err(|_| "byte relation current caller registry is mutably borrowed")?;
+        if !bodies
+            .get(&self.origin.call.caller)
+            .is_some_and(|body| Rc::ptr_eq(body, self.origin.call.body))
+        {
+            return Err("byte relation current caller Body was replaced or unavailable".into());
+        }
+        // The only output is spent work, carried into the existing source rejection service.
+        // Available source and this relation do not establish complete search semantics.
+        Ok(self.work.used())
+    }
+}
+
 #[cfg(test)]
 #[path = "readonly_byte_origins_probe.rs"]
 mod probe;

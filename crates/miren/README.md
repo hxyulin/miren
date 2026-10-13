@@ -1993,3 +1993,10 @@ Its mathematical zero, one, target-word and all-bit facts grant no raw/reference
 Complete byte search remains UNKNOWN until source/needle provenance, valid extents, failure edges
 and both search loops are certified. Missing ordinary bodies still refuse; retained-core use is
 explicit, and this source stage changes no comparison body limit or execution assumption.
+
+The experimental byte-search relation retains the actual shared source occurrence and current
+initialized needle. It checks projected extent and the exact compiler-derived byte encoding,
+including active NonZero validity, then carries its paid work into the existing source rejection
+service. It creates no raw pointer, reference, graph certificate or search result. Original
+associated-field type refusals remain conservative. Full byte-search semantics remain unsupported;
+retained-core scalar facts and live input relations do not prove the search loop.

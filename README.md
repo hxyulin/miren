@@ -67,7 +67,9 @@ owner lineage and returned storage. Bounded owned u16 products support writes th
 symbolic suffix indices, preserving compiler types and current Memory. The capability manifest
 covers 591 cases across 107 families, including concrete and symbolic local byte-copy controls.
 Available byte-search source, isolated word predicates and population-count facts have separate
-authentication checks.
+authentication checks. A live byte relation checks current origin, projected extent and needle
+encoding before carrying its work into source analysis. The relation issues no raw-reference or
+search certificate.
 Full aligned search remains UNKNOWN pending source metadata, storage, precondition and loop proofs.
 
 Fixed-array partial moves preserve initialization and execute remaining destructors in compiler

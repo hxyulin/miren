@@ -6,7 +6,7 @@ fn controls<'tcx>(tcx: TyCtxt<'tcx>, root: DefId) {
     let mut engine = nonzero_niches::test_engine(tcx);
     let caller = ty::Instance::mono(tcx, root);
     let body = engine.instantiated_body(caller).unwrap();
-    let (block, selected, original) = body
+    let (block, selected, original, slice_first) = body
         .basic_blocks
         .iter_enumerated()
         .find_map(|(block, data)| {
@@ -16,13 +16,18 @@ fn controls<'tcx>(tcx: TyCtxt<'tcx>, root: DefId) {
             if args.len() != 2 {
                 return None;
             }
-            let ty::Ref(_, slice, rustc_hir::Mutability::Not) =
-                args[0].node.ty(&body.local_decls, tcx).kind()
-            else {
-                return None;
-            };
-            let ty::Slice(original) = slice.kind() else {
-                return None;
+            let first = args[0].node.ty(&body.local_decls, tcx);
+            let second = args[1].node.ty(&body.local_decls, tcx);
+            let (original, slice_first) = match (first.kind(), second.kind()) {
+                (
+                    ty::Ref(_, slice, rustc_hir::Mutability::Not),
+                    ty::Ref(_, needle, rustc_hir::Mutability::Not),
+                ) => match (slice.kind(), needle.kind()) {
+                    (ty::Slice(original), _) if *original == *needle => (*original, true),
+                    (_, ty::Slice(original)) if *original == *slice => (*original, false),
+                    _ => return None,
+                },
+                _ => return None,
             };
             let ty::FnDef(id, args) = func.ty(&body.local_decls, tcx).kind() else {
                 return None;
@@ -33,7 +38,8 @@ fn controls<'tcx>(tcx: TyCtxt<'tcx>, root: DefId) {
                 engine
                     .resolve_function_item(*id, args.skip_binder())
                     .unwrap(),
-                *original,
+                original,
+                slice_first,
             ))
         })
         .unwrap();
@@ -62,7 +68,7 @@ fn controls<'tcx>(tcx: TyCtxt<'tcx>, root: DefId) {
         memory: Memory::from(vec![Some(slice.clone()), Some(needle.clone())]),
         conditions,
     };
-    let raw = [
+    let mut raw = [
         Value::Reference {
             allocation: 0,
             projection: Vec::new(),
@@ -74,10 +80,14 @@ fn controls<'tcx>(tcx: TyCtxt<'tcx>, root: DefId) {
             mutable: false,
         },
     ];
+    if !slice_first {
+        raw.swap(0, 1);
+    }
+    let source_index = usize::from(!slice_first);
     let call = CallOccurrence::new(caller, &body, block, &raw);
     let inputs = Inputs {
         selected,
-        slice_first: true,
+        slice_first,
         raw: &raw,
         slice: &slice,
         needle: &needle,
@@ -127,11 +137,85 @@ fn controls<'tcx>(tcx: TyCtxt<'tcx>, root: DefId) {
             .contains("replaced or unavailable")
     );
     engine.bodies.borrow_mut().insert(caller, body.clone());
+    // This asserts only the new live relation. It grants no search, pointer or helper theorem.
+    let relation = observe(&engine, &call, &inputs, &state)
+        .unwrap()
+        .relation()
+        .unwrap();
+    assert_eq!(relation.encoding, engine.terms.bit_vector(0, 8).unwrap());
+    assert_eq!(
+        relation.length,
+        usize_term(
+            &engine,
+            match &slice {
+                Value::CompositeSlice { length, .. } => length,
+                _ => unreachable!(),
+            }
+        )
+        .unwrap()
+    );
+    let carried = relation
+        .into_work(&engine, original, selected, &slice, &needle, &state)
+        .unwrap();
+    assert!(carried > 0 && carried < 131_072);
+    let relation = observe(&engine, &call, &inputs, &state)
+        .unwrap()
+        .relation()
+        .unwrap();
+    assert!(
+        relation
+            .into_work(&engine, original, selected, &slice, &needle, &cloned_state,)
+            .unwrap_err()
+            .contains("another live invocation")
+    );
+    let relation = observe(&engine, &call, &inputs, &state)
+        .unwrap()
+        .relation()
+        .unwrap();
+    engine
+        .bodies
+        .borrow_mut()
+        .insert(caller, Rc::new((*body).clone()));
+    assert!(
+        relation
+            .into_work(&engine, original, selected, &slice, &needle, &state)
+            .unwrap_err()
+            .contains("Body was replaced or unavailable")
+    );
+    engine.bodies.borrow_mut().insert(caller, body.clone());
+    let guarded = observe(&engine, &call, &inputs, &state).unwrap();
+    let exclusive = engine.bodies.borrow_mut();
+    assert!(
+        guarded
+            .relation()
+            .err()
+            .unwrap()
+            .contains("registry is mutably borrowed")
+    );
+    drop(exclusive);
+    let mut excessive = observe(&engine, &call, &inputs, &state).unwrap();
+    excessive.offset = engine
+        .terms
+        .bit_vector(
+            (1u128 << tcx.sess.target.pointer_width) - 1,
+            u32::from(tcx.sess.target.pointer_width),
+        )
+        .unwrap();
+    assert!(
+        excessive
+            .relation()
+            .err()
+            .unwrap()
+            .contains("projected extent exceeds its current allocation")
+    );
+    eprintln!(
+        "byte relation: live encoding/extent, carried work, foreign invocation/extent refusal"
+    );
     drop(origin);
 
     let bits = u32::from(tcx.sess.target.pointer_width);
     let mut projected_raw = raw.clone();
-    let Value::Reference { projection, .. } = &mut projected_raw[0] else {
+    let Value::Reference { projection, .. } = &mut projected_raw[source_index] else {
         unreachable!()
     };
     let step = symbolic::MemoryProjection::Slice {
@@ -261,7 +345,7 @@ fn controls<'tcx>(tcx: TyCtxt<'tcx>, root: DefId) {
     assert!(observe(&engine, &call, &changed, &state).is_err());
 
     let mut mutable_raw = raw.clone();
-    let Value::Reference { mutable, .. } = &mut mutable_raw[0] else {
+    let Value::Reference { mutable, .. } = &mut mutable_raw[source_index] else {
         unreachable!()
     };
     *mutable = true;
@@ -272,7 +356,7 @@ fn controls<'tcx>(tcx: TyCtxt<'tcx>, root: DefId) {
     };
     assert!(observe(&engine, &mutable_call, &changed, &state).is_err());
     let mut numeric_raw = raw.clone();
-    numeric_raw[0] = Value::RawPointer {
+    numeric_raw[source_index] = Value::RawPointer {
         address: engine.terms.bit_vector(1, bits).unwrap(),
         bits,
     };
@@ -283,7 +367,7 @@ fn controls<'tcx>(tcx: TyCtxt<'tcx>, root: DefId) {
     };
     assert!(observe(&engine, &numeric_call, &changed, &state).is_err());
     let mut wrong_width = raw.clone();
-    let Value::Reference { projection, .. } = &mut wrong_width[0] else {
+    let Value::Reference { projection, .. } = &mut wrong_width[source_index] else {
         unreachable!()
     };
     projection.push(symbolic::MemoryProjection::Slice {
@@ -357,19 +441,30 @@ fn actual_readonly_origin_facts_and_hostile_occurrences() {
         .unwrap();
     assert!(sysroot.status.success());
     let sysroot = String::from_utf8(sysroot.stdout).unwrap();
-    let args = vec![
-        "rustc".into(),
-        source.to_str().unwrap().into(),
-        "--crate-type=lib".into(),
-        "--edition=2024".into(),
-        "-Cpanic=abort".into(),
-        "-Copt-level=0".into(),
-        "--sysroot".into(),
-        sysroot.trim().into(),
-        "--out-dir".into(),
-        directory.to_str().unwrap().into(),
-    ];
-    let mut check = Check(false);
-    rustc_driver::run_compiler(&args, &mut check);
-    assert!(check.0);
+    for target in [None, Some("thumbv7em-none-eabihf")] {
+        for optimization in [0, 2] {
+            let mut args = vec![
+                "rustc".into(),
+                source.to_str().unwrap().into(),
+                "--crate-type=lib".into(),
+                "--edition=2024".into(),
+                "-Cpanic=abort".into(),
+                format!("-Copt-level={optimization}"),
+                "--sysroot".into(),
+                sysroot.trim().into(),
+                "--out-dir".into(),
+                directory.to_str().unwrap().into(),
+            ];
+            if let Some(target) = target {
+                args.extend(["--target".into(), target.into()]);
+            }
+            let mut check = Check(false);
+            rustc_driver::run_compiler(&args, &mut check);
+            assert!(check.0);
+            eprintln!(
+                "byte relation callback complete: {} O{optimization}",
+                target.unwrap_or("host"),
+            );
+        }
+    }
 }

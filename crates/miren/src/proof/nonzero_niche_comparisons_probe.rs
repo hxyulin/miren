@@ -1648,12 +1648,14 @@ fn public_application_controls<'tcx>(
         graph: GraphBudget::new(0).unwrap(),
         work: 0,
     };
+    application.charge(2).unwrap();
+    let mut meter = EncodingWork::Application(&mut application);
     let parsed = target
-        .parse_niche_needle(&mut application, schema, &active_zero)
+        .parse_niche_needle(&mut meter, schema, &active_zero)
         .unwrap();
     assert!(
         target
-            .encode_niche_needle(&mut application, schema, parsed, &state.conditions)
+            .encode_niche_needle(&mut meter, schema, parsed, &state.conditions)
             .unwrap_err()
             .contains("active Some lacks proved nonzero validity")
     );
@@ -1666,12 +1668,14 @@ fn public_application_controls<'tcx>(
         graph: GraphBudget::new(0).unwrap(),
         work: 0,
     };
+    application.charge(2).unwrap();
+    let mut meter = EncodingWork::Application(&mut application);
     let parsed = target
-        .parse_niche_needle(&mut application, schema, &invalid_tag)
+        .parse_niche_needle(&mut meter, schema, &invalid_tag)
         .unwrap();
     assert!(
         target
-            .encode_niche_needle(&mut application, schema, parsed, &state.conditions)
+            .encode_niche_needle(&mut meter, schema, parsed, &state.conditions)
             .unwrap_err()
             .contains("symbolic tag lacks proved validity")
     );

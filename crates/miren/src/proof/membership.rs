@@ -124,7 +124,7 @@ impl<'tcx> Engine<'tcx> {
         let slice = slice.materialize()?;
         if matches!(slice, Value::CompositeSlice { .. }) {
             if exact_niche {
-                if matches!(element.kind(), ty::Adt(_, option)
+                let member = if matches!(element.kind(), ty::Adt(_, option)
                     if matches!(option.type_at(0).kind(), ty::Adt(_, nonzero)
                         if nonzero.type_at(0) == self.tcx.types.u8))
                 {
@@ -137,11 +137,11 @@ impl<'tcx> Engine<'tcx> {
                     };
                     let origin = readonly_byte_origins::observe(self, call, &inputs, state)?;
                     origin.validate_current(self, call, state)?;
-                    // These invocation-local facts grant no raw read or derived reference rights.
-                    // The existing independently checked byte-membership refusal still applies.
-                }
-                let member =
-                    self.exact_niche_membership(*element, instance, &slice, needle, state)?;
+                    let relation = origin.relation()?;
+                    self.exact_byte_membership(relation, *element, instance, &slice, needle, state)?
+                } else {
+                    self.exact_niche_membership(*element, instance, &slice, needle, state)?
+                };
                 self.record_model(
                     callee,
                     if matches!(element.kind(), ty::Adt(_, args)
