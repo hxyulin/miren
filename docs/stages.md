@@ -7652,3 +7652,46 @@ builds, dependency checks and manual hooks. The first documentation build reject
 Option type in this stage's prose. A documentation-only successor quotes that type and passes
 formatting, manual hooks, documentation build, diff checks and the release survey. Failed build
 evidence is preserved; no code, fixture or manifest changed after full code validation.
+
+
+## Stage253: authenticated retained mutable carriers
+
+One local guarded u16 or exact `[f32; 2]` Range view retains its original typed parent storage.
+Actual selected compiler bodies certify the interval; caller obligations prove bounds. Writes
+translate checked view offsets into the original backing, preserving sibling storage. Parent
+authority stays suspended until lexical release; scalar helpers, nested views and early NLL
+parent reuse remain UNKNOWN. Original shared and FakeForPtrMetadata witnesses grant length
+observations only, with no general raw access.
+
+Rejected source V1 left an earlier whole-parent carrier executable and could interpret that
+parent using a shortened child extent. Corrected frozen V2 authenticates the actual operand and
+screens every visible, addressed, partial and detached storage carrier before issuance. The
+captured safe Rust staging-parent regression is UNKNOWN on all four profiles before any false
+observation. Independent review checks the full alias inventory, current bodies and Context,
+readonly occurrence witnesses, lexical release and prepaid resource services.
+
+Frozen source is `/tmp/miren-mutable-reborrow-parent249-carrier-source-v2/source.json`. All eight
+private checks pass; 100 strict four-profile proofs measure 40 PROVED, 32 REFUTED and 28 UNKNOWN,
+with 344 queried obligations and 32 counterexample models. Root composition keeps the shared Drop,
+integer niche and owning iterator stages, adding only the frozen mutable dispatch and statement
+hooks. One existing expectation advances to PROVED; ten appended controls include genuine
+counterexamples and the aliasing regression. Full Root validation and retained-proof audit remain
+required before commit.
+
+The final survey has 539 cases across 105 families. Every host/ARM O0/O2 profile measures
+277 PROVED, 161 REFUTED and 101 UNKNOWN: 438 supported cases, six more than Stage252. One old
+case advances to PROVED; ten new controls add two PROVED, three REFUTED and five UNKNOWN results.
+Full validation passes 989 outer Rust tests and 91 Python tests, formatting, lint, release builds,
+dependency checks, manual hooks, documentation build and the release survey. A preliminary scoped
+command named a nonexistent shared Drop test target; its failed receipt is preserved, and the
+corrected command passes without a source change.
+
+All 528 unaffected old case objects and the complete prior guest prefix remain literal. Across
+2,112 retained Proof comparisons, 64 match fully and 2,047 differ only by the actual appended
+fixture fingerprint. One query-free fold deadline context on optimized ARM differs in whether
+the call chain includes its closure; it remains UNKNOWN and is recorded separately. The first
+audit's prior three-profile qualification refused that fourth-profile context. Diagnostic evidence
+confirmed its exact zero-query scope before the final audit; no analyzer or proof was changed.
+All 4,376 retained queried obligations and models match exactly, with no unexplained differences.
+These checks use the unchanged 1,040-file source candidate; only this measured documentation
+summary follows full code validation.

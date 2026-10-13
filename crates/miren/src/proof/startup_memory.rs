@@ -101,7 +101,8 @@ impl Memory {
             match &backing.phase {
                 super::mutable_u16_children::Phase::Idle
                 | super::mutable_u16_children::Phase::Pending { .. } => {}
-                super::mutable_u16_children::Phase::Active { .. } => {
+                super::mutable_u16_children::Phase::Active { .. }
+                | super::mutable_u16_children::Phase::Retained { .. } => {
                     return Err("armed activation storage namespace is unsupported".into());
                 }
             }
@@ -139,6 +140,9 @@ impl Memory {
                     .map(|backing| {
                         let frames = match &backing.phase {
                             super::mutable_u16_children::Phase::Active { frames } => frames.len(),
+                            super::mutable_u16_children::Phase::Retained { metadata, .. } => {
+                                8usize.saturating_add(metadata.len().saturating_mul(2))
+                            }
                             super::mutable_u16_children::Phase::Idle
                             | super::mutable_u16_children::Phase::Pending { .. } => 0,
                         };

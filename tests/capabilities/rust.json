@@ -1274,8 +1274,7 @@
       "family": "owned_symbolic_suffix",
       "expected": "unknown",
       "unknown_category": "resource_limit",
-      "unknown_reason":
-        "owned_suffix_budget_unknown bb7: owned symbolic suffix exceeds its shared node or depth budget"
+      "unknown_reason": "owned_suffix_budget_unknown bb7: owned symbolic suffix exceeds its shared node or depth budget"
     },
     {
       "entry": "integer_table_two_args_selected",
@@ -1645,9 +1644,7 @@
     {
       "entry": "mutable_product_survey::proper_reborrow",
       "family": "mutable_product_slice",
-      "expected": "unknown",
-      "unknown_category": "semantics",
-      "unknown_reason": "mutable u16 child needs direct abort-only Rust body"
+      "expected": "proved"
     },
     {
       "entry": "mutable_product_survey::reference_product",
@@ -1896,16 +1893,14 @@
       "family": "mutable_product_symbolic_suffix",
       "expected": "unknown",
       "unknown_category": "resource_limit",
-      "unknown_reason":
-        "mutable product symbolic projection exceeds its shared node or depth budget"
+      "unknown_reason": "mutable product symbolic projection exceeds its shared node or depth budget"
     },
     {
       "entry": "mutable_product_symbolic_survey::whole_budget",
       "family": "mutable_product_symbolic_suffix",
       "expected": "unknown",
       "unknown_category": "resource_limit",
-      "unknown_reason":
-        "mutable product symbolic projection exceeds its shared node or depth budget"
+      "unknown_reason": "mutable product symbolic projection exceeds its shared node or depth budget"
     },
     {
       "entry": "array_move_initialization_survey::array_claim",
@@ -1966,16 +1961,14 @@
       "entry": "effect_free_zst_box_drop_survey::panicking",
       "family": "effect_free_zst_box_drop",
       "expected": "unknown",
-      "unknown_reason":
-        "effect-free Box Drop original/current destructor identity or locals differ",
+      "unknown_reason": "effect-free Box Drop original/current destructor identity or locals differ",
       "unknown_category": "semantics"
     },
     {
       "entry": "effect_free_zst_box_drop_survey::effectful",
       "family": "effect_free_zst_box_drop",
       "expected": "unknown",
-      "unknown_reason":
-        "effect-free Box Drop original/current destructor identity or locals differ",
+      "unknown_reason": "effect-free Box Drop original/current destructor identity or locals differ",
       "unknown_category": "semantics"
     },
     {
@@ -2288,8 +2281,7 @@
       "entry": "full_integer_nonzero_niche_survey::pointer_unknown",
       "family": "full_integer_nonzero_niche",
       "expected": "unknown",
-      "unknown_reason":
-        "only read-only byte slices and byte arrays are modeled: [core::option::Option<&",
+      "unknown_reason": "only read-only byte slices and byte arrays are modeled: [core::option::Option<&",
       "unknown_category": "semantics"
     },
     {
@@ -2846,6 +2838,66 @@
       "expected": "unknown",
       "unknown_reason": "only read-only byte slices and byte arrays are modeled",
       "unknown_category": "semantics"
+    },
+    {
+      "entry": "retained_mutable_views_survey::product_offset",
+      "family": "retained_mutable_views",
+      "expected": "proved"
+    },
+    {
+      "entry": "retained_mutable_views_survey::scalar_offset",
+      "family": "retained_mutable_views",
+      "expected": "proved"
+    },
+    {
+      "entry": "retained_mutable_views_survey::wrong_write",
+      "family": "retained_mutable_views",
+      "expected": "refuted"
+    },
+    {
+      "entry": "retained_mutable_views_survey::wrong_extent",
+      "family": "retained_mutable_views",
+      "expected": "refuted"
+    },
+    {
+      "entry": "retained_mutable_views_survey::invalid_range",
+      "family": "retained_mutable_views",
+      "expected": "refuted"
+    },
+    {
+      "entry": "retained_mutable_views_survey::scalar_helper_unknown",
+      "family": "retained_mutable_views",
+      "expected": "unknown",
+      "unknown_category": "semantics",
+      "unknown_reason": "scalar helper transport is unsupported"
+    },
+    {
+      "entry": "retained_mutable_views_survey::nested_unknown",
+      "family": "retained_mutable_views",
+      "expected": "unknown",
+      "unknown_category": "semantics",
+      "unknown_reason": "reborrow requires exact current carrier"
+    },
+    {
+      "entry": "retained_mutable_views_survey::nll_unknown",
+      "family": "retained_mutable_views",
+      "expected": "unknown",
+      "unknown_category": "semantics",
+      "unknown_reason": "current carrier witness"
+    },
+    {
+      "entry": "retained_mutable_views_survey::unsupported_codec",
+      "family": "retained_mutable_views",
+      "expected": "unknown",
+      "unknown_category": "semantics",
+      "unknown_reason": "direct abort-only Rust body"
+    },
+    {
+      "entry": "retained_mutable_views_survey::earlier_staging_parent",
+      "family": "retained_mutable_views",
+      "expected": "unknown",
+      "unknown_category": "semantics",
+      "unknown_reason": "retained issuance has another executable carrier"
     }
   ]
 }

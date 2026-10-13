@@ -385,6 +385,7 @@ impl<'tcx> Engine<'tcx> {
         }
         self.mutable_u16_terms(backing.certificate, &backing.length, backing.data.scalar()?)?;
         self.validate_mutable_interval(id, backing)?;
+        self.validate_mutable_retained(id, backing)?;
         Ok(backing)
     }
 
@@ -440,6 +441,12 @@ impl<'tcx> Engine<'tcx> {
                 if matches!(backing.data, Storage::Product(_)) {
                     return Err("mutable product length requires current path conditions".into());
                 }
+                if matches!(
+                    backing.phase,
+                    super::mutable_u16_children::Phase::Retained { .. }
+                ) {
+                    return Err("retained mutable extent requires current path conditions".into());
+                }
                 Ok(backing
                     .interval
                     .as_ref()
@@ -479,6 +486,12 @@ impl<'tcx> Engine<'tcx> {
             | MutableU16Role::HierarchyChild { .. } => {
                 self.mutable_u16_role_live(*id, role, memory)?;
                 let backing = self.mutable_u16_backing(*id, memory)?;
+                if matches!(
+                    backing.phase,
+                    super::mutable_u16_children::Phase::Retained { .. }
+                ) {
+                    return Err("retained mutable view owning snapshot is unsupported".into());
+                }
                 Ok(Value::MutableU16 {
                     id: *id,
                     role: MutableU16Role::Ghost {
@@ -557,6 +570,19 @@ impl<'tcx> Engine<'tcx> {
         self.check_local_initialization(state, place.local.as_usize(), &[])?;
         let backing = self.mutable_u16_backing(id, &state.memory)?;
         self.mutable_u16_role_live(id, &role, &state.memory)?;
+        if matches!(
+            state.memory.mutable_u16[id].phase,
+            super::mutable_u16_children::Phase::Retained { .. }
+        ) {
+            state.flow.require_unarmed()?;
+            self.mutable_retained_operand(
+                body.ok_or("retained mutable read needs original Body")?,
+                state,
+                place.local.as_usize(),
+                id,
+                &role,
+            )?;
+        }
         if place.projection.is_empty() {
             return Ok(Some(Value::MutableU16 { id, role }));
         }
@@ -639,10 +665,13 @@ impl<'tcx> Engine<'tcx> {
             ));
         }
         self.validate_mutable_interval(id, backing)?;
-        let length = backing
-            .interval
-            .as_ref()
-            .map_or(&backing.length, |view| view.length());
+        let retained_length = self.mutable_retained_extent(id, backing, conditions)?;
+        let length = retained_length.as_ref().unwrap_or_else(|| {
+            backing
+                .interval
+                .as_ref()
+                .map_or(&backing.length, |view| view.length())
+        });
         let (term, width, signed) = length.integer()?;
         if width != bits
             || signed
@@ -746,6 +775,13 @@ impl<'tcx> Engine<'tcx> {
         }
         self.check_local_initialization(state, place.local.as_usize(), &[])?;
         self.mutable_u16_role_live(id, &role, &state.memory)?;
+        if matches!(
+            state.memory.mutable_u16[id].phase,
+            super::mutable_u16_children::Phase::Retained { .. }
+        ) {
+            state.flow.require_unarmed()?;
+            self.mutable_retained_operand(body, state, place.local.as_usize(), id, &role)?;
+        }
         let Some(projection) = typed_element_projection(place) else {
             return Err(self.mutable_u16_error("mutable u16 store requires direct whole element"));
         };
@@ -902,6 +938,14 @@ impl<'tcx> Engine<'tcx> {
         self.check_local_initialization(state, place.local.as_usize(), &[])?;
         let backing = self.mutable_u16_backing(id, &state.memory)?;
         self.mutable_u16_role_live(id, &role, &state.memory)?;
+        if matches!(
+            backing.phase,
+            super::mutable_u16_children::Phase::Retained { .. }
+        ) {
+            state.flow.require_unarmed()?;
+            self.mutable_retained_operand(body, state, place.local.as_usize(), id, &role)?;
+            self.mutable_retained_extent(id, backing, &state.conditions)?;
+        }
         Ok(Some(Value::MutableU16 {
             id,
             role: match role {
@@ -953,6 +997,15 @@ impl<'tcx> Engine<'tcx> {
             return Err(self.mutable_u16_error("mutable u16 roles cannot enter aggregate storage"));
         }
         if let Value::MutableU16 { id, role } = value {
+            if matches!(
+                state.memory.mutable_u16[*id].phase,
+                super::mutable_u16_children::Phase::Retained { .. }
+            ) {
+                return Err(self.categorized_error(
+                    UnknownCategory::Semantics,
+                    "retained metadata transport requires actual shared assignment".into(),
+                ));
+            }
             if matches!(
                 role,
                 MutableU16Role::Child { .. } | MutableU16Role::HierarchyChild { .. }
@@ -1117,10 +1170,26 @@ impl<'tcx> Engine<'tcx> {
         value: &Value,
         memory: &Memory,
     ) -> Result<bool, String> {
+        self.mutable_u16_contains_with_work(value, memory, None)
+    }
+
+    pub(super) fn mutable_u16_contains_with_work(
+        &self,
+        value: &Value,
+        memory: &Memory,
+        mut work: Option<&mut super::mutable_reborrows::Work>,
+    ) -> Result<bool, String> {
+        if let Some(work) = work.as_deref_mut() {
+            work.charge(self, 1)?;
+        }
         let mut pending = vec![(value, 0_usize)];
         let mut visited = Vec::new();
         let mut nodes = 0_usize;
-        while let Some((value, depth)) = pending.pop() {
+        while !pending.is_empty() {
+            if let Some(work) = work.as_deref_mut() {
+                work.charge(self, 1)?;
+            }
+            let (value, depth) = pending.pop().unwrap();
             nodes += 1;
             if nodes > 512 || depth >= 16 || nodes + pending.len() > 512 {
                 return Err(self.categorized_error(
@@ -1143,6 +1212,9 @@ impl<'tcx> Engine<'tcx> {
                     UnknownCategory::ResourceLimit,
                     "mutable u16 role traversal exceeds existing node budget".into(),
                 ));
+            }
+            if let Some(work) = work.as_deref_mut() {
+                work.charge(self, children)?;
             }
             match value {
                 Value::OwnedArrayIterator { .. } => {
@@ -1167,6 +1239,11 @@ impl<'tcx> Engine<'tcx> {
                     projection,
                     ..
                 } => {
+                    if let Some(work) = work.as_deref_mut() {
+                        work.charge(self, memory.missing_places.entries().len())?;
+                        work.charge(self, projection.len())?;
+                        work.charge(self, visited.len())?;
+                    }
                     memory.check_projection_initialization(*allocation, projection)?;
                     if !visited.contains(allocation) {
                         visited.push(*allocation);
@@ -1178,6 +1255,10 @@ impl<'tcx> Engine<'tcx> {
                     }
                 }
                 Value::Cell { allocation } | Value::LocalAtomic { allocation, .. } => {
+                    if let Some(work) = work.as_deref_mut() {
+                        work.charge(self, memory.missing_places.entries().len())?;
+                        work.charge(self, visited.len())?;
+                    }
                     memory.check_projection_initialization(*allocation, &[])?;
                     if !visited.contains(allocation) {
                         visited.push(*allocation);

@@ -5,8 +5,19 @@ use symbolic::MutableU16Role;
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) enum Phase {
     Idle,
-    Pending { certificate: usize },
-    Active { frames: Vec<usize> },
+    Pending {
+        certificate: usize,
+    },
+    Active {
+        frames: Vec<usize>,
+    },
+    Retained {
+        certificate: usize,
+        carrier: usize,
+        offset: Term,
+        length: Term,
+        metadata: Vec<(usize, usize)>,
+    },
 }
 
 pub(super) struct Staging<'tcx> {
@@ -33,7 +44,8 @@ pub(super) fn role_live(backing: &super::mutable_u16::Backing, role: &MutableU16
             backing.phase == Phase::Idle && *generation == backing.generation
         }
         MutableU16Role::Child { generation } | MutableU16Role::ChildMetadata { generation } => {
-            matches!(&backing.phase, Phase::Active { frames } if !frames.is_empty())
+            (matches!(&backing.phase, Phase::Active { frames } if !frames.is_empty())
+                || matches!(backing.phase, Phase::Retained { .. }))
                 && *generation == backing.generation
         }
         MutableU16Role::Ghost { .. } => true,
@@ -108,6 +120,11 @@ impl<'tcx> Engine<'tcx> {
                 self.mutable_u16_backing(id, memory)?;
             }
             match &backing.phase {
+                Phase::Retained { .. } => {
+                    return Err(self.mutable_u16_child_error(
+                        "retained mutable view cannot escape its original local scope",
+                    ));
+                }
                 Phase::Idle => {}
                 Phase::Pending { .. } => {
                     return Err(self.mutable_u16_child_error(
@@ -343,6 +360,7 @@ impl<'tcx> Engine<'tcx> {
         if certificates
             .len()
             .saturating_add(self.mutable_u16_frames.borrow().len())
+            .saturating_add(self.mutable_retained.borrow().len())
             >= MAX_INPUT_VALUES
         {
             return Err(self.categorized_error(
@@ -488,6 +506,7 @@ impl<'tcx> Engine<'tcx> {
         if certificates
             .len()
             .saturating_add(self.mutable_u16_frames.borrow().len())
+            .saturating_add(self.mutable_retained.borrow().len())
             >= MAX_INPUT_VALUES
         {
             return Err(self.categorized_error(
@@ -833,6 +852,7 @@ impl<'tcx> Engine<'tcx> {
         if frames
             .len()
             .saturating_add(self.mutable_u16_staging.borrow().len())
+            .saturating_add(self.mutable_retained.borrow().len())
             >= MAX_INPUT_VALUES
         {
             return Err(self.categorized_error(
@@ -937,6 +957,19 @@ impl<'tcx> Engine<'tcx> {
             stack,
             site,
         } = call;
+        if state
+            .memory
+            .mutable_u16
+            .iter()
+            .any(|backing| matches!(backing.phase, Phase::Retained { .. }))
+            && !self.mutable_metadata_operation(instance)
+            && !super::super::identity::is_panic_call(self.tcx, instance.def_id())
+            && !self.is_core_panic_helper(instance.def_id())
+        {
+            return Err(self.mutable_u16_child_error(
+                "retained mutable view scalar helper transport is unsupported",
+            ));
+        }
         let active: Vec<_> = state
             .memory
             .mutable_u16
@@ -944,7 +977,7 @@ impl<'tcx> Engine<'tcx> {
             .enumerate()
             .filter_map(|(id, backing)| match &backing.phase {
                 Phase::Active { frames } => Some((id, backing.generation, frames.clone())),
-                Phase::Idle | Phase::Pending { .. } => None,
+                Phase::Idle | Phase::Pending { .. } | Phase::Retained { .. } => None,
             })
             .collect();
         let [(id, generation, frames)] = active.as_slice() else {

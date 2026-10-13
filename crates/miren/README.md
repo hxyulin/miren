@@ -1805,3 +1805,33 @@ and zero-sized iterators, helper transport and taken-element Drop mutations. The
 default iterator coverage. Remaining-element iterator Drop and the inherited `mem::forget`
 boundary remain UNKNOWN. Full iterator lifecycle support requires that actual remaining-slice Drop
 chain.
+
+One typed local mutable Range view can retain the incoming u16 or exact `[f32; 2]` owner in its
+current Rust frame. Complete selected compiler Range bodies certify the guarded relation; the
+caller proves its bounds. An explicit retained phase authenticates the actual Call, private
+reborrow occurrence, original type, current Body, Context, masks and monotonic generation.
+Parent authority stays suspended. Typed child indices check the view extent and translate to the
+same full backing; direct writes and checked lexical release preserve caller and sibling storage.
+The original product representation and integer interval gates stay distinct. Release requires
+an actual StorageDead with no other executable child carrier. Parent reuse before that endpoint
+remains UNKNOWN without a remaining-control-flow use proof. Scalar helper transport, nested
+retained views, other codecs, raw authority and reference escape remain UNKNOWN. Descriptor and
+carrier scans keep existing node/storage/certificate caps, and Armed transport remains refused.
+
+Retained validation prepays header, registry, block and statement walks before visiting them.
+Original-body validation, endpoint lookup and complete runtime-carrier inventory each retain the
+existing 512-node bound; repeated validation calls are separate paid services. These counters
+measure semantic visits and services, not CPU instructions or a reset of global application steps.
+The issuer combines exact reborrow and first shared observation in one normal-target walk. A paid
+consumed-mask set avoids scanning every mask for every local; nested/addressed carrier scans remain
+metered. Detached Ghost observations keep their previous independent behavior.
+
+Retained local mutable views authenticate each actual operand against its current same-frame
+carrier. Before issuance, a bounded prepaid inventory refuses earlier executable child or metadata
+aliases, including addressed and partially initialized storage; a copied Range receiver is refused.
+Readonly length transport uses the original shared assignment or compiler `FakeForPtrMetadata`
+assignment as a branch-local witness. This grants no real raw pointer or mutable authority. Generic
+metadata copying and parent reuse before the lexical release remain unsupported. The safe Rust
+staging-parent regression is UNKNOWN before any shortened parent observation can be interpreted.
+Witness inventory and original occurrence services have separate semantic node budgets; they pay
+actual walks and retain the existing application step, storage and activation fee limits.

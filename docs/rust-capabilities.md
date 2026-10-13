@@ -2673,3 +2673,18 @@ remain on their normal execution paths. Local direct-owner helpers may omit unus
 required contract views and nested or nonlocal transport remain UNKNOWN. Diagnostic controls use
 30,000 steps; the unchanged 8,192-step default refuses first transfer admission. Remaining iterator
 Drop and mem::forget remain unsupported. No general raw-memory authority or assumptions are added.
+
+
+## Retained mutable Range views
+
+Guarded local u16 and exact `[f32; 2]` Range views preserve current parent storage, checked offsets
+and sibling observations. An invocation-bound carrier suspends parent access until lexical
+release. Complete compiler bodies certify the range relation; callers still prove its bounds.
+Exact original shared metadata and compiler FakeForPtrMetadata occurrences grant readonly length
+observations only. No real raw-pointer authority or unchecked metadata transport is introduced.
+
+The alias inventory refuses an earlier executable parent/child carrier before publishing the view.
+The captured staging-parent regression remains UNKNOWN rather than producing a false
+counterexample. Nested views, early NLL parent reuse, scalar helper transport and other codecs
+remain unsupported. Source, Context, masks and original occurrence witnesses are checked under
+unchanged resource limits.

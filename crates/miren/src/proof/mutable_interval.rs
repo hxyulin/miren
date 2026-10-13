@@ -111,6 +111,9 @@ impl<'tcx> Engine<'tcx> {
         index: Value,
         conditions: &[Term],
     ) -> Result<Value, String> {
+        if matches!(backing.phase, Phase::Retained { .. }) {
+            return self.mutable_retained_index(id, backing, index, conditions);
+        }
         let Some(view) = &backing.interval else {
             self.mutable_u16_index(&index, &backing.length, conditions)?;
             return Ok(index);
@@ -371,5 +374,23 @@ impl<'tcx> Engine<'tcx> {
             },
         );
         Ok(Some((target.unwrap(), next)))
+    }
+}
+
+impl<'tcx> Engine<'tcx> {
+    pub(super) fn certify_retained_range_family(
+        &self,
+        instance: ty::Instance<'tcx>,
+        original: Ty<'tcx>,
+    ) -> Result<bool, String> {
+        if original == self.tcx.types.u16 {
+            templates::certify_u16_guarded_family(self.tcx, instance)?;
+        } else if original == Ty::new_array(self.tcx, self.tcx.types.f32, 2) {
+            templates::certify_f32_pair_guarded_family(self.tcx, instance)
+                .map_err(|e| self.categorized_error(e.category, e.reason))?;
+        } else {
+            return Ok(false);
+        }
+        Ok(true)
     }
 }

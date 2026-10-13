@@ -83,6 +83,7 @@ mod mutable_interval;
 mod mutable_lease_probe;
 mod mutable_metadata;
 mod mutable_products;
+mod mutable_reborrows;
 mod mutable_slice_ranges;
 mod mutable_u16;
 mod mutable_u16_children;
@@ -225,6 +226,7 @@ struct Engine<'tcx> {
     mutable_u16_frames: std::cell::RefCell<Vec<std::rc::Weak<Body<'tcx>>>>,
     mutable_integer_types: Vec<mutable_u16::IntegerCertificate<'tcx>>,
     mutable_u16_staging: std::cell::RefCell<Vec<mutable_u16_children::Staging<'tcx>>>,
+    mutable_retained: std::cell::RefCell<Vec<mutable_reborrows::Certificate<'tcx>>>,
     coroutine_places:
         std::cell::RefCell<Vec<(std::rc::Weak<Body<'tcx>>, coroutines::OriginalPlace<'tcx>)>>,
     bodies:
@@ -344,6 +346,7 @@ impl<'tcx> Engine<'tcx> {
             mutable_u16_frames: Default::default(),
             mutable_integer_types: Vec::new(),
             mutable_u16_staging: Default::default(),
+            mutable_retained: Default::default(),
             activation: Default::default(),
             coroutine_places: Default::default(),
             bodies: std::cell::RefCell::new(std::collections::HashMap::new()),
@@ -1811,6 +1814,24 @@ impl<'tcx> Engine<'tcx> {
                     }
                     let callee = instance.def_id();
                     if unarmed
+                        && let Some((target, continuation)) = self.mutable_retained_call(
+                            &state,
+                            mutable_u16_children::ChildCall {
+                                body,
+                                block,
+                                instance,
+                                args,
+                                destination: *destination,
+                                target: *target,
+                                stack: &stack,
+                                site: (id, terminator.source_info.span),
+                            },
+                        )?
+                    {
+                        queue.push_back((target, continuation, retry_path.clone()));
+                        continue;
+                    }
+                    if unarmed
                         && let Some((target, continuation)) = self.mutable_interval_call(
                             &state,
                             mutable_u16_children::ChildCall {
@@ -2617,6 +2638,12 @@ impl<'tcx> Engine<'tcx> {
             }
             StatementKind::Assign(assignment) => {
                 let (place, value) = assignment.as_ref();
+                if self.mutable_retained_shared_stage(body, state, *place, value, statement)? {
+                    return Ok(());
+                }
+                if self.mutable_retained_stage(body, state, *place, value, statement)? {
+                    return Ok(());
+                }
                 if self.mutable_u16_stage(body, state, *place, value, statement)? {
                     return Ok(());
                 }
@@ -2636,6 +2663,9 @@ impl<'tcx> Engine<'tcx> {
                 self.set_coroutine_state(body, state, **place, variant_index.as_usize())
             }
             StatementKind::StorageLive(local) | StatementKind::StorageDead(local) => {
+                if matches!(statement, StatementKind::StorageDead(_)) {
+                    self.mutable_retained_release(body, state, *local, statement)?;
+                }
                 state.constant_receipts.invalidate(Place::from(*local));
                 state.missing_places.initialize(local.as_usize(), &[]);
                 if let Some(allocation) = state.addresses[local.as_usize()].take() {

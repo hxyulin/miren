@@ -200,7 +200,7 @@ pub(super) fn certify_integer_guarded_family<'tcx>(
     if integer_element(tcx, element.original) != Some(element) {
         return Err("interval original integer layout/codec differs".into());
     }
-    certify_guarded_family(tcx, root, Some(element))
+    certify_guarded_family(tcx, root, Schema::Integer(element))
 }
 
 pub(super) fn u16_wrapper_signature<'tcx>(tcx: TyCtxt<'tcx>, instance: ty::Instance<'tcx>) -> bool {
@@ -217,15 +217,26 @@ pub(super) fn certify_u16_guarded_family<'tcx>(
     tcx: TyCtxt<'tcx>,
     root: ty::Instance<'tcx>,
 ) -> Result<(), String> {
-    certify_guarded_family(tcx, root, None).map_err(|error| error.reason)
+    certify_guarded_family(tcx, root, Schema::LegacyU16).map_err(|error| error.reason)
+}
+
+#[derive(Clone, Copy)]
+enum Schema<'tcx> {
+    LegacyU16,
+    Integer(Element<'tcx>),
+    F32Pair,
 }
 
 fn certify_guarded_family<'tcx>(
     tcx: TyCtxt<'tcx>,
     root: ty::Instance<'tcx>,
-    element: Option<Element<'tcx>>,
+    schema: Schema<'tcx>,
 ) -> Result<(), pure_comparison_templates::TemplateError> {
-    let original = element.map_or(tcx.types.u16, |element| element.original);
+    let (original, element, local_pair) = match schema {
+        Schema::LegacyU16 => (tcx.types.u16, None, false),
+        Schema::Integer(element) => (element.original, Some(element), false),
+        Schema::F32Pair => (Ty::new_array(tcx, tcx.types.f32, 2), None, true),
+    };
     let core = tcx
         .lang_items()
         .sized_trait()
@@ -304,10 +315,20 @@ fn certify_guarded_family<'tcx>(
         let encoded =
             pure_comparison_templates::encode_byte_copy_template(tcx, template_body, core)?;
         let key = pure_comparison_templates::definition_key(instance.def_id());
-        let matched = element.map_or_else(
-            || matches_body(&key, family, &encoded),
-            |element| integer_body_matches(&key, family, &encoded, element),
-        );
+        let matched = if local_pair && family == Family::Wrapper {
+            key == "DefId(core::slice::index::{impl#1}::index_mut)"
+                && [
+                    include_str!("mutable_interval_reference/wrapper-f32-pair.mir"),
+                    include_str!("mutable_interval_reference/wrapper-f32-pair-arm.mir"),
+                ]
+                .iter()
+                .any(|body| body.strip_suffix('\n') == Some(encoded.as_str()))
+        } else {
+            element.map_or_else(
+                || matches_body(&key, family, &encoded),
+                |element| integer_body_matches(&key, family, &encoded, element),
+            )
+        };
         if !matched || !signature_for(tcx, instance, family, original) {
             return Err("interval complete selected body or signature differs".into());
         }
@@ -557,4 +578,11 @@ fn reject_integer_instantiated_mutations<'tcx>(
         }
     }
     Ok(())
+}
+
+pub(super) fn certify_f32_pair_guarded_family<'tcx>(
+    tcx: TyCtxt<'tcx>,
+    root: ty::Instance<'tcx>,
+) -> Result<(), pure_comparison_templates::TemplateError> {
+    certify_guarded_family(tcx, root, Schema::F32Pair)
 }

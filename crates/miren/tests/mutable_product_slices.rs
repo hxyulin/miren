@@ -147,7 +147,7 @@ fn mutable_product_root_storage_metadata_and_refusals() {
             ("tuple_pair", P),
             ("struct_fields", P),
             ("zero_inner", P),
-            ("proper_reborrow", U),
+            ("proper_reborrow", P),
             ("unsupported_child", P),
             ("symbolic_suffix", P),
             ("pointer_product", U),

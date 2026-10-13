@@ -301,6 +301,7 @@ impl<'tcx> Engine<'tcx> {
                 );
             }
         }
+        self.validate_mutable_retained(id, backing)?;
         Ok(backing)
     }
 
@@ -342,7 +343,9 @@ impl<'tcx> Engine<'tcx> {
         if self.feasible(&invalid)? {
             return Err("mutable product lacks current valid target allocation extent".into());
         }
-        Ok(backing.length.clone())
+        Ok(self
+            .mutable_retained_extent(*id, backing, conditions)?
+            .unwrap_or_else(|| backing.length.clone()))
     }
 
     pub(super) fn mutable_owner_length(
@@ -350,6 +353,22 @@ impl<'tcx> Engine<'tcx> {
         value: &Value,
         state: &State,
     ) -> Result<Value, String> {
+        if let Value::MutableU16 { id, role } = value
+            && !matches!(role, MutableU16Role::Ghost { .. })
+            && let Some(extent) = self.mutable_retained_extent(
+                *id,
+                state
+                    .memory
+                    .mutable_u16
+                    .get(*id)
+                    .ok_or("mutable retained owner identity was not issued")?,
+                &state.conditions,
+            )?
+        {
+            state.flow.require_unarmed()?;
+            self.mutable_u16_role_live(*id, role, &state.memory)?;
+            return Ok(extent);
+        }
         if let Value::MutableU16 { id, role } = value
             && !matches!(role, MutableU16Role::Ghost { .. })
             && self.mutable_product_owner(*id, &state.memory)?
@@ -406,6 +425,9 @@ impl<'tcx> Engine<'tcx> {
             Phase::Pending { .. } => {
                 return Err("mutable product pending child has no observation permission".into());
             }
+            Phase::Retained { .. } => {
+                self.mutable_retained_frame(body, id, memory)?;
+            }
             Phase::Active { frames } => {
                 if !matches!(
                     role,
@@ -445,6 +467,7 @@ impl<'tcx> Engine<'tcx> {
         state.flow.require_unarmed()?;
         self.check_local_initialization(state, local, &[])?;
         self.mutable_product_frame(body, id, &role, &state.memory)?;
+        self.mutable_retained_operand(body, state, local, id, &role)?;
         Ok(Some((id, role)))
     }
 
@@ -500,6 +523,12 @@ impl<'tcx> Engine<'tcx> {
         }
         state.flow.require_unarmed()?;
         self.mutable_product_frame(body, *id, role, &state.memory)?;
+        if matches!(state.memory.mutable_u16[*id].phase, Phase::Retained { .. }) {
+            return Err(self.categorized_error(
+                UnknownCategory::Semantics,
+                "retained metadata transport requires actual shared assignment".into(),
+            ));
+        }
         if !matches!(
             role,
             MutableU16Role::Metadata { .. } | MutableU16Role::ChildMetadata { .. }
@@ -560,6 +589,16 @@ impl<'tcx> Engine<'tcx> {
                 );
             }
         };
+        self.memory_bounds(&index, length, &state.conditions)?;
+        let Value::MutableU16 { id, .. } = self.raw_local(state, place.local.as_usize())? else {
+            return Err("typed product view lost its original owner".into());
+        };
+        let index = self.mutable_retained_index(
+            id,
+            &state.memory.mutable_u16[id],
+            index,
+            &state.conditions,
+        )?;
         let (term, width, signed) = index.integer()?;
         if width != u32::from(self.tcx.sess.target.pointer_width)
             || signed
@@ -568,7 +607,6 @@ impl<'tcx> Engine<'tcx> {
         {
             return Err("mutable product outer index differs from current target usize".into());
         }
-        self.memory_bounds(&index, length, &state.conditions)?;
         let mut original = descriptor.ty;
         let mut shape = &descriptor.shape;
         let mut start = 0;
