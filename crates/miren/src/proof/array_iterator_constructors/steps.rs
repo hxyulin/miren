@@ -3,7 +3,7 @@ use super::*;
 use rustc_middle::mir::{BorrowKind, Location, RawPtrKind};
 
 mod evidence;
-pub(in crate::proof) use evidence::Evidence;
+pub(in crate::proof) use compiler_evidence::Evidence;
 use evidence::{load_evidence, schema};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -38,7 +38,7 @@ pub(in crate::proof) struct Pending {
     entry: Rc<()>,
 }
 #[derive(PartialEq)]
-enum Word {
+pub(super) enum Word {
     Slot(bool),
     Unit,
     Bool(Term),
@@ -286,7 +286,7 @@ pub(super) fn value_clone_work(
         | Value::Function => Err("IntoIter COW clone payload domain is unsupported".into()),
     }
 }
-fn validate_element<'tcx>(
+pub(super) fn validate_element<'tcx>(
     engine: &mut Engine<'tcx>,
     original: Ty<'tcx>,
     value: &Value,
@@ -411,16 +411,22 @@ fn validate_element<'tcx>(
         _ => Err("IntoIter yielded value differs from original pure element type/context".into()),
     }
 }
-fn observe_payload(
+pub(super) fn observe_payload(
     engine: &mut Engine<'_>,
     state: &State,
+    owner: usize,
+) -> Result<Vec<Word>, String> {
+    observe_payload_memory(engine, &state.memory, owner)
+}
+pub(super) fn observe_payload_memory(
+    engine: &mut Engine<'_>,
+    memory: &Memory,
     owner: usize,
 ) -> Result<Vec<Word>, String> {
     let Value::OwnedArrayIterator {
         payload: Some(payload),
         ..
-    } = state
-        .memory
+    } = memory
         .get(owner)
         .and_then(Option::as_ref)
         .ok_or("IntoIter lease owner is absent")?
@@ -588,11 +594,11 @@ impl<'tcx> Invocation<'tcx> {
     fn view(&self, role: Role) -> Value {
         let mut identity = self.identity.clone();
         identity.original = TransportType::Inner;
-        identity.view = Some(View {
+        identity.view = Some(PrivateView::Step(View {
             owner: self.owner,
             entry: self.entry.clone(),
             role,
-        });
+        }));
         Value::OwnedArrayIterator {
             identity,
             payload: None,
@@ -612,9 +618,11 @@ impl<'tcx> Invocation<'tcx> {
         else {
             return Err("IntoIter step private metadata local differs".into());
         };
-        let view = identity
-            .view
-            .ok_or("IntoIter step private metadata is absent")?;
+        let Some(PrivateView::Step(view)) = identity.view else {
+            return Err(
+                "IntoIter step private metadata is absent or belongs to destruction".into(),
+            );
+        };
         if view.owner != self.owner
             || view.role != role
             || !Rc::ptr_eq(&view.entry, &self.entry)
@@ -1066,7 +1074,9 @@ impl<'tcx> Engine<'tcx> {
         site: (DefId, Span),
     ) -> Result<Option<Vec<Return>>, String> {
         if !matches!(instance.def,ty::InstanceKind::Item(id)
-            if id.is_local()&&matches!(self.tcx.def_kind(id),DefKind::Fn|DefKind::AssocFn))
+            if (id.is_local() || self.tcx.get_diagnostic_item(
+                rustc_span::Symbol::intern("mem_drop")) == Some(id))
+                &&matches!(self.tcx.def_kind(id),DefKind::Fn|DefKind::AssocFn))
             || !values
                 .iter()
                 .any(|value| matches!(value, Value::OwnedArrayIterator { .. }))

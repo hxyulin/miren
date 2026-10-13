@@ -6,6 +6,8 @@ use rustc_middle::mir::{BasicBlock, CastKind, Local, MirPhase, RuntimePhase};
 use std::rc::Rc;
 #[path = "array_iterator_clone_work.rs"]
 mod clone_work;
+mod compiler_evidence;
+pub(super) mod drops;
 pub(super) mod steps;
 
 const MAX_ELEMENTS: u64 = 128;
@@ -17,6 +19,7 @@ pub struct Payload {
     pub(super) front: usize,
     pub(super) back: usize,
     pub(super) pending: Option<steps::Pending>,
+    pub(super) dropping: Option<drops::Progress>,
     pub(super) retired: bool,
 }
 impl Payload {
@@ -27,6 +30,7 @@ impl Payload {
             front: 0,
             back,
             pending: None,
+            dropping: None,
             retired: false,
         }
     }
@@ -43,6 +47,10 @@ impl Payload {
         }
         if self.pending.is_some() && !allow_pending {
             return Err("IntoIter pending yield cannot leave its actual invocation".into());
+        }
+        if let Some(progress) = &self.dropping {
+            progress.validate(self)?;
+            return Err("IntoIter active destruction cannot leave its actual invocation".into());
         }
         for (index, slot) in self.slots.iter().enumerate() {
             let alive = (self.front..self.back).contains(&index);
@@ -785,12 +793,18 @@ enum TransportType {
 }
 
 #[derive(Clone, Debug)]
+enum PrivateView {
+    Step(steps::View),
+    Drop(drops::View),
+}
+
+#[derive(Clone, Debug)]
 pub struct Identity {
     certificate: usize,
     seal: Rc<()>,
     entry: Rc<()>,
     original: TransportType,
-    view: Option<steps::View>,
+    view: Option<PrivateView>,
 }
 
 pub(super) struct Invocation {
@@ -1540,6 +1554,147 @@ mod tests {
                 .is_err()
         );
         let certificate = &engine.array_iterator_types[identity.certificate];
+        let iterator_ty = certificate.iterator;
+        let mut diagnostic_options = options();
+        diagnostic_options.limits.max_steps = 30_000;
+        let mut diagnostic_evidence = Engine::new(tcx, &config, diagnostic_options);
+        drops::core_evidence_controls(&mut diagnostic_evidence, iterator_ty);
+        let mut protocol_options = options();
+        protocol_options.limits.max_steps = 60_000;
+        let mut protocol_engine = Engine::new(tcx, &config, protocol_options);
+        let protocol_body = protocol_engine.instantiated_body(caller).unwrap();
+        let protocol_arguments = vec![
+            argument(&protocol_engine, 11),
+            argument(&protocol_engine, 22),
+        ];
+        let protocol_results = protocol_engine
+            .execute(
+                caller,
+                protocol_arguments,
+                Vec::new(),
+                Memory::default(),
+                &[],
+            )
+            .unwrap();
+        if std::env::var_os("MIREN_INTOITER_DROP_WORK_TRACE").is_some() {
+            println!(
+                "Drop work target={} opt={:?} constructor_move={}",
+                tcx.sess.target.llvm_target, tcx.sess.opts.optimize, protocol_engine.steps
+            );
+            for name in ["constructor", "remaining_drop_unknown", "next_unknown"] {
+                let selected = tcx
+                    .mir_keys(())
+                    .iter()
+                    .copied()
+                    .find(|id| {
+                        tcx.def_kind(id.to_def_id()) == DefKind::Fn
+                            && tcx.item_name(id.to_def_id()).as_str() == name
+                    })
+                    .unwrap();
+                let selected = ty::Instance::mono(tcx, selected.to_def_id());
+                let mut profile_options = options();
+                profile_options.limits.max_steps = 60_000;
+                let mut profile = Engine::new(tcx, &config, profile_options);
+                let input =
+                    Value::Elements(vec![argument(&profile, 11), argument(&profile, 22)].into());
+                let result =
+                    profile.execute(selected, vec![input], Vec::new(), Memory::default(), &[]);
+                println!(
+                    "Drop work root={name} target={} opt={:?} cumulative={} normal={}",
+                    tcx.sess.target.llvm_target,
+                    tcx.sess.opts.optimize,
+                    profile.steps,
+                    result.is_ok()
+                );
+                assert!(result.is_ok(), "{name}: {:?}", result.err());
+            }
+        }
+        drops::protocol_controls(
+            &mut protocol_engine,
+            &protocol_body,
+            &protocol_results[0].value,
+            &protocol_results[0].memory,
+        );
+        let glue = ty::Instance::resolve_drop_glue(tcx, iterator_ty);
+        let before_evidence = engine.array_iterator_step_evidence.len();
+        let glue_evidence = compiler_evidence::load_drop(&mut engine, glue).unwrap();
+        assert_eq!(
+            engine.array_iterator_step_evidence.len(),
+            before_evidence + 1
+        );
+        let cached_evidence = compiler_evidence::load_drop(&mut engine, glue).unwrap();
+        assert!(Rc::ptr_eq(&glue_evidence.current, &cached_evidence.current));
+        assert_eq!(
+            engine.array_iterator_step_evidence.len(),
+            before_evidence + 1
+        );
+        let replaced = Rc::new(glue_evidence.current.as_ref().clone());
+        engine.bodies.borrow_mut().insert(glue, replaced);
+        assert!(
+            compiler_evidence::load_drop(&mut engine, glue)
+                .err()
+                .unwrap()
+                .contains("cache was replaced")
+        );
+        engine
+            .bodies
+            .borrow_mut()
+            .insert(glue, glue_evidence.current.clone());
+        let cached = engine.array_iterator_step_evidence.pop().unwrap();
+        assert_eq!(cached.instance, glue);
+        let mut changed = glue_evidence.current.as_ref().clone();
+        changed.basic_blocks.as_mut()[BasicBlock::from_usize(0)].statements[0].kind =
+            StatementKind::Nop;
+        engine.bodies.borrow_mut().insert(glue, Rc::new(changed));
+        assert!(
+            compiler_evidence::load_drop(&mut engine, glue)
+                .err()
+                .unwrap()
+                .contains("original/current statement differs")
+        );
+        assert_eq!(engine.array_iterator_step_evidence.len(), before_evidence);
+        engine
+            .bodies
+            .borrow_mut()
+            .insert(glue, glue_evidence.current);
+        engine.array_iterator_step_evidence.push(cached);
+        // Compiler DropGlue evidence grants no execution or permission to escape an active owner.
+        let certificate = &engine.array_iterator_types[identity.certificate];
+        // Active destruction is not ordinary iterator transport, even when its phase-specific
+        // initialized-slot invariant is valid. These are hostile host states, not guest proofs.
+        for (next, leased) in [(0, None), (0, Some(0)), (1, None), (2, None)] {
+            let mut active = data.clone();
+            for (index, slot) in Rc::make_mut(&mut active.slots).iter_mut().enumerate() {
+                if index < next || leased == Some(index) {
+                    *slot = None;
+                }
+            }
+            active.dropping = Some(drops::Progress {
+                next,
+                leased: leased.map(|index| drops::Lease {
+                    index,
+                    allocation: 42,
+                }),
+                entry: Rc::new(()),
+            });
+            let value = Value::OwnedArrayIterator {
+                identity: identity.clone(),
+                payload: Some(active),
+            };
+            assert!(
+                engine
+                    .array_iterator_return(&value)
+                    .unwrap_err()
+                    .contains("active destruction cannot leave")
+            );
+            assert!(
+                engine
+                    .validate_array_iterator_value(certificate.iterator, &value)
+                    .unwrap_err()
+                    .contains("active destruction cannot leave")
+            );
+            assert!(engine.snapshot(&value, &result.memory, &[], 0).is_err());
+        }
         let mut missing_payload = identity.clone();
         missing_payload.original = TransportType::Iterator;
         assert!(

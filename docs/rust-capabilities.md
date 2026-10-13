@@ -2672,7 +2672,8 @@ transfer each initialized element slot once. Typed ordinary Option returns and t
 remain on their normal execution paths. Local direct-owner helpers may omit unused observations;
 required contract views and nested or nonlocal transport remain UNKNOWN. Diagnostic controls use
 30,000 steps; the unchanged 8,192-step default refuses first transfer admission. Remaining iterator
-Drop and mem::forget remain unsupported. No general raw-memory authority or assumptions are added.
+Drop executes under the restricted diagnostic scope below; mem::forget remains unsupported.
+No general raw-memory authority or assumptions are added.
 
 
 ## Retained mutable Range views
@@ -2751,3 +2752,29 @@ The current byte-membership controls reach source authentication and refuse unsu
 debug metadata. This measured Semantics UNKNOWN replaces the former blanket transport refusal;
 queried obligations and models remain unchanged. The current Root retained-core controls also
 validate raw metadata projections and isolated word equivalence without full-search credit.
+
+
+## Remaining owning-array iterator destruction
+
+A branch-local destruction phase tracks remaining slots independently from the compiler alive
+range. The actual Drop occurrence moves one initialized element into a single typed child lease.
+Element Drop and ordinary helper bodies execute their real contracts and effects. A normal child
+return retires that lease; only the real outer Drop return retires the iterator. Future slots and
+the suspended payload retain their checked identity. Other typed storage keeps ordinary effects.
+
+Host execution follows the real slice DropGlue Call. ARM follows the authenticated inlined slice
+source scope and actual element Drop terminator, without inventing a body or Call. Complete original
+signatures are normalized under bounded paid type, constant and region planning and checked against
+cached signatures before early readers. Active destruction disables callback-producing adapters,
+including library models, so supported helpers retain the checked frame through actual bodies.
+
+Diagnostic controls use 60,000 steps and measure seven PROVED, one REFUTED and five Semantics
+UNKNOWN per profile. The unchanged 8,192-step default yields ResourceLimit UNKNOWN on all thirteen
+controls.
+Physical-address observations, indirect callbacks, nested owning-field Drop and unsupported memory
+clones remain UNKNOWN. No assumed hardware, missing-body success or default coverage is added.
+
+Root validation passes 1,012 Rust tests and 91 Python tests. The four-profile default survey remains
+322 PROVED, 163 REFUTED and 106 UNKNOWN per profile; the remaining-Drop control now reaches the
+shared execution limit instead of the former unsupported-destructor frontier. All 5,232 retained
+queried obligations and counterexample models remain exact.

@@ -271,11 +271,11 @@ fn controls<'tcx>(tcx: TyCtxt<'tcx>) {
     assert!(payload.slots[1].is_some());
     assert!(branch.validate(2, false).is_err());
     let mut corrupt = identity.clone();
-    corrupt.view = Some(View {
+    corrupt.view = Some(PrivateView::Step(View {
         owner: 0,
         entry: Rc::new(()),
         role: Role::Data,
-    });
+    }));
     assert!(
         engine
             .array_iterator_return(&Value::OwnedArrayIterator {

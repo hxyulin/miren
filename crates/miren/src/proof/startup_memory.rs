@@ -46,6 +46,26 @@ pub(super) struct Memory {
 }
 
 impl Memory {
+    pub(super) fn clone_with_iterator_drop_masks(
+        &self,
+        missing_places: initialized_places::MissingPlaces,
+    ) -> Self {
+        Self {
+            incoming_byte_roots: self.incoming_byte_roots.clone(),
+            byte_copy_opaque: self.byte_copy_opaque,
+            mutable_u16: self.mutable_u16.clone(),
+            mutable_hierarchy: self.mutable_hierarchy,
+            allocations: self.allocations.clone(),
+            owned_regions: self.owned_regions.clone(),
+            missing_places,
+            initialized_owners: self.initialized_owners.clone(),
+            startup_values: self.startup_values.clone(),
+            startup_invalidated: self.startup_invalidated,
+            isolated_static_types: self.isolated_static_types.clone(),
+            startup_overwritten: self.startup_overwritten.clone(),
+            static_uninitialized: self.static_uninitialized.clone(),
+        }
+    }
     pub(super) fn activation_supported(
         &self,
         flow: &super::activation_flow::Flow,

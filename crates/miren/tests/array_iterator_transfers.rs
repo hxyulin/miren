@@ -81,10 +81,10 @@ fn verify(path: &Path, target: Option<&str>, level: &str, mutant: bool) {
             {
                 ProofStatus::Refuted
             }
-            "remaining_unknown" | "mem_forget_unknown" => ProofStatus::Unknown,
-            "front_drop" | "back_drop" | "mixed" | "empty" | "zero_sized" | "helper_transport" => {
-                ProofStatus::Proved
-            }
+            "mem_forget_unknown" => ProofStatus::Unknown,
+            "remaining_unknown" if target.is_none() && level == "0" => ProofStatus::Unknown,
+            "front_drop" | "back_drop" | "mixed" | "empty" | "zero_sized" | "helper_transport"
+            | "remaining_unknown" => ProofStatus::Proved,
             _ => panic!("unexpected selected root"),
         };
         assert_eq!(
@@ -98,11 +98,21 @@ fn verify(path: &Path, target: Option<&str>, level: &str, mutant: bool) {
                 && proof.trusted_calls.is_empty()
         );
         if expected == ProofStatus::Unknown {
+            let (category, reason) = if function.name == "remaining_unknown" {
+                (
+                    UnknownCategory::ResourceLimit,
+                    "IntoIter shared execution step limit reached",
+                )
+            } else {
+                (
+                    UnknownCategory::Semantics,
+                    "owned array iterator element destructors are not modeled",
+                )
+            };
             assert!(proof.obligations.iter().any(|obligation| obligation.status
                 == ProofStatus::Unknown
-                && obligation.unknown_category == Some(UnknownCategory::Semantics)
-                && obligation.detail
-                    == "owned array iterator element destructors are not modeled"
+                && obligation.unknown_category == Some(category)
+                && obligation.detail == reason
                 && obligation.query.is_none()
                 && obligation.model.is_none()));
         }

@@ -238,12 +238,26 @@ pub(super) fn step_variable(
     Ok(plan.owned)
 }
 pub(super) fn body(engine: &mut Engine<'_>, body: &Body<'_>) -> Result<usize, String> {
-    body_inner(engine, body, false)
+    body_inner(engine, body, false, false)
 }
 pub(super) fn step_body(engine: &mut Engine<'_>, body: &Body<'_>) -> Result<usize, String> {
-    body_inner(engine, body, true)
+    body_inner(engine, body, true, false)
 }
-fn body_inner(engine: &mut Engine<'_>, body: &Body<'_>, step_debug: bool) -> Result<usize, String> {
+pub(super) fn drop_body(engine: &mut Engine<'_>, body: &Body<'_>) -> Result<usize, String> {
+    if !matches!(
+        body.source.instance,
+        ty::InstanceKind::Shim(ty::ShimKind::DropGlue(_, Some(_)))
+    ) {
+        return Err("IntoIter destruction clone plan requires actual typed DropGlue".into());
+    }
+    body_inner(engine, body, true, true)
+}
+fn body_inner(
+    engine: &mut Engine<'_>,
+    body: &Body<'_>,
+    step_debug: bool,
+    boring_locals: bool,
+) -> Result<usize, String> {
     let mut plan = Plan { nodes: 0, owned: 0 };
     plan.node(engine, 20)?; // Pinned Body fields plus shallow BasicBlocks cache Arc clone.
     if body.coroutine.is_some()
@@ -263,7 +277,21 @@ fn body_inner(engine: &mut Engine<'_>, body: &Body<'_>, step_debug: bool) -> Res
     plan.vector(engine, body.local_decls.len())?;
     for local in &body.local_decls {
         plan.node(engine, 5)?;
-        if !matches!(local.local_info, ClearCrossCrate::Clear) || local.user_ty.is_some() {
+        match &local.local_info {
+            ClearCrossCrate::Clear => {}
+            ClearCrossCrate::Set(info)
+                if boring_locals
+                    && matches!(info.as_ref(), rustc_middle::mir::LocalInfo::Boring) =>
+            {
+                plan.node(engine, 2)?; // A real LocalInfo Box allocation and its Boring enum.
+            }
+            ClearCrossCrate::Set(_) => {
+                return Err(
+                    "IntoIter clone plan owned local auxiliary metadata is unsupported".into(),
+                );
+            }
+        }
+        if local.user_ty.is_some() {
             return Err("IntoIter clone plan owned local auxiliary metadata is unsupported".into());
         }
     }
@@ -320,6 +348,15 @@ pub(super) fn masks(
     engine: &mut Engine<'_>,
     masks: &initialized_places::MissingPlaces,
 ) -> Result<initialized_places::MissingPlaces, String> {
+    let work = mask_clone_work(engine, masks)?;
+    pay(engine, work)?;
+    Ok(masks.clone())
+}
+
+pub(super) fn mask_clone_work(
+    engine: &mut Engine<'_>,
+    masks: &initialized_places::MissingPlaces,
+) -> Result<usize, String> {
     pay(engine, 1)?; // Distinct borrowed ledger planning pass.
     let mut nodes = 0_usize;
     let mut clone_work = 1_usize; // Owned entries vector header/allocation.
@@ -338,6 +375,5 @@ pub(super) fn masks(
             .checked_add(3 + path.len())
             .ok_or("IntoIter initialization ledger clone work overflow")?;
     }
-    pay(engine, clone_work)?;
-    Ok(masks.clone())
+    Ok(clone_work)
 }

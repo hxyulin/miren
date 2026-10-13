@@ -71,12 +71,14 @@ Full aligned search remains UNKNOWN pending source metadata, storage, preconditi
 
 Fixed-array partial moves preserve initialization and execute remaining destructors in compiler
 order. Nested destruction and covering assignments retain actual destructor effects. The exact
-compiler array/slice DropGlue protocol is authenticated separately; general slice destruction and
-remaining iterator destruction with elements needing Drop remains UNKNOWN.
+compiler array/slice DropGlue protocol is authenticated separately. General slice destruction
+remains UNKNOWN. Remaining owning-array iterator destruction executes actual bodies at a larger
+recorded budget. The current stage passes 1,012 Rust tests and preserves all 5,232 retained
+queried obligations and counterexample models across four profiles.
 Authenticated non-inlined array iterator constructors preserve owning payloads through actual Rust
 bodies and ordinary returns. Direct owners also pass through local helpers with unused observations.
 Element transfer executes at an explicitly larger analysis budget; default next and remaining
-iterator destruction remain UNKNOWN.
+iterator destruction remain UNKNOWN under the unchanged resource limits.
 
 Shared fixed-array views of local Drop structs support guarded scalar field observations and
 ordinary scalar accessor calls, including authenticated lazy input arrays. Original types, current

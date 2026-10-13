@@ -1802,9 +1802,8 @@ operands, places, constants, source scopes and debug metadata remain checked. Di
 tests explicitly use 30,000 steps for real front/back transfer, repeated/mixed exhaustion, empty
 and zero-sized iterators, helper transport and taken-element Drop mutations. The unchanged default
 8,192-step limit currently refuses this transfer admission; these diagnostic successes do not add
-default iterator coverage. Remaining-element iterator Drop and the inherited `mem::forget`
-boundary remain UNKNOWN. Full iterator lifecycle support requires that actual remaining-slice Drop
-chain.
+default iterator coverage. Remaining-element Drop follows the restricted diagnostic scope below;
+the inherited `mem::forget` boundary remains UNKNOWN. The default-budget lifecycle remains open.
 
 One typed local mutable Range view can retain the incoming u16 or exact `[f32; 2]` owner in its
 current Rust frame. Complete selected compiler Range bodies certify the guarded relation; the
@@ -1929,3 +1928,60 @@ associated projections retain their full Instance argument inventory before clon
 bodies and signatures still refuse aliases. This authenticates source only and grants no raw
 pointer, reference, byte-search or application proof authority. Retained-core analysis remains an
 explicit configuration; ordinary unavailable bodies remain UNKNOWN.
+
+
+Remaining-iterator destruction progress is separate from the original compiler alive range. Active
+progress cannot pass ordinary iterator validation, publication or return gates, even when its
+phase-specific slot invariant holds. That invariant grants no destructor call, child access or raw
+pointer permission. A separate invocation follows actual IntoIter/core destruction bodies. Host
+uses the actual remaining-slice DropGlue call; ARM uses the original inlined slice scope and real
+partial-drop element terminator. No slice call or body entry is fabricated on ARM.
+
+The real loop creates its raw element marker and advances its cursor before element Drop. Only
+that authenticated Drop occurrence moves one remaining initialized slot into scoped typed storage,
+using the existing initialized-owner/type registry. Actual element Drop and ordinary helper bodies
+execute with their normal contracts. The element retires after normal child return; the iterator
+retires after the real outer DropGlue returns with no remaining slots or child lease. Other incoming
+typed storage keeps ordinary validation; equality checks cover the suspended iterator payload and
+progress rather than all Memory.
+
+Diagnostic compiler controls use an explicit 60,000-step limit for full, partial front/back, mixed,
+exhausted, empty and zero-sized remaining Drop. They include a refuted remaining-element assertion,
+a genuine destructor mutation and native effect-order controls. These outcomes do not add default
+coverage: the unchanged 8,192-step limit still produces ResourceLimit UNKNOWN on these roots.
+Every active Drop Call authenticates its current frame before any early adapter. Indirect calls
+remain UNKNOWN before function-table execution, and mutable early adapters cannot bypass the scoped
+child/helper frame. Trusted, storage-effect and return-alias summaries are rejected before any
+ordinary summary route, including valid configured summaries with assumptions enabled. Ordinary
+statically resolved Rust helpers retain real body execution and contracts.
+
+Element/helper physical-address operations, indirect callbacks, nested owning-field Drop, owned
+reference projection clones and unsupported auxiliary Memory clones remain UNKNOWN. This is a
+restricted remaining Drop
+implementation; full iterator lifecycle and full Rust parity remain open.
+
+Original/current compiler evidence uses one shared streamed comparison service. Generated typed
+DropGlue evidence has a separate clone domain for exact boxed `LocalInfo::Boring` metadata, paying
+for its actual allocation before cloning and checking its original/current form. Ordinary iterator
+step bodies retain their Clear-only auxiliary metadata domain and charges. This compiler evidence
+alone grants no execution authority or supported application outcome.
+
+
+Private remaining-Drop metadata creation has separate payments before view/Identity cloning,
+integer term interning, alive-range vectors and nominal ADT construction. The alive value admits
+only the original core IndexRange with its exact module chain and two usize start/end fields;
+nominal and field string allocations are bounded before construction. Frame validation and final
+publication keep their existing independent charges. Resource controls refuse before construction,
+keep spent work, and do not raise the default limit or change diagnostic support into default proof.
+
+Active iterator destruction independently authenticates each ordinary callable's full original
+signature before dispatcher snapshots or summaries. Bounded prepaid type, constant and region
+visits precede substitution and normalization; exact binder, ABI, safety, input and output cache
+comparison refuses poisoned callable metadata. Unsupported signature normalization domains remain
+UNKNOWN. Default and diagnostic resource limits are unchanged.
+Executable callback and independent helper adapters are disabled during active destruction.
+Ordinary available callees execute with the destruction lease; callback shims and unsupported
+signature domains remain UNKNOWN before observations can escape to an unrelated execution frame.
+The retained transfer fixture's remaining-element root reaches ResourceLimit at diagnostic 30000
+steps on host O0 after signature authentication charges. Its other three profiles remain supported
+at that budget; the separate Drop matrix records its explicit diagnostic 60000-step outcomes.

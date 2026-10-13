@@ -120,8 +120,8 @@ fn actual_calls_preserve_constructor_returns_across_profiles() {
                             "IntoIter shared execution step limit reached",
                         ),
                         "remaining_drop_unknown" => (
-                            miren::UnknownCategory::Semantics,
-                            "owned array iterator element destructors are not modeled",
+                            miren::UnknownCategory::ResourceLimit,
+                            "IntoIter shared execution step limit reached",
                         ),
                         name => panic!("unexpected Unknown root {name}"),
                     };

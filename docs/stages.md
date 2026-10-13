@@ -7792,3 +7792,40 @@ comparisons match after separately recording eight measured UNKNOWN-reason chang
 query-free fold timeout contexts. All 5,232 retained queried obligations and counterexample models
 match exactly, with no unexplained differences. Only this measured documentation successor follows
 the unchanged 1,055-file final-check candidate; original failed check evidence remains preserved.
+
+
+## Stage257: remaining iterator Drop through typed child leases
+
+A separate destruction progress record preserves the compiler alive range. Actual host slice calls
+or ARM inlined source-scope Drop occurrences transfer one initialized slot into an existing typed
+owner allocation. Real element and helper bodies execute; normal child and outer returns retire the
+lease and iterator respectively. Bounded cloning and value construction are paid before execution.
+
+Independent review held earlier frozen revisions for late adapter checks, unpaid statement
+construction, unchecked signature caches and callback models losing the destruction frame. V4b
+retains those failures, pays construction before allocation, authenticates complete original
+signatures and uses actual helper bodies during active destruction. Genuine FromFn/map controls
+reach their core helpers and remain UNKNOWN before any closure-body entry.
+
+Private terminal validation passes ten scoped guards and eight strict release reports across
+host/ARM O0/O2. At 60,000 steps each profile measures seven PROVED, one REFUTED and five Semantics
+UNKNOWN; at the unchanged 8,192-step default all thirteen controls are ResourceLimit UNKNOWN.
+The five signature-cache mutations exercise the actual child DropGlue-to-Drop Call; no separately
+poisoned helper occurrence is claimed. One inherited 30,000-step host O0 transfer control reaches
+ResourceLimit after the added signature work; its other three profiles still prove at that budget.
+
+Root composition preserves the byte foundation and nested helper frames, disables both newer
+retained-view adapters during active destruction, and changes only the existing default remaining
+Drop UNKNOWN frontier.
+
+Final frozen Root validation passes all ten checks, including 1,012 outer Rust tests, 91 Python
+tests, lint, release builds, dependency checks, manual hooks and the four-profile release survey.
+Nested native controls include one expected mutant failure and are counted separately. Every profile
+retains 322 PROVED, 163 REFUTED and 106 UNKNOWN across 591 cases and 107 families. No default-budget
+supported outcome is added.
+
+All 2,360 unaffected retained Proof comparisons match: 2,357 are literal full matches and three
+query-free fold deadline contexts are qualified separately. All 5,232 retained queried obligations
+and counterexample models match exactly. The four changed remaining-Drop UNKNOWN reports are
+recorded separately, with no assumptions or success added. Only this measured documentation
+successor follows the unchanged 1,061-file full-check candidate.

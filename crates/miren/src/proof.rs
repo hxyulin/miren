@@ -1349,7 +1349,12 @@ impl<'tcx> Engine<'tcx> {
             || self
                 .specification(instance)?
                 .is_some_and(|spec| !spec.arguments.is_empty());
-        let snapshots = if self.array_iterator_step_arguments(
+        let snapshots = if self.array_iterator_drop_arguments(
+            frame.destruction_invocation(),
+            &owned_body,
+            &arguments,
+            &memory,
+        )? || self.array_iterator_step_arguments(
             frame.step_invocation(),
             &owned_body,
             &arguments,
@@ -1491,6 +1496,17 @@ impl<'tcx> Engine<'tcx> {
             for (statement_index, statement) in
                 body.basic_blocks[block].statements.iter().enumerate()
             {
+                if self.array_iterator_drop_statement(
+                    frame.destruction_invocation(),
+                    &owned_body,
+                    &mut state,
+                    rustc_middle::mir::Location {
+                        block,
+                        statement_index,
+                    },
+                )? {
+                    continue;
+                }
                 if self.array_iterator_step_statement(
                     frame.step_invocation(),
                     &owned_body,
@@ -1611,6 +1627,11 @@ impl<'tcx> Engine<'tcx> {
                     } else {
                         self.local(&state, 0)?
                     };
+                    self.array_iterator_drop_return(
+                        frame.destruction_invocation(),
+                        &owned_body,
+                        &state,
+                    )?;
                     self.array_iterator_step_return(frame.step_invocation(), &owned_body, &state)?;
                     self.validate_array_iterator_value(body.return_ty(), &value)?;
                     self.nonzero_niche_admission(body.return_ty(), &value, &state.conditions)?;
@@ -1664,7 +1685,13 @@ impl<'tcx> Engine<'tcx> {
                             &state,
                             incoming_allocations,
                         )?;
-                        let escape = if self.array_iterator_step_frame_escape(
+                        let escape = if self.array_iterator_drop_escape(
+                            frame.destruction_invocation(),
+                            &owned_body,
+                            &value,
+                            &state,
+                            incoming_allocations,
+                        )? || self.array_iterator_step_frame_escape(
                             frame.step_invocation(),
                             &owned_body,
                             &value,
@@ -1761,6 +1788,12 @@ impl<'tcx> Engine<'tcx> {
                     target,
                     ..
                 } => {
+                    self.array_iterator_drop_call_gate(
+                        frame.destruction_invocation(),
+                        &owned_body,
+                        &state,
+                        func,
+                    )?;
                     if let Some(helper) = frame.retained_helper_invocation() {
                         helper.scope(self, &owned_body, &state.memory)?;
                         self.retained_helper_nested_call(body, func)?;
@@ -1785,6 +1818,7 @@ impl<'tcx> Engine<'tcx> {
                     }
                     let callable_ty = func.ty(&body.local_decls, self.tcx);
                     if frame.retained_helper_invocation().is_none()
+                        && frame.destruction_invocation().is_none()
                         && let Some(results) = self.function_table_call(
                             &state,
                             function_tables::TableCall {
@@ -1802,6 +1836,10 @@ impl<'tcx> Engine<'tcx> {
                         let target =
                             target.ok_or("function table call has no normal return edge")?;
                         for (consumed, result) in results {
+                            self.array_iterator_drop_adopt_work(
+                                frame.destruction_invocation(),
+                                &state,
+                            )?;
                             let mut continuation = self.adopt_flow_return(
                                 &consumed,
                                 result.conditions,
@@ -1833,6 +1871,38 @@ impl<'tcx> Engine<'tcx> {
                         }
                         _ => return Err("unresolved indirect call".to_owned()),
                     };
+                    if let Some(results) = self.array_iterator_drop_call(
+                        frame.destruction_invocation(),
+                        (caller_instance, block),
+                        &owned_body,
+                        instance,
+                        &mut state,
+                        &stack,
+                    )? {
+                        let target =
+                            target.ok_or("IntoIter destruction lacks normal return edge")?;
+                        for result in results {
+                            self.array_iterator_drop_adopt_work(
+                                frame.destruction_invocation(),
+                                &state,
+                            )?;
+                            let mut continuation = self.adopt_flow_return(
+                                &state,
+                                result.conditions,
+                                result.memory,
+                                result.flow,
+                            )?;
+                            self.store_call_result(
+                                body,
+                                &mut continuation,
+                                *destination,
+                                destination_indices.as_ref(),
+                                result.value,
+                            )?;
+                            queue.push_back((target, continuation, retry_path.clone()));
+                        }
+                        continue;
+                    }
                     let unarmed = matches!(state.flow, activation_flow::Flow::Unarmed);
                     let armed_metadata = self.activation_armed_call_route(&state.flow, instance)?;
                     if unarmed {
@@ -1844,6 +1914,7 @@ impl<'tcx> Engine<'tcx> {
                     }
                     let callee = instance.def_id();
                     if unarmed
+                        && frame.destruction_invocation().is_none()
                         && let Some(results) = self.retained_primitive_helper_call(
                             caller_instance,
                             &owned_body,
@@ -1894,6 +1965,7 @@ impl<'tcx> Engine<'tcx> {
                         ));
                     }
                     if unarmed
+                        && frame.destruction_invocation().is_none()
                         && let Some((target, continuation)) = self.mutable_retained_call(
                             &state,
                             mutable_u16_children::ChildCall {
@@ -1912,6 +1984,7 @@ impl<'tcx> Engine<'tcx> {
                         continue;
                     }
                     if unarmed
+                        && frame.destruction_invocation().is_none()
                         && let Some((target, continuation)) = self.mutable_interval_call(
                             &state,
                             mutable_u16_children::ChildCall {
@@ -1929,21 +2002,27 @@ impl<'tcx> Engine<'tcx> {
                         queue.push_back((target, continuation, retry_path.clone()));
                         continue;
                     }
-                    if let Some(results) = self.mutable_hierarchy_call(
-                        &mut state,
-                        mutable_u16_children::ChildCall {
-                            body,
-                            block,
-                            instance,
-                            args,
-                            destination: *destination,
-                            target: *target,
-                            stack: &stack,
-                            site: (id, terminator.source_info.span),
-                        },
-                    )? {
+                    if frame.destruction_invocation().is_none()
+                        && let Some(results) = self.mutable_hierarchy_call(
+                            &mut state,
+                            mutable_u16_children::ChildCall {
+                                body,
+                                block,
+                                instance,
+                                args,
+                                destination: *destination,
+                                target: *target,
+                                stack: &stack,
+                                site: (id, terminator.source_info.span),
+                            },
+                        )?
+                    {
                         let target = target.ok_or("mutable u16 child has no normal return edge")?;
                         for result in results {
+                            self.array_iterator_drop_adopt_work(
+                                frame.destruction_invocation(),
+                                &state,
+                            )?;
                             let mut continuation = self.adopt_flow_return(
                                 &state,
                                 result.conditions,
@@ -1961,21 +2040,27 @@ impl<'tcx> Engine<'tcx> {
                         }
                         continue;
                     }
-                    if let Some(results) = self.mutable_u16_child_call(
-                        &mut state,
-                        mutable_u16_children::ChildCall {
-                            body,
-                            block,
-                            instance,
-                            args,
-                            destination: *destination,
-                            target: *target,
-                            stack: &stack,
-                            site: (id, terminator.source_info.span),
-                        },
-                    )? {
+                    if frame.destruction_invocation().is_none()
+                        && let Some(results) = self.mutable_u16_child_call(
+                            &mut state,
+                            mutable_u16_children::ChildCall {
+                                body,
+                                block,
+                                instance,
+                                args,
+                                destination: *destination,
+                                target: *target,
+                                stack: &stack,
+                                site: (id, terminator.source_info.span),
+                            },
+                        )?
+                    {
                         let target = target.ok_or("mutable u16 child has no normal return edge")?;
                         for result in results {
+                            self.array_iterator_drop_adopt_work(
+                                frame.destruction_invocation(),
+                                &state,
+                            )?;
                             let mut continuation = self.adopt_flow_return(
                                 &state,
                                 result.conditions,
@@ -1993,16 +2078,22 @@ impl<'tcx> Engine<'tcx> {
                         }
                         continue;
                     }
-                    if let Some(results) = self.array_iterator_step_call(
-                        frame.step_invocation(),
-                        (caller_instance, block),
-                        &owned_body,
-                        instance,
-                        &mut state,
-                        &stack,
-                    )? {
+                    if frame.destruction_invocation().is_none()
+                        && let Some(results) = self.array_iterator_step_call(
+                            frame.step_invocation(),
+                            (caller_instance, block),
+                            &owned_body,
+                            instance,
+                            &mut state,
+                            &stack,
+                        )?
+                    {
                         let target = target.ok_or("IntoIter step lacks normal return edge")?;
                         for result in results {
+                            self.array_iterator_drop_adopt_work(
+                                frame.destruction_invocation(),
+                                &state,
+                            )?;
                             let mut continuation = self.adopt_flow_return(
                                 &state,
                                 result.conditions,
@@ -2020,17 +2111,23 @@ impl<'tcx> Engine<'tcx> {
                         }
                         continue;
                     }
-                    if let Some(results) = self.array_iterator_constructor_call(
-                        caller_instance,
-                        &owned_body,
-                        block,
-                        instance,
-                        &mut state,
-                        &stack,
-                    )? {
+                    if frame.destruction_invocation().is_none()
+                        && let Some(results) = self.array_iterator_constructor_call(
+                            caller_instance,
+                            &owned_body,
+                            block,
+                            instance,
+                            &mut state,
+                            &stack,
+                        )?
+                    {
                         let target =
                             target.ok_or("IntoIter constructor lacks normal return edge")?;
                         for result in results {
+                            self.array_iterator_drop_adopt_work(
+                                frame.destruction_invocation(),
+                                &state,
+                            )?;
                             let mut continuation = self.adopt_flow_return(
                                 &state,
                                 result.conditions,
@@ -2126,15 +2223,21 @@ impl<'tcx> Engine<'tcx> {
                     } else {
                         instance
                     };
-                    if let Some(results) = self.shared_trait_object_call(
-                        instance,
-                        &values,
-                        &state,
-                        &stack,
-                        (id, terminator.source_info.span),
-                    )? {
+                    if frame.destruction_invocation().is_none()
+                        && let Some(results) = self.shared_trait_object_call(
+                            instance,
+                            &values,
+                            &state,
+                            &stack,
+                            (id, terminator.source_info.span),
+                        )?
+                    {
                         let target = target.ok_or("shared trait choice has no return edge")?;
                         for result in results {
+                            self.array_iterator_drop_adopt_work(
+                                frame.destruction_invocation(),
+                                &state,
+                            )?;
                             let mut continuation = self.adopt_flow_return(
                                 &state,
                                 result.conditions,
@@ -2171,6 +2274,44 @@ impl<'tcx> Engine<'tcx> {
                         }
                         let target = target.ok_or("trusted call has no return edge")?;
                         for result in results {
+                            self.array_iterator_drop_adopt_work(
+                                frame.destruction_invocation(),
+                                &state,
+                            )?;
+                            let mut continuation = self.adopt_flow_return(
+                                &state,
+                                result.conditions,
+                                result.memory,
+                                result.flow,
+                            )?;
+                            self.store_call_result(
+                                body,
+                                &mut continuation,
+                                *destination,
+                                destination_indices.as_ref(),
+                                result.value,
+                            )?;
+                            queue.push_back((target, continuation, retry_path.clone()));
+                        }
+                        continue;
+                    }
+                    if unarmed
+                        && frame.destruction_invocation().is_none()
+                        && let Some(results) = self.array_iterator_ordinary_call(
+                            instance,
+                            &mut values,
+                            &state,
+                            &stack,
+                            (id, terminator.source_info.span),
+                        )?
+                    {
+                        let target =
+                            target.ok_or("IntoIter ordinary helper lacks normal return edge")?;
+                        for result in results {
+                            self.array_iterator_drop_adopt_work(
+                                frame.destruction_invocation(),
+                                &state,
+                            )?;
                             let mut continuation = self.adopt_flow_return(
                                 &state,
                                 result.conditions,
@@ -2191,6 +2332,7 @@ impl<'tcx> Engine<'tcx> {
                     let configured = self.specification(instance)?.is_some();
                     if unarmed
                         && !configured
+                        && frame.destruction_invocation().is_none()
                         && let Some(results) = self.owned_iterator_call(
                             instance,
                             &values,
@@ -2201,6 +2343,10 @@ impl<'tcx> Engine<'tcx> {
                     {
                         let target = target.ok_or("owned iterator call has no return edge")?;
                         for result in results {
+                            self.array_iterator_drop_adopt_work(
+                                frame.destruction_invocation(),
+                                &state,
+                            )?;
                             let mut continuation = self.adopt_flow_return(
                                 &state,
                                 result.conditions,
@@ -2220,6 +2366,7 @@ impl<'tcx> Engine<'tcx> {
                     }
                     if unarmed
                         && !configured
+                        && frame.destruction_invocation().is_none()
                         && let Some(results) = self.iterator_call(
                             instance,
                             &values,
@@ -2230,6 +2377,10 @@ impl<'tcx> Engine<'tcx> {
                     {
                         let target = target.ok_or("iterator call has no return edge")?;
                         for result in results {
+                            self.array_iterator_drop_adopt_work(
+                                frame.destruction_invocation(),
+                                &state,
+                            )?;
                             let mut continuation = self.adopt_flow_return(
                                 &state,
                                 result.conditions,
@@ -2290,44 +2441,21 @@ impl<'tcx> Engine<'tcx> {
                         queue.push_back((target, state, retry_path.clone()));
                         continue;
                     }
-                    if let Some(results) = self.shared_drop_receiver_call(
-                        (caller_instance, &owned_body, block),
-                        instance,
-                        &values,
-                        &mut state,
-                        &stack,
-                    )? {
-                        let target = target.ok_or("shared Drop call has no normal return edge")?;
-                        for result in results {
-                            let mut continuation = self.adopt_flow_return(
-                                &state,
-                                result.conditions,
-                                result.memory,
-                                result.flow,
-                            )?;
-                            self.store_call_result(
-                                body,
-                                &mut continuation,
-                                *destination,
-                                destination_indices.as_ref(),
-                                result.value,
-                            )?;
-                            queue.push_back((target, continuation, retry_path.clone()));
-                        }
-                        continue;
-                    }
-                    if unarmed
-                        && let Some(results) = self.array_iterator_ordinary_call(
+                    if frame.destruction_invocation().is_none()
+                        && let Some(results) = self.shared_drop_receiver_call(
+                            (caller_instance, &owned_body, block),
                             instance,
-                            &mut values,
-                            &state,
+                            &values,
+                            &mut state,
                             &stack,
-                            (id, terminator.source_info.span),
                         )?
                     {
-                        let target =
-                            target.ok_or("IntoIter ordinary helper lacks normal return edge")?;
+                        let target = target.ok_or("shared Drop call has no normal return edge")?;
                         for result in results {
+                            self.array_iterator_drop_adopt_work(
+                                frame.destruction_invocation(),
+                                &state,
+                            )?;
                             let mut continuation = self.adopt_flow_return(
                                 &state,
                                 result.conditions,
@@ -2377,6 +2505,7 @@ impl<'tcx> Engine<'tcx> {
                     }
                     if (unarmed || armed_metadata)
                         && !configured
+                        && frame.destruction_invocation().is_none()
                         && let Some(results) = self.library_call(
                             instance,
                             &modeled_values,
@@ -2394,6 +2523,10 @@ impl<'tcx> Engine<'tcx> {
                     {
                         let target = target.ok_or("modeled call has no return edge")?;
                         for result in results {
+                            self.array_iterator_drop_adopt_work(
+                                frame.destruction_invocation(),
+                                &state,
+                            )?;
                             let mut continuation = self.adopt_flow_return(
                                 &state,
                                 result.conditions,
@@ -2495,16 +2628,33 @@ impl<'tcx> Engine<'tcx> {
                     state
                         .flow
                         .charge_call_memory(&state.conditions, &state.memory)?;
-                    let results = self.call_instance_flow(
-                        &mut state.flow,
-                        instance,
-                        values,
-                        state.conditions.clone(),
-                        state.memory.clone(),
-                        (&stack, (id, terminator.source_info.span)),
-                    )?;
+                    let results = if let Some(parent) =
+                        self.array_iterator_drop_child_frame(frame.destruction_invocation())
+                    {
+                        self.array_iterator_drop_helper_execute(
+                            parent,
+                            &owned_body,
+                            instance,
+                            values,
+                            &state,
+                            (&stack, (id, terminator.source_info.span)),
+                        )?
+                    } else {
+                        self.call_instance_flow(
+                            &mut state.flow,
+                            instance,
+                            values,
+                            state.conditions.clone(),
+                            state.memory.clone(),
+                            (&stack, (id, terminator.source_info.span)),
+                        )?
+                    };
                     let target = target.ok_or("local call has no return edge")?;
                     for result in results {
+                        self.array_iterator_drop_adopt_work(
+                            frame.destruction_invocation(),
+                            &state,
+                        )?;
                         let mut continuation = self.adopt_flow_return(
                             &state,
                             result.conditions,
@@ -2528,6 +2678,39 @@ impl<'tcx> Engine<'tcx> {
                         continue;
                     }
                     state.flow.require_unarmed()?;
+                    if let Some(results) = self.array_iterator_drop_element(
+                        frame.destruction_invocation(),
+                        &owned_body,
+                        &mut state,
+                        block,
+                        &stack,
+                    )? {
+                        for continuation in results {
+                            queue.push_back((*target, continuation, retry_path.clone()));
+                        }
+                        continue;
+                    }
+                    if self
+                        .array_iterator_drop_child_frame(frame.destruction_invocation())
+                        .is_some()
+                    {
+                        return Err(self.categorized_error(
+                            UnknownCategory::Semantics,
+                            "IntoIter nested element Drop requires its active child lease".into(),
+                        ));
+                    }
+                    if let Some(results) = self.array_iterator_drop_place(
+                        caller_instance,
+                        &owned_body,
+                        block,
+                        &mut state,
+                        &stack,
+                    )? {
+                        for continuation in results {
+                            queue.push_back((*target, continuation, retry_path.clone()));
+                        }
+                        continue;
+                    }
                     if let Some(results) =
                         self.drop_fixed_subslice(instance, &owned_body, block, &state, &stack)?
                     {
@@ -2601,6 +2784,10 @@ impl<'tcx> Engine<'tcx> {
                             (id, terminator.source_info.span),
                         )?;
                         for result in results {
+                            self.array_iterator_drop_adopt_work(
+                                frame.destruction_invocation(),
+                                &state,
+                            )?;
                             let mut continuation = self.adopt_flow_return(
                                 &state,
                                 result.conditions,

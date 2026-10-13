@@ -236,6 +236,10 @@ pub(super) fn compiler_field_footprint<'tcx>(
 }
 
 impl<'tcx> Engine<'tcx> {
+    pub(super) fn initialized_type_count(&self) -> usize {
+        self.initialized_types.types.borrow().len()
+    }
+
     pub(super) fn preflight_initialized_owner(
         &self,
         body: &Body<'tcx>,
@@ -330,7 +334,25 @@ impl<'tcx> Engine<'tcx> {
         let allocation = state.addresses[place.local.as_usize()]
             .ok_or("ownership array type issuance requires actual addressed owner")?;
         let original = body.local_decls[place.local].ty;
-        let memory = &mut state.memory;
+        self.bind_validated_owned_storage(original, &mut state.memory, allocation)
+    }
+
+    pub(super) fn bind_iterator_element_storage(
+        &self,
+        witness: &array_iterator_constructors::drops::ElementWitness<'tcx>,
+        state: &mut State,
+        allocation: usize,
+    ) -> Result<(), String> {
+        let original = witness.element(self, state, allocation)?;
+        self.bind_validated_owned_storage(original, &mut state.memory, allocation)
+    }
+
+    fn bind_validated_owned_storage(
+        &self,
+        original: Ty<'tcx>,
+        memory: &mut Memory,
+        allocation: usize,
+    ) -> Result<(), String> {
         if memory.get(allocation).and_then(Option::as_ref).is_none() {
             return Err("ownership type evidence requires live retained allocation".into());
         }

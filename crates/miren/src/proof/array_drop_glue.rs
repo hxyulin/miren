@@ -322,6 +322,7 @@ pub(super) struct Frame<'tcx> {
     constructor: Option<array_iterator_constructors::Invocation>,
     step: Option<array_iterator_constructors::steps::Invocation<'tcx>>,
     retained_helper: Option<mutable_reborrows::helpers::Invocation<'tcx>>,
+    destruction: Option<array_iterator_constructors::drops::Invocation<'tcx>>,
 }
 struct Admission<'tcx> {
     array: Ty<'tcx>,
@@ -337,6 +338,7 @@ impl<'tcx> Frame<'tcx> {
             constructor: None,
             step: None,
             retained_helper: None,
+            destruction: None,
         }
     }
     pub(super) fn constructor(
@@ -349,6 +351,7 @@ impl<'tcx> Frame<'tcx> {
             constructor: Some(invocation),
             step: None,
             retained_helper: None,
+            destruction: None,
         }
     }
     pub(super) fn step(
@@ -361,6 +364,7 @@ impl<'tcx> Frame<'tcx> {
             constructor: None,
             step: Some(invocation),
             retained_helper: None,
+            destruction: None,
         }
     }
     pub(super) fn retained_helper(
@@ -373,12 +377,31 @@ impl<'tcx> Frame<'tcx> {
             constructor: None,
             step: None,
             retained_helper: Some(invocation),
+            destruction: None,
         }
     }
     pub(super) fn retained_helper_invocation(
         &self,
     ) -> Option<&mutable_reborrows::helpers::Invocation<'tcx>> {
         self.retained_helper.as_ref()
+    }
+    pub(super) fn destruction(
+        instance: ty::Instance<'tcx>,
+        invocation: array_iterator_constructors::drops::Invocation<'tcx>,
+    ) -> Self {
+        Self {
+            instance,
+            admission: None,
+            constructor: None,
+            step: None,
+            destruction: Some(invocation),
+            retained_helper: None,
+        }
+    }
+    pub(super) fn destruction_invocation(
+        &self,
+    ) -> Option<&array_iterator_constructors::drops::Invocation<'tcx>> {
+        self.destruction.as_ref()
     }
     pub(super) fn step_invocation(
         &self,
@@ -449,6 +472,7 @@ impl<'tcx> Engine<'tcx> {
             constructor: None,
             step: None,
             retained_helper: None,
+            destruction: None,
             admission: Some(Admission {
                 array,
                 array_instance: instance,
