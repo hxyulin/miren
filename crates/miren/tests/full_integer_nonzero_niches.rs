@@ -150,11 +150,7 @@ fn actual_full_integer_niches_cover_widths_signedness_and_target_metadata() {
             ("same_isize", P, None),
             ("member_isize", P, None),
             ("extremes", P, None),
-            (
-                "local_unknown",
-                U,
-                Some("NonZero new readonly width requires original core Option"),
-            ),
+            ("local_unknown", P, None),
             (
                 "mutable_unknown",
                 U,

@@ -47,8 +47,8 @@ UNKNOWN. A solver counterexample is not automatically a confirmed runtime panic.
 
 Readonly `Option<NonZero<T>>` slices support every Rust integer primitive on 32-bit and 64-bit
 targets, including target-sized `usize`/`isize`. These and exact
-local u16 empty/payload enums retain the compiler's zero-only niche with correlated tags and guarded
-payload observations. Signed payloads preserve negative and minimum values.
+local empty/NonZero integer enums retain the compiler's zero-only niche with correlated tags and
+guarded payload observations. Signed payloads preserve negative and minimum values.
 Original type, body, lifetime and resource checks remain required; pointer niches, mutable niches
 and whole-slice comparison are separate unsupported domains. See the
 [capability evidence](docs/rust-capabilities.md).
@@ -61,7 +61,7 @@ product helpers execute actual bodies and preserve returned storage. Nested owne
 reborrows remain UNKNOWN. Deeper whole scalar calls preserve checked owner lineage and returned
 storage; the dedicated proper-reborrow caller remains UNKNOWN. Bounded owned u16 products support
 writes through multiple symbolic suffix indices, preserving compiler types and current Memory. The
-capability manifest covers 489 cases across 103 families, including concrete and symbolic local
+capability manifest covers 529 cases across 104 families, including concrete and symbolic local
 byte-copy controls.
 
 Fixed-array partial moves preserve initialization and execute remaining destructors in compiler

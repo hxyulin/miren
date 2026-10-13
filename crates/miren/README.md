@@ -1766,3 +1766,13 @@ Readonly whole-record reborrows preserve the original reference carrier. Only un
 snapshots with the existing argument-binding predicate false are omitted, after receiver validation.
 Ordinary NoPanic metadata remains supported. Requires/Ensures needing whole-record observations,
 mutable/raw authority, nonprimitive results and unsupported adapters remain conservative.
+
+
+Readonly local two-variant NonZero enums admit every Rust integer payload width, including signed
+and target-sized integers, when the actual compiler layout has one exact zero-only niche. Both
+variant orders retain their original discriminants and correlated raw payload bits. The original
+local Copy/Freeze/noDrop inventory, anchored core NonZero wrapper, associated scalar Pat, size,
+alignment and offsets remain required. Core Option and earlier u16 routes keep their original
+checks. Actual getters remain authenticated; mutable/reference/raw payload authority, non-niche
+layouts, additional variant fields and destructor-bearing enums stay conservative. No limits,
+contracts or assumptions change.

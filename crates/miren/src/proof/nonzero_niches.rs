@@ -7,6 +7,9 @@ mod comparisons;
 #[path = "nonzero_full_integer_probe.rs"]
 mod full_integer_probe;
 #[cfg(test)]
+#[path = "nonzero_local_integer_probe.rs"]
+mod local_integer_probe;
+#[cfg(test)]
 use rustc_abi::Integer;
 use rustc_abi::{BackendRepr, FieldIdx, Primitive, Scalar, TagEncoding, Variants};
 use rustc_middle::mir::Local;
@@ -196,10 +199,8 @@ fn certify<'tcx>(tcx: TyCtxt<'tcx>, original: Ty<'tcx>) -> Result<Certificate<'t
     let (payload_bits, payload_signed) =
         super::nonzero_options::readonly_niche_integer_type(tcx, primitive)
             .ok_or("NonZero readonly primitive is not admitted")?;
-    // Preserve the old local enum domain; the new width is exact original Option only.
-    if !option && primitive != tcx.types.u16 {
-        return Err("NonZero new readonly width requires original core Option".into());
-    }
+    // The original local two-variant inventory and actual zero-only niche above apply to
+    // every admitted Rust integer payload. Core Option retains its additional identity gate.
     if option
         && (args.len() != 1
             || args.type_at(0) != nonzero_ty

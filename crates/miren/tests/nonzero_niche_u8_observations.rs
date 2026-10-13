@@ -42,7 +42,7 @@ fn exact_option8_observations_comparisons_and_boundaries() {
                     ("same_observation_ne8", ProofStatus::Proved),
                     ("wrong_ne8", ProofStatus::Refuted),
                     ("asserted_contains8", ProofStatus::Unknown),
-                    ("local_enum_unknown", ProofStatus::Unknown),
+                    ("local_enum_unknown", ProofStatus::Proved),
                     ("mutable_unknown", ProofStatus::Unknown),
                     ("signed_unknown", ProofStatus::Proved),
                     ("pointer_unknown", ProofStatus::Unknown),

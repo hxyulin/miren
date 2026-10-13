@@ -7573,3 +7573,42 @@ scalar query drift is resolved by the signature eligibility correction; the fail
 archived. The final full checks and release audit use the unchanged 1,023-file source snapshot.
 Independent review covers the frozen private source, Root composition and the explicit eligibility
 successor. No assumptions, raw authority or missing-body success are added.
+
+
+## Stage251: local integer NonZero enum niches
+
+The existing authenticated local empty/NonZero enum codec now admits every Rust integer type. The
+former non-u16 Option-only restriction is removed; exact nominal/purity/variant inventories, core
+NonZero and associated Pat identities, compiler layouts, signed scalar validity, Context and
+bounded shape/getter checks remain unchanged. Core Option and existing local u16 paths retain
+their validation sequence and fee expressions. Both variant orders preserve the actual zero/empty
+tag.
+
+Frozen source V2 is `/tmp/miren-local-integer-niches-source-v2/source.json`. Independent source
+review verifies all 1,028 files, seven owned paths and compiler/solver guards. The first
+integration run exposed an authored UNKNOWN reason mismatch: dropping enums are refused earlier
+during input admission. Four raw reports establish that same conservative frontier; V2 changes
+only the new test reason. Failed source/API and report parser receipts remain archived.
+
+Scoped compiler controls check 24 genuine layouts on four profiles. The original 40-case matrix,
+twelve real helper mutations, native signed extremes and omitted dependency bodies pass. Strict
+raw capture measures 108 PROVED, 144 REFUTED and 16 UNKNOWN outcomes, with 396 queries and 144
+models. All source, tool and analyzer guards match. The three existing local enum roots are PROVED
+on every profile without assumptions or trusted calls. Root updates only those three old
+expectations and appends forty controls. Full Root validation and retained-proof audit are
+required before commit.
+
+ The final release survey has 529 cases across 104 families: 273 PROVED, 158 REFUTED and 98
+UNKNOWN on each host/ARM O0/O2 profile. Three existing cases advance to PROVED; forty appended
+controls add 36 supported outcomes, bringing the supported total to 431. Full validation passes
+980 outer Rust tests and 91 Python tests, plus formatting, lint, release builds, dependency
+checks, manual hooks and documentation checks.
+
+All 486 unaffected old case objects and the complete old guest fixture prefix remain literal.
+Across 1,944 retained Proof comparisons, 48 are literal, 1,893 differ only by the actual appended
+fixture fingerprint and three query-free fold deadline contexts are qualified separately. Those
+three contexts belong only to `scalar_slice_unbounded_fold` on host O0/O2 and ARM O0. All 4,172
+retained queried obligations and their models match exactly. Full checks and release audit use the
+unchanged 1,028-file Root source snapshot; the final documentation-only successor wraps one long
+line and records these measured results. No compiler, guest, contract or analysis code changes
+follow that validation.

@@ -139,11 +139,7 @@ fn actual_signed_readonly_niches_preserve_tags_negative_payloads_and_refusals() 
             ("wrong_nonnegative", R, None),
             ("wrong_zero", R, None),
             ("wrong_minimum", R, None),
-            (
-                "local_enum_unknown",
-                U,
-                Some("NonZero new readonly width requires original core Option"),
-            ),
+            ("local_enum_unknown", P, None),
             (
                 "mutable_unknown",
                 U,

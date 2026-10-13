@@ -1575,9 +1575,7 @@
     {
       "entry": "local_enum_unknown",
       "family": "readonly_nonzero_niche",
-      "expected": "unknown",
-      "unknown_reason": "NonZero new readonly width requires original core Option",
-      "unknown_category": "semantics"
+      "expected": "proved"
     },
     {
       "entry": "mutable_unknown",
@@ -2123,9 +2121,7 @@
     {
       "entry": "signed_nonzero_niche_survey::local_enum_unknown",
       "family": "signed_nonzero_niche",
-      "expected": "unknown",
-      "unknown_reason": "NonZero new readonly width requires original core Option",
-      "unknown_category": "semantics"
+      "expected": "proved"
     },
     {
       "entry": "signed_nonzero_niche_survey::mutable_unknown",
@@ -2279,9 +2275,7 @@
     {
       "entry": "full_integer_nonzero_niche_survey::local_unknown",
       "family": "full_integer_nonzero_niche",
-      "expected": "unknown",
-      "unknown_reason": "NonZero new readonly width requires original core Option",
-      "unknown_category": "semantics"
+      "expected": "proved"
     },
     {
       "entry": "full_integer_nonzero_niche_survey::mutable_unknown",
@@ -2645,6 +2639,214 @@
       "family": "shared_drop_receiver",
       "expected": "unknown",
       "unknown_reason": "shared Drop projection cannot materialize or copy a non-Copy owner",
+      "unknown_category": "semantics"
+    },
+    {
+      "entry": "local_integer_nonzero_niche_survey::read_u8",
+      "family": "local_integer_nonzero_niche",
+      "expected": "proved"
+    },
+    {
+      "entry": "local_integer_nonzero_niche_survey::reverse_u8",
+      "family": "local_integer_nonzero_niche",
+      "expected": "proved"
+    },
+    {
+      "entry": "local_integer_nonzero_niche_survey::wrong_u8",
+      "family": "local_integer_nonzero_niche",
+      "expected": "refuted"
+    },
+    {
+      "entry": "local_integer_nonzero_niche_survey::read_u16",
+      "family": "local_integer_nonzero_niche",
+      "expected": "proved"
+    },
+    {
+      "entry": "local_integer_nonzero_niche_survey::reverse_u16",
+      "family": "local_integer_nonzero_niche",
+      "expected": "proved"
+    },
+    {
+      "entry": "local_integer_nonzero_niche_survey::wrong_u16",
+      "family": "local_integer_nonzero_niche",
+      "expected": "refuted"
+    },
+    {
+      "entry": "local_integer_nonzero_niche_survey::read_u32",
+      "family": "local_integer_nonzero_niche",
+      "expected": "proved"
+    },
+    {
+      "entry": "local_integer_nonzero_niche_survey::reverse_u32",
+      "family": "local_integer_nonzero_niche",
+      "expected": "proved"
+    },
+    {
+      "entry": "local_integer_nonzero_niche_survey::wrong_u32",
+      "family": "local_integer_nonzero_niche",
+      "expected": "refuted"
+    },
+    {
+      "entry": "local_integer_nonzero_niche_survey::read_u64",
+      "family": "local_integer_nonzero_niche",
+      "expected": "proved"
+    },
+    {
+      "entry": "local_integer_nonzero_niche_survey::reverse_u64",
+      "family": "local_integer_nonzero_niche",
+      "expected": "proved"
+    },
+    {
+      "entry": "local_integer_nonzero_niche_survey::wrong_u64",
+      "family": "local_integer_nonzero_niche",
+      "expected": "refuted"
+    },
+    {
+      "entry": "local_integer_nonzero_niche_survey::read_u128",
+      "family": "local_integer_nonzero_niche",
+      "expected": "proved"
+    },
+    {
+      "entry": "local_integer_nonzero_niche_survey::reverse_u128",
+      "family": "local_integer_nonzero_niche",
+      "expected": "proved"
+    },
+    {
+      "entry": "local_integer_nonzero_niche_survey::wrong_u128",
+      "family": "local_integer_nonzero_niche",
+      "expected": "refuted"
+    },
+    {
+      "entry": "local_integer_nonzero_niche_survey::read_usize",
+      "family": "local_integer_nonzero_niche",
+      "expected": "proved"
+    },
+    {
+      "entry": "local_integer_nonzero_niche_survey::reverse_usize",
+      "family": "local_integer_nonzero_niche",
+      "expected": "proved"
+    },
+    {
+      "entry": "local_integer_nonzero_niche_survey::wrong_usize",
+      "family": "local_integer_nonzero_niche",
+      "expected": "refuted"
+    },
+    {
+      "entry": "local_integer_nonzero_niche_survey::read_i8",
+      "family": "local_integer_nonzero_niche",
+      "expected": "proved"
+    },
+    {
+      "entry": "local_integer_nonzero_niche_survey::reverse_i8",
+      "family": "local_integer_nonzero_niche",
+      "expected": "proved"
+    },
+    {
+      "entry": "local_integer_nonzero_niche_survey::wrong_i8",
+      "family": "local_integer_nonzero_niche",
+      "expected": "refuted"
+    },
+    {
+      "entry": "local_integer_nonzero_niche_survey::read_i16",
+      "family": "local_integer_nonzero_niche",
+      "expected": "proved"
+    },
+    {
+      "entry": "local_integer_nonzero_niche_survey::reverse_i16",
+      "family": "local_integer_nonzero_niche",
+      "expected": "proved"
+    },
+    {
+      "entry": "local_integer_nonzero_niche_survey::wrong_i16",
+      "family": "local_integer_nonzero_niche",
+      "expected": "refuted"
+    },
+    {
+      "entry": "local_integer_nonzero_niche_survey::read_i32",
+      "family": "local_integer_nonzero_niche",
+      "expected": "proved"
+    },
+    {
+      "entry": "local_integer_nonzero_niche_survey::reverse_i32",
+      "family": "local_integer_nonzero_niche",
+      "expected": "proved"
+    },
+    {
+      "entry": "local_integer_nonzero_niche_survey::wrong_i32",
+      "family": "local_integer_nonzero_niche",
+      "expected": "refuted"
+    },
+    {
+      "entry": "local_integer_nonzero_niche_survey::read_i64",
+      "family": "local_integer_nonzero_niche",
+      "expected": "proved"
+    },
+    {
+      "entry": "local_integer_nonzero_niche_survey::reverse_i64",
+      "family": "local_integer_nonzero_niche",
+      "expected": "proved"
+    },
+    {
+      "entry": "local_integer_nonzero_niche_survey::wrong_i64",
+      "family": "local_integer_nonzero_niche",
+      "expected": "refuted"
+    },
+    {
+      "entry": "local_integer_nonzero_niche_survey::read_i128",
+      "family": "local_integer_nonzero_niche",
+      "expected": "proved"
+    },
+    {
+      "entry": "local_integer_nonzero_niche_survey::reverse_i128",
+      "family": "local_integer_nonzero_niche",
+      "expected": "proved"
+    },
+    {
+      "entry": "local_integer_nonzero_niche_survey::wrong_i128",
+      "family": "local_integer_nonzero_niche",
+      "expected": "refuted"
+    },
+    {
+      "entry": "local_integer_nonzero_niche_survey::read_isize",
+      "family": "local_integer_nonzero_niche",
+      "expected": "proved"
+    },
+    {
+      "entry": "local_integer_nonzero_niche_survey::reverse_isize",
+      "family": "local_integer_nonzero_niche",
+      "expected": "proved"
+    },
+    {
+      "entry": "local_integer_nonzero_niche_survey::wrong_isize",
+      "family": "local_integer_nonzero_niche",
+      "expected": "refuted"
+    },
+    {
+      "entry": "local_integer_nonzero_niche_survey::mutable_unknown",
+      "family": "local_integer_nonzero_niche",
+      "expected": "unknown",
+      "unknown_reason": "only read-only byte slices and byte arrays are modeled",
+      "unknown_category": "semantics"
+    },
+    {
+      "entry": "local_integer_nonzero_niche_survey::reference_unknown",
+      "family": "local_integer_nonzero_niche",
+      "expected": "unknown",
+      "unknown_reason": "only read-only byte slices and byte arrays are modeled",
+      "unknown_category": "semantics"
+    },
+    {
+      "entry": "local_integer_nonzero_niche_survey::extra_unknown",
+      "family": "local_integer_nonzero_niche",
+      "expected": "unknown",
+      "unknown_reason": "NonZero niche original variant schema mismatch",
+      "unknown_category": "semantics"
+    },
+    {
+      "entry": "local_integer_nonzero_niche_survey::drop_unknown",
+      "family": "local_integer_nonzero_niche",
+      "expected": "unknown",
+      "unknown_reason": "only read-only byte slices and byte arrays are modeled",
       "unknown_category": "semantics"
     }
   ]

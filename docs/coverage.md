@@ -3758,3 +3758,11 @@ claims; native originals pass and mutants fail. Actual compiler controls check n
 bound regions, current bodies, retired/consumed storage and foreign Context. No assumptions or
 missing-body success are introduced. Repeated current candidate validations remain separately
 bounded semantic services under unchanged limits.
+
+
+## Local integer NonZero enum niches
+
+Readonly local two-variant Copy/Freeze enums support empty/NonZero payloads across all Rust
+integer types, including target-sized integers and both variant orders. Exact original nominal
+types, compiler zero-only niche layouts, signed payloads and current getter bodies remain checked.
+Pointers, references, mutable niche storage and dropping enums remain separate unsupported domains.
