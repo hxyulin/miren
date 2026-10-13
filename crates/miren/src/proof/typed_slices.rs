@@ -70,6 +70,9 @@ impl<'tcx> Engine<'tcx> {
         let mut value = value.clone();
         for _ in 0..16 {
             match value {
+                Value::OwnedArrayIterator { .. } => {
+                    return Err("owned array iterator requires its private typed protocol".into());
+                }
                 Value::MutableU16 { .. } | Value::OwnedRegion { .. } | Value::OwnedSnapshot(_) => {
                     return Err("owned regions require their private typed protocol".into());
                 }

@@ -2038,7 +2038,7 @@
       "family": "partial_array_drops",
       "expected": "unknown",
       "unknown_reason": "owned array iterator element destructors are not modeled",
-      "unknown_category": "unclassified"
+      "unknown_category": "semantics"
     },
     {
       "entry": "partial_array_drops_survey::symbolic_partial",
@@ -2565,6 +2565,42 @@
       "entry": "incoming_drop_survey::char_eager_pressure",
       "family": "incoming_drop_array_storage",
       "expected": "proved"
+    },
+    {
+      "entry": "array_iterator_constructors_survey::constructor",
+      "family": "owned_array_iterator_constructor",
+      "expected": "proved"
+    },
+    {
+      "entry": "array_iterator_constructors_survey::constructor_move",
+      "family": "owned_array_iterator_constructor",
+      "expected": "proved"
+    },
+    {
+      "entry": "array_iterator_constructors_survey::constructor_wrong",
+      "family": "owned_array_iterator_constructor",
+      "expected": "refuted"
+    },
+    {
+      "entry": "array_iterator_constructors_survey::helper_argument_unknown",
+      "family": "owned_array_iterator_constructor",
+      "expected": "unknown",
+      "unknown_reason": "IntoIter owner requires a private frame-bound metadata snapshot",
+      "unknown_category": "semantics"
+    },
+    {
+      "entry": "array_iterator_constructors_survey::next_unknown",
+      "family": "owned_array_iterator_constructor",
+      "expected": "unknown",
+      "unknown_reason": "owned array iterator element destructors are not modeled",
+      "unknown_category": "semantics"
+    },
+    {
+      "entry": "array_iterator_constructors_survey::remaining_drop_unknown",
+      "family": "owned_array_iterator_constructor",
+      "expected": "unknown",
+      "unknown_reason": "owned array iterator element destructors are not modeled",
+      "unknown_category": "semantics"
     }
   ]
 }

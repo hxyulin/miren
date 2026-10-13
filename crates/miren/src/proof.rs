@@ -28,6 +28,7 @@ mod aggregates;
 mod arm_interrupts;
 mod array_drop_glue;
 mod array_equality;
+pub(crate) mod array_iterator_constructors;
 mod async_entries;
 mod atomic_intrinsics;
 mod atomic_rmw;
@@ -186,6 +187,7 @@ struct Engine<'tcx> {
     function_pointers: std::cell::RefCell<Vec<function_pointers::Target<'tcx>>>,
     static_addresses: std::collections::HashMap<DefId, Term>,
     maybe_uninit_types: Vec<Ty<'tcx>>,
+    array_iterator_types: Vec<array_iterator_constructors::PhysicalTypes<'tcx>>,
     owned_box_types: Vec<owned_boxes::BoxType<'tcx>>,
     next_owned_region: u64,
     owned_box_constructors: Vec<owned_box_constructors::Constructor<'tcx>>,
@@ -305,6 +307,7 @@ impl<'tcx> Engine<'tcx> {
             static_addresses: std::collections::HashMap::new(),
             tracked_addresses: Vec::new(),
             maybe_uninit_types: Vec::new(),
+            array_iterator_types: Vec::new(),
             owned_box_types: Vec::new(),
             next_owned_region: 0,
             owned_box_constructors: Vec::new(),
@@ -604,6 +607,9 @@ impl<'tcx> Engine<'tcx> {
 
     fn input_binding(&mut self, name: &str, value: &Value) -> Result<(), String> {
         let description = match value {
+            Value::OwnedArrayIterator { .. } => {
+                return Err("owned array iterator requires its private typed protocol".into());
+            }
             Value::MutableU16 { id, role } => {
                 if matches!(
                     role,
@@ -1454,6 +1460,18 @@ impl<'tcx> Engine<'tcx> {
                 continue;
             }
             for statement_index in 0..body.basic_blocks[block].statements.len() {
+                if self.array_iterator_constructor_statement(
+                    frame.constructor_invocation(),
+                    instance,
+                    &owned_body,
+                    &mut state,
+                    rustc_middle::mir::Location {
+                        block,
+                        statement_index,
+                    },
+                )? {
+                    continue;
+                }
                 self.receipt_statement(
                     instance,
                     &owned_body,
@@ -1543,6 +1561,7 @@ impl<'tcx> Engine<'tcx> {
                     } else {
                         self.local(&state, 0)?
                     };
+                    self.validate_array_iterator_value(body.return_ty(), &value)?;
                     self.nonzero_niche_admission(body.return_ty(), &value, &state.conditions)?;
                     self.mutable_u16_exit_with_flow(
                         body,
@@ -1810,6 +1829,34 @@ impl<'tcx> Engine<'tcx> {
                         },
                     )? {
                         let target = target.ok_or("mutable u16 child has no normal return edge")?;
+                        for result in results {
+                            let mut continuation = self.adopt_flow_return(
+                                &state,
+                                result.conditions,
+                                result.memory,
+                                result.flow,
+                            )?;
+                            self.store_call_result(
+                                body,
+                                &mut continuation,
+                                *destination,
+                                destination_indices.as_ref(),
+                                result.value,
+                            )?;
+                            queue.push_back((target, continuation, retry_path.clone()));
+                        }
+                        continue;
+                    }
+                    if let Some(results) = self.array_iterator_constructor_call(
+                        caller_instance,
+                        &owned_body,
+                        block,
+                        instance,
+                        &mut state,
+                        &stack,
+                    )? {
+                        let target =
+                            target.ok_or("IntoIter constructor lacks normal return edge")?;
                         for result in results {
                             let mut continuation = self.adopt_flow_return(
                                 &state,
@@ -2488,6 +2535,18 @@ impl<'tcx> Engine<'tcx> {
         value: Value,
         occurrence: &StatementKind<'tcx>,
     ) -> Result<(), String> {
+        self.validate_array_iterator_value(place.ty(&body.local_decls, self.tcx).ty, &value)?;
+        self.store_assignment_value_inner(body, state, place, value, occurrence)
+    }
+
+    fn store_assignment_value_inner(
+        &mut self,
+        body: &Body<'tcx>,
+        state: &mut State,
+        place: Place<'tcx>,
+        value: Value,
+        occurrence: &StatementKind<'tcx>,
+    ) -> Result<(), String> {
         state.constant_receipts.invalidate(place);
         if self.mutable_u16_store(body, state, place, &value)? {
             return Ok(());
@@ -2845,6 +2904,21 @@ impl<'tcx> Engine<'tcx> {
                         UnknownCategory::Semantics,
                         "mutable u16 root Copy/Move transport is unsupported".into(),
                     ));
+                }
+                self.validate_array_iterator_value(
+                    place.ty(&body.local_decls, self.tcx).ty,
+                    &value,
+                )?;
+                if matches!(operand, Operand::Copy(_))
+                    && !self.tcx.type_is_copy_modulo_regions(
+                        ty::TypingEnv::fully_monomorphized(),
+                        place.ty(&body.local_decls, self.tcx).ty,
+                    )
+                    && self
+                        .contains_array_iterator_type(place.ty(&body.local_decls, self.tcx).ty)?
+                    && self.contains_array_iterator(&value)?
+                {
+                    return Err("IntoIter executable Copy is unsupported".into());
                 }
                 self.nonzero_niche_admission(
                     place.ty(&body.local_decls, self.tcx).ty,

@@ -80,6 +80,9 @@ fn normalize(
     let template = template.ok_or("missing inductive value template")?;
     let value = slot.as_mut().ok_or("missing inductive value")?;
     match (template, &mut *value) {
+        (Value::OwnedArrayIterator { .. }, _) => {
+            return Err("owned array iterator requires its private typed protocol".into());
+        }
         (Value::MutableU16 { .. } | Value::OwnedRegion { .. } | Value::OwnedSnapshot(_), _) => {
             return Err("owned regions require their private typed protocol".into());
         }

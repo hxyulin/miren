@@ -80,6 +80,10 @@ impl<'tcx> Engine<'tcx> {
             return Err("memory snapshot nesting limit reached".to_owned());
         }
         match value {
+            Value::OwnedArrayIterator { .. } => Err(self.categorized_error(
+                UnknownCategory::Semantics,
+                "IntoIter owner requires a private frame-bound metadata snapshot".into(),
+            )),
             Value::MutableU16 { id, role }
                 if !matches!(role, symbolic::MutableU16Role::Ghost { .. })
                     && self.mutable_product_owner(*id, memory)? =>
@@ -1507,6 +1511,10 @@ impl<'tcx> Engine<'tcx> {
             self.validate_static_initialization_graph(&value, state, &mut Vec::new())?;
         }
         match value {
+            value @ Value::OwnedArrayIterator { .. } => {
+                self.array_iterator_return(&value)?;
+                Ok(value)
+            }
             Value::MutableU16 { .. } => Err(self.categorized_error(
                 UnknownCategory::Semantics,
                 "mutable u16 roles cannot return or escape".into(),

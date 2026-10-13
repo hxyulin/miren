@@ -44,6 +44,21 @@ impl<'tcx> Engine<'tcx> {
         stack: &[DefId],
         site: (DefId, Span),
     ) -> Result<Vec<Return>, String> {
+        conditions = self.call_preconditions(instance, &values, conditions, &memory, site)?;
+        if let Some(target) = self.foreign_rust_target(instance)? {
+            return self.call_instance(target, values, conditions, memory, stack, site);
+        }
+        self.execute(instance, values, conditions, memory, stack)
+    }
+
+    pub(super) fn call_preconditions(
+        &mut self,
+        instance: ty::Instance<'tcx>,
+        values: &[Value],
+        mut conditions: Vec<Term>,
+        memory: &Memory,
+        site: (DefId, Span),
+    ) -> Result<Vec<Term>, String> {
         let callee = instance.def_id();
         let contracts = self.configured_contracts(instance)?;
         if contracts
@@ -51,7 +66,7 @@ impl<'tcx> Engine<'tcx> {
             .any(|contract| matches!(contract.kind, ContractKind::Requires))
         {
             let body = self.instantiated_body(instance)?;
-            let snapshots = self.snapshots(&values, &memory, &conditions)?;
+            let snapshots = self.snapshots(values, memory, &conditions)?;
             let bindings = self.configured_bindings(&body, &snapshots, instance)?;
             for contract in contracts
                 .iter()
@@ -73,10 +88,7 @@ impl<'tcx> Engine<'tcx> {
                 conditions.push(safe);
             }
         }
-        if let Some(target) = self.foreign_rust_target(instance)? {
-            return self.call_instance(target, values, conditions, memory, stack, site);
-        }
-        self.execute(instance, values, conditions, memory, stack)
+        Ok(conditions)
     }
 
     pub(super) fn call_instance_flow(

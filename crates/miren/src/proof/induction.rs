@@ -1140,6 +1140,9 @@ fn flatten(state: &State) -> Result<Vec<Term>, String> {
 
 fn flatten_value(value: &Value, result: &mut Vec<Term>) -> Result<(), String> {
     match value {
+        Value::OwnedArrayIterator { .. } => {
+            return Err("owned array iterator requires its private typed protocol".into());
+        }
         Value::MutableU16 { .. } | Value::OwnedRegion { .. } | Value::OwnedSnapshot(_) => {
             return Err("owned regions require their private typed protocol".into());
         }

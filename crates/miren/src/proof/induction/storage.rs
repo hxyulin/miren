@@ -33,6 +33,9 @@ impl<'tcx> Engine<'tcx> {
 
     pub(super) fn loop_fresh_value(&mut self, value: &Value) -> Result<Value, String> {
         Ok(match value {
+            Value::OwnedArrayIterator { .. } => {
+                return Err("owned array iterator requires its private typed protocol".into());
+            }
             Value::MutableU16 { .. } | Value::OwnedRegion { .. } | Value::OwnedSnapshot(_) => {
                 return Err("owned regions require their private typed protocol".into());
             }
@@ -378,6 +381,11 @@ impl<'tcx> Engine<'tcx> {
                 ProjectionElem::Field(field, _) => {
                     let index = field.as_usize();
                     value = match value {
+                        Value::OwnedArrayIterator { .. } => {
+                            return Err(
+                                "owned array iterator requires its private typed protocol".into()
+                            );
+                        }
                         Value::MutableU16 { .. }
                         | Value::OwnedRegion { .. }
                         | Value::OwnedSnapshot(_) => {
@@ -493,6 +501,9 @@ pub(super) fn same_shape(expected: Option<&Value>, actual: Option<&Value>) -> Re
         return Err("inductive storage sorts changed".into());
     }
     match (expected, actual) {
+        (Value::OwnedArrayIterator { .. }, _) => {
+            Err("owned array iterator requires its private typed protocol".into())
+        }
         (Value::MutableU16 { .. } | Value::OwnedRegion { .. } | Value::OwnedSnapshot(_), _) => {
             Err("owned regions require their private typed protocol".into())
         }
@@ -644,6 +655,9 @@ pub(super) fn same_shape(expected: Option<&Value>, actual: Option<&Value>) -> Re
 
 pub(super) fn static_projection(value: Value, part: &MemoryProjection) -> Result<Value, String> {
     match (part, value) {
+        (_, Value::OwnedArrayIterator { .. }) => {
+            Err("owned array iterator requires its private typed protocol".into())
+        }
         (_, Value::MutableU16 { .. } | Value::OwnedRegion { .. } | Value::OwnedSnapshot(_)) => {
             Err("owned regions require their private typed protocol".into())
         }

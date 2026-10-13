@@ -97,7 +97,10 @@ impl<'tcx> Engine<'tcx> {
                 return Err("owned array iterator exceeds 128-element limit".to_owned());
             }
             if element.needs_drop(self.tcx, ty::TypingEnv::fully_monomorphized()) {
-                return Err("owned array iterator element destructors are not modeled".to_owned());
+                return Err(self.categorized_error(
+                    UnknownCategory::Semantics,
+                    "owned array iterator element destructors are not modeled".to_owned(),
+                ));
             }
             let [source] = values else {
                 return Err("owned array iterator constructor arity mismatch".to_owned());
@@ -142,7 +145,10 @@ impl<'tcx> Engine<'tcx> {
             return Ok(None);
         };
         if element.needs_drop(self.tcx, ty::TypingEnv::fully_monomorphized()) {
-            return Err("owned array iterator element destructors are not modeled".to_owned());
+            return Err(self.categorized_error(
+                UnknownCategory::Semantics,
+                "owned array iterator element destructors are not modeled".to_owned(),
+            ));
         }
         let iterator_trait = self.tcx.get_diagnostic_item(Symbol::intern("Iterator"));
         let double_ended = trait_id.is_some_and(|id| {

@@ -1145,6 +1145,9 @@ impl<'tcx> Engine<'tcx> {
                 ));
             }
             match value {
+                Value::OwnedArrayIterator { .. } => {
+                    return Err("owned array iterator requires its private typed protocol".into());
+                }
                 Value::MutableU16 { .. } => return Ok(true),
                 Value::Tuple(fields) => pending.extend(fields.iter().map(|v| (v, depth + 1))),
                 Value::Elements(fields) => pending.extend(fields.iter().map(|v| (v, depth + 1))),

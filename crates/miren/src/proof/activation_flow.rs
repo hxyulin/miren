@@ -127,6 +127,9 @@ impl Flow {
 
     fn constant_clone_leaf(value: &Value) -> Result<(), String> {
         match value {
+            Value::OwnedArrayIterator { .. } => {
+                Err("owned array iterator requires its private typed protocol".into())
+            }
             Value::MutableU16 {
                 role: symbolic::MutableU16Role::Ghost { .. },
                 ..
@@ -294,6 +297,9 @@ impl Flow {
             .as_ref()
             .ok_or("armed publication root is unavailable")?;
         match value {
+            Value::OwnedArrayIterator { .. } => {
+                Err("armed array iterator publication is unsupported".into())
+            }
             Value::Elements(fields) => {
                 // The shared Elements clone is constant work; an actual write may detach
                 // its vector. Charge every borrowed field and cloned value beforehand.

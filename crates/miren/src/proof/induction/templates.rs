@@ -15,6 +15,9 @@ impl<'tcx> Engine<'tcx> {
                 storage::static_projection(value, part)
             }
             MemoryProjection::Index(index) => match value {
+                Value::OwnedArrayIterator { .. } => {
+                    Err("owned array iterator requires its private typed protocol".into())
+                }
                 Value::MutableU16 { .. } | Value::OwnedRegion { .. } | Value::OwnedSnapshot(_) => {
                     Err("owned regions require their private typed protocol".into())
                 }
@@ -126,6 +129,9 @@ impl<'tcx> Engine<'tcx> {
             return Err("inductive snapshot depth limit".into());
         }
         match value {
+            Value::OwnedArrayIterator { .. } => {
+                Err("owned array iterator requires its private typed protocol".into())
+            }
             Value::MutableU16 { .. } | Value::OwnedRegion { .. } | Value::OwnedSnapshot(_) => {
                 Err("owned regions require their private typed protocol".into())
             }

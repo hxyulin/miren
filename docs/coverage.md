@@ -3696,3 +3696,45 @@ Bool, integer and exact f32/f64 lazy fields are supported. Char pressure control
 storage because lazy Char descriptors remain unavailable. Whole Drop receivers and mutable/raw
 projection authority remain UNKNOWN. Actual array glue, element destructors and their helpers
 execute normally; unavailable helpers remain UNKNOWN. No external-state assumptions are added.
+
+
+## Owning array iterator constructors
+
+Authenticated non-inlined core array `IntoIterator::into_iter` calls execute their actual compiler
+body for retained plain owned Drop values. The original array, MaybeUninit storage, inner wrapper
+and iterator types remain checked. Private constructor Copy operands carry metadata without
+duplicating the executable payload; actual normal return and caller publication preserve
+ownership.
+
+Bounded borrowed planning prepays owned MIR cloning and normalization structure separately from
+comparison. Initialization-mask clones pay before allocation and retain 512-node/depth16 limits.
+Opaque compiler queries are not instruction-counted. Unsupported auxiliary metadata, reference-
+bearing payloads and unavailable bodies cannot gain constructor success. Caller preconditions
+share the ordinary checker; unsupported whole iterator contract observations remain UNKNOWN.
+
+The scoped four-profile matrix measures two PROVED, one REFUTED and three UNKNOWN controls.
+Iteration, remaining-element destruction and incoming iterator arguments remain separate
+unsupported domains. Default-MIR O2 inlined transmute paths remain UNKNOWN; the ordinary CLI pins
+MIR optimization to zero. The existing partial-array iterator control retains its destructor-
+exclusion reason; its previously unclassified category is refined to Semantics. No assumptions or
+missing-body success are introduced.
+
+
+The final release survey has 480 cases across 102 families: 239 PROVED, 144 REFUTED and 97 UNKNOWN
+on each host/ARM O0/O2 profile. Six appended cases add three supported outcomes, bringing the
+supported total to 383. No old expected status changes. The full workspace run passes 971 outer
+Rust tests and 91 Python tests. Formatting, lint, release builds, dependency checks, manual hooks
+and documentation checks pass.
+
+All 473 unaffected old case objects and the complete old guest fixture prefix remain literal. One
+existing iterator case retains its UNKNOWN status and exact destructor-exclusion reason while its
+cause category changes to Semantics. Across 1,896 retained Proof comparisons, 60 are literal,
+1,831 differ only by the actual appended fixture fingerprint, four also contain that exact
+category refinement, and one query-free fold deadline context is recorded separately. All 4,108
+retained queried obligations and their models match exactly.
+
+Independent review covers the frozen private constructor source and the explicit Root successors
+for prepaid source-ledger cloning, callee-kind eligibility and test-directory uniqueness. The
+final full checks and release audit use the unchanged 1,019-file Root source snapshot. The prior
+compiler crash and failed host test run remain archived; their receipts are not counted as
+successful validation.

@@ -7467,3 +7467,61 @@ Proof comparisons, 60 are literal and 1,765 differ only by the appended fixture 
 query-free fold deadline contexts are recorded separately. All 3,996 retained queried obligations
 and models match exactly. Independent reviews cover both the frozen private source and Root
 composition, including the signature formatting qualification.
+
+
+## Stage249: owning array iterator constructor transport
+
+Authenticated non-inlined core array `IntoIterator::into_iter` calls execute their actual compiler
+body for retained plain owned Drop values. The original array, MaybeUninit storage, inner wrapper
+and iterator types remain checked. Private constructor Copy operands carry metadata without
+duplicating the executable payload; actual normal return and caller publication preserve
+ownership.
+
+Bounded borrowed planning prepays owned MIR cloning and normalization structure separately from
+comparison. Initialization-mask clones pay before allocation and retain 512-node/depth16 limits.
+Opaque compiler queries are not instruction-counted. Unsupported auxiliary metadata, reference-
+bearing payloads and unavailable bodies cannot gain constructor success. Caller preconditions
+share the ordinary checker; unsupported whole iterator contract observations remain UNKNOWN.
+
+The scoped four-profile matrix measures two PROVED, one REFUTED and three UNKNOWN controls.
+Iteration, remaining-element destruction and incoming iterator arguments remain separate
+unsupported domains. Default-MIR O2 inlined transmute paths remain UNKNOWN; the ordinary CLI pins
+MIR optimization to zero. The existing partial-array iterator control retains its destructor-
+exclusion reason; its previously unclassified category is refined to Semantics. No assumptions or
+missing-body success are introduced.
+
+The frozen V2 package is `/tmp/miren-intoiter-runtime-frozen-v2/source.json`. Its seven scoped
+checks pass, including genuine compiler controls and five legacy destructor tests. Independent
+review and full Root checks are required before this stage is committed. The earlier V1 review
+withheld approval for unpaid owned Body and local-mask clones; V2 addresses those concrete costs.
+
+The first Root suite exposed a closure compiler-query crash in constructor eligibility. The failed
+run was stopped and archived. Eligibility now checks the actual Item/AssocFn kind before querying
+a compiler signature; ordinary closure calls retain their normal execution path. Source handoff
+initialization ledgers also use the bounded prepaid mask clone service, retaining the existing
+source-consumption allowance. Frozen private V2 evidence is qualified by these explicit successors.
+
+The corrected Root suite completed with one host test-directory collision: concurrent byte-copy
+tests could receive the same clock-based name. Their scratch paths now also include an atomic
+per-process sequence. Analyzer and guest semantics are unchanged by this test-only successor; the
+failed full run and focused follow-up are retained before another complete validation.
+
+
+The final release survey has 480 cases across 102 families: 239 PROVED, 144 REFUTED and 97 UNKNOWN
+on each host/ARM O0/O2 profile. Six appended cases add three supported outcomes, bringing the
+supported total to 383. No old expected status changes. The full workspace run passes 971 outer
+Rust tests and 91 Python tests. Formatting, lint, release builds, dependency checks, manual hooks
+and documentation checks pass.
+
+All 473 unaffected old case objects and the complete old guest fixture prefix remain literal. One
+existing iterator case retains its UNKNOWN status and exact destructor-exclusion reason while its
+cause category changes to Semantics. Across 1,896 retained Proof comparisons, 60 are literal,
+1,831 differ only by the actual appended fixture fingerprint, four also contain that exact
+category refinement, and one query-free fold deadline context is recorded separately. All 4,108
+retained queried obligations and their models match exactly.
+
+Independent review covers the frozen private constructor source and the explicit Root successors
+for prepaid source-ledger cloning, callee-kind eligibility and test-directory uniqueness. The
+final full checks and release audit use the unchanged 1,019-file Root source snapshot. The prior
+compiler crash and failed host test run remain archived; their receipts are not counted as
+successful validation.

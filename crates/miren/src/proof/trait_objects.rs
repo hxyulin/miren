@@ -787,6 +787,9 @@ impl<'tcx> Engine<'tcx> {
         self.shared_trait_fee(1)?;
         let mut child = |value| self.shared_trait_graph_node(value, state, depth + 1, visited);
         match value {
+            Value::OwnedArrayIterator { .. } => {
+                Err("owned array iterator requires its private typed protocol".into())
+            }
             Value::TraitObject { source, id, .. } => {
                 self.validate_shared_trait_bundle(source, *id)?;
                 child(source)

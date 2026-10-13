@@ -111,6 +111,21 @@ impl<'tcx> Engine<'tcx> {
             }
         }
         match value {
+            Value::OwnedArrayIterator { payload, .. } => {
+                let engine = engine.ok_or("IntoIter ownership graph needs compiler evidence")?;
+                engine.array_iterator_return(value)?;
+                for value in payload.as_ref().ok_or("IntoIter metadata cannot escape")? {
+                    Self::reference_graph(
+                        value,
+                        state,
+                        incoming,
+                        visited,
+                        initialized,
+                        Some(engine),
+                    )?;
+                }
+                Ok(())
+            }
             Value::MutableU16 { id, role } => {
                 if incoming.is_some() {
                     return Err("private mutable u16 roles cannot escape a frame".into());

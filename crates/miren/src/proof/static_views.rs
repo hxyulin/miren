@@ -825,6 +825,10 @@ impl<'tcx> Engine<'tcx> {
             return Ok(true);
         }
         match value {
+            Value::OwnedArrayIterator { .. } => {
+                self.array_iterator_return(value)?;
+                Ok(false)
+            }
             // Private Unit-region roles carry no ordinary mutable reference capability.
             Value::MutableU16 { .. } | Value::OwnedRegion { .. } | Value::OwnedSnapshot(_) => {
                 Ok(false)

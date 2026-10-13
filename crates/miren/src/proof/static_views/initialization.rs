@@ -89,6 +89,9 @@ impl Engine<'_> {
             return Ok(());
         }
         match value {
+            Value::OwnedArrayIterator { .. } => {
+                Err("owned array iterator requires its private typed protocol".into())
+            }
             Value::MutableU16 { .. } => Ok(()),
             Value::OwnedRegion { .. } => self.validate_owned_region(value, &state.memory),
             Value::OwnedSnapshot(_) => {

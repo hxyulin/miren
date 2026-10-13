@@ -43,6 +43,9 @@ impl<'tcx> Engine<'tcx> {
                 Err("typed owned projections are unsupported in induction".into())
             }
             Some((MemoryProjection::Field(index), rest)) => match storage {
+                Value::OwnedArrayIterator { .. } => {
+                    Err("owned array iterator requires its private typed protocol".into())
+                }
                 Value::MutableU16 { .. } | Value::OwnedRegion { .. } | Value::OwnedSnapshot(_) => {
                     Err("owned regions require their private typed protocol".into())
                 }
@@ -83,6 +86,9 @@ impl<'tcx> Engine<'tcx> {
                 | Value::Unit => Err("unsupported inductive write field".into()),
             },
             Some((MemoryProjection::Variant(index), rest)) => match storage {
+                Value::OwnedArrayIterator { .. } => {
+                    Err("owned array iterator requires its private typed protocol".into())
+                }
                 Value::MutableU16 { .. } | Value::OwnedRegion { .. } | Value::OwnedSnapshot(_) => {
                     Err("owned regions require their private typed protocol".into())
                 }
@@ -162,6 +168,9 @@ fn scalar_update(
     old: &Value,
 ) -> Result<Value, String> {
     match (new, old) {
+        (Value::OwnedArrayIterator { .. }, _) => {
+            Err("owned array iterator requires its private typed protocol".into())
+        }
         (Value::MutableU16 { .. } | Value::OwnedRegion { .. } | Value::OwnedSnapshot(_), _) => {
             Err("owned regions require their private typed protocol".into())
         }

@@ -206,6 +206,9 @@ impl<'tcx> Engine<'tcx> {
 
     fn invalidate_local_atomics(value: &Value, memory: &mut [Option<Value>]) -> Result<(), String> {
         match value {
+            Value::OwnedArrayIterator { .. } => {
+                return Err("owned array iterator requires its private typed protocol".into());
+            }
             Value::MutableU16 { .. } | Value::OwnedRegion { .. } | Value::OwnedSnapshot(_) => {
                 return Err("owned regions require their private typed protocol".into());
             }

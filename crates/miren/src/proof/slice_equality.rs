@@ -264,6 +264,9 @@ impl<'tcx> Engine<'tcx> {
 
     fn equality_slice_length(&self, source: &Value, conditions: &[Term]) -> Result<Value, String> {
         match source {
+            Value::OwnedArrayIterator { .. } => {
+                Err("owned array iterator requires its private typed protocol".into())
+            }
             Value::MutableU16 { .. } | Value::OwnedRegion { .. } | Value::OwnedSnapshot(_) => {
                 Err("owned regions require their private typed protocol".into())
             }
@@ -310,6 +313,9 @@ impl<'tcx> Engine<'tcx> {
         conditions: &[Term],
     ) -> Result<Value, String> {
         match value {
+            Value::OwnedArrayIterator { .. } => {
+                Err("owned array iterator requires its private typed protocol".into())
+            }
             Value::MutableU16 { .. } | Value::OwnedRegion { .. } | Value::OwnedSnapshot(_) => {
                 Err("owned regions require their private typed protocol".into())
             }

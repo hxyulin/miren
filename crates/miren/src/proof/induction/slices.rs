@@ -241,6 +241,9 @@ impl<'tcx> Engine<'tcx> {
 
     pub(super) fn loop_slice_length(&self, source: &Value) -> Result<Value, String> {
         match source {
+            Value::OwnedArrayIterator { .. } => {
+                Err("owned array iterator requires its private typed protocol".into())
+            }
             Value::MutableU16 { .. } | Value::OwnedRegion { .. } | Value::OwnedSnapshot(_) => {
                 Err("owned regions require their private typed protocol".into())
             }

@@ -1731,3 +1731,28 @@ CPU-instruction counter. Scalar codecs preserve Bool, integer and exact f32/f64 
 Char inputs
 remain unavailable; eager Char storage retains its existing support. Whole owners, mutable/raw
 projection authority and missing destructor bodies remain unsupported. Destructors execute normally.
+
+Exact non-inlined core array `IntoIterator::into_iter` calls for retained plain owned Drop values
+execute their actual constructor body and preserve a single payload through the normal return and
+caller destination. Internal constructor Copy operands transport authenticated metadata; they do
+not duplicate executable ownership. Fresh compiler certificates preserve the original `[T; N]`,
+`MaybeUninit`, inner wrapper and iterator types. This is constructor transport coverage only:
+`next`, `next_back` and remaining-element iterator destruction stay UNKNOWN. Inlined constructor
+transmute paths outside the normal mir-opt-level=0 pipeline stay UNKNOWN pending separate original
+caller occurrence support.
+General MaybeUninit, transmute and raw-access admission is unchanged. Private iterator contract
+observations, reference-bearing/interior-mutable payloads and incoming iterator arguments remain
+unsupported. Caller-side constructor preconditions use the same checker as ordinary function calls;
+unsupported result contract views stay UNKNOWN. Partial constructor metadata requires the actual
+invocation and cannot pass ordinary operand, publication, snapshot or return gates.
+
+Constructor evidence plans owned MIR cloning before allocation, with separate payments for planning,
+cloning, fold/normalization structure and comparison. Interned compiler handles remain shallow;
+these structural allowances do not count opaque compiler query instructions. Unsupported owned
+auxiliary MIR metadata refuses before cloning. Local initialization-mask copies retain the existing
+512-node and 16-projection bounds and pay before allocation.
+
+Unsupported incoming iterator snapshots and the existing Drop-element exclusion report Semantics
+UNKNOWN. Reference-bearing payloads retain the ordinary Drop-element refusal before consuming their
+source. The existing `partial_array_drops_survey::iterator_claim` remains UNKNOWN with its original
+destructor-exclusion reason; only its previously unclassified category becomes Semantics.

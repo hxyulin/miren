@@ -2899,6 +2899,7 @@ impl<'tcx> Engine<'tcx> {
             | Value::StaticText
             | Value::FormatArguments
             | Value::FunctionPointer { .. }
+            | Value::OwnedArrayIterator { .. }
             | Value::Function => Err("hierarchy moved Root has unsupported live carrier".into()),
         }
     }

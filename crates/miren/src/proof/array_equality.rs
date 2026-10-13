@@ -131,6 +131,9 @@ impl<'tcx> Engine<'tcx> {
         state: &State,
     ) -> Result<Vec<Value>, String> {
         match value.materialize()? {
+            Value::OwnedArrayIterator { .. } => {
+                Err("owned array iterator requires its private typed protocol".into())
+            }
             Value::MutableU16 { .. } | Value::OwnedRegion { .. } | Value::OwnedSnapshot(_) => {
                 Err("owned regions require their private typed protocol".into())
             }

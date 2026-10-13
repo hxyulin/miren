@@ -92,6 +92,10 @@ pub enum MutableU16Role {
 
 #[derive(Clone, Debug)]
 pub enum Value {
+    OwnedArrayIterator {
+        identity: crate::proof::array_iterator_constructors::Identity,
+        payload: Option<Elements>,
+    },
     MutableU16 {
         id: usize,
         role: MutableU16Role,
@@ -217,6 +221,7 @@ pub enum Value {
 impl Value {
     pub fn owned_repeat_size(&self) -> Option<usize> {
         match self {
+            Self::OwnedArrayIterator { .. } => None,
             Self::Input(input) => {
                 let size = input.shape.slots as usize;
                 (size <= MAX_REPEAT_VALUES).then_some(size)
@@ -280,6 +285,7 @@ impl Value {
     pub fn owned_repeat_clone_size(&self) -> Option<usize> {
         self.owned_repeat_size()?;
         match self {
+            Self::OwnedArrayIterator { .. } => None,
             Self::Tuple(fields) => fields.iter().try_fold(1_usize, |size, value| {
                 size.checked_add(value.owned_repeat_clone_size()?)
                     .filter(|size| *size <= MAX_REPEAT_VALUES)
@@ -332,6 +338,7 @@ impl Value {
 
     pub fn owned_iterator_size(&self) -> Option<usize> {
         match self {
+            Self::OwnedArrayIterator { .. } => None,
             Self::Reference { .. } => Some(1),
             Self::Tuple(fields) => fields.iter().try_fold(1_usize, |size, value| {
                 size.checked_add(value.owned_iterator_size()?)
@@ -391,6 +398,7 @@ impl Value {
 
     pub fn contains_mutable(&self) -> bool {
         match self {
+            Self::OwnedArrayIterator { .. } => false,
             Self::MaybeUninit { payload, .. } => {
                 payload.as_ref().is_some_and(|v| v.contains_mutable())
             }
@@ -436,6 +444,7 @@ impl Value {
 
     pub fn contains_local_atomic(&self) -> bool {
         match self {
+            Self::OwnedArrayIterator { .. } => false,
             Self::MaybeUninit { payload, .. } => {
                 payload.as_ref().is_some_and(|v| v.contains_local_atomic())
             }

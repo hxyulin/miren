@@ -61,13 +61,16 @@ product helpers execute actual bodies and preserve returned storage. Nested owne
 reborrows remain UNKNOWN. Deeper whole scalar calls preserve checked owner lineage and returned
 storage; the dedicated proper-reborrow caller remains UNKNOWN. Bounded owned u16 products support
 writes through multiple symbolic suffix indices, preserving compiler types and current Memory. The
-capability manifest covers 474 cases across 101 families, including concrete and symbolic local
+capability manifest covers 480 cases across 102 families, including concrete and symbolic local
 byte-copy controls.
 
 Fixed-array partial moves preserve initialization and execute remaining destructors in compiler
 order. Nested destruction and covering assignments retain actual destructor effects. The exact
 compiler array/slice DropGlue protocol is authenticated separately; general slice destruction and
-array iterators with elements needing Drop remain UNKNOWN.
+remaining iterator destruction with elements needing Drop remains UNKNOWN.
+Authenticated non-inlined array iterator constructors preserve owning payloads through actual Rust
+bodies and ordinary returns. Iterator element transfer and incoming iterator arguments remain
+UNKNOWN.
 
 Shared fixed-array views of local Drop structs support guarded scalar field observations and
 ordinary scalar accessor calls, including authenticated lazy input arrays. Original types, current

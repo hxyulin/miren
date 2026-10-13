@@ -319,6 +319,7 @@ fn validate_protocol<'tcx>(
 pub(super) struct Frame<'tcx> {
     instance: ty::Instance<'tcx>,
     admission: Option<Admission<'tcx>>,
+    constructor: Option<array_iterator_constructors::Invocation>,
 }
 struct Admission<'tcx> {
     array: Ty<'tcx>,
@@ -331,7 +332,23 @@ impl<'tcx> Frame<'tcx> {
         Self {
             instance,
             admission: None,
+            constructor: None,
         }
+    }
+    pub(super) fn constructor(
+        instance: ty::Instance<'tcx>,
+        invocation: array_iterator_constructors::Invocation,
+    ) -> Self {
+        Self {
+            instance,
+            admission: None,
+            constructor: Some(invocation),
+        }
+    }
+    pub(super) fn constructor_invocation(
+        &self,
+    ) -> Option<&array_iterator_constructors::Invocation> {
+        self.constructor.as_ref()
     }
     pub(super) fn instance(&self) -> ty::Instance<'tcx> {
         self.instance
@@ -389,6 +406,7 @@ impl<'tcx> Engine<'tcx> {
         self.validate_tracked_value(&argument, state)?;
         let certified = Frame {
             instance: slice_glue,
+            constructor: None,
             admission: Some(Admission {
                 array,
                 array_instance: instance,
