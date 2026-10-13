@@ -44,7 +44,7 @@ fn exact_option8_observations_comparisons_and_boundaries() {
                     ("asserted_contains8", ProofStatus::Unknown),
                     ("local_enum_unknown", ProofStatus::Unknown),
                     ("mutable_unknown", ProofStatus::Unknown),
-                    ("signed_unknown", ProofStatus::Unknown),
+                    ("signed_unknown", ProofStatus::Proved),
                     ("pointer_unknown", ProofStatus::Unknown),
                 ],
                 target,

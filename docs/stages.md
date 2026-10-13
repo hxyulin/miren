@@ -7178,3 +7178,57 @@ Evidence: /tmp/miren-stage243-root-corrected-checks/complete.json,
 /tmp/miren-stage243-root-evidence-review.json,
 /tmp/miren-stage243-diagnostic-correction-independent-review.json and
 /tmp/miren-stage243-root-survey-proof-audit.json.
+
+
+## Stage244: signed readonly NonZero niches
+
+Readonly core `Option<NonZeroI8>`, `Option<NonZeroI16>` and `Option<NonZeroI32>` retain
+correlated zero-only niches with signed payload observations. Original primitive, payload, inner,
+tag and layout must agree. Raw zero selects None; every nonzero bit pattern, including negative
+minimum values, selects Some. Payload signedness is separate from word-sized enum discriminants
+and slice indices. Guarded getters, equality and selected membership use original payload bits.
+
+Signed getters authenticate complete independent raw/current Bodies, exact selected Instance,
+original core identity, signature, receiver, result and normal Return. Actual body availability
+is required before a cached Body can participate. Comparison-law witnesses retain their original
+available-body and current-body checks. Current FieldTy, initialized readonly storage and Context
+must agree. The old unsigned primitive helper and local u16 enum domain remain intact.
+Mutable, pointer, other-width and signed-byte transport cases remain UNKNOWN. No permission,
+contract verification or body availability is inferred from type inventory alone.
+
+Additional sign derivation and validation work is charged in its actual membership phases;
+old fees and resource caps remain. Independent review found two match-phase sign services that
+needed a separate prepayment, now recorded without discounting original work. Four compiler
+callbacks on host/ARM O0/O2 test genuine layouts and minimum payload bits, altered current types,
+foreign Context, mixed scalar representations, getter bodies and comparison-law witnesses.
+
+Isolated Parent242 captures retain 80 complete Proofs: 40 PROVED, 20 REFUTED and 20 UNKNOWN,
+with 108 queried obligations and 20 models, no assumptions or trusted calls. Actual getter and
+equality mutations refute unchanged caller claims across four profiles. Native originals pass
+and both helper mutants fail at O0/O2. Three unchanged old signed entries prove in all four
+profiles before old expectations change. The original Cargo test rebuilt the CLI binary;
+both binaries and the exact source association remain archived, and the passing test is not
+repeated to hide that evidence-driver qualification. V3 changes only two measured old test
+expectations; application sources remain unchanged.
+
+Fresh corrected Root release surveys measure 396 cases across 97 families: 187 PROVED,
+119 REFUTED and 90 UNKNOWN per profile. Fifteen new cases add ten supported outcomes; one unchanged
+old signed entry advances to PROVED. All other 380 old case objects and the literal fixture prefix
+remain unchanged. Of 1,520 old whole Proof pairs, 40 match literally, 1,479 differ only by source
+fingerprint, and one also retains the inherited query-free fold deadline-context qualification.
+All 3,412 existing queries and models remain exact. Four actual old UNKNOWN/new PROVED pairs are
+recorded separately without normalizing their semantic differences.
+
+Formatting, lint, a complete green workspace run with 949 outer Rust tests, 91 Python tests,
+release builds, dependency policy, manual hooks and documentation pass. The first release survey
+used the prior executable: snapshot copies preserved source mtimes older than the previous build,
+and Cargo reused it. That terminal failed survey remains archived. Refreshing only source mtimes
+preserves all 999 source hashes; actual release recompilation changes the binary hash and the
+corrected four-profile survey passes. No expectation or source-byte change conceals that failure.
+Final prose checks follow the corrected survey. No application rewrite, unsafe premise or
+solver-policy change is introduced.
+
+Evidence: /tmp/miren-stage244-root-corrected-checks/complete.json,
+/tmp/miren-stage244-root-isolated-evidence-review.json,
+/tmp/miren-stage244-root-release-rebuild/outcome.json and
+/tmp/miren-stage244-root-survey-proof-audit.json.

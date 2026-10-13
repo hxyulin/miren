@@ -198,7 +198,7 @@ fn exact_nonzero_niches_keep_payloads_guarded_and_conservative_frontiers() {
         ("wrong_bounds", ProofStatus::Refuted),
         ("zero_max", ProofStatus::Proved),
         ("unsupported_zero", ProofStatus::Proved),
-        ("signed_niche", ProofStatus::Unknown),
+        ("signed_niche", ProofStatus::Proved),
         ("over_budget", ProofStatus::Unknown),
         ("expanded_budget", ProofStatus::Unknown),
         ("whole_membership", ProofStatus::Proved),

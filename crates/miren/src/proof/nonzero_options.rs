@@ -345,3 +345,13 @@ pub(super) fn readonly_niche_unsigned_bits(original: Ty<'_>) -> Option<u32> {
         _ => None,
     }
 }
+
+/// Exact readonly payload domains; discriminant and index signedness are separate facts.
+pub(super) fn readonly_niche_integer_type(original: Ty<'_>) -> Option<(u32, bool)> {
+    match original.kind() {
+        ty::Int(ty::IntTy::I8) => Some((8, true)),
+        ty::Int(ty::IntTy::I16) => Some((16, true)),
+        ty::Int(ty::IntTy::I32) => Some((32, true)),
+        _ => readonly_niche_unsigned_bits(original).map(|bits| (bits, false)),
+    }
+}

@@ -1552,10 +1552,10 @@ impl<'tcx> Engine<'tcx> {
             || payload_arguments.len() != 1
             || !matches!(payload_arguments.first().map(|arg| arg.kind()),
                 Some(ty::GenericArgKind::Type(original))
-                    if super::super::nonzero_options::readonly_niche_unsigned_bits(original)
+                    if super::super::nonzero_options::readonly_niche_integer_type(original)
                         .is_some())
         {
-            return Err("niche Option payload is not an admitted original unsigned NonZero".into());
+            return Err("niche Option payload is not an admitted original integer NonZero".into());
         }
         if outer.def_id().krate != definition.did().krate {
             return Err("niche outer is not original core".into());
@@ -1580,6 +1580,8 @@ impl<'tcx> Engine<'tcx> {
         // and the fixed NicheFacts field copy. Compiler-internal complexity is not claimed.
         // Old schema fees remain; extra copies4 and two bounded width/range services48.
         budget.phase(GraphPhase::Schema, 6 + 5 + 3 + 1 + 2 + 32 + 4 + 48)?;
+        // Additional actual primitive sign/range and derived-sign metadata services.
+        budget.phase(GraphPhase::Schema, 6)?;
         let schema = certify(self.tcx, original)?;
         if schema.payload_variant != 1 || schema.tags != [0, 1] || !facts_match(&schema.facts) {
             return Err("niche membership exact original schema mismatch".into());
@@ -2262,7 +2264,7 @@ impl<'tcx> Engine<'tcx> {
                 Value::Int {
                     expression,
                     bits,
-                    signed: false,
+                    signed,
                 },
             ),
         ] = fields.as_slice()
@@ -2270,7 +2272,9 @@ impl<'tcx> Engine<'tcx> {
             return Err("niche Some scalar shape differs".into());
         };
         self.niche_name_service(application, name, &schema.inner_field)?;
+        application.charge(2)?; // Derive authenticated payload sign and compare scalar metadata.
         if *bits != schema.payload_bits()
+            || *signed != schema.payload_signed()
             || expression.sort() != &Sort::BitVec(schema.payload_bits())
             || !expression.belongs_to(&self.terms)
         {
@@ -2404,4 +2408,31 @@ impl<'tcx> Engine<'tcx> {
             }
         }
     }
+}
+
+#[cfg(test)]
+pub(super) fn signed_current_comparison_control<'tcx>(
+    engine: &Engine<'tcx>,
+    original: Ty<'tcx>,
+    outer: ty::Instance<'tcx>,
+) {
+    let law = engine.check_niche_comparison_law(original, outer).unwrap();
+    law.validate(engine).unwrap();
+    let (instance, _) = law.bodies.first().unwrap();
+    let instance = *instance;
+    let previous = engine.instantiated_body(instance).unwrap();
+    let mut changed = previous.as_ref().clone();
+    changed.basic_blocks.as_mut()[rustc_middle::mir::START_BLOCK]
+        .terminator_mut()
+        .kind = TerminatorKind::Unreachable;
+    engine
+        .bodies
+        .borrow_mut()
+        .insert(instance, std::rc::Rc::new(changed));
+    assert_eq!(
+        law.validate(engine).unwrap_err(),
+        "niche law selected Engine body was replaced or evicted"
+    );
+    engine.bodies.borrow_mut().insert(instance, previous);
+    law.validate(engine).unwrap();
 }

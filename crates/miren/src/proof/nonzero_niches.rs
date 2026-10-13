@@ -3,9 +3,9 @@ use super::*;
 use crate::symbolic::ScalarSliceElement;
 #[path = "nonzero_niche_comparisons.rs"]
 mod comparisons;
-use rustc_abi::{BackendRepr, FieldIdx, Scalar, TagEncoding, Variants};
 #[cfg(test)]
-use rustc_abi::{Integer, Primitive};
+use rustc_abi::Integer;
+use rustc_abi::{BackendRepr, FieldIdx, Primitive, Scalar, TagEncoding, Variants};
 use rustc_middle::mir::Local;
 use rustc_middle::ty::{AdtFlags, CoroutineArgsExt, TypeVisitableExt};
 
@@ -37,11 +37,24 @@ struct NicheFacts {
     empty_repr: BackendRepr,
 }
 
-fn scalar_range(repr: BackendRepr, bits: u32, start: u128) -> bool {
-    super::nonzero_options::nonzero_integer_scalar(repr, bits, false, start)
+fn scalar_range(repr: BackendRepr, bits: u32, signed: bool, start: u128) -> bool {
+    super::nonzero_options::nonzero_integer_scalar(repr, bits, signed, start)
+}
+
+impl NicheFacts {
+    fn payload_signed(&self) -> bool {
+        matches!(
+            self.primitive,
+            BackendRepr::Scalar(Scalar::Initialized {
+                value: Primitive::Int(_, true),
+                ..
+            })
+        )
+    }
 }
 
 fn facts_match(facts: &NicheFacts) -> bool {
+    let signed = facts.payload_signed();
     matches!(facts.payload_bits, 8 | 16 | 32)
         && facts.untagged < 2
         && facts.niche_first == 1 - facts.untagged
@@ -61,10 +74,10 @@ fn facts_match(facts: &NicheFacts) -> bool {
         && facts.empty_size == 0
         && facts.empty_repr == (BackendRepr::Memory { sized: true })
         && facts.parent == BackendRepr::Scalar(facts.tag)
-        && scalar_range(facts.parent, facts.payload_bits, 0)
-        && scalar_range(facts.primitive, facts.payload_bits, 0)
-        && scalar_range(facts.payload, facts.payload_bits, 1)
-        && scalar_range(facts.inner, facts.payload_bits, 1)
+        && scalar_range(facts.parent, facts.payload_bits, signed, 0)
+        && scalar_range(facts.primitive, facts.payload_bits, signed, 0)
+        && scalar_range(facts.payload, facts.payload_bits, signed, 1)
+        && scalar_range(facts.inner, facts.payload_bits, signed, 1)
 }
 
 #[derive(Clone)]
@@ -168,7 +181,7 @@ fn certify<'tcx>(tcx: TyCtxt<'tcx>, original: Ty<'tcx>) -> Result<Certificate<'t
             .is_none_or(|sized| sized.krate != anchor.krate)
         || !nonzero.is_struct()
         || nz_args.len() != 1
-        || super::nonzero_options::readonly_niche_unsigned_bits(nz_args.type_at(0)).is_none()
+        || super::nonzero_options::readonly_niche_integer_type(nz_args.type_at(0)).is_none()
         || nonzero.non_enum_variant().fields.len() != 1
         || !nonzero_ty.is_freeze(tcx, env)
         || !tcx.type_is_copy_modulo_regions(env, nonzero_ty)
@@ -177,8 +190,9 @@ fn certify<'tcx>(tcx: TyCtxt<'tcx>, original: Ty<'tcx>) -> Result<Certificate<'t
         return Err("NonZero wrapper original identity mismatch".into());
     }
     let primitive = nz_args.type_at(0);
-    let payload_bits = super::nonzero_options::readonly_niche_unsigned_bits(primitive)
-        .ok_or("NonZero readonly primitive is not admitted")?;
+    let (payload_bits, payload_signed) =
+        super::nonzero_options::readonly_niche_integer_type(primitive)
+            .ok_or("NonZero readonly primitive is not admitted")?;
     // Preserve the old local enum domain; the new width is exact original Option only.
     if !option && primitive != tcx.types.u16 {
         return Err("NonZero new readonly width requires original core Option".into());
@@ -225,6 +239,15 @@ fn certify<'tcx>(tcx: TyCtxt<'tcx>, original: Ty<'tcx>) -> Result<Certificate<'t
         return Err("NonZero original storage wrapper mismatch".into());
     }
     let primitive_layout = layout(tcx, primitive)?;
+    if !super::nonzero_options::nonzero_integer_scalar(
+        primitive_layout.backend_repr,
+        payload_bits,
+        payload_signed,
+        0,
+    ) {
+        return Err("NonZero original primitive signed width/layout mismatch".into());
+    }
+
     let facts = NicheFacts {
         parent: parent.backend_repr,
         tag: *tag,
@@ -459,7 +482,7 @@ impl<'tcx> Observation<'tcx> {
                 Value::Int {
                     expression: self.raw.clone(),
                     bits: self.certificate.facts.payload_bits,
-                    signed: false,
+                    signed: self.certificate.facts.payload_signed(),
                 },
             )]
             .into(),
@@ -534,16 +557,14 @@ fn exact_compiler_nonzero_niche_and_private_latent_observations() {
                 0
             );
             assert_eq!(nodes, 7);
-            for name in [
-                "zero_ref",
-                "zero_pat",
-                "wrong_sign",
-                "plain",
-                "extra",
-                "drop",
-            ] {
+            for name in ["zero_ref", "zero_pat", "plain", "extra", "drop"] {
                 assert!(shape(tcx, originals[name], 0, &mut 0).is_err(), "{name}");
             }
+            let signed_original = originals["wrong_sign"];
+            let signed_certificate = certify(tcx, signed_original).unwrap();
+            assert_eq!(signed_certificate.primitive, tcx.types.i16);
+            assert!(signed_certificate.facts.payload_signed());
+            assert_eq!(shape(tcx, signed_original, 0, &mut 0).unwrap().columns(), 1);
             for name in ["wide", "expanded"] {
                 assert!(shape(tcx, originals[name], 0, &mut 0).is_err(), "{name}");
             }
@@ -846,10 +867,11 @@ impl Schema {
                     Box::new(Sort::BitVec(self.bits)),
                     Box::new(Sort::BitVec(self.facts.payload_bits)),
                 )
-            || !array.belongs_to(context)
-            || !index.belongs_to(context)
         {
             return Err("NonZero niche observation compiler metadata mismatch".into());
+        }
+        if !array.belongs_to(context) || !index.belongs_to(context) {
+            return Err("NonZero niche observation current Context mismatch".into());
         }
         let raw = context.apply(Op::Select, &[array.clone(), index.clone()])?;
         let zero = context.apply(
@@ -874,7 +896,7 @@ impl Schema {
                 Value::Int {
                     expression: raw,
                     bits: self.facts.payload_bits,
-                    signed: false,
+                    signed: self.facts.payload_signed(),
                 },
             )]
             .into(),
@@ -1013,7 +1035,7 @@ impl<'tcx> Engine<'tcx> {
         if args.len() != 1 {
             return Err("NonZero niche standalone original argument count mismatch".into());
         }
-        if super::nonzero_options::readonly_niche_unsigned_bits(args.type_at(0)).is_none() {
+        if super::nonzero_options::readonly_niche_integer_type(args.type_at(0)).is_none() {
             return Ok(());
         }
         self.nonzero_niche_checked_value(original, value, conditions)?;
@@ -1066,7 +1088,7 @@ impl<'tcx> Engine<'tcx> {
         if !matches!(self.tcx.def_kind(parent), DefKind::Impl { of_trait: false })
             || !matches!(receiver.kind(), ty::Adt(def, args)
                 if def.did() == anchor && args.len() == 1
-                    && super::nonzero_options::readonly_niche_unsigned_bits(args.type_at(0))
+                    && super::nonzero_options::readonly_niche_integer_type(args.type_at(0))
                         .is_some())
             || self
                 .tcx
@@ -1092,7 +1114,28 @@ impl<'tcx> Engine<'tcx> {
             return Err("NonZero getter requires exact safe instantiated signature".into());
         }
         // Availability is checked by instantiated_body; preserve MissingCompilerEvidence.
+        if super::nonzero_options::readonly_niche_integer_type(primitive)
+            .is_some_and(|(_, signed)| signed)
+            && !self.tcx.is_mir_available(callee)
+        {
+            return Err(self.missing_body_reason(callee));
+        }
         let body = self.instantiated_body(instance)?;
+        if super::nonzero_options::readonly_niche_integer_type(primitive)
+            .is_some_and(|(_, signed)| signed)
+        {
+            if body.source.instance != instance.def || body.source.promoted.is_some() {
+                return Err("signed NonZero getter current source Instance mismatch".into());
+            }
+            let raw = instance
+                .try_instantiate_mir_and_normalize_erasing_regions(
+                    self.tcx,
+                    ty::TypingEnv::fully_monomorphized(),
+                    ty::EarlyBinder::bind(self.tcx, self.tcx.instance_mir(instance.def).clone()),
+                )
+                .map_err(|_| "signed NonZero getter original body instantiation failed")?;
+            certify_get_body(&raw, receiver, primitive)?;
+        }
         if getter_work(&body) > 512 {
             return Err(self.categorized_error(
                 UnknownCategory::ResourceLimit,
@@ -1197,7 +1240,7 @@ fn check_selected_getter_body<'tcx>(
             Value::Int {
                 expression: raw.clone(),
                 bits: certificate.facts.payload_bits,
-                signed: false,
+                signed: certificate.facts.payload_signed(),
             },
         )]
         .into(),
@@ -1439,7 +1482,7 @@ fn contains_nonzero16<'tcx>(
         ty::Adt(def, args) => {
             if tcx.is_diagnostic_item(rustc_span::Symbol::intern("NonZero"), def.did()) {
                 return Ok(args.len() == 1
-                    && super::nonzero_options::readonly_niche_unsigned_bits(args.type_at(0))
+                    && super::nonzero_options::readonly_niche_integer_type(args.type_at(0))
                         .is_some());
             }
             for variant in def.variants() {
@@ -1579,7 +1622,7 @@ fn nonzero16_terminal<'tcx>(tcx: TyCtxt<'tcx>, mut original: Ty<'tcx>) -> bool {
             ty::Adt(def, args) => {
                 return tcx.is_diagnostic_item(rustc_span::Symbol::intern("NonZero"), def.did())
                     && args.len() == 1
-                    && super::nonzero_options::readonly_niche_unsigned_bits(args.type_at(0))
+                    && super::nonzero_options::readonly_niche_integer_type(args.type_at(0))
                         .is_some();
             }
             _ => return false,
@@ -1901,6 +1944,8 @@ impl Schema {
         // Retain the complete old fee and prepay both new scalar-width checks
         // and payload/facts equality services.
         let mut work = 128usize + 64;
+        // Two actual match-local facts_match calls each derive their primitive payload sign.
+        work += 2;
         for name in [
             self.name.as_str(),
             self.variant_names[0].as_str(),
@@ -1956,8 +2001,12 @@ impl Schema {
     pub(super) fn payload_element(&self) -> ScalarSliceElement {
         ScalarSliceElement::Integer {
             bits: self.facts.payload_bits,
-            signed: false,
+            signed: self.facts.payload_signed(),
         }
+    }
+
+    pub(super) fn payload_signed(&self) -> bool {
+        self.facts.payload_signed()
     }
 
     pub(super) fn payload_bits(&self) -> u32 {
@@ -1968,3 +2017,7 @@ impl Schema {
         self.facts.size
     }
 }
+
+#[cfg(test)]
+#[path = "nonzero_signed_probe.rs"]
+mod signed_probe;

@@ -1603,9 +1603,7 @@
     {
       "entry": "signed_unknown",
       "family": "readonly_nonzero_niche",
-      "expected": "unknown",
-      "unknown_reason": "NonZero wrapper original identity mismatch",
-      "unknown_category": "semantics"
+      "expected": "proved"
     },
     {
       "entry": "pointer_unknown",
@@ -2085,6 +2083,91 @@
       "entry": "partial_array_drops_survey::symbolic_covering_wrong",
       "family": "partial_array_drops",
       "expected": "refuted"
+    },
+    {
+      "entry": "signed_nonzero_niche_survey::correlated8",
+      "family": "signed_nonzero_niche",
+      "expected": "proved"
+    },
+    {
+      "entry": "signed_nonzero_niche_survey::correlated16",
+      "family": "signed_nonzero_niche",
+      "expected": "proved"
+    },
+    {
+      "entry": "signed_nonzero_niche_survey::correlated32",
+      "family": "signed_nonzero_niche",
+      "expected": "proved"
+    },
+    {
+      "entry": "signed_nonzero_niche_survey::same16",
+      "family": "signed_nonzero_niche",
+      "expected": "proved"
+    },
+    {
+      "entry": "signed_nonzero_niche_survey::minimums",
+      "family": "signed_nonzero_niche",
+      "expected": "proved"
+    },
+    {
+      "entry": "signed_nonzero_niche_survey::fixed_array",
+      "family": "signed_nonzero_niche",
+      "expected": "proved"
+    },
+    {
+      "entry": "signed_nonzero_niche_survey::contains_selected",
+      "family": "signed_nonzero_niche",
+      "expected": "proved"
+    },
+    {
+      "entry": "signed_nonzero_niche_survey::wrong_nonnegative",
+      "family": "signed_nonzero_niche",
+      "expected": "refuted"
+    },
+    {
+      "entry": "signed_nonzero_niche_survey::wrong_zero",
+      "family": "signed_nonzero_niche",
+      "expected": "refuted"
+    },
+    {
+      "entry": "signed_nonzero_niche_survey::wrong_minimum",
+      "family": "signed_nonzero_niche",
+      "expected": "refuted"
+    },
+    {
+      "entry": "signed_nonzero_niche_survey::local_enum_unknown",
+      "family": "signed_nonzero_niche",
+      "expected": "unknown",
+      "unknown_reason": "NonZero new readonly width requires original core Option",
+      "unknown_category": "semantics"
+    },
+    {
+      "entry": "signed_nonzero_niche_survey::mutable_unknown",
+      "family": "signed_nonzero_niche",
+      "expected": "unknown",
+      "unknown_reason": "only read-only byte slices and byte arrays are modeled",
+      "unknown_category": "semantics"
+    },
+    {
+      "entry": "signed_nonzero_niche_survey::pointer_unknown",
+      "family": "signed_nonzero_niche",
+      "expected": "unknown",
+      "unknown_reason": "NonZero wrapper original identity mismatch",
+      "unknown_category": "semantics"
+    },
+    {
+      "entry": "signed_nonzero_niche_survey::width64_unknown",
+      "family": "signed_nonzero_niche",
+      "expected": "unknown",
+      "unknown_reason": "NonZero wrapper original identity mismatch",
+      "unknown_category": "semantics"
+    },
+    {
+      "entry": "signed_nonzero_niche_survey::signed_byte_unknown",
+      "family": "signed_nonzero_niche",
+      "expected": "unknown",
+      "unknown_reason": "niche byte-sized transport needs a separate available-body certificate",
+      "unknown_category": "semantics"
     }
   ]
 }

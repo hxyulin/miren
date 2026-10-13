@@ -1632,3 +1632,20 @@ Ordinary raw-slice/static layout rules and IntoIter destructor exclusions remain
 nested/covering and symbolic order controls pass on host/ARM O0/O2. Wrong claims and real helper
 mutations refute, and native controls corroborate them. Missing dependency bodies stay UNKNOWN.
 The hostile shim/owner compiler callback is measured on host O0 only.
+
+Readonly original core Option<NonZeroI8>, Option<NonZeroI16> and Option<NonZeroI32> niche
+observations retain exact signed payload codecs alongside the existing unsigned domain. Enum
+discriminants and slice indices keep their separate word-sized metadata. Original compiler
+primitive/inner/payload/tag representations must agree on width and signedness, initialized
+zero-only ranges, size/alignment and offsets. Negative two's-complement bits remain correlated
+with Some; only raw zero chooses None. Ordinary signed comparisons use those original payload
+bits rather than treating negative values as unsigned.
+
+Original/current getter and comparison bodies, original core identities, anchored inner Pat,
+current FieldTy/signature/cache/Context and readonly initialized storage gates remain required.
+The old local empty/payload enum domain stays u16-only. Signed byte membership still needs its
+separate available-body transport certificate; mutable/pointer/other-width niches and arbitrary
+Pat values remain unsupported. The separate signed primitive dispatcher leaves the old unsigned
+helper and its accepted set intact. Existing fees/caps remain, with additional performed metadata
+checks paid in their actual membership phases. No source review, type inventory or recorded
+constant origin alone supplies execution, reference authority or a completed proof.

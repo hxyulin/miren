@@ -11,8 +11,16 @@ execution at O0 and O2, positive/refuted/unknown controls, a source mutation tha
 structured UNKNOWN reporting, and passing repository checks. Completion establishes a repeatable
 baseline. It does not establish full Rust support or a completed memory-model refactor.
 
-The current manifest contains 381 cases across 96 families.
-The completed Stage243 host/ARM O0/O2 surveys measured 179 PROVED, 116 REFUTED and 86 UNKNOWN.
+The current manifest contains 396 cases across 97 families.
+The completed Stage244 host/ARM O0/O2 surveys measured 187 PROVED, 119 REFUTED and 90 UNKNOWN.
+Readonly core `Option<NonZeroI8>`, `Option<NonZeroI16>` and `Option<NonZeroI32>` support signed
+payload observations, guarded getters, comparison and selected membership.
+Minimum and negative values retain their original bit patterns;
+raw zero alone selects None. Exact original/current bodies, initialized storage and Context remain
+required. Mutable, pointer, other-width and signed-byte transport cases stay unsupported.
+One unchanged old signed entry advances to PROVED; all 380 other old case objects remain unchanged.
+All 3,412 existing queries and models remain exact.
+The preceding Stage243 host/ARM O0/O2 surveys measured 179 PROVED, 116 REFUTED and 86 UNKNOWN.
 Fixed-array partial destruction executes actual child DropGlue, including nested and covering
 assignment paths. Symbolic wrapping destructor effects retain compiler order; wrong-order claims
 have genuine counterexamples. The exact compiler array/slice protocol retains normal frame checks.
