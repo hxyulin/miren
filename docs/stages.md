@@ -7279,3 +7279,66 @@ Evidence: /tmp/miren-stage245-root-checks/complete.json,
 /tmp/miren-stage245-root-isolated-evidence-review.json,
 /tmp/miren-stage245-root-checks-association.json and
 /tmp/miren-stage245-root-survey-proof-audit.json.
+
+
+## Stage246: shared scalar observations from Drop storage
+
+A private readonly storage witness supports symbolic fixed-array selection of local unpacked
+Freeze Drop structs with original primitive fields. It retains the actual caller Instance and
+current Body, original owner type and allocation namespace. Current receiver types, FieldTy,
+Context, bounds, liveness and complete feasible receiver masks are checked on every use.
+Unaddressed storage moves once into tracked memory. Ordinary pure-product copying remains intact.
+
+Scalar field reborrows extend the existing checked path before generic snapshot resolution,
+preserving actual normal accessor calls. Whole non-Copy receivers are never materialized or copied.
+Mutable/raw authority, escaping local owners and missing bodies remain conservative refusals.
+Actual array, element and user destructors still execute. Work walks retain their structural
+bounds and Unarmed requirement; no existing Armed fee, budget or permission is relaxed.
+
+The first application run exposed a whole-owner read in generic reference-path resolution.
+Actual MIR identified the scalar reborrow occurrence; the corrected private route carries the
+current readonly path directly to its primitive field. The failed capture remains archived.
+Four compiler callbacks validate current masks, original types, Body replacement, foreign Context,
+retirement and availability before cache reuse, including a genuine no-MIR cached issuer.
+
+A destructor mutation exposed a native test expectation mismatch: two array elements panic during
+cleanup and Rust aborts. Raw O0/O2 execution records SIGABRT6 and both original destructor assertion
+origins. A checker local to this integration now requires that precise signal and cleanup
+diagnostics; the shared native helper and guest assertions remain unchanged. Accessor mutations
+still require ordinary panic exit101. Missing-accessor dependency bodies remain UNKNOWN.
+
+The remaining fieldless input frontier used a lazy empty-struct descriptor, not Unit. Actual
+compiler type/layout and producer evidence authenticate the current descriptor and Context without
+decoding a whole owning value. Additional four-profile controls exercise nonempty destructor/helper
+effects, actual destructor mutation and a genuinely unavailable dependency inside the helper.
+The unchanged old fieldless case proves before its expectation changes. Unit and arbitrary
+zero-sized values supply no permission. Three measured legacy cases now require actual Drop body
+entries; all old guest assertions remain literal.
+
+An initial Root evidence-parser error treated a list summary as a map; its shell continued into
+early checks before the measured legacy update. The known Root process tree was stopped during
+compilation, and the capture is retained. Corrected parsing verifies the full raw Proofs and artifact
+hashes before a fresh complete check run. This does not change any guest or proof expectation.
+
+Fresh Root release surveys measure 438 cases across 99 families: 214 PROVED, 129 REFUTED and
+95 UNKNOWN in each host/ARM O0/O2 profile. Fourteen appended cases add ten supported outcomes
+and four explicit refusal controls. All 424 old case objects and the entire old fixture prefix
+remain literal. Three unchanged standalone legacy cases advance to PROVED with real Drop body
+entries; no corresponding main-manifest advancement is inferred.
+
+Of 1,696 retained old whole Proof pairs, 60 match fully, 1,635 differ only by the appended-source
+fingerprint, and one also retains the inherited query-free fold deadline-context qualification.
+All 3,708 old queried obligations and models remain exact. Independent composition review verifies
+all 1,006 staged/live source hashes, the preserved integer stage and current storage invariants.
+Isolated evidence retains its actual Parent244 basis and is not relabeled as Root evidence.
+
+The corrected complete workspace run passes 961 Rust tests and 91 Python tests. Formatting, lint,
+actual release recompilation, dependency policy, manual hooks and documentation pass. Final prose
+checks follow the measured survey. No unsafe assumptions, guest rewrites, new hardware premises,
+body availability shortcuts or solver-policy changes are introduced.
+
+Evidence: /tmp/miren-stage246-root-corrected-checks/complete.json,
+/tmp/miren-stage246-root-isolated-evidence-review.json,
+/tmp/miren-stage246-root-fieldless-evidence-review.json,
+/tmp/miren-stage246-root-adoption-independent-review.json and
+/tmp/miren-stage246-root-survey-proof-audit.json.

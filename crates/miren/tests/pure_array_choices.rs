@@ -88,10 +88,7 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
                     UnknownCategory::Unclassified,
                     "non-scalar array index is not uniquely determined on this path",
                 ),
-                "ambiguous_drop" => (
-                    UnknownCategory::Unclassified,
-                    "non-scalar array index is not uniquely determined on this path",
-                ),
+
                 other => panic!("missing expected frontier for {other}"),
             };
             assert!(
@@ -99,11 +96,17 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
                     obligation.status == ProofStatus::Unknown
                         && obligation.unknown_category == Some(category)
                         && obligation.detail.contains(reason)
-                        && (*name != "ambiguous_drop"
-                            || obligation.call_chain == ["ambiguous_drop"])
                 }),
                 "wrong frontier for {name}: {:?}",
                 proof.obligations
+            );
+        }
+        if *name == "ambiguous_drop" {
+            assert!(
+                proof
+                    .body_entries
+                    .iter()
+                    .any(|body| { body.function.contains("Dropped as core::ops::Drop") })
             );
         }
         if *name == "mutation_claim" {
@@ -166,7 +169,7 @@ fn pure_nested_array_choices_preserve_correlations_and_existing_rights() {
         ("nan_numeric_reflexivity", ProofStatus::Refuted),
         ("ambiguous_references", ProofStatus::Unknown),
         ("ambiguous_adt", ProofStatus::Proved),
-        ("ambiguous_drop", ProofStatus::Unknown),
+        ("ambiguous_drop", ProofStatus::Proved),
         ("byte_array_choices", ProofStatus::Proved),
         ("symbolic_mutation", ProofStatus::Proved),
     ];

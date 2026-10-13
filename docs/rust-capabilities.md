@@ -2488,3 +2488,29 @@ The four-profile release survey has 424 cases across 98 families: 208 PROVED, 12
 cases. Its three new refusal controls explain the net increase of one UNKNOWN. Compiler controls
 and actual getter/equality mutations pass; native originals pass and mutants fail. The complete
 workspace run passes 954 Rust tests and 91 Python tests.
+
+
+## Shared scalar observations from Drop storage
+
+Shared views of bounded fixed arrays retain their original local Freeze Drop struct type and
+current initialized storage. Symbolic indices select actual feasible elements; scalar field
+observations preserve original primitive types, including Char validity and Float raw bits.
+Nested arrays and ordinary scalar accessor calls use the same checked storage path.
+
+A scalar reborrow extends the current readonly witness before ordinary snapshot resolution.
+Every use checks the current caller body, original pointee and FieldTy, owner namespace/liveness,
+Context, bounds and complete selected receiver masks. The owner is moved once into tracked storage.
+No whole non-Copy value is selected or copied. Actual array and element destructors still execute.
+Whole Drop helper receivers, mutable/raw authority and escaping local owners remain unsupported.
+Unavailable accessor bodies remain UNKNOWN; no external-state assumptions are added.
+
+Fieldless Drop structs may retain lazy input storage only with an exact original zero-size layout,
+current descriptor identity, empty Struct inventory and Context. This path observes initialized
+storage without materializing an owning Drop value. Nonempty destructors and their helper bodies
+still execute; missing helper bodies remain UNKNOWN.
+
+The release survey has 438 cases across 99 families: 214 PROVED, 129 REFUTED and 95 UNKNOWN per
+host/ARM O0/O2 profile. Fourteen new cases add ten supported outcomes; three unchanged standalone
+legacy cases also prove with actual destructor body entries. All 424 old manifest objects and
+3,708 retained queried obligations/models remain exact. The full workspace run passes 961 Rust
+tests and 91 Python tests, with release, dependency, hook and documentation checks passing.

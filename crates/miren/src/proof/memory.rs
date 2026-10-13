@@ -234,6 +234,12 @@ impl<'tcx> Engine<'tcx> {
         memory: &Memory,
         conditions: &[Term],
     ) -> Result<Value, String> {
+        if let Some(value) = self
+            .read_drop_shared_reference(reference, memory, conditions)
+            .map_err(|reason| self.drop_shared_error(reason))?
+        {
+            return Ok(value);
+        }
         if let Value::Reference {
             allocation,
             projection,
@@ -255,6 +261,12 @@ impl<'tcx> Engine<'tcx> {
         memory: &Memory,
         conditions: &[Term],
     ) -> Result<Value, String> {
+        if let Some(value) = self
+            .read_drop_shared_reference(reference, memory, conditions)
+            .map_err(|reason| self.drop_shared_error(reason))?
+        {
+            return Ok(value);
+        }
         let Value::Reference {
             allocation,
             projection,
@@ -893,6 +905,11 @@ impl<'tcx> Engine<'tcx> {
         place: Place<'tcx>,
         mutable: bool,
     ) -> Result<Value, String> {
+        if mutable && self.drop_shared_place_candidate(body, place) {
+            return Err(self.drop_shared_error(
+                "shared Drop projection grants no mutable reference authority".into(),
+            ));
+        }
         if (place
             .projection
             .iter()

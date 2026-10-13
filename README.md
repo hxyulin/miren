@@ -61,12 +61,17 @@ stores. Whole product helpers execute actual bodies and preserve returned storag
 calls and proper reborrows remain UNKNOWN. Deeper scalar nesting and the dedicated
 proper-reborrow caller remain UNKNOWN. Bounded owned u16 products support writes through multiple
 symbolic suffix indices, preserving compiler types and current Memory. The capability manifest
-covers 424 cases across 98 families, including concrete and symbolic local byte-copy controls.
+covers 438 cases across 99 families, including concrete and symbolic local byte-copy controls.
 
 Fixed-array partial moves preserve initialization and execute remaining destructors in compiler
 order. Nested destruction and covering assignments retain actual destructor effects. The exact
 compiler array/slice DropGlue protocol is authenticated separately; general slice destruction and
 array iterators with elements needing Drop remain UNKNOWN.
+
+Shared fixed-array views of local Drop structs support guarded scalar field observations and
+ordinary scalar accessor calls. Original types, current initialized storage and readonly witnesses
+remain required; actual destructors still execute. Whole Drop helper receivers and mutable/raw
+projection authority remain UNKNOWN.
 
 Finite known shared trait objects can be selected from local fixed arrays and retained slices.
 Selected alternatives execute actual method bodies, preserving their backing references and

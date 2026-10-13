@@ -82,6 +82,14 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
                 "and independent primitive leaf arrays"
             ))));
         }
+        if *name == "drop_zero" {
+            assert!(
+                proof
+                    .body_entries
+                    .iter()
+                    .any(|body| { body.function.contains("Dropped as core::ops::Drop") })
+            );
+        }
         if *expected == ProofStatus::Unknown {
             let (category, reason) = match *name {
                 "reference_zero" | "refined_zero" | "core_zero" => (
@@ -91,10 +99,7 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
                 "analyzer_only::dead_empty" => {
                     (UnknownCategory::Unclassified, "dead or uninitialized")
                 }
-                "drop_zero" => (
-                    UnknownCategory::Unclassified,
-                    "non-scalar array index is not uniquely determined on this path",
-                ),
+
                 "oversized" => (
                     UnknownCategory::ResourceLimit,
                     "composite slice type array exceeds the 128-element shape budget",
@@ -176,7 +181,7 @@ fn deferred_zero_products_preserve_exact_nominal_types_and_actual_method_effects
         ("reference_zero", ProofStatus::Unknown),
         ("refined_zero", ProofStatus::Unknown),
         ("core_zero", ProofStatus::Unknown),
-        ("drop_zero", ProofStatus::Unknown),
+        ("drop_zero", ProofStatus::Proved),
         ("oversized", ProofStatus::Unknown),
         ("retained_borrow", ProofStatus::Proved),
         ("analyzer_only::dead_empty", ProofStatus::Unknown),

@@ -5,10 +5,11 @@ use storage_locations::StorageLocation;
 use symbolic::MemoryProjection;
 use typed_array_choices::{MAX_CHOICE_DEPTH, MAX_CHOICE_NODES};
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug)]
 pub(super) struct OwnedProjectionCertificate<'tcx> {
-    original: Ty<'tcx>,
-    fields: Vec<usize>,
+    pub(super) original: Ty<'tcx>,
+    pub(super) fields: Vec<usize>,
+    pub(super) drop_shared: Option<drop_shared_projections::Witness<'tcx>>,
 }
 
 impl<'tcx> Engine<'tcx> {
@@ -18,11 +19,19 @@ impl<'tcx> Engine<'tcx> {
         fields: Vec<usize>,
     ) -> Result<usize, String> {
         validate_projection_prefix(&fields)?;
-        let certificate = OwnedProjectionCertificate { original, fields };
+        let certificate = OwnedProjectionCertificate {
+            original,
+            fields,
+            drop_shared: None,
+        };
         if let Some(id) = self
             .owned_projection_certificates
             .iter()
-            .position(|issued| *issued == certificate)
+            .position(|issued| {
+                issued.drop_shared.is_none()
+                    && issued.original == certificate.original
+                    && issued.fields == certificate.fields
+            })
         {
             return Ok(id);
         }
@@ -45,6 +54,9 @@ impl<'tcx> Engine<'tcx> {
             .owned_projection_certificates
             .get(certificate)
             .ok_or("typed owned projection has no compiler certificate")?;
+        if certificate.drop_shared.is_some() {
+            return Err("shared Drop projection cannot materialize a non-Copy owner".into());
+        }
         // Keep prior direct-array reads, including their query construction, unchanged.
         if certificate.fields.is_empty() {
             return self.read_typed_owned_index(certificate.original, value, index, conditions);

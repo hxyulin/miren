@@ -49,6 +49,7 @@ mod constant_reference_receipts;
 mod constants;
 mod coroutine_snapshots;
 mod coroutines;
+mod drop_shared_projections;
 mod enum_tags;
 mod enum_transmutes;
 mod error_formatting;
@@ -2555,6 +2556,18 @@ impl<'tcx> Engine<'tcx> {
             return Ok(value);
         }
         if let Some(body) = body {
+            if let Some(value) = self
+                .read_drop_shared_deref(body, state, place)
+                .map_err(|reason| self.drop_shared_error(reason))?
+            {
+                return Ok(value);
+            }
+            if let Some(value) = self
+                .read_drop_shared_place(body, state, place)
+                .map_err(|reason| self.drop_shared_error(reason))?
+            {
+                return Ok(value);
+            }
             self.check_typed_place_initialization(body, state, place)?;
             self.validate_fixed_array_storage(body, state, place)?;
         } else {
@@ -3005,6 +3018,12 @@ impl<'tcx> Engine<'tcx> {
                 // Armed shared whole-view borrows use live hierarchy metadata only.
                 // Other snapshot/owned/readonly adapters refuse before construction.
                 state.flow.require_unarmed()?;
+                if let Some(value) = self
+                    .reborrow_drop_shared_scalar(body, state, *place)
+                    .map_err(|reason| self.drop_shared_error(reason))?
+                {
+                    return Ok(value);
+                }
                 if let Some(value) = self.owned_box_shared_borrow(state, *place, false)? {
                     return Ok(value);
                 }
@@ -3026,6 +3045,12 @@ impl<'tcx> Engine<'tcx> {
                     return Ok(value);
                 }
                 if let Some(value) = self.borrow_shared_snapshot(body, state, *place)? {
+                    return Ok(value);
+                }
+                if let Some(value) = self
+                    .borrow_drop_shared_place(body, state, *place)
+                    .map_err(|reason| self.drop_shared_error(reason))?
+                {
                     return Ok(value);
                 }
                 match self.borrow_typed(body, state, *place, false) {
@@ -3081,6 +3106,11 @@ impl<'tcx> Engine<'tcx> {
                     return Err(self.categorized_error(
                         UnknownCategory::Semantics,
                         "mutable u16 root cannot issue a raw address".into(),
+                    ));
+                }
+                if self.drop_shared_place_candidate(body, *place) {
+                    return Err(self.drop_shared_error(
+                        "shared Drop projection grants no raw pointer authority".into(),
                     ));
                 }
                 self.validate_owned_raw_borrow(state, *place)?;

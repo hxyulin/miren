@@ -86,7 +86,18 @@ impl<'tcx> Engine<'tcx> {
         {
             if initialized {
                 if let Some(engine) = engine {
-                    engine.check_memory_initialization(&state.memory, *allocation, projection)?;
+                    if !engine.check_drop_shared_reference(
+                        *allocation,
+                        projection,
+                        &state.memory,
+                        &state.conditions,
+                    )? {
+                        engine.check_memory_initialization(
+                            &state.memory,
+                            *allocation,
+                            projection,
+                        )?;
+                    }
                 } else {
                     state
                         .memory

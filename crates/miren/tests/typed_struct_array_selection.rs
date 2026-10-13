@@ -100,10 +100,7 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
                     UnknownCategory::Unclassified,
                     "non-scalar array index is not uniquely determined on this path",
                 ),
-                "dropped_record" => (
-                    UnknownCategory::Unclassified,
-                    "non-scalar array index is not uniquely determined on this path",
-                ),
+
                 "oversized_shape" => (
                     UnknownCategory::ResourceLimit,
                     "composite slice type array exceeds the 128-element shape budget",
@@ -125,14 +122,12 @@ fn verify(path: &Path, entries: &[(&str, ProofStatus)], target: Option<&str>, op
             );
         }
         if *name == "dropped_record" {
-            assert!(proof.obligations.iter().any(|obligation| {
-                obligation.status == ProofStatus::Unknown
-                    && obligation.unknown_category == Some(UnknownCategory::Unclassified)
-                    && obligation
-                        .detail
-                        .contains("non-scalar array index is not uniquely determined on this path")
-                    && obligation.call_chain == ["dropped_record"]
-            }));
+            assert!(
+                proof
+                    .body_entries
+                    .iter()
+                    .any(|body| { body.function.contains("Dropped as core::ops::Drop") })
+            );
         }
         let helper = match *name {
             "mutation_claim" => Some("selected_field"),
@@ -199,7 +194,7 @@ fn typed_array_selection_preserves_nominal_fields_and_correlations() {
         ("ambiguous_store", ProofStatus::Proved),
         ("raw_record", ProofStatus::Unknown),
         ("refined_zero_array", ProofStatus::Unknown),
-        ("dropped_record", ProofStatus::Unknown),
+        ("dropped_record", ProofStatus::Proved),
         ("byte_choices", ProofStatus::Proved),
         ("oversized_shape", ProofStatus::Unknown),
         ("full_contains", ProofStatus::Proved),

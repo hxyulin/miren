@@ -2311,6 +2311,84 @@
       "unknown_reason":
         "only read-only byte slices and byte arrays are modeled: [core::option::Option<&",
       "unknown_category": "semantics"
+    },
+    {
+      "entry": "drop_shared_projection_survey::borrowed",
+      "family": "drop_shared_projection",
+      "expected": "proved"
+    },
+    {
+      "entry": "drop_shared_projection_survey::direct",
+      "family": "drop_shared_projection",
+      "expected": "proved"
+    },
+    {
+      "entry": "drop_shared_projection_survey::nested",
+      "family": "drop_shared_projection",
+      "expected": "proved"
+    },
+    {
+      "entry": "drop_shared_projection_survey::scalar_codecs",
+      "family": "drop_shared_projection",
+      "expected": "proved"
+    },
+    {
+      "entry": "drop_shared_projection_survey::wrong",
+      "family": "drop_shared_projection",
+      "expected": "refuted"
+    },
+    {
+      "entry": "drop_shared_projection_survey::unguarded",
+      "family": "drop_shared_projection",
+      "expected": "refuted"
+    },
+    {
+      "entry": "drop_shared_projection_survey::whole_receiver_unknown",
+      "family": "drop_shared_projection",
+      "expected": "unknown",
+      "unknown_reason": "cannot materialize or copy a non-Copy owner",
+      "unknown_category": "semantics"
+    },
+    {
+      "entry": "drop_shared_projection_survey::mutable_unknown",
+      "family": "drop_shared_projection",
+      "expected": "unknown",
+      "unknown_reason": "grants no mutable reference authority",
+      "unknown_category": "semantics"
+    },
+    {
+      "entry": "drop_shared_projection_survey::raw_unknown",
+      "family": "drop_shared_projection",
+      "expected": "unknown",
+      "unknown_reason": "grants no raw pointer authority",
+      "unknown_category": "semantics"
+    },
+    {
+      "entry": "drop_shared_projection_survey::fieldless_drop::incoming",
+      "family": "drop_shared_projection",
+      "expected": "proved"
+    },
+    {
+      "entry": "drop_shared_projection_survey::fieldless_drop::local",
+      "family": "drop_shared_projection",
+      "expected": "proved"
+    },
+    {
+      "entry": "drop_shared_projection_survey::fieldless_drop::wrong",
+      "family": "drop_shared_projection",
+      "expected": "refuted"
+    },
+    {
+      "entry": "drop_shared_projection_survey::fieldless_drop::unguarded",
+      "family": "drop_shared_projection",
+      "expected": "refuted"
+    },
+    {
+      "entry": "drop_shared_projection_survey::fieldless_drop::whole_unknown",
+      "family": "drop_shared_projection",
+      "expected": "unknown",
+      "unknown_reason": "cannot materialize or copy a non-Copy owner",
+      "unknown_category": "semantics"
     }
   ]
 }

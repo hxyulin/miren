@@ -1661,3 +1661,30 @@ and current bodies before modeling. The original unsigned 8/16/32 helper stays u
 128-bit range maxima retain the existing u128::MAX branch for compiler-admitted widths. Local enums,
 mutable/pointer niches and arbitrary Pat payloads retain their separate conservative domains.
 Source inventory and compiler control declarations are not behavioral coverage evidence.
+
+A private shared projection route can retain owned fixed arrays of local unpacked Freeze structs
+with actual Drop implementations and primitive fields. Original compiler types, counts, FieldTy,
+current caller Instance/Body, target usize/Context and physical stored fields authenticate the
+borrowed path. Each feasible element must retain a complete initialized receiver; scalar fields
+reuse existing valid Bool, Char, integer and Float codecs. Whole Drop values are never selected as
+owning products. The old pure product copy and projection domains retain their existing gates.
+
+Only readonly storage views and Copy scalar observations enter this route. Whole non-Copy
+snapshots and helper receivers, mutable/raw borrows and frame-owned reference escape remain
+unsupported. Scalar field references can enter ordinary accessor bodies with current Memory and
+normal argument/return checks. Actual array/element Drop still executes after observation. The
+private certificate and scoped owner metadata are checked afresh on every use, including branch
+masks and retired storage. Issuing a view moves unaddressed storage into one tracked owner; it does
+not clone an executable owner. Existing count128, depth16, node512 and cumulative storage bounds
+remain, with additional performed type, mask, solver and scalar work. Compiler, mutation and
+native controls validate the bounded domain; source coherence alone supplies no behavior credit.
+
+Scalar reborrows extend the current checked storage witness before ordinary snapshot resolution.
+They do not read or select a whole Drop pointee merely to locate its primitive field.
+
+A fieldless local Freeze Drop struct with actual inhabited size0 layout may retain its existing
+lazy input storage. Only the current Engine original Ty-to-descriptor Rc, empty Struct inventory,
+zero slots, height1 and matching Context seed authenticate that case. The readonly path checks
+current owner identity and initialization masks without decoding or copying a whole Drop owner.
+A Unit or arbitrary zero-sized value does not supply this evidence. Actual nonempty destructors
+and their helper calls still execute normally, including missing-body and mutation controls.

@@ -483,6 +483,9 @@ impl<'tcx> Engine<'tcx> {
         allocation: usize,
         path: &[MemoryProjection],
     ) -> Result<(), String> {
+        if self.check_drop_shared_reference(allocation, path, memory, &[])? {
+            return Ok(());
+        }
         let fields = self
             .typed_memory_footprint(memory, allocation, path)?
             .unwrap_or_default();
