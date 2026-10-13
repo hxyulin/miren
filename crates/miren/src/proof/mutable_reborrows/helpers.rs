@@ -2,6 +2,7 @@
 use super::*;
 use crate::proof::mutable_u16::Storage;
 use rustc_middle::mir::UnwindAction;
+use std::rc::Weak;
 
 fn pay(engine: &mut Engine<'_>, count: usize) -> Result<(), String> {
     let attempted = engine.steps.checked_add(count).ok_or_else(|| {
@@ -151,17 +152,10 @@ struct Site<'tcx> {
     destination: Place<'tcx>,
 }
 
-pub(in crate::proof) struct Invocation<'tcx> {
+struct RootOwner<'tcx> {
     owner: usize,
     caller: ty::Instance<'tcx>,
     caller_body: Rc<Body<'tcx>>,
-    callee: ty::Instance<'tcx>,
-    callee_body: Rc<Body<'tcx>>,
-    block: BasicBlock,
-    occurrence: usize,
-    target: BasicBlock,
-    destination: Place<'tcx>,
-    token: Rc<()>,
     certificate: usize,
     allocation: usize,
     original: Ty<'tcx>,
@@ -169,6 +163,27 @@ pub(in crate::proof) struct Invocation<'tcx> {
     data: Storage,
     generation: u64,
     phase: Phase,
+}
+
+struct Edge<'tcx> {
+    caller: ty::Instance<'tcx>,
+    caller_body: Rc<Body<'tcx>>,
+    callee: ty::Instance<'tcx>,
+    callee_body: Rc<Body<'tcx>>,
+    signature: ty::PolyFnSig<'tcx>,
+    block: BasicBlock,
+    occurrence: usize,
+    target: BasicBlock,
+    destination: Place<'tcx>,
+    parent: Option<Rc<Edge<'tcx>>>,
+    token: Weak<()>,
+    depth: usize,
+}
+
+pub(in crate::proof) struct Invocation<'tcx> {
+    root: Rc<RootOwner<'tcx>>,
+    edge: Rc<Edge<'tcx>>,
+    token: Rc<()>,
 }
 
 // A normal-return proof tied to the exact immutable Body/Memory observation, not a role flag.
@@ -212,7 +227,7 @@ impl<'tcx> Invocation<'tcx> {
             Storage::Scalar(_) => 1,
             Storage::Product(columns) => columns.len(),
         };
-        pay(engine, phase_slots + columns + 28)?;
+        pay(engine, phase_slots + columns + 34)?;
         let original = engine
             .mutable_owner_certificate(backing.certificate)?
             .original;
@@ -221,18 +236,11 @@ impl<'tcx> Invocation<'tcx> {
         state
             .memory
             .check_projection_initialization(backing.allocation, &[])?;
-        let invocation = Self {
+        let signature = checked_signature(engine, callee)?;
+        let root = Rc::new(RootOwner {
             owner,
             caller,
-            occurrence: std::ptr::from_ref(&caller_body.basic_blocks[block].terminator().kind)
-                as usize,
-            caller_body,
-            callee,
-            callee_body,
-            block,
-            target,
-            destination,
-            token: Rc::new(()),
+            caller_body: caller_body.clone(),
             certificate: backing.certificate,
             allocation: backing.allocation,
             original,
@@ -240,8 +248,94 @@ impl<'tcx> Invocation<'tcx> {
             data: backing.data.clone(),
             generation: backing.generation,
             phase: backing.phase.clone(),
+        });
+        let token = Rc::new(());
+        let invocation = Self {
+            root,
+            edge: Rc::new(Edge {
+                caller,
+                occurrence: std::ptr::from_ref(&caller_body.basic_blocks[block].terminator().kind)
+                    as usize,
+                caller_body,
+                callee,
+                callee_body,
+                signature,
+                block,
+                target,
+                destination,
+                parent: None,
+                token: Rc::downgrade(&token),
+                depth: 1,
+            }),
+            token,
         };
-        invocation.check(engine, &invocation.callee_body, &state.memory)?;
+        invocation.check(engine, &invocation.edge.callee_body, &state.memory)?;
+        Ok(invocation)
+    }
+
+    fn derive(
+        &self,
+        engine: &mut Engine<'tcx>,
+        site: Site<'tcx>,
+        state: &State,
+        signature: ty::PolyFnSig<'tcx>,
+    ) -> Result<Self, String> {
+        self.check(engine, &site.caller_body, &state.memory)?;
+        let depth = self
+            .edge
+            .depth
+            .checked_add(1)
+            .ok_or("retained helper depth overflow")?;
+        // Each edge and its frame-local token/root handles use twenty logical slots.
+        // Enforce live ancestry storage before allocating a new node.
+        pay(engine, state.memory.storage_slots() + 36)?;
+        let metadata_slots = match &self.root.phase {
+            Phase::Retained { metadata, .. } => metadata.len().saturating_mul(2),
+            Phase::Idle | Phase::Pending { .. } | Phase::Active { .. } => unreachable!(),
+        };
+        let columns = match &self.root.data {
+            Storage::Scalar(_) => 1,
+            Storage::Product(columns) => columns.len(),
+        };
+        if depth > engine.limits.max_call_depth
+            || state
+                .memory
+                .storage_slots()
+                .saturating_add(depth.saturating_mul(20) + 40 + metadata_slots + columns)
+                > MAX_INPUT_VALUES
+        {
+            return Err(engine.categorized_error(
+                UnknownCategory::ResourceLimit,
+                "retained helper ancestry exceeds existing depth/storage limits".into(),
+            ));
+        }
+        if site.caller != self.edge.callee || !Rc::ptr_eq(&site.caller_body, &self.edge.callee_body)
+        {
+            return Err(engine.retained_error("retained helper child has a different parent frame"));
+        }
+        pay(engine, 40)?;
+        let token = Rc::new(());
+        let invocation = Self {
+            root: self.root.clone(),
+            edge: Rc::new(Edge {
+                caller: site.caller,
+                occurrence: std::ptr::from_ref(
+                    &site.caller_body.basic_blocks[site.block].terminator().kind,
+                ) as usize,
+                caller_body: site.caller_body,
+                callee: site.callee,
+                callee_body: site.callee_body,
+                signature,
+                block: site.block,
+                target: site.target,
+                destination: site.destination,
+                parent: Some(self.edge.clone()),
+                token: Rc::downgrade(&token),
+                depth,
+            }),
+            token,
+        };
+        invocation.scope(engine, &invocation.edge.callee_body, &state.memory)?;
         Ok(invocation)
     }
 
@@ -255,7 +349,7 @@ impl<'tcx> Invocation<'tcx> {
         self.check(engine, body, &state.memory)?;
         primitive_value(engine, body.return_ty(), value, &state.conditions)?;
         Ok(ReturnedOwner {
-            owner: self.owner,
+            owner: self.root.owner,
             body,
             memory: &state.memory,
         })
@@ -268,11 +362,11 @@ impl<'tcx> Invocation<'tcx> {
         memory: &Memory,
     ) -> Result<(), String> {
         self.scope(engine, body, memory)?;
-        let Phase::Retained { metadata, .. } = &self.phase else {
+        let Phase::Retained { metadata, .. } = &self.root.phase else {
             unreachable!()
         };
-        pay_source_validation(engine, &self.caller_body, metadata.len())?;
-        engine.mutable_retained_frame(&self.caller_body, self.owner, memory)
+        pay_source_validation(engine, &self.root.caller_body, metadata.len())?;
+        engine.mutable_retained_frame(&self.root.caller_body, self.root.owner, memory)
     }
 
     pub(in crate::proof) fn scope(
@@ -281,14 +375,23 @@ impl<'tcx> Invocation<'tcx> {
         body: &Body<'tcx>,
         memory: &Memory,
     ) -> Result<(), String> {
+        if self.edge.depth == 0
+            || self.edge.depth > MAX_INPUT_VALUES
+            || self.edge.depth > engine.limits.max_call_depth
+        {
+            return Err(engine.categorized_error(
+                UnknownCategory::ResourceLimit,
+                "retained helper ancestry walk exceeds existing depth/value limits".into(),
+            ));
+        }
         let registry = engine.bodies.borrow().len();
-        let phase_work = match &self.phase {
+        let phase_work = match &self.root.phase {
             Phase::Retained { metadata, .. } => metadata.len().saturating_mul(2),
             Phase::Idle | Phase::Pending { .. } | Phase::Active { .. } => {
                 return Err(engine.retained_error("retained helper snapshot phase differs"));
             }
         };
-        let columns = match &self.data {
+        let columns = match &self.root.data {
             Storage::Scalar(_) => 1,
             Storage::Product(columns) => columns.len(),
         };
@@ -296,67 +399,118 @@ impl<'tcx> Invocation<'tcx> {
             engine,
             registry + memory.mutable_u16.len() + phase_work + columns + 15,
         )?;
-        let bodies = engine.bodies.borrow();
-        if !std::ptr::eq(body, self.callee_body.as_ref())
-            || bodies
-                .get(&self.callee)
-                .is_none_or(|held| !Rc::ptr_eq(held, &self.callee_body))
-            || bodies
-                .get(&self.caller)
-                .is_none_or(|held| !Rc::ptr_eq(held, &self.caller_body))
-            || self.callee_body.source.instance != self.callee.def
-            || self.caller_body.source.instance != self.caller.def
+        if !std::ptr::eq(body, self.edge.callee_body.as_ref())
             || Rc::strong_count(&self.token) != 1
+            || !Weak::ptr_eq(&self.edge.token, &Rc::downgrade(&self.token))
             || memory.mutable_u16.len() != 1
         {
-            return Err(
-                engine.retained_error("retained helper current caller/callee invocation differs")
-            );
+            return Err(engine.retained_error("retained helper current frame/depth differs"));
         }
+        // Prepay the complete bounded linked walk before visiting any ancestor node.
+        pay(engine, self.edge.depth * (registry + 40) + 4)?;
+        let bodies = engine.bodies.borrow();
+        let signatures = engine.call_signatures.borrow();
+        let mut cursor = Some(self.edge.as_ref());
+        let mut remaining = self.edge.depth;
+        while let Some(edge) = cursor {
+            let live = edge
+                .token
+                .upgrade()
+                .ok_or_else(|| engine.retained_error("retained helper ancestor frame has ended"))?;
+            if Rc::strong_count(&live) != 2 {
+                return Err(
+                    engine.retained_error("retained helper ancestor frame token is aliased")
+                );
+            }
+            if remaining == 0
+                || edge.depth != remaining
+                || bodies
+                    .get(&edge.callee)
+                    .is_none_or(|held| !Rc::ptr_eq(held, &edge.callee_body))
+                || bodies
+                    .get(&edge.caller)
+                    .is_none_or(|held| !Rc::ptr_eq(held, &edge.caller_body))
+                || edge.callee_body.source.instance != edge.callee.def
+                || edge.caller_body.source.instance != edge.caller.def
+                || signatures.get(&edge.callee) != Some(&edge.signature)
+            {
+                return Err(
+                    engine.retained_error("retained helper current ancestor source differs")
+                );
+            }
+            let terminator = edge.caller_body.basic_blocks[edge.block].terminator();
+            let TerminatorKind::Call {
+                func: Operand::Constant(function),
+                destination,
+                target: Some(target),
+                unwind,
+                ..
+            } = &terminator.kind
+            else {
+                return Err(engine.retained_error("retained helper original caller Call is absent"));
+            };
+            let ty::FnDef(id, args) = function.const_.ty().kind() else {
+                return Err(engine.retained_error("retained helper original FnDef is absent"));
+            };
+            if engine.resolve_function_item(*id, args.skip_binder())? != edge.callee
+                || std::ptr::from_ref(&terminator.kind) as usize != edge.occurrence
+                || *destination != edge.destination
+                || *target != edge.target
+                || !matches!(unwind, UnwindAction::Unreachable)
+            {
+                return Err(
+                    engine.retained_error("retained helper original occurrence/edge differs")
+                );
+            }
+            match &edge.parent {
+                Some(parent) => {
+                    if parent.callee != edge.caller
+                        || !Rc::ptr_eq(&parent.callee_body, &edge.caller_body)
+                    {
+                        return Err(
+                            engine.retained_error("retained helper ancestor adjacency differs")
+                        );
+                    }
+                    cursor = Some(parent.as_ref());
+                }
+                None => {
+                    if edge.caller != self.root.caller
+                        || !Rc::ptr_eq(&edge.caller_body, &self.root.caller_body)
+                        || remaining != 1
+                    {
+                        return Err(engine.retained_error("retained helper issuing root differs"));
+                    }
+                    cursor = None;
+                }
+            }
+            remaining -= 1;
+        }
+        if remaining != 0 {
+            return Err(engine.retained_error("retained helper incomplete ancestor chain"));
+        }
+        drop(signatures);
         drop(bodies);
-        let terminator = self.caller_body.basic_blocks[self.block].terminator();
-        let TerminatorKind::Call {
-            func: Operand::Constant(function),
-            destination,
-            target: Some(target),
-            unwind,
-            ..
-        } = &terminator.kind
-        else {
-            return Err(engine.retained_error("retained helper original caller Call is absent"));
-        };
-        let ty::FnDef(id, args) = function.const_.ty().kind() else {
-            return Err(engine.retained_error("retained helper original FnDef is absent"));
-        };
-        if engine.resolve_function_item(*id, args.skip_binder())? != self.callee
-            || std::ptr::from_ref(&terminator.kind) as usize != self.occurrence
-            || *destination != self.destination
-            || *target != self.target
-            || !matches!(unwind, UnwindAction::Unreachable)
-        {
-            return Err(engine.retained_error("retained helper original occurrence/edge differs"));
-        }
         let backing = memory
             .mutable_u16
-            .get(self.owner)
+            .get(self.root.owner)
             .ok_or("retained helper suspended owner is absent")?;
         let mut work = Work(0);
         work.charge(engine, memory.missing_places.entries().len())?;
         pay(engine, memory.missing_places.entries().len() + 14)?;
-        memory.check_projection_initialization(self.allocation, &[])?;
-        if !matches!(memory.get(self.allocation), Some(Some(Value::Unit))) {
+        memory.check_projection_initialization(self.root.allocation, &[])?;
+        if !matches!(memory.get(self.root.allocation), Some(Some(Value::Unit))) {
             return Err(engine.retained_error("retained helper owner anchor was replaced"));
         }
         let current = engine
             .mutable_owner_certificate(backing.certificate)?
             .original;
-        if backing.certificate != self.certificate
-            || backing.allocation != self.allocation
-            || current != self.original
-            || backing.generation != self.generation
-            || backing.length.integer()?.0 != self.length
-            || backing.data != self.data
-            || backing.phase != self.phase
+        if backing.certificate != self.root.certificate
+            || backing.allocation != self.root.allocation
+            || current != self.root.original
+            || backing.generation != self.root.generation
+            || backing.length.integer()?.0 != self.root.length
+            || backing.data != self.root.data
+            || backing.phase != self.root.phase
             || backing.interval.is_some()
             || backing.hierarchy.is_some()
         {
@@ -382,11 +536,8 @@ impl<'tcx> Engine<'tcx> {
         let ty::FnDef(id, args) = function.const_.ty().kind() else {
             return Err(self.retained_error("retained helper nested callee is unsupported"));
         };
-        let instance = self.resolve_function_item(*id, args.skip_binder())?;
-        if func.ty(&body.local_decls, self.tcx) != function.const_.ty()
-            || !(super::super::super::identity::is_panic_call(self.tcx, instance.def_id())
-                || self.is_core_panic_helper(instance.def_id()))
-        {
+        self.resolve_function_item(*id, args.skip_binder())?;
+        if func.ty(&body.local_decls, self.tcx) != function.const_.ty() {
             return Err(self.retained_error("retained helper nested scalar calls are unsupported"));
         }
         Ok(())
@@ -398,6 +549,7 @@ impl<'tcx> Engine<'tcx> {
         caller_body: &Rc<Body<'tcx>>,
         state: &mut State,
         call: ChildCall<'_, 'tcx>,
+        parent: Option<&Invocation<'tcx>>,
     ) -> Result<Option<Vec<Return>>, String> {
         let ChildCall {
             body,
@@ -431,7 +583,8 @@ impl<'tcx> Engine<'tcx> {
         }
         let registry = self.bodies.borrow().len();
         pay(self, registry + args.len() + 8)?;
-        let signature = checked_signature(self, instance)?.skip_binder();
+        let poly_signature = checked_signature(self, instance)?;
+        let signature = poly_signature.skip_binder();
         if signature.safety() != rustc_hir::Safety::Safe
             || signature.abi() != rustc_abi::ExternAbi::Rust
             || signature.c_variadic()
@@ -488,17 +641,19 @@ impl<'tcx> Engine<'tcx> {
         else {
             unreachable!()
         };
-        let Value::MutableU16 { id, role } = self.raw_local(state, *carrier)? else {
-            return Err(self.retained_error("retained helper caller carrier is absent"));
-        };
-        if id != owner {
-            return Err(self.retained_error("retained helper caller owner differs"));
+        if parent.is_none() {
+            let Value::MutableU16 { id, role } = self.raw_local(state, *carrier)? else {
+                return Err(self.retained_error("retained helper caller carrier is absent"));
+            };
+            if id != owner {
+                return Err(self.retained_error("retained helper caller owner differs"));
+            }
+            // Operand authentication invokes backing validation and current-frame validation.
+            // Each remains a distinct performed source service and is prepaid separately.
+            pay_source_validation(self, body, metadata.len())?;
+            pay_source_validation(self, body, metadata.len())?;
+            self.mutable_retained_operand(body, state, *carrier, owner, &role)?;
         }
-        // Operand authentication invokes backing validation and current-frame validation.
-        // Each remains a distinct performed source service and is prepaid separately.
-        pay_source_validation(self, body, metadata.len())?;
-        pay_source_validation(self, body, metadata.len())?;
-        self.mutable_retained_operand(body, state, *carrier, owner, &role)?;
         let witness_slots = metadata.len().saturating_mul(2);
         let backing_columns = match &state.memory.mutable_u16[owner].data {
             Storage::Scalar(_) => 1,
@@ -543,19 +698,19 @@ impl<'tcx> Engine<'tcx> {
             return Err(self.retained_error("retained helper selected Body/schema differs"));
         }
         pay(self, 4)?;
-        let invocation = Invocation::capture(
-            self,
-            Site {
-                caller,
-                caller_body: caller_body.clone(),
-                callee: instance,
-                callee_body: callee_body.clone(),
-                block,
-                target,
-                destination,
-            },
-            state,
-        )?;
+        let site_descriptor = Site {
+            caller,
+            caller_body: caller_body.clone(),
+            callee: instance,
+            callee_body: callee_body.clone(),
+            block,
+            target,
+            destination,
+        };
+        let invocation = match parent {
+            Some(parent) => parent.derive(self, site_descriptor, state, poly_signature)?,
+            None => Invocation::capture(self, site_descriptor, state)?,
+        };
         let mut values = Vec::with_capacity(args.len());
         for (arg, original) in args.iter().zip(signature.inputs()) {
             if arg.node.ty(&body.local_decls, self.tcx) != *original {

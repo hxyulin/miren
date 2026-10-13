@@ -2700,10 +2700,27 @@ calls and mixed primitive signatures use the same path. The caller owner remains
 storage is preserved through normal return; contracts check actual preconditions and postconditions.
 
 Full original compiler signatures, source bodies, Context, initialized storage and live carrier
-witnesses remain required. Missing bodies, nested helper calls, owner transport, foreign ABIs and
+witnesses remain required. Missing bodies, owner transport, indirect calls, foreign ABIs and
 unsupported signature graphs remain UNKNOWN. The default resource limits are unchanged.
 
 The capability matrix adds all twelve integer primitives, Bool, Char, both floats, unit, associated
-and mixed calls, with a wrong-claim REFUTED control and a nested-call UNKNOWN control. Dedicated
+and mixed calls, with a wrong-claim REFUTED control. The original nested-call control advances
+to PROVED in the nested-helper stage below; new deeper-call controls retain UNKNOWN. Dedicated
 integration tests also cover missing dependency bodies, genuine helper mutations, native execution
 and contract failures on all four profiles.
+
+
+## Nested primitive helpers and bounded recursion
+
+Nested direct primitive helpers retain one checked mutable Range owner through actual caller and
+callee bodies. Each child edge derives from the live parent frame and preserves the original
+owner snapshot. Exact current bodies, full signatures, original Call/normal edges and live unique
+ancestor tokens remain checked. No descendant local is interpreted as the original carrier.
+
+Finite recursion executes ordinary MIR within unchanged call-depth, storage and step limits;
+there is no recursive summary or induction assumption. Argument/result validity, real contracts,
+ordinary incoming escape checks and StorageDead cleanup remain on the execution path. The measured
+deeper-chain and unbounded-recursion controls remain UNKNOWN ResourceLimit; indirect, closure,
+foreign, shim,
+owner-transport and missing-body calls remain UNKNOWN. Dedicated compiler controls authenticate a
+real function-pointer shim separately from the feature-free survey closure control.

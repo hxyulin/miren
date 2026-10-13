@@ -57,7 +57,7 @@ fn primitive_helpers_execute_actual_bodies_preserving_retained_storage() {
                 entries.push((entry, ProofStatus::Proved));
             }
             entries.push(("wrong", ProofStatus::Refuted));
-            entries.push(("nested_unknown", ProofStatus::Unknown));
+            entries.push(("nested_unknown", ProofStatus::Proved));
             let report = verify(
                 &fixture("retained_scalar_helpers.rs"),
                 &entries,
@@ -89,22 +89,6 @@ fn primitive_helpers_execute_actual_bodies_preserving_retained_storage() {
                             || b.function == "choose")
                 );
             }
-            let proof = report
-                .functions
-                .iter()
-                .find(|f| f.name == "nested_unknown")
-                .unwrap()
-                .proof
-                .as_ref()
-                .unwrap();
-            assert!(
-                proof
-                    .obligations
-                    .iter()
-                    .any(|o| o.status == ProofStatus::Unknown
-                        && o.unknown_category == Some(UnknownCategory::Semantics)
-                        && o.detail.contains("nested scalar calls are unsupported"))
-            );
         }
     }
 }

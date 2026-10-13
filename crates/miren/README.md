@@ -1814,7 +1814,8 @@ Parent authority stays suspended. Typed child indices check the view extent and 
 same full backing; direct writes and checked lexical release preserve caller and sibling storage.
 The original product representation and integer interval gates stay distinct. Release requires
 an actual StorageDead with no other executable child carrier. Parent reuse before that endpoint
-remains UNKNOWN without a remaining-control-flow use proof. Nested or indirect helper transport,
+remains UNKNOWN without a remaining-control-flow use proof. Nested owner-view or indirect helper
+transport,
 retained views of other codecs, raw authority and reference escape remain UNKNOWN. Descriptor and
 carrier scans keep existing node/storage/certificate caps, and Armed transport remains refused.
 
@@ -1849,7 +1850,7 @@ phase remains unchanged. A checked normal return admits only that exact suspende
 mutable-owner exit; all incoming storage keeps ordinary escape checks. The Unit backing anchor
 needs no fabricated reference or private-role graph exemption. Caller lexical-release authority
 cannot be invoked by a callee's coincidentally numbered local; normal callee storage cleanup still
-executes. Nested ordinary helpers, indirect calls, missing bodies, private returns and trusted
+executes. Indirect calls, missing bodies, private returns and trusted
 adapters remain UNKNOWN. Existing caps and execution fees are unchanged.
 
 The retained primitive helper independently normalizes the original complete compiler signature
@@ -1857,3 +1858,26 @@ and compares its full binder and flags against the call cache before using safet
 A poisoned signature cache refuses. Original signature graphs are bounded before normalization:
 flat primitive/Unit types and primitive type parameters are admitted; bound-variable or const
 parameter signatures and other type graphs remain unsupported in this helper route.
+
+Nested direct primitive helpers derive child frame leases from the live parent invocation. Each
+child retains the original issuing owner snapshot and the exact linked ancestor call edges; it
+never constructs a carrier in a descendant local. Every ancestor Body, full Instance, original
+Call/normal target and independently authenticated full signature remain checked against current
+caches. A shared immutable root snapshot avoids repeated owned metadata cloning; every actual
+edge allocation, linked walk and source validation service is prepaid under existing limits.
+
+Original signature normalization occurs at each actual edge admission. Subsequent ancestor walks
+compare the complete held immutable PolyFnSig against the live cache. Child entry and normal return
+execute full retained-root validation; derivation checks the parent before allocation and the new
+edge before entry. Parent resumption checks returned Memory, exact source ancestry and unchanged
+owner data before normal typed destination storage. Ordinary incoming escape checks and all callee
+StorageDead cleanup remain intact. Every invocation has a separate unique token. Each edge holds a
+weak witness to its live frame's
+sole token owner; a dropped or aliased ancestor frame refuses before source authority is reused.
+
+Finite actual recursion can execute within ordinary call-depth, storage and shared-step limits.
+No recursive summary or invariant is assumed. Large nested chains and branches can remain UNKNOWN
+at the default 8192 steps; raising diagnostic limits does not give default capability credit.
+Indirect, foreign, shim, missing-body and owner-transport callees remain UNKNOWN. Compiler controls
+cover all primitive domains, genuine nested helper mutations, contracts, missing dependencies and
+hostile ancestor/cache/edge/Context/mask/escape state on host and ARM at O0/O2.

@@ -1784,19 +1784,21 @@ impl<'tcx> Engine<'tcx> {
                         )?;
                     }
                     let callable_ty = func.ty(&body.local_decls, self.tcx);
-                    if let Some(results) = self.function_table_call(
-                        &state,
-                        function_tables::TableCall {
-                            body,
-                            block,
-                            func,
-                            args,
-                            destination: *destination,
-                            target: *target,
-                            stack: &stack,
-                            site: (id, terminator.source_info.span),
-                        },
-                    )? {
+                    if frame.retained_helper_invocation().is_none()
+                        && let Some(results) = self.function_table_call(
+                            &state,
+                            function_tables::TableCall {
+                                body,
+                                block,
+                                func,
+                                args,
+                                destination: *destination,
+                                target: *target,
+                                stack: &stack,
+                                site: (id, terminator.source_info.span),
+                            },
+                        )?
+                    {
                         let target =
                             target.ok_or("function table call has no normal return edge")?;
                         for (consumed, result) in results {
@@ -1856,6 +1858,7 @@ impl<'tcx> Engine<'tcx> {
                                 stack: &stack,
                                 site: (id, terminator.source_info.span),
                             },
+                            frame.retained_helper_invocation(),
                         )?
                     {
                         let target = target.ok_or("retained helper lacks normal continuation")?;
@@ -1866,6 +1869,9 @@ impl<'tcx> Engine<'tcx> {
                                 result.memory,
                                 result.flow,
                             )?;
+                            if let Some(parent) = frame.retained_helper_invocation() {
+                                parent.scope(self, &owned_body, &continuation.memory)?;
+                            }
                             self.store_call_result(
                                 body,
                                 &mut continuation,
@@ -1876,6 +1882,16 @@ impl<'tcx> Engine<'tcx> {
                             queue.push_back((target, continuation, retry_path.clone()));
                         }
                         continue;
+                    }
+                    if frame.retained_helper_invocation().is_some()
+                        && !crate::identity::is_panic_call(self.tcx, instance.def_id())
+                        && !self.is_core_panic_helper(instance.def_id())
+                    {
+                        return Err(self.categorized_error(
+                            UnknownCategory::Semantics,
+                            "retained helper nested callee lacks a supported primitive lease"
+                                .into(),
+                        ));
                     }
                     if unarmed
                         && let Some((target, continuation)) = self.mutable_retained_call(

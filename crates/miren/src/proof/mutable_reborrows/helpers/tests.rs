@@ -2,7 +2,10 @@ use super::*;
 
 #[test]
 fn actual_primitive_helper_lease_preserves_owner_and_rejects_hostile_state() {
-    struct Check(bool);
+    struct Check {
+        done: bool,
+        nested: bool,
+    }
     impl rustc_driver::Callbacks for Check {
         fn after_analysis<'tcx>(
             &mut self,
@@ -22,7 +25,15 @@ fn actual_primitive_helper_lease_preserves_owner_and_rejects_hostile_state() {
             let caller_id = tcx
                 .mir_keys(())
                 .iter()
-                .find(|id| tcx.item_name(id.to_def_id()).as_str() == "scalar")
+                .find(|id| {
+                    tcx.def_kind(id.to_def_id()) == DefKind::Fn
+                        && tcx.item_name(id.to_def_id()).as_str()
+                            == if self.nested {
+                                "nested_unknown"
+                            } else {
+                                "scalar"
+                            }
+                })
                 .unwrap()
                 .to_def_id();
             let caller = ty::Instance::mono(tcx, caller_id);
@@ -59,7 +70,10 @@ fn actual_primitive_helper_lease_preserves_owner_and_rejects_hostile_state() {
                 .unwrap();
             let &(helper_block, helper, helper_args, helper_destination, helper_target) = calls
                 .iter()
-                .find(|(_, i, _, _, _)| tcx.item_name(i.def_id()).as_str() == "flip")
+                .find(|(_, i, _, _, _)| {
+                    tcx.item_name(i.def_id()).as_str()
+                        == if self.nested { "nested_flip" } else { "flip" }
+                })
                 .unwrap();
             let mut memory = Memory::default();
             let mut conditions = Vec::new();
@@ -173,6 +187,7 @@ fn actual_primitive_helper_lease_preserves_owner_and_rejects_hostile_state() {
                                 stack: &[],
                                 site: (caller_id, body.span),
                             },
+                            None,
                         )
                         .is_err()
                 );
@@ -204,15 +219,17 @@ fn actual_primitive_helper_lease_preserves_owner_and_rejects_hostile_state() {
             let Phase::Retained { carrier, .. } = &state.memory.mutable_u16[0].phase else {
                 unreachable!()
             };
-            assert!(
-                helper_body
-                    .basic_blocks
-                    .iter()
-                    .flat_map(|b| &b.statements)
-                    .any(|s| matches!(s.kind, StatementKind::StorageDead(local)
-                    if local.as_usize() == *carrier)),
-                "actual callee local collision"
-            );
+            if !self.nested {
+                assert!(
+                    helper_body
+                        .basic_blocks
+                        .iter()
+                        .flat_map(|b| &b.statements)
+                        .any(|s| matches!(s.kind, StatementKind::StorageDead(local)
+                        if local.as_usize() == *carrier)),
+                    "actual callee local collision"
+                );
+            }
             assert!(lease.check(&mut engine, &body, &state.memory).is_err());
             let mut changed_body = helper_body.as_ref().clone();
             changed_body.basic_blocks.as_mut()[BasicBlock::from_usize(0)].statements[0].kind =
@@ -230,6 +247,177 @@ fn actual_primitive_helper_lease_preserves_owner_and_rejects_hostile_state() {
                 .bodies
                 .borrow_mut()
                 .insert(helper, helper_body.clone());
+            let mut orphan = None;
+            if self.nested {
+                let (block, callee, destination, target) = helper_body
+                    .basic_blocks
+                    .iter_enumerated()
+                    .find_map(|(block, data)| {
+                        let TerminatorKind::Call {
+                            func,
+                            destination,
+                            target: Some(target),
+                            ..
+                        } = &data.terminator().kind
+                        else {
+                            return None;
+                        };
+                        let ty::FnDef(id, generic) = func.ty(&helper_body.local_decls, tcx).kind()
+                        else {
+                            return None;
+                        };
+                        let callee = engine
+                            .resolve_function_item(*id, generic.skip_binder())
+                            .unwrap();
+                        Some((block, callee, *destination, *target))
+                    })
+                    .unwrap();
+                let nested_body = array_iterator_constructors::steps::authenticated_helper_body(
+                    &mut engine,
+                    callee,
+                )
+                .unwrap();
+                let signature = checked_signature(&mut engine, callee).unwrap();
+                let mut child = lease
+                    .derive(
+                        &mut engine,
+                        Site {
+                            caller: helper,
+                            caller_body: helper_body.clone(),
+                            callee,
+                            callee_body: nested_body.clone(),
+                            block,
+                            target,
+                            destination,
+                        },
+                        &state,
+                        signature,
+                    )
+                    .unwrap();
+                child
+                    .check(&mut engine, &nested_body, &state.memory)
+                    .unwrap();
+                assert!(
+                    child
+                        .scope(&mut engine, &helper_body, &state.memory)
+                        .is_err()
+                );
+                assert!(
+                    lease
+                        .derive(
+                            &mut engine,
+                            Site {
+                                caller,
+                                caller_body: body.clone(),
+                                callee,
+                                callee_body: nested_body.clone(),
+                                block,
+                                target,
+                                destination,
+                            },
+                            &state,
+                            signature
+                        )
+                        .is_err()
+                );
+                let original_signature = engine.call_signatures.borrow()[&helper];
+                engine.call_signatures.borrow_mut().insert(
+                    helper,
+                    original_signature.map_bound(|s| s.set_safety(rustc_hir::Safety::Unsafe)),
+                );
+                assert!(
+                    child
+                        .scope(&mut engine, &nested_body, &state.memory)
+                        .is_err()
+                );
+                engine
+                    .call_signatures
+                    .borrow_mut()
+                    .insert(helper, original_signature);
+                for ancestor in [caller, helper] {
+                    let original = engine.bodies.borrow()[&ancestor].clone();
+                    let mut changed = original.as_ref().clone();
+                    changed.basic_blocks.as_mut()[START_BLOCK].is_cleanup = true;
+                    engine
+                        .bodies
+                        .borrow_mut()
+                        .insert(ancestor, Rc::new(changed));
+                    assert!(
+                        child
+                            .scope(&mut engine, &nested_body, &state.memory)
+                            .is_err()
+                    );
+                    engine.bodies.borrow_mut().insert(ancestor, original);
+                }
+                let edge = Rc::get_mut(&mut child.edge).unwrap();
+                edge.occurrence ^= 1;
+                assert!(
+                    child
+                        .scope(&mut engine, &nested_body, &state.memory)
+                        .is_err()
+                );
+                Rc::get_mut(&mut child.edge).unwrap().occurrence ^= 1;
+                Rc::get_mut(&mut child.edge).unwrap().depth += 1;
+                assert!(
+                    child
+                        .scope(&mut engine, &nested_body, &state.memory)
+                        .is_err()
+                );
+                Rc::get_mut(&mut child.edge).unwrap().depth -= 1;
+                let ancestor_token = lease.token.clone();
+                assert!(
+                    child
+                        .scope(&mut engine, &nested_body, &state.memory)
+                        .is_err()
+                );
+                drop(ancestor_token);
+                let token = child.token.clone();
+                assert!(
+                    child
+                        .scope(&mut engine, &nested_body, &state.memory)
+                        .is_err()
+                );
+                drop(token);
+                child
+                    .scope(&mut engine, &nested_body, &state.memory)
+                    .unwrap();
+                let limit = engine.limits.max_call_depth;
+                engine.limits.max_call_depth = 1;
+                assert!(
+                    child
+                        .scope(&mut engine, &nested_body, &state.memory)
+                        .is_err()
+                );
+                engine.limits.max_call_depth = limit;
+                let storage = state.memory.storage_slots();
+                let mut full = state.clone();
+                while full.memory.storage_slots() < MAX_INPUT_VALUES {
+                    full.memory.push(Some(Value::Unit));
+                }
+                assert!(full.memory.storage_slots() > storage);
+                assert!(
+                    lease
+                        .derive(
+                            &mut engine,
+                            Site {
+                                caller: helper,
+                                caller_body: helper_body.clone(),
+                                callee,
+                                callee_body: nested_body.clone(),
+                                block,
+                                target,
+                                destination,
+                            },
+                            &full,
+                            signature
+                        )
+                        .is_err()
+                );
+                orphan = Some(child);
+                println!(
+                    "Actual nested retained child/ancestor/cache/edge/token/depth/storage controls"
+                );
+            }
             for mutation in 0..5 {
                 let mut changed = state.memory.clone();
                 let backing = &mut Rc::make_mut(&mut changed.mutable_u16)[0];
@@ -278,7 +466,7 @@ fn actual_primitive_helper_lease_preserves_owner_and_rejects_hostile_state() {
             let mut missing = state.memory.clone();
             missing
                 .missing_places
-                .consume(lease.allocation, Vec::new())
+                .consume(lease.root.allocation, Vec::new())
                 .unwrap();
             assert!(lease.check(&mut engine, &helper_body, &missing).is_err());
             let foreign = symbolic::Context::default();
@@ -323,18 +511,30 @@ fn actual_primitive_helper_lease_preserves_owner_and_rejects_hostile_state() {
             };
             *raw_bits = Some(engine.terms.bit_vector(0x3f80_0000, 32).unwrap());
             assert!(primitive_value(&mut engine, tcx.types.f32, &mismatched, &[]).is_err());
+            let checked = match orphan {
+                Some(child) => {
+                    drop(lease);
+                    let body = child.edge.callee_body.clone();
+                    assert!(
+                        child
+                            .scope(&mut engine, &body, &state.memory)
+                            .unwrap_err()
+                            .contains("ancestor frame has ended")
+                    );
+                    println!("Actual dropped retained ancestor token refused");
+                    child
+                }
+                None => lease,
+            };
             let stopped = engine.steps;
             engine.limits.max_steps = stopped;
-            assert!(
-                lease
-                    .check(&mut engine, &helper_body, &state.memory)
-                    .is_err()
-            );
+            let body = checked.edge.callee_body.clone();
+            assert!(checked.check(&mut engine, &body, &state.memory).is_err());
             assert!(engine.steps > stopped);
             println!(
                 "Actual retained helper signature/owner/body/metadata/escape/scalar validity controls"
             );
-            self.0 = true;
+            self.done = true;
             rustc_driver::Compilation::Stop
         }
     }
@@ -342,7 +542,87 @@ fn actual_primitive_helper_lease_preserves_owner_and_rejects_hostile_state() {
         .join("../../tests/fixtures/retained_scalar_helpers.rs");
     for target in [None, Some("thumbv7em-none-eabihf")] {
         for level in [0, 2] {
-            let mut callbacks = Check(false);
+            for nested in [false, true] {
+                let mut callbacks = Check {
+                    done: false,
+                    nested,
+                };
+                let mut args = vec![
+                    "rustc".into(),
+                    source.display().to_string(),
+                    "--crate-type=lib".into(),
+                    "--edition=2024".into(),
+                    "-Cpanic=abort".into(),
+                    "-Zmir-opt-level=0".into(),
+                    format!("-Copt-level={level}"),
+                    "--sysroot".into(),
+                    env!("MIREN_SYSROOT").into(),
+                ];
+                if let Some(target) = target {
+                    args.extend(["--target".into(), target.into()]);
+                }
+                rustc_driver::run_compiler(&args, &mut callbacks);
+                assert!(callbacks.done);
+            }
+        }
+    }
+}
+
+#[test]
+fn actual_nested_function_trait_call_resolves_to_a_function_pointer_shim() {
+    struct Check(bool);
+    impl rustc_driver::Callbacks for Check {
+        fn after_analysis<'tcx>(
+            &mut self,
+            _: &rustc_interface::interface::Compiler,
+            tcx: TyCtxt<'tcx>,
+        ) -> rustc_driver::Compilation {
+            let engine = super::super::super::nonzero_niches::test_engine(tcx);
+            let id = tcx
+                .mir_keys(())
+                .iter()
+                .find(|id| {
+                    tcx.def_kind(id.to_def_id()) == DefKind::Fn
+                        && tcx.item_name(id.to_def_id()).as_str() == "shim_middle"
+                })
+                .unwrap()
+                .to_def_id();
+            let body = engine
+                .instantiated_body(ty::Instance::mono(tcx, id))
+                .unwrap();
+            let instance = body
+                .basic_blocks
+                .iter()
+                .find_map(|block| {
+                    let TerminatorKind::Call { func, .. } = &block.terminator().kind else {
+                        return None;
+                    };
+                    let ty::FnDef(id, generic) = func.ty(&body.local_decls, tcx).kind() else {
+                        return None;
+                    };
+                    Some(
+                        engine
+                            .resolve_function_item(*id, generic.skip_binder())
+                            .unwrap(),
+                    )
+                })
+                .unwrap();
+            assert!(
+                matches!(
+                    instance.def,
+                    ty::InstanceKind::Shim(ty::ShimKind::FnPtr(..))
+                ),
+                "{instance:?}"
+            );
+            println!("Actual nested Fn::call resolves to FnPtrShim: {instance:?}");
+            self.0 = true;
+            rustc_driver::Compilation::Stop
+        }
+    }
+    let source = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/fixtures/nested_retained_scalar_shim.rs");
+    for target in [None, Some("thumbv7em-none-eabihf")] {
+        for level in [0, 2] {
             let mut args = vec![
                 "rustc".into(),
                 source.display().to_string(),
@@ -357,8 +637,9 @@ fn actual_primitive_helper_lease_preserves_owner_and_rejects_hostile_state() {
             if let Some(target) = target {
                 args.extend(["--target".into(), target.into()]);
             }
-            rustc_driver::run_compiler(&args, &mut callbacks);
-            assert!(callbacks.0);
+            let mut check = Check(false);
+            rustc_driver::run_compiler(&args, &mut check);
+            assert!(check.0);
         }
     }
 }

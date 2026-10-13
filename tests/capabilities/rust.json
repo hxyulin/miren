@@ -3010,9 +3010,164 @@
     {
       "entry": "retained_primitive_helpers_survey::nested_unknown",
       "family": "retained_primitive_helpers",
+      "expected": "proved"
+    },
+    {
+      "entry": "nested_retained_primitive_helpers_survey::integer_u8",
+      "family": "nested_retained_primitive_helpers",
+      "expected": "proved"
+    },
+    {
+      "entry": "nested_retained_primitive_helpers_survey::integer_u16",
+      "family": "nested_retained_primitive_helpers",
+      "expected": "proved"
+    },
+    {
+      "entry": "nested_retained_primitive_helpers_survey::integer_u32",
+      "family": "nested_retained_primitive_helpers",
+      "expected": "proved"
+    },
+    {
+      "entry": "nested_retained_primitive_helpers_survey::integer_u64",
+      "family": "nested_retained_primitive_helpers",
+      "expected": "proved"
+    },
+    {
+      "entry": "nested_retained_primitive_helpers_survey::integer_u128",
+      "family": "nested_retained_primitive_helpers",
+      "expected": "proved"
+    },
+    {
+      "entry": "nested_retained_primitive_helpers_survey::integer_usize",
+      "family": "nested_retained_primitive_helpers",
+      "expected": "proved"
+    },
+    {
+      "entry": "nested_retained_primitive_helpers_survey::integer_i8",
+      "family": "nested_retained_primitive_helpers",
+      "expected": "proved"
+    },
+    {
+      "entry": "nested_retained_primitive_helpers_survey::integer_i16",
+      "family": "nested_retained_primitive_helpers",
+      "expected": "proved"
+    },
+    {
+      "entry": "nested_retained_primitive_helpers_survey::integer_i32",
+      "family": "nested_retained_primitive_helpers",
+      "expected": "proved"
+    },
+    {
+      "entry": "nested_retained_primitive_helpers_survey::integer_i64",
+      "family": "nested_retained_primitive_helpers",
+      "expected": "proved"
+    },
+    {
+      "entry": "nested_retained_primitive_helpers_survey::integer_i128",
+      "family": "nested_retained_primitive_helpers",
+      "expected": "proved"
+    },
+    {
+      "entry": "nested_retained_primitive_helpers_survey::integer_isize",
+      "family": "nested_retained_primitive_helpers",
+      "expected": "proved"
+    },
+    {
+      "entry": "nested_retained_primitive_helpers_survey::scalar",
+      "family": "nested_retained_primitive_helpers",
+      "expected": "proved"
+    },
+    {
+      "entry": "nested_retained_primitive_helpers_survey::product",
+      "family": "nested_retained_primitive_helpers",
+      "expected": "proved"
+    },
+    {
+      "entry": "nested_retained_primitive_helpers_survey::boolean",
+      "family": "nested_retained_primitive_helpers",
+      "expected": "proved"
+    },
+    {
+      "entry": "nested_retained_primitive_helpers_survey::character",
+      "family": "nested_retained_primitive_helpers",
+      "expected": "proved"
+    },
+    {
+      "entry": "nested_retained_primitive_helpers_survey::float32",
+      "family": "nested_retained_primitive_helpers",
+      "expected": "proved"
+    },
+    {
+      "entry": "nested_retained_primitive_helpers_survey::float64",
+      "family": "nested_retained_primitive_helpers",
+      "expected": "proved"
+    },
+    {
+      "entry": "nested_retained_primitive_helpers_survey::unit",
+      "family": "nested_retained_primitive_helpers",
+      "expected": "proved"
+    },
+    {
+      "entry": "nested_retained_primitive_helpers_survey::associated",
+      "family": "nested_retained_primitive_helpers",
+      "expected": "proved"
+    },
+    {
+      "entry": "nested_retained_primitive_helpers_survey::mixed",
+      "family": "nested_retained_primitive_helpers",
+      "expected": "proved"
+    },
+    {
+      "entry": "nested_retained_primitive_helpers_survey::finite_recursive",
+      "family": "nested_retained_primitive_helpers",
+      "expected": "proved"
+    },
+    {
+      "entry": "nested_retained_primitive_helpers_survey::wrong",
+      "family": "nested_retained_primitive_helpers",
+      "expected": "refuted"
+    },
+    {
+      "entry": "nested_retained_primitive_helpers_survey::nested_unknown",
+      "family": "nested_retained_primitive_helpers",
+      "expected": "unknown",
+      "unknown_category": "resource_limit",
+      "unknown_reason": "retained helper shared execution step limit reached"
+    },
+    {
+      "entry": "nested_retained_primitive_helpers_survey::unbounded_recursive",
+      "family": "nested_retained_primitive_helpers",
+      "expected": "unknown",
+      "unknown_category": "resource_limit",
+      "unknown_reason": "retained helper shared execution step limit reached"
+    },
+    {
+      "entry": "nested_retained_primitive_helpers_survey::indirect_unknown",
+      "family": "nested_retained_primitive_helpers",
       "expected": "unknown",
       "unknown_category": "semantics",
-      "unknown_reason": "nested scalar calls are unsupported"
+      "unknown_reason": "retained helper nested/indirect call is unsupported"
+    },
+    {
+      "entry": "nested_retained_primitive_helpers_survey::foreign_unknown",
+      "family": "nested_retained_primitive_helpers",
+      "expected": "unknown",
+      "unknown_category": "semantics",
+      "unknown_reason": "retained helper nested callee lacks a supported primitive lease"
+    },
+    {
+      "entry": "nested_retained_primitive_helpers_survey::owner_unknown",
+      "family": "nested_retained_primitive_helpers",
+      "expected": "unknown",
+      "unknown_category": "semantics",
+      "unknown_reason": "retained helper original signature type domain differs"
+    },
+    {
+      "entry": "nested_retained_primitive_helpers_survey::closure_unknown",
+      "family": "nested_retained_primitive_helpers",
+      "expected": "unknown",
+      "unknown_category": "semantics",
+      "unknown_reason": "retained helper nested callee lacks a supported primitive lease"
     }
   ]
 }

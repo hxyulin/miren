@@ -7722,3 +7722,32 @@ obligations and counterexample models match exactly. Full validation passes 994 
 and 91 Python tests, formatting, lint, release builds, dependency checks, manual hooks,
 documentation build and the four-profile survey. Four overlong documentation lines are wrapped in
 a final documentation-only successor; code, fixtures and manifest retain the full-check hashes.
+
+
+## Stage255: nested primitive helper frames
+
+Nested helpers derive exact call edges from a live parent while sharing the original immutable
+retained-owner snapshot. Every edge holds its independently authenticated original full signature
+and a weak witness to its invocation's sole token. A bounded paid walk checks actual source,
+normal edges, signature caches and live ancestor identities. Child entry/return and parent
+resumption preserve the checked owner and ordinary typed argument/result/contract behavior.
+
+Private V3 evidence validates 80 controls per profile: 53 PROVED, 9 REFUTED and 18 UNKNOWN,
+including 29 feature-free prospective survey controls. Genuine leaf mutations fail static and
+native claims; deeper recursion remains conservative under the unchanged default limits.
+The existing nested helper advances to PROVED. A separate feature-gated compiler/integration
+control confirms a real function-pointer shim, while the survey labels its closure control
+accurately. The function-table frame gate is redundant defense, not an observed bypass fix.
+Full Root validation and retained-proof audit remain required before committing.
+
+The final release survey has 591 cases across 107 families. Every host/ARM O0/O2 profile measures
+322 PROVED, 163 REFUTED and 106 UNKNOWN: 485 supported outcomes, 24 more than Stage254. The old
+nested-helper control advances to PROVED; 29 appended controls add 22 PROVED, one REFUTED and
+six UNKNOWN. All 561 unaffected old case objects and the complete prior guest prefix remain literal.
+
+All 2,244 retained Proof comparisons match after recording the actual appended guest fingerprint;
+two query-free fold deadline contexts are qualified separately. All 4,856 retained queried
+obligations and counterexample models match exactly, with no unexplained differences. Full
+validation passes 1,000 outer Rust tests and 91 Python tests, formatting, lint, release builds,
+dependency checks, manual hooks, documentation build and the four-profile survey. Only this measured
+documentation summary and wording corrections follow the unchanged 1,050-file full-check candidate.
