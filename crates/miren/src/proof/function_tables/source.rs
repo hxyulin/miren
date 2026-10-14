@@ -369,7 +369,7 @@ fn inventory<'tcx>(
     work.error.take().map_or(Ok(()), Err)
 }
 
-pub(super) fn borrowed<'tcx>(
+pub(in crate::proof) fn borrowed<'tcx>(
     engine: &mut Engine<'tcx>,
     instance: ty::Instance<'tcx>,
 ) -> Result<Option<std::rc::Rc<Body<'tcx>>>, String> {

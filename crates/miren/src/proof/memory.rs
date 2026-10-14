@@ -92,6 +92,7 @@ impl<'tcx> Engine<'tcx> {
                     role,
                     symbolic::MutableU16Role::Metadata { .. }
                         | symbolic::MutableU16Role::ChildMetadata { .. }
+                        | symbolic::MutableU16Role::HierarchyMetadata { .. }
                 ) {
                     return Err("mutable product Ghost observations are unsupported".into());
                 }

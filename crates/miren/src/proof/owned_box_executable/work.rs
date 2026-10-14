@@ -603,11 +603,17 @@ impl<'tcx> Engine<'tcx> {
         invocation: Option<&Invocation<'tcx>>,
         path: &retry_frontiers::Path,
     ) -> Result<retry_frontiers::Path, String> {
+        #[cfg(test)]
+        tests::near_limit(self, tests::Phase::Retry, invocation.map(|i| i.kind), None);
+        self.mutable_product_retry_work(path)?;
         if invocation.is_some() {
             bound(self, path.len(), "retry metadata")?;
             // BTreeMap cloning owns a new entry tree, even though its keys are inline.
             pay(self, 4 + 8 * path.len())?;
         }
-        Ok(path.clone())
+        let cloned = path.clone();
+        #[cfg(test)]
+        tests::publication(tests::Phase::Retry);
+        Ok(cloned)
     }
 }

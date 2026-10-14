@@ -3026,3 +3026,29 @@ and dependency checks. Four capability profiles retain 336 PROVED, 164 REFUTED a
 across 613 cases. All 5,420 queried obligations and 656 counterexample models remain literal.
 Of 2,452 full baseline Proofs, 2,450 match literally; two query-free fold timeout call chains
 differ. No supported outcome is added by this metadata stage.
+
+
+## Exclusive nested mutable Product helpers
+
+Whole Product reborrows bootstrap an exclusive hierarchy and execute original nested helper bodies.
+Full source/signature, Context, initialization, occurrence, generation, lease and metadata epoch
+guards remain separate from paid descriptor credits. Child return restores current caller storage
+and instruction access; failed Product execution cannot resume. Primitive helper frames retain the
+owner invocation. No annotation supplies execution or ownership authority.
+
+Ordinary routing retains its one shared work charge without poisoning an unselected Product service.
+Inactive ordinary snapshot, binding and Return errors also preserve their original failure domain.
+Actual Product failures remain sticky. Compiler controls check 192 denied payments before publication
+across nine phases, with native originals and genuine assertion-preserving mutations.
+
+Fresh release applications retain ten new default-budget Resource UNKNOWNs. At diagnostic2000000,
+five prove, two refute and three remain UNKNOWN in every profile and MIR policy. Two older nested
+roots separately prove through actual helpers at that budget; their default frontier changes from
+semantic refusal to Product ResourceLimit. Existing Box outcomes and finite function-choice gains
+remain supported. Application source paths and rich evidence are qualified separately.
+
+Full validation passes 1,037 Rust and 91 Python tests. Each 613-case profile retains 336 PROVED,
+164 REFUTED and 113 UNKNOWN. All 5,420 queried obligations and 656 counterexample models remain
+literal. Of 2,452 full baseline Proofs, 2,443 match; eight reflect the two new default resource
+frontiers and one differs only in a query-free fold timeout call chain. No default promotion is
+claimed. The first full run and first routing fix failures are preserved; renewed validation passes.

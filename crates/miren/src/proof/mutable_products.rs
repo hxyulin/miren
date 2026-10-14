@@ -137,6 +137,7 @@ impl<'tcx> Engine<'tcx> {
             .mutable_integer_types
             .get(id)
             .ok_or("mutable product certificate was not issued")?;
+        self.mutable_product_descriptor_guard(id, certificate.original)?;
         let ElementCodec::Product(issued) = &certificate.codec else {
             return Err("mutable product needs an exact product certificate".into());
         };
@@ -259,6 +260,9 @@ impl<'tcx> Engine<'tcx> {
             .mutable_u16
             .get(id)
             .ok_or("mutable product owner identity was not issued")?;
+        if backing.hierarchy.is_some() {
+            self.mutable_product_hierarchy_live(id, backing, memory)?;
+        }
         let certificate = self.mutable_product_certificate(backing.certificate)?;
         let ElementCodec::Product(descriptor) = &certificate.codec else {
             return Err("mutable product descriptor is absent".into());
@@ -269,8 +273,7 @@ impl<'tcx> Engine<'tcx> {
         // This gate validates representation, not lifecycle permission. Pending observations
         // remain refused by role validation; only original staging/call transactions use it.
         if backing.interval.is_some()
-            || backing.hierarchy.is_some()
-            || memory.mutable_hierarchy.is_some()
+            || backing.hierarchy.is_none() && memory.mutable_hierarchy.is_some()
             || columns.len() != descriptor.leaves.len()
         {
             return Err("mutable product root identity/phase/column inventory differs".into());
@@ -322,6 +325,8 @@ impl<'tcx> Engine<'tcx> {
                 | MutableU16Role::Metadata { .. }
                 | MutableU16Role::Child { .. }
                 | MutableU16Role::ChildMetadata { .. }
+                | MutableU16Role::HierarchyChild { .. }
+                | MutableU16Role::HierarchyMetadata { .. }
         ) {
             return Err("mutable product hierarchy/Ghost length is unsupported".into());
         }
@@ -415,6 +420,9 @@ impl<'tcx> Engine<'tcx> {
         memory: &Memory,
     ) -> Result<(), String> {
         let backing = self.mutable_product_backing(id, memory)?;
+        if backing.hierarchy.is_some() {
+            return self.mutable_product_hierarchy_frame(body, id, role, memory, backing);
+        }
         self.mutable_u16_role_live(id, role, memory)?;
         match &backing.phase {
             Phase::Idle => {
@@ -480,8 +488,12 @@ impl<'tcx> Engine<'tcx> {
         let Some((id, role)) = self.product_local(body, state, place.local.as_usize())? else {
             return Ok(None);
         };
-        if !matches!(role, MutableU16Role::Root | MutableU16Role::Child { .. })
-            || place.projection.as_ref() != [ProjectionElem::Deref]
+        if !matches!(
+            role,
+            MutableU16Role::Root
+                | MutableU16Role::Child { .. }
+                | MutableU16Role::HierarchyChild { .. }
+        ) || place.projection.as_ref() != [ProjectionElem::Deref]
             || !self.mutable_u16_matches(
                 body.local_decls[place.local].ty,
                 id,
@@ -493,12 +505,36 @@ impl<'tcx> Engine<'tcx> {
         }
         let generation = self.mutable_product_backing(id, &state.memory)?.generation;
         let metadata = match role {
+            MutableU16Role::Root
+                if self
+                    .mutable_product_backing(id, &state.memory)?
+                    .hierarchy
+                    .is_some() =>
+            {
+                let h = state.memory.mutable_u16[id]
+                    .hierarchy
+                    .as_ref()
+                    .ok_or("product metadata hierarchy disappeared")?;
+                MutableU16Role::HierarchyMetadata {
+                    lease: 0,
+                    epoch: h.metadata_epoch(0)?,
+                }
+            }
+            MutableU16Role::HierarchyChild { lease } => {
+                let h = state.memory.mutable_u16[id]
+                    .hierarchy
+                    .as_ref()
+                    .ok_or("product metadata hierarchy disappeared")?;
+                MutableU16Role::HierarchyMetadata {
+                    lease,
+                    epoch: h.metadata_epoch(lease)?,
+                }
+            }
             MutableU16Role::Root => MutableU16Role::Metadata { generation },
             MutableU16Role::Child { .. } => MutableU16Role::ChildMetadata { generation },
             MutableU16Role::Metadata { .. }
             | MutableU16Role::ChildMetadata { .. }
             | MutableU16Role::Ghost { .. }
-            | MutableU16Role::HierarchyChild { .. }
             | MutableU16Role::HierarchyMetadata { .. } => {
                 return Err("mutable product metadata source lacks payload authority".into());
             }
@@ -531,7 +567,9 @@ impl<'tcx> Engine<'tcx> {
         }
         if !matches!(
             role,
-            MutableU16Role::Metadata { .. } | MutableU16Role::ChildMetadata { .. }
+            MutableU16Role::Metadata { .. }
+                | MutableU16Role::ChildMetadata { .. }
+                | MutableU16Role::HierarchyMetadata { .. }
         ) || !place.projection.is_empty()
             || place.local.as_usize() <= body.arg_count
             || state.addresses[place.local.as_usize()].is_some()
@@ -806,7 +844,12 @@ impl<'tcx> Engine<'tcx> {
         if place.projection.is_empty() {
             return Ok(Some(Value::MutableU16 { id, role }));
         }
-        if !matches!(role, MutableU16Role::Root | MutableU16Role::Child { .. }) {
+        if !matches!(
+            role,
+            MutableU16Role::Root
+                | MutableU16Role::Child { .. }
+                | MutableU16Role::HierarchyChild { .. }
+        ) {
             return Err("mutable product metadata cannot observe payload".into());
         }
         if !self.mutable_u16_matches(body.local_decls[place.local].ty, id, &state.memory, true)? {
@@ -853,12 +896,19 @@ impl<'tcx> Engine<'tcx> {
         if place.projection.is_empty()
             && matches!(
                 role,
-                MutableU16Role::Metadata { .. } | MutableU16Role::ChildMetadata { .. }
+                MutableU16Role::Metadata { .. }
+                    | MutableU16Role::ChildMetadata { .. }
+                    | MutableU16Role::HierarchyMetadata { .. }
             )
         {
             return Ok(false);
         }
-        if !matches!(role, MutableU16Role::Root | MutableU16Role::Child { .. }) {
+        if !matches!(
+            role,
+            MutableU16Role::Root
+                | MutableU16Role::Child { .. }
+                | MutableU16Role::HierarchyChild { .. }
+        ) {
             return Err("mutable product metadata cannot write payload".into());
         }
         if !self.mutable_u16_matches(body.local_decls[place.local].ty, id, &state.memory, true)? {

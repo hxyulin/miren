@@ -10,6 +10,7 @@ pub(super) enum Phase {
     Requires,
     FinalArguments,
     Result,
+    Retry,
 }
 
 struct Probe {
@@ -41,7 +42,8 @@ pub(super) fn near_limit(
             | Phase::Incoming
             | Phase::Requires
             | Phase::FinalArguments
-            | Phase::Result => Kind::Helper,
+            | Phase::Result
+            | Phase::Retry => Kind::Helper,
             Phase::Switch => Kind::BoxDrop,
         };
         if probe.phase == phase && kind == Some(expected) && !probe.hit {
@@ -124,6 +126,7 @@ fn actual_box_frames_switches_and_incoming_graphs_refuse_before_unpaid_work() {
                 Phase::Requires,
                 Phase::FinalArguments,
                 Phase::Result,
+                Phase::Retry,
             ] {
                 let id = tcx
                     .mir_keys(())

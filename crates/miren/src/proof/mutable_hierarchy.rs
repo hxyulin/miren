@@ -6,6 +6,8 @@ use std::rc::Rc;
 #[cfg(test)]
 #[path = "mutable_deeper_scope_probe.rs"]
 mod deeper_probe;
+#[path = "mutable_product_hierarchy.rs"]
+pub(super) mod products;
 
 // Only the new associated route uses this borrowed inventory. No selected body is cloned here.
 struct AssociatedBodyWork<'a, 'tcx> {
@@ -511,7 +513,7 @@ pub(super) struct Origin {
     certificate: usize,
     allocation: usize,
     capacity: Value,
-    data_context: Term,
+    data_context: super::mutable_u16::Storage,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -707,7 +709,12 @@ impl Hierarchy {
 
     pub(super) fn storage_slots(&self) -> usize {
         // Dormant origin and counters persist even when the owner stack is empty.
+        let columns = match &self.origin.data_context {
+            super::mutable_u16::Storage::Scalar(_) => 0,
+            super::mutable_u16::Storage::Product(columns) => columns.len(),
+        };
         6usize
+            .saturating_add(columns)
             .saturating_add(
                 self.owners
                     .iter()
@@ -821,9 +828,13 @@ impl<'tcx> Engine<'tcx> {
         if hierarchy.origin.certificate != backing.certificate
             || hierarchy.origin.allocation != backing.allocation
             || hierarchy.origin.capacity.integer()? != backing.length.integer()?
-            || !hierarchy.origin.data_context.belongs_to(&self.terms)
+            || !hierarchy
+                .origin
+                .data_context
+                .scalar()?
+                .belongs_to(&self.terms)
             || !backing.data.scalar()?.belongs_to(&self.terms)
-            || hierarchy.origin.data_context.sort() != backing.data.scalar()?.sort()
+            || hierarchy.origin.data_context.scalar()?.sort() != backing.data.scalar()?.sort()
         {
             return Err("activation backing no longer matches its issued origin".into());
         }
@@ -989,9 +1000,13 @@ impl<'tcx> Engine<'tcx> {
             || hierarchy.origin.certificate != backing.certificate
             || hierarchy.origin.allocation != backing.allocation
             || hierarchy.origin.capacity.integer()? != backing.length.integer()?
-            || !hierarchy.origin.data_context.belongs_to(&self.terms)
+            || !hierarchy
+                .origin
+                .data_context
+                .scalar()?
+                .belongs_to(&self.terms)
             || !backing.data.scalar()?.belongs_to(&self.terms)
-            || hierarchy.origin.data_context.sort() != backing.data.scalar()?.sort()
+            || hierarchy.origin.data_context.scalar()?.sort() != backing.data.scalar()?.sort()
             || !self.mutable_hierarchy_element(self.mutable_interval_element(backing.certificate)?)
             || hierarchy.issued < backing.generation
         {
@@ -1155,6 +1170,24 @@ impl<'tcx> Engine<'tcx> {
         state: &mut State,
         call: super::mutable_u16_children::ChildCall<'_, 'tcx>,
     ) -> Result<Option<Vec<Return>>, String> {
+        // Product lineage has its separately paid typed call protocol and cannot fall back.
+        if self.mutable_product_hierarchy_active(&state.memory) {
+            let original = self
+                .tcx
+                .fn_sig(call.instance.def_id())
+                .instantiate(self.tcx, call.instance.args)
+                .skip_binder();
+            if self.mutable_metadata_operation(call.instance)
+                || crate::identity::is_panic_call(self.tcx, call.instance.def_id())
+                || self.is_core_panic_helper(call.instance.def_id())
+                || self
+                    .float_bits_operation(call.instance.def_id(), call.instance.args, original)
+                    .is_some()
+            {
+                return Ok(None);
+            }
+            return Err("product call has no supported invocation-bound route".into());
+        }
         // Disabled routing performs no role observation, Body scan or term construction.
         if !issuance_enabled() && state.memory.mutable_hierarchy.is_none() {
             return Ok(None);
@@ -2948,7 +2981,7 @@ impl Hierarchy {
                 certificate: backing.certificate,
                 allocation: backing.allocation,
                 capacity: backing.length.clone(),
-                data_context: data.clone(),
+                data_context: super::mutable_u16::Storage::Scalar(data.clone()),
             }),
             issued: backing.generation,
             epoch: 0,
@@ -5617,7 +5650,7 @@ impl Hierarchy {
                 certificate: backing.certificate,
                 allocation: backing.allocation,
                 capacity: backing.length.clone(),
-                data_context: backing.data.scalar()?.clone(),
+                data_context: super::mutable_u16::Storage::Scalar(backing.data.scalar()?.clone()),
             }),
             issued: backing.generation,
             epoch: 0,
@@ -5638,8 +5671,8 @@ impl Hierarchy {
             || backing.allocation != self.origin.allocation
             || backing.length.integer()? != self.origin.capacity.integer()?
             || !backing.data.scalar()?.belongs_to(&engine.terms)
-            || !self.origin.data_context.belongs_to(&engine.terms)
-            || backing.data.scalar()?.sort() != self.origin.data_context.sort()
+            || !self.origin.data_context.scalar()?.belongs_to(&engine.terms)
+            || backing.data.scalar()?.sort() != self.origin.data_context.scalar()?.sort()
             || !matches!(
                 state.memory.get(backing.allocation),
                 Some(Some(Value::Unit))

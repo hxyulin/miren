@@ -105,11 +105,12 @@ impl<'tcx> Engine<'tcx> {
                     owned_box_executable::work::Observation::Requires,
                 )?;
             }
+            self.mutable_product_snapshot_work(values, memory)?;
             let snapshots = self.snapshots(values, memory, &conditions)?;
             if box_invocation.is_some() {
                 self.executable_box_configured_binding_work(&body, &snapshots)?;
             }
-            let bindings = self.configured_bindings(&body, &snapshots, instance)?;
+            let bindings = self.mutable_product_bindings(&body, &snapshots, instance, memory)?;
             for contract in contracts
                 .iter()
                 .filter(|contract| matches!(contract.kind, ContractKind::Requires))

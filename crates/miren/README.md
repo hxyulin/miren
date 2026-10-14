@@ -2150,3 +2150,34 @@ compared with target usize layout. Its consumed metadata remains conditional: mi
 semantics, initialized loads, alignment, reference lifetime and the mathematical range theorem
 remain separate obligations. Pending source records still refuse their missing body; no search,
 branch exclusion or raw access certificate is issued.
+
+The isolated whole-product hierarchy route boots an actual Root/Pending reborrow into a fresh
+exclusive lineage before the legacy Active route. Nested direct helpers execute their original
+Rust bodies and return current storage; primitive helper frames retain the owning invocation.
+Typed integer, Bool, Char, float and Unit columns keep their original validators. Current source,
+full signatures, occurrence, owner generation, lease, metadata epoch, column Context and
+initialization checks remain required at each observation. Source authentication retains immutable
+full Instance/body/signature records and rejects contradictory current caches; it grants no storage
+or call permission. Instruction guard and descriptor credits are prepaid to the shared counter,
+consumed before work and discarded on instruction exit. A failed service cannot resume after cache
+restoration. Incoming storage still runs the ordinary escape validators.
+
+This development route has no default coverage claim. Whole-product helper diagnostics preserve
+actual native storage effects and a genuine leaf mutation; wider named-record work can reach the
+shared limit and sequential calls can exceed the 512-node source service. Root-only primitive
+calls after the owning invocation ends, moved owners, proper intervals, returned owners and
+independent constructor/static protocols retain conservative refusals. Final compiler controls and
+four-profile admission evidence are separate from this source description.
+
+A paid eligibility node checks catalogue, codec, original type and hierarchy headers before the
+argument classifier. Empty catalogues and exact singleton Scalar catalogues omit that classifier
+itself; Product storage, Product codecs/origins and multi-backing catalogues retain its complete
+paid scan. Product access/source state cannot become an empty or Scalar catalogue, and failure
+remains sticky. The eligibility node pays one ordinary shared execution step before Product
+selection. Exhausting that routing step reports the ordinary ResourceLimit without failing an
+unselected Product service. Inactive observation, binding and Return adoption delegates retain
+ordinary failures without marking an unrelated Product service failed. Structural catalogue
+errors and selected Product service failures
+remain sticky; no fee, execution cap or failed-service state is reset. The two earlier nested
+Product UNKNOWN controls now stop at the new paid Product frontier under default8192. Separate
+2000000-step diagnostic controls execute their actual helpers and prove without premises.

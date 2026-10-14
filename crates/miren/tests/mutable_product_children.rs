@@ -76,8 +76,8 @@ fn check_report(output: std::process::Output, entries: &[(&str, ProofStatus)]) {
                 // them; an unrelated UNKNOWN never satisfies this control.
                 let (category, reason) = match *name {
                     "nested_owner_unknown" => (
-                        UnknownCategory::Semantics,
-                        "mutable product staging needs a pending child",
+                        UnknownCategory::ResourceLimit,
+                        "mutable product hierarchy shared execution step limit reached",
                     ),
                     "moved_parent_unknown" => (
                         UnknownCategory::Semantics,
@@ -110,6 +110,17 @@ fn check_report(output: std::process::Output, entries: &[(&str, ProofStatus)]) {
             }
             ProofStatus::ProvedWithAssumptions => panic!("new premises are forbidden"),
         }
+        if *name == "nested_owner_unknown" && *expected == ProofStatus::Proved {
+            for helper in ["nested_child", "write_float", "stored_float"] {
+                assert!(
+                    proof
+                        .body_entries
+                        .iter()
+                        .any(|entry| entry.function == helper)
+                );
+            }
+            assert!(proof.obligations.iter().any(|o| o.query.is_some()));
+        }
         if matches!(
             *name,
             "float_call" | "wrong_float_call" | "sequential" | "false_retention"
@@ -140,11 +151,20 @@ fn check_report(output: std::process::Output, entries: &[(&str, ProofStatus)]) {
     }
 }
 fn inspect(source: &Path, entries: &[(&str, ProofStatus)]) {
+    inspect_with_steps(source, entries, 8192);
+}
+fn inspect_with_steps(source: &Path, entries: &[(&str, ProofStatus)], steps: usize) {
     for target in [None, Some("thumbv7em-none-eabihf")] {
         for level in [0, 2] {
             let scratch = Scratch::new();
             let mut cmd = Command::new(env!("CARGO_BIN_EXE_miren"));
-            cmd.args(["--verify", "--json", "--quiet"]);
+            cmd.args([
+                "--verify",
+                "--json",
+                "--quiet",
+                "--max-steps",
+                &steps.to_string(),
+            ]);
             for (name, _) in entries {
                 cmd.args(["--entry", name]);
             }
@@ -191,6 +211,15 @@ fn actual_whole_product_children_preserve_current_storage_and_refusals() {
         ],
     );
 }
+#[test]
+fn nested_product_diagnostic_executes_actual_helpers() {
+    inspect_with_steps(
+        &fixture(),
+        &[("nested_owner_unknown", ProofStatus::Proved)],
+        2_000_000,
+    );
+}
+
 fn changed_payload(source: &str) -> String {
     assert_eq!(source.matches("0x7fc0_1234").count(), 1);
     source.replace("0x7fc0_1234", "0x7fc0_1235")

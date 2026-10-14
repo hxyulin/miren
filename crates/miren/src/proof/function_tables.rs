@@ -7,7 +7,7 @@ use rustc_middle::mir::visit::Visitor;
 #[path = "function_tables/nested.rs"]
 mod nested;
 #[path = "function_tables/source.rs"]
-mod source;
+pub(super) mod source;
 
 const ENABLE_PRIMITIVE_FUNCTION_TABLES: bool = true;
 

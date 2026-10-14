@@ -763,6 +763,7 @@ fn compiler_cases<'tcx>(tcx: TyCtxt<'tcx>, output: &std::path::Path, transport_o
         };
         // The old exact520 runs remain sealed. New accounting may refuse earlier.
         assert!(original_error.contains("activation transport exceeds shared work budget"));
+        assert!(!engine.mutable_product_failed.get());
         eprintln!("carrier current legacy512 Resource: {original_error}");
         // The default ceiling remains unchanged; larger diagnostics carry a separate private tag.
         super::mutable_hierarchy::compiler_return_default_budget_frontier(
@@ -770,6 +771,7 @@ fn compiler_cases<'tcx>(tcx: TyCtxt<'tcx>, output: &std::path::Path, transport_o
             &carrier_body,
             &carrier_base,
         );
+        assert!(!engine.mutable_product_failed.get());
         let current_original = super::mutable_hierarchy::compiler_return_transport_with_flow(
             &mut engine,
             &carrier_body,

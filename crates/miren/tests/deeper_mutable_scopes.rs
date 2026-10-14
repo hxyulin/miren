@@ -25,11 +25,20 @@ fn fixture() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/deeper_mutable_scopes.rs")
 }
 fn inspect(path: &Path, entries: &[(&str, ProofStatus, Option<&str>)]) {
+    inspect_with_steps(path, entries, 8192);
+}
+fn inspect_with_steps(path: &Path, entries: &[(&str, ProofStatus, Option<&str>)], steps: usize) {
     for target in [None, Some("thumbv7em-none-eabihf")] {
         for level in [0, 2] {
             let scratch = Scratch::new();
             let mut command = Command::new(env!("CARGO_BIN_EXE_miren"));
-            command.args(["--verify", "--json", "--quiet"]);
+            command.args([
+                "--verify",
+                "--json",
+                "--quiet",
+                "--max-steps",
+                &steps.to_string(),
+            ]);
             for (name, _, _) in entries {
                 command.args(["--entry", name]);
             }
@@ -77,6 +86,17 @@ fn inspect(path: &Path, entries: &[(&str, ProofStatus, Option<&str>)]) {
                         && proof.entry_assumptions.is_empty()
                         && proof.trusted_calls.is_empty()
                 );
+                if *name == "product_unknown" && *expected == ProofStatus::Proved {
+                    for helper in ["product_outer", "product_leaf"] {
+                        assert!(
+                            proof
+                                .body_entries
+                                .iter()
+                                .any(|entry| entry.function == helper)
+                        );
+                    }
+                    assert!(proof.obligations.iter().any(|o| o.query.is_some()));
+                }
                 match expected {
                     ProofStatus::Proved => assert!(
                         proof
@@ -97,7 +117,12 @@ fn inspect(path: &Path, entries: &[(&str, ProofStatus, Option<&str>)]) {
                             .obligations
                             .iter()
                             .any(|o| o.status == ProofStatus::Unknown
-                                && o.unknown_category == Some(UnknownCategory::Semantics)
+                                && o.unknown_category
+                                    == Some(if *name == "product_unknown" {
+                                        UnknownCategory::ResourceLimit
+                                    } else {
+                                        UnknownCategory::Semantics
+                                    })
                                 && o.detail.contains(frontier.unwrap())
                                 && o.query.is_none()
                                 && o.model.is_none()),
@@ -140,11 +165,20 @@ fn actual_deeper_mutable_scopes_follow_body_effects_and_conservative_views() {
             (
                 "product_unknown",
                 U,
-                Some("mutable product staging needs a pending child"),
+                Some("mutable product hierarchy shared execution step limit reached"),
             ),
         ],
     );
 }
+#[test]
+fn nested_product_diagnostic_executes_actual_helpers() {
+    inspect_with_steps(
+        &fixture(),
+        &[("product_unknown", ProofStatus::Proved, None)],
+        2_000_000,
+    );
+}
+
 fn mutant(source: &str, name: &str) -> String {
     let (needle, replacement) = match name {
         "u16" => (

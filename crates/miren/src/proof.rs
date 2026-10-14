@@ -201,6 +201,10 @@ struct Engine<'tcx> {
     scalar_slice_types: Vec<Ty<'tcx>>,
     composite_slice_types: Vec<composite_slices::CompositeType<'tcx>>,
     tracked_addresses: Vec<(tracked_pointers::AddressLocation<'tcx>, Term)>,
+    mutable_product_failed: std::cell::Cell<bool>,
+    mutable_product_access: std::cell::RefCell<Option<mutable_hierarchy::products::Access<'tcx>>>,
+    mutable_product_sources:
+        std::cell::RefCell<BTreeMap<usize, mutable_hierarchy::products::Source<'tcx>>>,
     steps: usize,
     call_chain: Vec<DefId>,
     failed_call_chain: Option<Vec<DefId>>,
@@ -324,6 +328,9 @@ impl<'tcx> Engine<'tcx> {
             owned_box_constructors: Vec::new(),
             scalar_slice_types: Vec::new(),
             composite_slice_types: Vec::new(),
+            mutable_product_access: Default::default(),
+            mutable_product_sources: Default::default(),
+            mutable_product_failed: Default::default(),
             steps: 0,
             call_chain: Vec::new(),
             failed_call_chain: None,
@@ -1250,6 +1257,7 @@ impl<'tcx> Engine<'tcx> {
         stack: &[DefId],
         flow: activation_flow::Flow,
     ) -> Result<Vec<Return>, String> {
+        self.mutable_product_stack_work(&memory, stack.len())?;
         let chain = stack.iter().copied().chain([instance.def_id()]).collect();
         let previous = std::mem::replace(&mut self.call_chain, chain);
         let result = self.execute_body(instance, arguments, conditions, memory, stack, flow);
@@ -1288,6 +1296,21 @@ impl<'tcx> Engine<'tcx> {
         stack: &[DefId],
         flow: activation_flow::Flow,
     ) -> Result<Vec<Return>, String> {
+        let result =
+            self.execute_product_body_scope(frame, arguments, conditions, memory, stack, flow);
+        self.mutable_product_access_end(result.is_err());
+        result
+    }
+
+    fn execute_product_body_scope(
+        &mut self,
+        frame: array_drop_glue::Frame<'tcx>,
+        arguments: Vec<Value>,
+        conditions: Vec<Term>,
+        memory: Memory,
+        stack: &[DefId],
+        flow: activation_flow::Flow,
+    ) -> Result<Vec<Return>, String> {
         let instance = frame.instance();
         let id = instance.def_id();
         let caller_instance = instance;
@@ -1301,6 +1324,7 @@ impl<'tcx> Engine<'tcx> {
             ));
         }
         self.executable_box_stack_work(frame.box_invocation(), stack.len() + 1)?;
+        self.mutable_product_stack_work(&memory, stack.len())?;
         let mut stack = stack.to_vec();
         stack.push(id);
         let owned_body = if matches!(flow, activation_flow::Flow::Unarmed) {
@@ -1319,6 +1343,7 @@ impl<'tcx> Engine<'tcx> {
         if let Some(helper) = frame.retained_helper_invocation() {
             helper.check(self, &owned_body, &memory)?;
         }
+        self.mutable_product_frame_name_work(instance, &memory)?;
         let name = format!("{} {:?}", self.tcx.def_path_str(id), instance.args);
         if !self.proof.analyzed_bodies.contains(&name) {
             self.proof.analyzed_bodies.push(name);
@@ -1331,6 +1356,7 @@ impl<'tcx> Engine<'tcx> {
             body.local_decls.len(),
             arguments.len(),
         )?;
+        self.mutable_product_frame_work(body, &arguments, &memory)?;
         self.validate_owned_call_arguments(&arguments, &memory)?;
         let initial_regions = memory.owned_regions.len();
         let owned_arguments = if initial_regions == 0 {
@@ -1396,9 +1422,26 @@ impl<'tcx> Engine<'tcx> {
             // Unused detached observations need no owning materialization.
             Vec::new()
         } else if frame.box_invocation().is_some() {
+            self.mutable_product_snapshot_work(&arguments, &memory)?;
             self.executable_box_snapshots(&arguments, &memory, &conditions)?
         } else if matches!(flow, activation_flow::Flow::Unarmed) {
-            self.typed_coroutine_snapshots(&argument_types, &arguments, &memory, &conditions)?
+            #[cfg(test)]
+            mutable_hierarchy::products::work_controls::begin(
+                self,
+                mutable_hierarchy::products::work_controls::Phase::EntrySnapshots,
+                &memory,
+            );
+            let observations = self.mutable_product_observations(
+                &argument_types,
+                &arguments,
+                &memory,
+                &conditions,
+            )?;
+            #[cfg(test)]
+            mutable_hierarchy::products::work_controls::publication(
+                mutable_hierarchy::products::work_controls::Phase::EntrySnapshots,
+            );
+            observations
         } else {
             // Armed contracts are rejected above. These unused observations would create
             // detached payloads; omit the actual operation rather than credit its work.
@@ -1408,7 +1451,7 @@ impl<'tcx> Engine<'tcx> {
             if frame.box_invocation().is_some() {
                 self.executable_box_configured_binding_work(body, &snapshots)?;
             }
-            self.configured_bindings(body, &snapshots, instance)?
+            self.mutable_product_bindings(body, &snapshots, instance, &memory)?
         } else {
             BTreeMap::new()
         };
@@ -1601,6 +1644,16 @@ impl<'tcx> Engine<'tcx> {
                 })?;
             }
             let terminator = body.basic_blocks[block].terminator();
+            let guards = match &terminator.kind {
+                TerminatorKind::Call { args, .. } => 16usize.saturating_add(4 * args.len()),
+                _ => 16,
+            };
+            self.mutable_product_access_begin(
+                body,
+                std::ptr::from_ref(&terminator.kind) as usize,
+                &state.memory,
+                guards,
+            )?;
             match &terminator.kind {
                 TerminatorKind::Goto { target } => queue.push_back((
                     *target,
@@ -1613,6 +1666,7 @@ impl<'tcx> Engine<'tcx> {
                         &state,
                         targets.all_targets().len() - 1,
                     )?;
+                    self.mutable_product_switch_work(&state, targets.all_targets().len())?;
                     let value = self.evaluate_operand(id, body, &mut state, discr)?;
                     let mut excluded = Vec::new();
                     for (number, target) in targets.iter() {
@@ -1740,6 +1794,7 @@ impl<'tcx> Engine<'tcx> {
                         incoming_allocations,
                     )?;
                     if coroutine_transport {
+                        self.mutable_product_incoming_work(&state, incoming_allocations)?;
                         self.validate_incoming_frame_escape(&state, incoming_allocations)?;
                     } else {
                         self.validate_closure_escape(
@@ -1769,6 +1824,8 @@ impl<'tcx> Engine<'tcx> {
                         )? {
                             Ok(())
                         } else {
+                            self.mutable_product_return_work(&value, &state.memory)?;
+                            self.mutable_product_incoming_work(&state, incoming_allocations)?;
                             self.validate_frame_escape(&value, &state, incoming_allocations)
                         };
                         escape.map_err(|error| {
@@ -1778,7 +1835,12 @@ impl<'tcx> Engine<'tcx> {
                     if frame.box_invocation().is_some() {
                         self.executable_box_binding_clone_work(&bindings)?;
                     }
+                    self.mutable_product_bindings_clone_work(&bindings, &state.memory)?;
                     let mut post_bindings = bindings.clone();
+                    #[cfg(test)]
+                    mutable_hierarchy::products::work_controls::publication(
+                        mutable_hierarchy::products::work_controls::Phase::BindingClone,
+                    );
                     let uses_post_state = contracts
                         .iter()
                         .filter(|contract| matches!(contract.kind, ContractKind::Ensures))
@@ -1790,11 +1852,13 @@ impl<'tcx> Engine<'tcx> {
                         if frame.box_invocation().is_some() {
                             self.executable_box_final_argument_work(body, &state)?;
                         }
+                        self.mutable_product_vector_work(&state.memory, body.arg_count)?;
                         let final_arguments = body
                             .args_iter()
                             .map(|local| self.local(&state, local.as_usize()))
                             .collect::<Result<Vec<_>, _>>()?;
                         let final_snapshots = if frame.box_invocation().is_some() {
+                            self.mutable_product_snapshot_work(&final_arguments, &state.memory)?;
                             self.executable_box_contract_snapshots(
                                 &final_arguments,
                                 &state.memory,
@@ -1802,35 +1866,69 @@ impl<'tcx> Engine<'tcx> {
                                 owned_box_executable::work::Observation::FinalArguments,
                             )?
                         } else {
-                            self.typed_coroutine_snapshots(
+                            #[cfg(test)]
+                            mutable_hierarchy::products::work_controls::begin(
+                                self,
+                                mutable_hierarchy::products::work_controls::Phase::FinalSnapshots,
+                                &state.memory,
+                            );
+                            let observations = self.mutable_product_observations(
                                 &argument_types,
                                 &final_arguments,
                                 &state.memory,
                                 &state.conditions,
-                            )?
+                            )?;
+                            #[cfg(test)]
+                            mutable_hierarchy::products::work_controls::publication(
+                                mutable_hierarchy::products::work_controls::Phase::FinalSnapshots,
+                            );
+                            observations
                         };
                         if frame.box_invocation().is_some() {
                             self.executable_box_configured_binding_work(body, &final_snapshots)?;
                         }
-                        for (name, value) in
-                            self.configured_bindings(body, &final_snapshots, instance)?
-                        {
+                        for (name, value) in self.mutable_product_bindings(
+                            body,
+                            &final_snapshots,
+                            instance,
+                            &state.memory,
+                        )? {
                             if frame.box_invocation().is_some() {
                                 owned_box_executable::pay(self, name.len() + 16)?;
                             }
+                            self.mutable_product_binding_insert_work(
+                                &post_bindings,
+                                &name,
+                                6,
+                                &state.memory,
+                            )?;
                             post_bindings.insert(format!("final_{name}"), value);
+                            #[cfg(test)]
+                            mutable_hierarchy::products::work_controls::publication(
+                                mutable_hierarchy::products::work_controls::Phase::FinalInsert,
+                            );
                         }
                     }
                     if contracts
                         .iter()
                         .any(|contract| matches!(contract.kind, ContractKind::Ensures))
                     {
+                        self.mutable_product_binding_insert_work(
+                            &post_bindings,
+                            "result",
+                            0,
+                            &state.memory,
+                        )?;
                         if frame.box_invocation().is_some() {
                             owned_box_executable::pay(self, 16)?;
                         }
                         post_bindings.insert(
                             "result".to_owned(),
                             if frame.box_invocation().is_some() {
+                                self.mutable_product_snapshot_work(
+                                    std::slice::from_ref(&value),
+                                    &state.memory,
+                                )?;
                                 self.executable_box_contract_snapshots(
                                     std::slice::from_ref(&value),
                                     &state.memory,
@@ -1838,16 +1936,29 @@ impl<'tcx> Engine<'tcx> {
                                     owned_box_executable::work::Observation::Result,
                                 )?
                             } else {
-                                self.typed_coroutine_snapshots(
-                                    &[body.return_ty()],
-                                    std::slice::from_ref(&value),
+                                #[cfg(test)]
+                                mutable_hierarchy::products::work_controls::begin(
+                                    self,
+                                    mutable_hierarchy::products::work_controls::Phase::ResultSnapshots,
                                     &state.memory,
-                                    &state.conditions,
-                                )?
+                                );
+                                let observations = self.mutable_product_observations(
+                                    &[body.return_ty()], std::slice::from_ref(&value),
+                                    &state.memory, &state.conditions,
+                                )?;
+                                #[cfg(test)]
+                                mutable_hierarchy::products::work_controls::publication(
+                                    mutable_hierarchy::products::work_controls::Phase::ResultSnapshots,
+                                );
+                                observations
                             }
                             .remove(0),
                         );
                     }
+                    #[cfg(test)]
+                    mutable_hierarchy::products::work_controls::publication(
+                        mutable_hierarchy::products::work_controls::Phase::ResultInsert,
+                    );
                     for contract in &contracts {
                         if matches!(contract.kind, ContractKind::Ensures) {
                             let text = contract
@@ -1927,6 +2038,7 @@ impl<'tcx> Engine<'tcx> {
                     let callable_ty = func.ty(&body.local_decls, self.tcx);
                     if frame.retained_helper_invocation().is_none()
                         && !frame.has_destruction()
+                        && !self.mutable_product_hierarchy_active(&state.memory)
                         && let Some(results) = self.function_table_call(
                             &state,
                             function_tables::TableCall {
@@ -1945,7 +2057,7 @@ impl<'tcx> Engine<'tcx> {
                             target.ok_or("function table call has no normal return edge")?;
                         for (consumed, result) in results {
                             self.active_destruction_adopt_work(&frame, &state)?;
-                            let mut continuation = self.adopt_flow_return(
+                            let mut continuation = self.mutable_product_adopt_return(
                                 &consumed,
                                 result.conditions,
                                 result.memory,
@@ -2076,7 +2188,7 @@ impl<'tcx> Engine<'tcx> {
                             target.ok_or("IntoIter destruction lacks normal return edge")?;
                         for result in results {
                             self.active_destruction_adopt_work(&frame, &state)?;
-                            let mut continuation = self.adopt_flow_return(
+                            let mut continuation = self.mutable_product_adopt_return(
                                 &state,
                                 result.conditions,
                                 result.memory,
@@ -2112,6 +2224,66 @@ impl<'tcx> Engine<'tcx> {
                     let callee = instance.def_id();
                     if unarmed
                         && !frame.has_destruction()
+                        && frame.retained_helper_invocation().is_none()
+                        && let Some(results) = self.mutable_product_hierarchy_call(
+                            caller_instance,
+                            &mut state,
+                            mutable_u16_children::ChildCall {
+                                body,
+                                block,
+                                instance,
+                                args,
+                                destination: *destination,
+                                target: *target,
+                                stack: &stack,
+                                site: (id, terminator.source_info.span),
+                            },
+                        )?
+                    {
+                        let target = target.ok_or("product child lacks normal return edge")?;
+                        for result in results {
+                            let mut continuation = self.mutable_product_adopt_return(
+                                &state,
+                                result.conditions,
+                                result.memory,
+                                result.flow,
+                            )?;
+                            #[cfg(test)]
+                            mutable_hierarchy::products::work_controls::begin(
+                                self,
+                                mutable_hierarchy::products::work_controls::Phase::CallerAccess,
+                                &continuation.memory,
+                            );
+                            self.mutable_product_access_begin(
+                                body,
+                                std::ptr::from_ref(&terminator.kind) as usize,
+                                &continuation.memory,
+                                16,
+                            )?;
+                            #[cfg(test)]
+                            mutable_hierarchy::products::work_controls::publication(
+                                mutable_hierarchy::products::work_controls::Phase::CallerAccess,
+                            );
+                            self.store_call_result(
+                                body,
+                                &mut continuation,
+                                *destination,
+                                destination_indices.as_ref(),
+                                result.value,
+                            )?;
+                            queue.push_back((
+                                target,
+                                continuation,
+                                self.executable_box_retry_clone(
+                                    frame.box_invocation(),
+                                    &retry_path,
+                                )?,
+                            ));
+                        }
+                        continue;
+                    }
+                    if unarmed
+                        && !frame.has_destruction()
                         && let Some(results) = self.retained_primitive_helper_call(
                             caller_instance,
                             &owned_body,
@@ -2131,7 +2303,7 @@ impl<'tcx> Engine<'tcx> {
                     {
                         let target = target.ok_or("retained helper lacks normal continuation")?;
                         for result in results {
-                            let mut continuation = self.adopt_flow_return(
+                            let mut continuation = self.mutable_product_adopt_return(
                                 &state,
                                 result.conditions,
                                 result.memory,
@@ -2232,7 +2404,7 @@ impl<'tcx> Engine<'tcx> {
                         let target = target.ok_or("mutable u16 child has no normal return edge")?;
                         for result in results {
                             self.active_destruction_adopt_work(&frame, &state)?;
-                            let mut continuation = self.adopt_flow_return(
+                            let mut continuation = self.mutable_product_adopt_return(
                                 &state,
                                 result.conditions,
                                 result.memory,
@@ -2274,7 +2446,7 @@ impl<'tcx> Engine<'tcx> {
                         let target = target.ok_or("mutable u16 child has no normal return edge")?;
                         for result in results {
                             self.active_destruction_adopt_work(&frame, &state)?;
-                            let mut continuation = self.adopt_flow_return(
+                            let mut continuation = self.mutable_product_adopt_return(
                                 &state,
                                 result.conditions,
                                 result.memory,
@@ -2311,7 +2483,7 @@ impl<'tcx> Engine<'tcx> {
                         let target = target.ok_or("IntoIter step lacks normal return edge")?;
                         for result in results {
                             self.active_destruction_adopt_work(&frame, &state)?;
-                            let mut continuation = self.adopt_flow_return(
+                            let mut continuation = self.mutable_product_adopt_return(
                                 &state,
                                 result.conditions,
                                 result.memory,
@@ -2349,7 +2521,7 @@ impl<'tcx> Engine<'tcx> {
                             target.ok_or("IntoIter constructor lacks normal return edge")?;
                         for result in results {
                             self.active_destruction_adopt_work(&frame, &state)?;
-                            let mut continuation = self.adopt_flow_return(
+                            let mut continuation = self.mutable_product_adopt_return(
                                 &state,
                                 result.conditions,
                                 result.memory,
@@ -2468,7 +2640,7 @@ impl<'tcx> Engine<'tcx> {
                         let target = target.ok_or("shared trait choice has no return edge")?;
                         for result in results {
                             self.active_destruction_adopt_work(&frame, &state)?;
-                            let mut continuation = self.adopt_flow_return(
+                            let mut continuation = self.mutable_product_adopt_return(
                                 &state,
                                 result.conditions,
                                 result.memory,
@@ -2513,7 +2685,7 @@ impl<'tcx> Engine<'tcx> {
                         let target = target.ok_or("trusted call has no return edge")?;
                         for result in results {
                             self.active_destruction_adopt_work(&frame, &state)?;
-                            let mut continuation = self.adopt_flow_return(
+                            let mut continuation = self.mutable_product_adopt_return(
                                 &state,
                                 result.conditions,
                                 result.memory,
@@ -2551,7 +2723,7 @@ impl<'tcx> Engine<'tcx> {
                             target.ok_or("IntoIter ordinary helper lacks normal return edge")?;
                         for result in results {
                             self.active_destruction_adopt_work(&frame, &state)?;
-                            let mut continuation = self.adopt_flow_return(
+                            let mut continuation = self.mutable_product_adopt_return(
                                 &state,
                                 result.conditions,
                                 result.memory,
@@ -2590,7 +2762,7 @@ impl<'tcx> Engine<'tcx> {
                         let target = target.ok_or("owned iterator call has no return edge")?;
                         for result in results {
                             self.active_destruction_adopt_work(&frame, &state)?;
-                            let mut continuation = self.adopt_flow_return(
+                            let mut continuation = self.mutable_product_adopt_return(
                                 &state,
                                 result.conditions,
                                 result.memory,
@@ -2628,7 +2800,7 @@ impl<'tcx> Engine<'tcx> {
                         let target = target.ok_or("iterator call has no return edge")?;
                         for result in results {
                             self.active_destruction_adopt_work(&frame, &state)?;
-                            let mut continuation = self.adopt_flow_return(
+                            let mut continuation = self.mutable_product_adopt_return(
                                 &state,
                                 result.conditions,
                                 result.memory,
@@ -2746,7 +2918,7 @@ impl<'tcx> Engine<'tcx> {
                         let target = target.ok_or("shared Drop call has no normal return edge")?;
                         for result in results {
                             self.active_destruction_adopt_work(&frame, &state)?;
-                            let mut continuation = self.adopt_flow_return(
+                            let mut continuation = self.mutable_product_adopt_return(
                                 &state,
                                 result.conditions,
                                 result.memory,
@@ -2774,6 +2946,7 @@ impl<'tcx> Engine<'tcx> {
                         if matches!(instance.def, ty::InstanceKind::Intrinsic(_)) {
                             // The only active Box consumer here is the admitted intrinsic.
                             // Its original full signature was checked by the earlier call gate.
+                            self.mutable_product_snapshot_work(&values, &state.memory)?;
                             self.executable_box_snapshots(
                                 &values,
                                 &state.memory,
@@ -2785,11 +2958,12 @@ impl<'tcx> Engine<'tcx> {
                             Vec::new()
                         }
                     } else {
+                        self.mutable_product_vector_work(&state.memory, args.len())?;
                         let argument_types: Vec<_> = args
                             .iter()
                             .map(|arg| arg.node.ty(&body.local_decls, self.tcx))
                             .collect();
-                        self.typed_coroutine_snapshots(
+                        self.mutable_product_observations(
                             &argument_types,
                             &values,
                             &state.memory,
@@ -2842,7 +3016,7 @@ impl<'tcx> Engine<'tcx> {
                         let target = target.ok_or("modeled call has no return edge")?;
                         for result in results {
                             self.active_destruction_adopt_work(&frame, &state)?;
-                            let mut continuation = self.adopt_flow_return(
+                            let mut continuation = self.mutable_product_adopt_return(
                                 &state,
                                 result.conditions,
                                 result.memory,
@@ -2994,7 +3168,7 @@ impl<'tcx> Engine<'tcx> {
                     let target = target.ok_or("local call has no return edge")?;
                     for result in results {
                         self.active_destruction_adopt_work(&frame, &state)?;
-                        let mut continuation = self.adopt_flow_return(
+                        let mut continuation = self.mutable_product_adopt_return(
                             &state,
                             result.conditions,
                             result.memory,
@@ -3201,7 +3375,7 @@ impl<'tcx> Engine<'tcx> {
                         )?;
                         for result in results {
                             self.active_destruction_adopt_work(&frame, &state)?;
-                            let mut continuation = self.adopt_flow_return(
+                            let mut continuation = self.mutable_product_adopt_return(
                                 &state,
                                 result.conditions,
                                 result.memory,
@@ -3308,6 +3482,32 @@ impl<'tcx> Engine<'tcx> {
         state: &mut State,
         statement: &StatementKind<'tcx>,
     ) -> Result<(), String> {
+        let guards = match statement {
+            StatementKind::Assign(assignment) => match &assignment.1 {
+                Rvalue::Aggregate(_, operands) => 16usize.saturating_add(4 * operands.len()),
+                _ => 16,
+            },
+            _ => 8,
+        };
+        self.mutable_product_access_begin(
+            body,
+            std::ptr::from_ref(statement) as usize,
+            &state.memory,
+            guards,
+        )?;
+        self.mutable_product_statement_work(body, state, statement)?;
+        let result = self.statement_with_product_access(instance, body, state, statement);
+        self.mutable_product_access_end(result.is_err());
+        result
+    }
+
+    fn statement_with_product_access(
+        &mut self,
+        instance: ty::Instance<'tcx>,
+        body: &Body<'tcx>,
+        state: &mut State,
+        statement: &StatementKind<'tcx>,
+    ) -> Result<(), String> {
         let id = instance.def_id();
         match statement {
             StatementKind::Intrinsic(intrinsic) => {
@@ -3337,6 +3537,9 @@ impl<'tcx> Engine<'tcx> {
                     return Ok(());
                 }
                 if self.mutable_retained_stage(body, state, *place, value, statement)? {
+                    return Ok(());
+                }
+                if self.mutable_product_hierarchy_stage(body, state, *place, value, statement)? {
                     return Ok(());
                 }
                 if self.mutable_u16_stage(body, state, *place, value, statement)? {
