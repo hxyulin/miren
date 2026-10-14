@@ -8084,3 +8084,57 @@ For that one fold, only the additional actual call frame differs; all other fiel
 Two diagnostic case objects change; all 611 other case objects and all guest function bytes
 remain unchanged. The final four-document successor preserves all 1,069 code, fixture, manifest
 and other files from the frozen full-check candidate. No default coverage promotion is claimed.
+
+
+## Stage 263: operation-local authenticated signature reuse
+
+Root composes the reviewed four-path signature successor against committed Stage262, preserving
+its separate Box cache and current byte/Drop source routes. The private basis is the exact earlier
+uncommitted Stage261 candidate; original source/evidence and failed predecessors stay immutable.
+A current README prefix precedes the incoming signature documentation. No guest body changes.
+
+Recursive dispatch admission returns full independently normalized original signatures keyed by
+complete Instance. Repeated leaf admission and source-graph lookup reuse those bounded records
+after paid full current-cache comparisons. The tree and primitive-domain allowances remain
+unchanged; only the actual redundant graph normalization service is removed. Original/current
+Body evidence, typed values, call/effect/Memory handling and before/after guards stay separate.
+Failed partial admission is consumed; a failed record service prevents further use.
+
+The frozen private default8192 matrix measures fourteen PROVED, one REFUTED and seven UNKNOWN
+on all four profiles. Only Bool, Char and the false correlation claim change from the previous
+default matrix. Diagnostic60000 keeps twenty PROVED, one REFUTED and one UNKNOWN. Independent
+review authenticates 635 artifacts and 107 command outcomes, recomputes all 176 matrix Proofs,
+and retains 44 literal old flat Proofs with 56 queries and 12 models. Genuine leaf/native
+mutations, all eight old opaque cases, contracts and missing dependencies pass their controls.
+The earlier unborn isolated Git index made the documentation hook fail before admission; only
+synthetic local baseline metadata changed, with source fixed and no false rerun claim.
+
+Three measured default case outcomes are promoted in the corpus. Every guest assertion and the
+other 609 case objects remain unchanged. Root full validation and corpus proof comparison are
+pending; the remaining harder default cases stay recorded UNKNOWN.
+
+The initial Root full run passes formatting and Clippy, then fails the capability matrix on a
+stale resource diagnostic for the direct pair case. A fresh, source-guarded 22-case run confirms
+fourteen PROVED, one REFUTED and seven UNKNOWN on each of the four profiles. The direct pair
+remains UNKNOWN and now reaches the shared IntoIter execution limit. Only its measured diagnostic
+metadata changes; the failed full run is preserved with no complete-stage credit.
+
+
+The corrected frozen Root run passes all ten required checks: formatting, Clippy, 1,019 outer Rust
+tests, 91 Python tests, release builds, cargo deny, manual/documentation hooks, diff and the
+four-profile survey. Source remains unchanged throughout the full run. The two nested native
+controls remain separately counted, including the expected failing mutant.
+
+Every profile measures 336 PROVED, 164 REFUTED and 113 UNKNOWN, yielding 500 supported outcomes
+across 613 cases and 108 families. All 5,404 previous queried obligations and models remain exact;
+current reports contain 5,420 queries. Twelve actual profile-specific promotions preserve their
+old rich-query prefixes. Of the remaining 2,440 Proof comparisons, 2,418 are literal full matches,
+twenty retain exact independently captured nested resource frontiers, and two have query-free
+fold deadline contexts. Each nested frontier adds exactly one genuine leaf entry; all other fields
+are literal except the direct pair's measured resource diagnostic. These entries are execution
+evidence, not new proofs. The one additional fold qualification changes only the wrapping_add
+frame at the actual deadline. Earlier failed audit attempts remain preserved without credit.
+
+Only three case outcomes and one resource diagnostic change. All 609 other case objects and all
+guest function bytes remain literal. Final documentation validation and independent commit review
+follow as a four-document-only successor to the frozen full-check source.

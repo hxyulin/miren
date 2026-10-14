@@ -2062,7 +2062,26 @@ and payload are validated before source-only effectful-constructor preparation c
 refusals preserve the type registry, owner generation and guest Memory. Successful old effect-free
 admission still uses its complete constructor/Drop certificate before issuing an owner.
 
-Current constructor-source validation passes 1,019 Rust and 91 Python tests with all repository
+Stage262 constructor-source validation passes 1,019 Rust and 91 Python tests with all repository
 checks. Four-profile surveys retain 334 PROVED, 163 REFUTED and 116 UNKNOWN across 613 cases.
 All 5,404 previous queried obligations and models remain exact. Two Box diagnostic frontiers
 change to the source-work budget, with no new supported outcome or effectful owner permission.
+
+Finite nested dispatch shares independently authenticated full signatures within one operation.
+Recursive admission keeps its existing 512-step allowance and returns at most sixteen records keyed
+by complete compiler Instance. Source-graph lookup checks the original full signature against any
+present cached entry before using the record; it performs no second normalization. Record lookup,
+comparison and construction remain prepaid. A failed partial admission is consumed, and a failed
+record service prevents reuse after cache or Context restoration.
+
+These records certify signature metadata only. Original/current Body comparison, exact current Body
+identities, helper graph restrictions, primitive-domain admission and its 512-step allowance remain
+separate. Actual call arguments, contracts, execution, returned values and Memory still use their
+ordinary guards. No outcomes, storage rights or effect permissions are cached. This source packet
+has measured default outcomes of fourteen PROVED, one REFUTED and seven UNKNOWN across all four
+profiles. Bool and Char advance to PROVED; the false correlation claim advances to REFUTED.
+The separate 60000 matrix stays at twenty PROVED, one REFUTED and one UNKNOWN. Full checkout
+validation passes all ten required checks, including 1,019 Rust and 91 Python tests. Four-profile
+surveys measure 336 PROVED, 164 REFUTED and 113 UNKNOWN; all 5,404 old queried obligations and
+models remain exact. Five resource UNKNOWN controls reach one additional genuine leaf body,
+without proof credit. The direct pair retains UNKNOWN with its measured shared IntoIter limit.

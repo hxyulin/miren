@@ -204,6 +204,7 @@ fn check<'tcx>(tcx: TyCtxt<'tcx>) {
             targets: vec![inner, first_id],
         }))
         .unwrap();
+    check_signature_reuse(&mut engine, tcx, outer, signature, first);
     let conditions = [i.clone(), j.clone()]
         .iter()
         .map(|index| {
@@ -576,5 +577,97 @@ fn primitive_controls(tcx: TyCtxt<'_>) {
     }
     println!(
         "NestedChoice primitive Bool/Char/Float entry, Unicode and four Return encoding refusals"
+    );
+}
+
+fn check_signature_reuse<'tcx>(
+    engine: &mut Engine<'tcx>,
+    tcx: TyCtxt<'tcx>,
+    outer: usize,
+    expected: Ty<'tcx>,
+    first: ty::Instance<'tcx>,
+) {
+    use super::super::aggregates::RepeatWork;
+    let checks = nested::signature_check_count();
+    let mut admission = engine
+        .admit_dispatch_signatures(outer, expected, RepeatWork::new())
+        .unwrap();
+    // Three leaf occurrences share exactly two independently authenticated full signatures.
+    assert_eq!(nested::signature_check_count(), checks + 2);
+    let original = engine.call_poly_signature(first).unwrap();
+    assert_eq!(
+        admission.graph_signature(engine, first).unwrap(),
+        Some(original)
+    );
+    assert_eq!(nested::signature_check_count(), checks + 2);
+    let alias = ty::Instance::new_raw(first.def_id(), tcx.mk_args(&[tcx.types.u32.into()]));
+    assert!(admission.graph_signature(engine, alias).unwrap().is_none());
+    for fault in 0..5 {
+        let mut admission = engine
+            .admit_dispatch_signatures(outer, expected, RepeatWork::new())
+            .unwrap();
+        let poisoned = match fault {
+            0 => original.map_bound(|signature| signature.set_safety(rustc_hir::Safety::Unsafe)),
+            1 => original.map_bound(|signature| ty::FnSig {
+                fn_sig_kind: signature
+                    .fn_sig_kind
+                    .set_abi(rustc_abi::ExternAbi::C { unwind: false }),
+                ..signature
+            }),
+            2 => ty::Binder::bind_with_vars(
+                original.skip_binder(),
+                tcx.mk_bound_variable_kinds(&[ty::BoundVariableKind::Ty(ty::BoundTyKind::Anon)]),
+            ),
+            3 | 4 => original.map_bound(|signature| {
+                let mut types = signature.inputs_and_output.to_vec();
+                let selected = if fault == 3 { 0 } else { types.len() - 1 };
+                types[selected] = tcx.types.u8;
+                ty::FnSig {
+                    inputs_and_output: tcx.mk_type_list(&types),
+                    ..signature
+                }
+            }),
+            _ => unreachable!(),
+        };
+        assert_ne!(poisoned, original);
+        engine.call_signatures.borrow_mut().insert(first, poisoned);
+        assert!(admission.graph_signature(engine, first).is_err());
+        engine.call_signatures.borrow_mut().insert(first, original);
+        assert!(admission.graph_signature(engine, first).is_err());
+    }
+
+    let mut admission = engine
+        .admit_dispatch_signatures(outer, expected, RepeatWork::new())
+        .unwrap();
+    let context = engine.terms.clone();
+    engine.terms = Context::default();
+    assert!(admission.graph_signature(engine, first).is_err());
+    engine.terms = context;
+    assert!(admission.graph_signature(engine, first).is_err());
+
+    let mut admission = engine
+        .admit_dispatch_signatures(outer, expected, RepeatWork::new())
+        .unwrap();
+    engine.steps = engine.limits.max_steps;
+    assert!(admission.graph_signature(engine, first).is_err());
+    engine.steps = 0;
+    assert!(admission.graph_signature(engine, first).is_err());
+
+    let body = engine.instantiated_body(first).unwrap();
+    let admission = engine
+        .admit_dispatch_signatures(outer, expected, RepeatWork::new())
+        .unwrap();
+    let mut wrong = body.as_ref().clone();
+    wrong.local_decls[rustc_middle::mir::RETURN_PLACE].ty = tcx.types.u32;
+    engine
+        .bodies
+        .borrow_mut()
+        .insert(first, std::rc::Rc::new(wrong));
+    // A held signature cannot authenticate a replacement Body or bypass source comparison.
+    assert!(engine.admitted_source_probe(first, admission).is_err());
+    engine.bodies.borrow_mut().insert(first, body);
+    engine.steps = 0;
+    eprintln!(
+        "nested-signature-reuse: two-original-checks/cache/alias/Context/resource/Body guards"
     );
 }

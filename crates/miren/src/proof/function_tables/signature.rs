@@ -4,6 +4,16 @@ use super::*;
 use rustc_middle::ty::{TypeSuperVisitable, TypeVisitable, TypeVisitor};
 use std::ops::ControlFlow;
 
+#[cfg(test)]
+thread_local! {
+    static CHECK_COUNT: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+#[cfg(test)]
+pub(super) fn check_count() -> usize {
+    CHECK_COUNT.with(std::cell::Cell::get)
+}
+
 struct Plan<'a, 'tcx> {
     engine: &'a Engine<'tcx>,
     work: &'a mut RepeatWork,
@@ -211,6 +221,8 @@ pub(super) fn check<'tcx>(
     let cost = plan.nodes + poly.bound_vars().len() + count + 4;
     // Actual substitution and normalization, independently prepaid before compiler services.
     engine.repeat_charge(plan.work, 2 * cost)?;
+    #[cfg(test)]
+    CHECK_COUNT.with(|count| count.set(count.get() + 1));
     let normalized = engine
         .tcx
         .try_normalize_erasing_regions(

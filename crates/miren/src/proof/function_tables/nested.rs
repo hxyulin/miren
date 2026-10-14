@@ -15,6 +15,161 @@ pub(super) fn pay(engine: &mut Engine<'_>, count: usize) -> Result<(), String> {
     Ok(())
 }
 
+// Signature metadata only: Body authentication and primitive-domain admission remain separate.
+struct AdmittedSignature<'tcx> {
+    instance: ty::Instance<'tcx>,
+    signature: ty::PolyFnSig<'tcx>,
+    pointer: Ty<'tcx>,
+    comparison_work: usize,
+}
+
+pub(super) struct Admission<'tcx> {
+    context: Term,
+    signatures: Vec<AdmittedSignature<'tcx>>,
+    failed: bool,
+}
+
+impl<'tcx> Admission<'tcx> {
+    fn new(engine: &Engine<'tcx>, work: &mut RepeatWork) -> Result<Self, String> {
+        engine.repeat_charge(work, 4)?;
+        Ok(Self {
+            context: engine.terms.boolean(true),
+            signatures: Vec::new(),
+            failed: false,
+        })
+    }
+
+    fn check_record(
+        &self,
+        engine: &Engine<'tcx>,
+        record: &AdmittedSignature<'tcx>,
+        expected: Option<Ty<'tcx>>,
+    ) -> Result<(), String> {
+        if self.failed || !self.context.belongs_to(&engine.terms) {
+            return Err("nested choice signature admission failed or Context differs".into());
+        }
+        if engine
+            .call_signatures
+            .borrow()
+            .get(&record.instance)
+            .is_some_and(|signature| *signature != record.signature)
+            || expected.is_some_and(|expected| expected != record.pointer)
+        {
+            return Err("nested choice admitted original/full cached signature changed".into());
+        }
+        Ok(())
+    }
+
+    fn authenticate(
+        &mut self,
+        engine: &Engine<'tcx>,
+        instance: ty::Instance<'tcx>,
+        expected: Ty<'tcx>,
+        work: &mut RepeatWork,
+    ) -> Result<(), String> {
+        let result = self.authenticate_inner(engine, instance, expected, work);
+        if result.is_err() {
+            self.failed = true;
+        }
+        result
+    }
+
+    fn authenticate_inner(
+        &mut self,
+        engine: &Engine<'tcx>,
+        instance: ty::Instance<'tcx>,
+        expected: Ty<'tcx>,
+        work: &mut RepeatWork,
+    ) -> Result<(), String> {
+        if self.failed {
+            return Err("nested choice signature admission already failed".into());
+        }
+        engine.repeat_charge(work, 6 + instance.args.len() + self.signatures.len())?;
+        if !self.context.belongs_to(&engine.terms) {
+            return Err("nested choice signature admission Context differs".into());
+        }
+        if let Some(record) = self
+            .signatures
+            .iter()
+            .find(|record| record.instance == instance)
+        {
+            engine.repeat_charge(
+                work,
+                record.comparison_work + engine.call_signatures.borrow().len(),
+            )?;
+            return self.check_record(engine, record, Some(expected));
+        }
+        if self.signatures.len() >= MAX_ARRAY_ELEMENTS {
+            return Err(engine.categorized_error(
+                UnknownCategory::ResourceLimit,
+                "nested choice admitted signatures exceed existing16 source records".into(),
+            ));
+        }
+        let signature = signature::check(engine, instance, Some(expected), work)?;
+        let comparison_work = 8
+            + instance.args.len()
+            + signature.bound_vars().len()
+            + signature.skip_binder().inputs_and_output.len();
+        engine.repeat_charge(work, 8 + comparison_work)?;
+        self.signatures
+            .try_reserve_exact(1)
+            .map_err(|_| "nested choice admitted signature allocation failed")?;
+        self.signatures.push(AdmittedSignature {
+            instance,
+            signature,
+            pointer: expected,
+            comparison_work,
+        });
+        Ok(())
+    }
+
+    pub(super) fn graph_signature(
+        &mut self,
+        engine: &mut Engine<'tcx>,
+        instance: ty::Instance<'tcx>,
+    ) -> Result<Option<ty::PolyFnSig<'tcx>>, String> {
+        let result = self.graph_signature_inner(engine, instance);
+        if result.is_err() {
+            self.failed = true;
+        }
+        result
+    }
+
+    fn graph_signature_inner(
+        &self,
+        engine: &mut Engine<'tcx>,
+        instance: ty::Instance<'tcx>,
+    ) -> Result<Option<ty::PolyFnSig<'tcx>>, String> {
+        if self.failed {
+            return Err("nested choice signature admission already failed".into());
+        }
+        if instance.args.len() > MAX_INPUT_VALUES
+            || self.signatures.len() > MAX_ARRAY_ELEMENTS
+            || engine.call_signatures.borrow().len() > MAX_INPUT_VALUES
+        {
+            return Err(engine.categorized_error(
+                UnknownCategory::ResourceLimit,
+                "nested choice signature reuse exceeds existing record/type/cache bounds".into(),
+            ));
+        }
+        pay(engine, 6 + instance.args.len() + self.signatures.len())?;
+        if !self.context.belongs_to(&engine.terms) {
+            return Err("nested choice signature admission Context differs".into());
+        }
+        let Some(record) = self
+            .signatures
+            .iter()
+            .find(|record| record.instance == instance)
+        else {
+            return Ok(None);
+        };
+        let comparison_work = record.comparison_work + engine.call_signatures.borrow().len();
+        pay(engine, comparison_work)?;
+        self.check_record(engine, record, None)?;
+        Ok(Some(record.signature))
+    }
+}
+
 struct Leaf<'tcx> {
     instance: ty::Instance<'tcx>,
     conditions: Vec<Term>,
@@ -26,6 +181,7 @@ struct Recipe<'tcx> {
     sources: Vec<Source<'tcx>>,
     tree_nodes: usize,
     source_nodes: usize,
+    admission: Admission<'tcx>,
 }
 
 struct Source<'tcx> {
@@ -59,14 +215,40 @@ fn current_sources<'tcx>(
     Ok(())
 }
 
+#[cfg(test)]
+pub(super) fn signature_check_count() -> usize {
+    signature::check_count()
+}
+
 impl<'tcx> Engine<'tcx> {
+    #[cfg(test)]
+    pub(super) fn admitted_source_probe(
+        &mut self,
+        instance: ty::Instance<'tcx>,
+        mut admission: Admission<'tcx>,
+    ) -> Result<std::rc::Rc<Body<'tcx>>, String> {
+        self.nested_source_graph(instance, 0, &mut Vec::new(), &mut 0, &mut admission)
+    }
+
     pub(super) fn admit_nested_target(
         &self,
         id: usize,
         expected: Ty<'tcx>,
         work: &mut RepeatWork,
     ) -> Result<(), String> {
-        self.admit_nested_node(id, expected, 0, work)
+        self.admit_nested_node(id, expected, 0, work, &mut None)
+    }
+
+    pub(super) fn admit_dispatch_signatures(
+        &self,
+        id: usize,
+        expected: Ty<'tcx>,
+        mut work: RepeatWork,
+    ) -> Result<Admission<'tcx>, String> {
+        let mut admission = Some(Admission::new(self, &mut work)?);
+        // A failed partial admission is consumed here, never returned to the caller.
+        self.admit_nested_node(id, expected, 0, &mut work, &mut admission)?;
+        Ok(admission.unwrap())
     }
 
     fn admit_nested_node(
@@ -75,6 +257,7 @@ impl<'tcx> Engine<'tcx> {
         expected: Ty<'tcx>,
         depth: usize,
         work: &mut RepeatWork,
+        admission: &mut Option<Admission<'tcx>>,
     ) -> Result<(), String> {
         self.repeat_charge(work, 6)?;
         if depth >= MAX_INPUT_DEPTH {
@@ -99,7 +282,11 @@ impl<'tcx> Engine<'tcx> {
                 if *actual != expected {
                     return Err("nested function choice leaf signature differs".into());
                 }
-                signature::check(self, *instance, Some(expected), work)?;
+                if let Some(admission) = admission {
+                    admission.authenticate(self, *instance, expected, work)?;
+                } else {
+                    signature::check(self, *instance, Some(expected), work)?;
+                }
                 self.validate_table_target(id, expected)?;
                 Ok(())
             }
@@ -124,7 +311,7 @@ impl<'tcx> Engine<'tcx> {
                     if *child >= id {
                         return Err("nested function choice forward or cyclic registry edge".into());
                     }
-                    self.admit_nested_node(*child, expected, depth + 1, work)?;
+                    self.admit_nested_node(*child, expected, depth + 1, work, admission)?;
                 }
                 Ok(())
             }
@@ -209,6 +396,7 @@ impl<'tcx> Engine<'tcx> {
         depth: usize,
         sources: &mut Vec<Source<'tcx>>,
         nodes: &mut usize,
+        admission: &mut Admission<'tcx>,
     ) -> Result<std::rc::Rc<Body<'tcx>>, String> {
         pay(self, 8 + instance.args.len() + sources.len())?;
         *nodes = nodes.saturating_add(1);
@@ -237,8 +425,13 @@ impl<'tcx> Engine<'tcx> {
             }
             return Ok(source.body.clone());
         }
-        pay(self, MAX_INPUT_VALUES)?;
-        let poly = signature::check(self, instance, None, &mut RepeatWork::new())?;
+        let poly = match admission.graph_signature(self, instance)? {
+            Some(signature) => signature,
+            None => {
+                pay(self, MAX_INPUT_VALUES)?;
+                signature::check(self, instance, None, &mut RepeatWork::new())?
+            }
+        };
         if sources.len() >= MAX_ARRAY_ELEMENTS {
             return Err(self.categorized_error(
                 UnknownCategory::ResourceLimit,
@@ -315,7 +508,7 @@ impl<'tcx> Engine<'tcx> {
                         signature::check(self, selected, None, &mut RepeatWork::new())?;
                         continue; // Actual panic execution must create its ordinary obligation.
                     }
-                    self.nested_source_graph(selected, depth + 1, sources, nodes)?;
+                    self.nested_source_graph(selected, depth + 1, sources, nodes, admission)?;
                 }
                 TerminatorKind::Drop { place, .. }
                     if place
@@ -381,6 +574,7 @@ impl<'tcx> Engine<'tcx> {
                     0,
                     &mut recipe.sources,
                     &mut recipe.source_nodes,
+                    &mut recipe.admission,
                 )?;
                 pay(self, 4 + recipe.leaves.len())?;
                 let validated = recipe.leaves.iter().any(|leaf| leaf.instance == instance);
@@ -512,7 +706,7 @@ impl<'tcx> Engine<'tcx> {
         }
         // One cumulative local admission budget for the complete tree, prepaid in shared steps.
         pay(self, MAX_INPUT_VALUES)?;
-        self.admit_nested_target(id, expected, &mut RepeatWork::new())?;
+        let admission = self.admit_dispatch_signatures(id, expected, RepeatWork::new())?;
         let signature = expected.fn_sig(self.tcx).skip_binder();
         if call.args.len() != signature.inputs().len() {
             return Err("nested function choice original argument arity differs".into());
@@ -538,6 +732,7 @@ impl<'tcx> Engine<'tcx> {
             sources: Vec::new(),
             tree_nodes: 0,
             source_nodes: 0,
+            admission,
         };
         self.nested_leaves(id, expected, &state.conditions, 0, &mut recipe)?;
         pay(self, 8 + state.conditions.len() + state.locals.len())?;

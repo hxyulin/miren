@@ -74,8 +74,9 @@ input observations. Exact compiler-bound NonZeroU8 fields preserve initialized S
 Full aligned search remains UNKNOWN pending source metadata, storage, precondition and loop proofs.
 
 Finite nested function choices preserve correlated selection predicates and execute actual leaf
-bodies. Default-budget controls support all twelve unary integer domains. Bool, Char, floating,
-Repeat and pair controls have separate diagnostic results; default resource refusals stay UNKNOWN.
+bodies. Default-budget controls support all twelve unary integer domains plus Bool and Char;
+a false correlation claim has a counterexample. Floating, Repeat and pair controls retain separate
+diagnostic results; their default resource refusals stay UNKNOWN.
 
 Fieldless Box constructor preparation authenticates actual constructor and allocation source
 bodies under a separate bounded compiler-source policy. It preserves type registries on refusal;
@@ -86,8 +87,8 @@ order. Nested destruction and covering assignments retain actual destructor effe
 compiler array/slice DropGlue protocol is authenticated separately. General slice destruction
 remains UNKNOWN. Remaining owning-array iterator destruction executes actual bodies at a larger
 recorded budget. The current stage passes 1,019 Rust and 91 Python tests.
-Four-profile surveys measure
-334 PROVED, 163 REFUTED and 116 UNKNOWN, adding twelve default supported outcomes. All 5,232
+Four-profile surveys measure 336 PROVED, 164 REFUTED and 113 UNKNOWN, with 500 supported
+outcomes across 613 cases. Signature reuse adds three default supported outcomes. All 5,404
 previous queried obligations and counterexample models remain exact.
 Authenticated non-inlined array iterator constructors preserve owning payloads through actual Rust
 bodies and ordinary returns. Direct owners also pass through local helpers with unused observations.

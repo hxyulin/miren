@@ -3172,16 +3172,12 @@
     {
       "entry": "nested_function_choices_survey::nested_bool",
       "family": "finite_nested_function_choices",
-      "expected": "unknown",
-      "unknown_reason": "nested function choice shared step budget exhausted",
-      "unknown_category": "resource_limit"
+      "expected": "proved"
     },
     {
       "entry": "nested_function_choices_survey::nested_char",
       "family": "finite_nested_function_choices",
-      "expected": "unknown",
-      "unknown_reason": "IntoIter shared execution step limit reached",
-      "unknown_category": "resource_limit"
+      "expected": "proved"
     },
     {
       "entry": "nested_function_choices_survey::nested_f32",
@@ -3282,15 +3278,13 @@
       "entry": "nested_function_choices_survey::nested_pair_direct",
       "family": "finite_nested_function_choices",
       "expected": "unknown",
-      "unknown_reason": "nested function choice shared step budget exhausted",
+      "unknown_reason": "IntoIter shared execution step limit reached",
       "unknown_category": "resource_limit"
     },
     {
       "entry": "nested_function_choices_survey::wrong_correlation",
       "family": "finite_nested_function_choices",
-      "expected": "unknown",
-      "unknown_reason": "nested function choice shared step budget exhausted",
-      "unknown_category": "resource_limit"
+      "expected": "refuted"
     },
     {
       "entry": "nested_function_choices_survey::opaque_bool",

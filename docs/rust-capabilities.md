@@ -11,8 +11,8 @@ execution at O0 and O2, positive/refuted/unknown controls, a source mutation tha
 structured UNKNOWN reporting, and passing repository checks. Completion establishes a repeatable
 baseline. It does not establish full Rust support or a completed memory-model refactor.
 
-The current manifest contains 613 cases across 108 families. Stage261 host/ARM O0/O2 surveys
-measure 334 PROVED, 163 REFUTED and 116 UNKNOWN per profile, with 497 supported outcomes.
+The current manifest contains 613 cases across 108 families. Stage263 host/ARM O0/O2 surveys
+measure 336 PROVED, 164 REFUTED and 113 UNKNOWN per profile, with 500 supported outcomes.
 These counts describe the declared corpus, not a percentage of Rust parity.
 The historical Stage244 manifest contained 396 cases across 97 families.
 The completed Stage244 host/ARM O0/O2 surveys measured 187 PROVED, 119 REFUTED and 90 UNKNOWN.
@@ -2903,3 +2903,23 @@ cargo deny and repository hooks. All four profiles retain their 613 case outcome
 queried obligations/models. Of 2,452 retained Proof comparisons, 2,443 are literal full matches;
 eight separately qualified Box source frontiers and one query-free fold deadline context account
 for the remaining records. No default supported outcome is added by constructor preparation.
+
+
+## Operation-local signature reuse
+
+Nested dispatch keeps at most sixteen independently normalized original full signatures keyed
+by complete compiler Instance. Its source graph reuses an exact record after prepaid current
+cache comparisons, omitting the second normalization service because it no longer runs. Body
+authentication, primitive-domain checks and their allowances stay independent; actual calls,
+contracts, effects and returned Memory use normal execution. Failures prevent record reuse.
+
+The unchanged twenty-two-case family measures fourteen PROVED, one REFUTED and seven UNKNOWN at
+8192 across host/ARM O0/O2. Bool and Char now prove, and the false correlation claim refutes.
+Floats, Repeat and pairs remain resource UNKNOWN; the opaque callable remains semantic UNKNOWN.
+Diagnostic60000 stays at twenty PROVED, one REFUTED and one UNKNOWN. Source/native mutations and
+missing-body controls pass independently. Full Root validation passes all ten checks, with 1,019
+Rust and 91 Python tests. All 5,404 old queried obligations/models remain exact; the new corpus
+contains 5,420 queried obligations. Five resource UNKNOWN cases reach an additional genuine leaf
+body, with no supported-outcome credit. Exact query-free fold timeout contexts are recorded
+separately. No executed-service fee is discounted, default limit increased or guest assertion
+rewritten.
