@@ -65,7 +65,7 @@ actual bodies with checked live ancestry. Nested owner calls remain UNKNOWN. Gua
 release and preserve offset writes and sibling storage. Deeper whole scalar calls preserve checked
 owner lineage and returned storage. Bounded owned u16 products support writes through multiple
 symbolic suffix indices, preserving compiler types and current Memory. The capability manifest
-covers 591 cases across 107 families, including concrete and symbolic local byte-copy controls.
+covers 613 cases across 108 families, including concrete and symbolic local byte-copy controls.
 Available byte-search source, isolated word predicates and population-count facts have separate
 authentication checks. A live byte relation checks current origin, projected extent and needle
 encoding before carrying its work into source analysis. The relation issues no raw-reference or
@@ -73,12 +73,18 @@ search certificate. Available original caller MIR and full signatures are authen
 input observations. Exact compiler-bound NonZeroU8 fields preserve initialized Some payloads.
 Full aligned search remains UNKNOWN pending source metadata, storage, precondition and loop proofs.
 
+Finite nested function choices preserve correlated selection predicates and execute actual leaf
+bodies. Default-budget controls support all twelve unary integer domains. Bool, Char, floating,
+Repeat and pair controls have separate diagnostic results; default resource refusals stay UNKNOWN.
+
 Fixed-array partial moves preserve initialization and execute remaining destructors in compiler
 order. Nested destruction and covering assignments retain actual destructor effects. The exact
 compiler array/slice DropGlue protocol is authenticated separately. General slice destruction
 remains UNKNOWN. Remaining owning-array iterator destruction executes actual bodies at a larger
-recorded budget. The current stage passes 1,013 Rust tests and preserves all 5,232 retained
-queried obligations and counterexample models across four profiles.
+recorded budget. The current stage passes 1,017 Rust and 91 Python tests.
+Four-profile surveys measure
+334 PROVED, 163 REFUTED and 116 UNKNOWN, adding twelve default supported outcomes. All 5,232
+previous queried obligations and counterexample models remain exact.
 Authenticated non-inlined array iterator constructors preserve owning payloads through actual Rust
 bodies and ordinary returns. Direct owners also pass through local helpers with unused observations.
 Element transfer executes at an explicitly larger analysis budget; default next and remaining

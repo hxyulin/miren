@@ -7935,3 +7935,8 @@ pub fn closure_unknown(values: &mut [u16], word: u16) {
 }
 
 }
+
+
+#[forbid(unsafe_code)]
+#[path = "nested_function_choice_cases.rs"]
+pub mod nested_function_choices_survey;

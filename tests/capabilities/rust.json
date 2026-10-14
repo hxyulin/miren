@@ -3168,6 +3168,136 @@
       "expected": "unknown",
       "unknown_category": "semantics",
       "unknown_reason": "retained helper nested callee lacks a supported primitive lease"
+    },
+    {
+      "entry": "nested_function_choices_survey::nested_bool",
+      "family": "finite_nested_function_choices",
+      "expected": "unknown",
+      "unknown_reason": "nested function choice shared step budget exhausted",
+      "unknown_category": "resource_limit"
+    },
+    {
+      "entry": "nested_function_choices_survey::nested_char",
+      "family": "finite_nested_function_choices",
+      "expected": "unknown",
+      "unknown_reason": "IntoIter shared execution step limit reached",
+      "unknown_category": "resource_limit"
+    },
+    {
+      "entry": "nested_function_choices_survey::nested_f32",
+      "family": "finite_nested_function_choices",
+      "expected": "unknown",
+      "unknown_reason": "nested function choice shared step budget exhausted",
+      "unknown_category": "resource_limit"
+    },
+    {
+      "entry": "nested_function_choices_survey::nested_f64",
+      "family": "finite_nested_function_choices",
+      "expected": "unknown",
+      "unknown_reason": "nested function choice shared step budget exhausted",
+      "unknown_category": "resource_limit"
+    },
+    {
+      "entry": "nested_function_choices_survey::nested_u8",
+      "family": "finite_nested_function_choices",
+      "expected": "proved"
+    },
+    {
+      "entry": "nested_function_choices_survey::nested_u16",
+      "family": "finite_nested_function_choices",
+      "expected": "proved"
+    },
+    {
+      "entry": "nested_function_choices_survey::nested_u32",
+      "family": "finite_nested_function_choices",
+      "expected": "proved"
+    },
+    {
+      "entry": "nested_function_choices_survey::nested_u64",
+      "family": "finite_nested_function_choices",
+      "expected": "proved"
+    },
+    {
+      "entry": "nested_function_choices_survey::nested_u128",
+      "family": "finite_nested_function_choices",
+      "expected": "proved"
+    },
+    {
+      "entry": "nested_function_choices_survey::nested_usize",
+      "family": "finite_nested_function_choices",
+      "expected": "proved"
+    },
+    {
+      "entry": "nested_function_choices_survey::nested_i8",
+      "family": "finite_nested_function_choices",
+      "expected": "proved"
+    },
+    {
+      "entry": "nested_function_choices_survey::nested_i16",
+      "family": "finite_nested_function_choices",
+      "expected": "proved"
+    },
+    {
+      "entry": "nested_function_choices_survey::nested_i32",
+      "family": "finite_nested_function_choices",
+      "expected": "proved"
+    },
+    {
+      "entry": "nested_function_choices_survey::nested_i64",
+      "family": "finite_nested_function_choices",
+      "expected": "proved"
+    },
+    {
+      "entry": "nested_function_choices_survey::nested_i128",
+      "family": "finite_nested_function_choices",
+      "expected": "proved"
+    },
+    {
+      "entry": "nested_function_choices_survey::nested_isize",
+      "family": "finite_nested_function_choices",
+      "expected": "proved"
+    },
+    {
+      "entry": "nested_function_choices_survey::repeat_bool",
+      "family": "finite_nested_function_choices",
+      "expected": "unknown",
+      "unknown_reason": "nested function choice shared step budget exhausted",
+      "unknown_category": "resource_limit"
+    },
+    {
+      "entry": "nested_function_choices_survey::repeat_bool_once",
+      "family": "finite_nested_function_choices",
+      "expected": "unknown",
+      "unknown_reason": "nested function choice shared step budget exhausted",
+      "unknown_category": "resource_limit"
+    },
+    {
+      "entry": "nested_function_choices_survey::nested_pair",
+      "family": "finite_nested_function_choices",
+      "expected": "unknown",
+      "unknown_reason": "nested function choice shared step budget exhausted",
+      "unknown_category": "resource_limit"
+    },
+    {
+      "entry": "nested_function_choices_survey::nested_pair_direct",
+      "family": "finite_nested_function_choices",
+      "expected": "unknown",
+      "unknown_reason": "nested function choice shared step budget exhausted",
+      "unknown_category": "resource_limit"
+    },
+    {
+      "entry": "nested_function_choices_survey::wrong_correlation",
+      "family": "finite_nested_function_choices",
+      "expected": "unknown",
+      "unknown_reason": "nested function choice shared step budget exhausted",
+      "unknown_category": "resource_limit"
+    },
+    {
+      "entry": "nested_function_choices_survey::opaque_bool",
+      "family": "finite_nested_function_choices",
+      "expected": "unknown",
+      "unknown_reason": "function table cannot contain opaque or nested choices",
+      "unknown_category": "semantics"
     }
   ]
 }

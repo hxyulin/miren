@@ -423,11 +423,10 @@ fn check_prepared_calls<'tcx>(tcx: TyCtxt<'tcx>) {
         Value::FunctionPointer { id: choice_id },
         pointers[1].clone(),
     ];
-    assert!(
-        engine
-            .capture_function_table(original, &nested, &index, &conditions)
-            .is_err()
-    );
+    let nested_pointer = engine
+        .capture_function_table(original, &nested, &index, &conditions)
+        .unwrap()
+        .unwrap();
     let opaque_id = engine.opaque_function_pointer_id(signature).unwrap();
     let opaque = [
         Value::FunctionPointer { id: opaque_id },
@@ -507,6 +506,58 @@ fn check_prepared_calls<'tcx>(tcx: TyCtxt<'tcx>) {
         conditions.push(wrong);
         assert!(!engine.feasible(&conditions).unwrap());
     }
+    let mut nested_state = state.clone();
+    nested_state.locals[callable_place.local.as_usize()] = Some(nested_pointer);
+    let nested_returns = engine
+        .function_table_call(&nested_state, make_call())
+        .unwrap()
+        .unwrap();
+    assert_eq!(nested_returns.len(), 2);
+    for (consumed, result) in &nested_returns {
+        assert!(engine.operand(moved, &body, consumed, func).is_err());
+        assert!(
+            engine
+                .operand(moved, &body, consumed, &args[0].node)
+                .is_err()
+        );
+        let (term, bits, signed) = result.value.integer().unwrap();
+        assert_eq!((bits, signed), (16, false));
+        // Both levels use the same symbolic index: no independent choice is permitted.
+        for (selected_index, expected) in [(0, 129), (1, 128)] {
+            let selected = engine
+                .terms
+                .apply(
+                    Op::Equal,
+                    &[
+                        raw.clone(),
+                        engine
+                            .terms
+                            .bit_vector(selected_index, tcx.sess.target.pointer_width.into())
+                            .unwrap(),
+                    ],
+                )
+                .unwrap();
+            let wrong = engine
+                .terms
+                .apply(
+                    Op::Not,
+                    &[engine
+                        .terms
+                        .apply(
+                            Op::Equal,
+                            &[term.clone(), engine.terms.bit_vector(expected, 16).unwrap()],
+                        )
+                        .unwrap()],
+                )
+                .unwrap();
+            let mut conditions = result.conditions.clone();
+            conditions.extend([selected, wrong]);
+            assert!(!engine.feasible(&conditions).unwrap());
+        }
+    }
+    let mut joined = nested_returns[0].1.conditions.clone();
+    joined.extend(nested_returns[1].1.conditions.iter().cloned());
+    assert!(!engine.feasible(&joined).unwrap());
     assert!(engine.operand(moved, &body, &state, func).is_ok());
     assert!(engine.operand(moved, &body, &state, &args[0].node).is_ok());
     assert!(!state.memory.byte_copy_opaque);
@@ -1902,20 +1953,37 @@ fn check_known_repeats<'tcx>(tcx: TyCtxt<'tcx>, output: &std::path::Path) {
         .unwrap()
         .0
         .clone(),
-        targets: vec![0, 0],
+        targets: vec![token, token],
     };
     let choice = engine
         .register_function_pointer(Target::Choice(choice))
         .unwrap();
-    assert!(
-        engine
-            .validate_repeat_target(
-                &Value::FunctionPointer { id: choice },
-                signature,
-                &mut RepeatWork::new()
-            )
-            .is_err()
-    );
+    engine
+        .validate_repeat_target(
+            &Value::FunctionPointer { id: choice },
+            signature,
+            &mut RepeatWork::new(),
+        )
+        .unwrap();
+    let returns = engine
+        .execute_body(
+            generic_owner,
+            vec![
+                symbolic::integer(&engine.terms, 0, 16, false),
+                Value::FunctionPointer { id: choice },
+            ],
+            Vec::new(),
+            Memory::default(),
+            &[],
+            activation_flow::Flow::Unarmed,
+        )
+        .unwrap();
+    assert_eq!(returns.len(), 1);
+    assert!(matches!(&returns[0].value, Value::Elements(values)
+        if matches!(values.as_slice(), [Value::FunctionPointer { id: first },
+            Value::FunctionPointer { id: second }] if *first == choice && *second == choice)));
+    observations
+        .push("actual generic Repeat preserves the same admitted Choice token twice".into());
     // Direct cached-registry fault setup, not a claim that safe source naturally fills it.
     *engine.function_pointers.borrow_mut() = vec![known; 512];
     let binary = tcx
@@ -2341,6 +2409,7 @@ fn check_primitive_move_call<'tcx>(
     let Target::Choice(valid_choice) = &saved_choice else {
         unreachable!();
     };
+    let classification_work = 3 + 2 * valid_choice.targets.len();
     let mut wrong_signature = valid_choice.clone();
     // An original array mismatch must refuse before the Choice vector is cloned.
     wrong_signature.original = tcx.types.u32;
@@ -2472,9 +2541,53 @@ fn check_primitive_move_call<'tcx>(
         .bodies
         .borrow_mut()
         .insert(first_instance, std::rc::Rc::new(oversized));
+    let before = format!(
+        "{:?}/{:?}/{:?}/{:?}/{:?}",
+        state.locals,
+        state.missing_places,
+        state.conditions,
+        state.addresses,
+        state.memory.as_slice()
+    );
     let steps = engine.steps;
-    assert!(engine.function_table_call(&state, call()).is_err());
-    assert_eq!(engine.steps, steps);
+    let error = match engine.function_table_call(&state, call()) {
+        Err(error) => error,
+        Ok(_) => panic!("oversized cached callee unexpectedly admitted"),
+    };
+    assert_eq!(engine.steps, steps + classification_work);
+    assert_eq!(
+        engine.unknown_causes.borrow().get(&error),
+        Some(&UnknownCategory::ResourceLimit)
+    );
+    assert_eq!(
+        format!(
+            "{:?}/{:?}/{:?}/{:?}/{:?}",
+            state.locals,
+            state.missing_places,
+            state.conditions,
+            state.addresses,
+            state.memory.as_slice()
+        ),
+        before
+    );
+    assert!(
+        engine
+            .operand(caller_id, &body, &state, &args[0].node)
+            .is_ok()
+    );
+    assert!(engine.read_place(&state, destination, Some(&body)).is_err());
+    assert!(!state.memory.byte_copy_opaque);
+    assert!(state.memory.incoming_byte_roots.is_empty());
+    assert!(state.memory.mutable_u16.is_empty());
+    assert!(state.memory.mutable_hierarchy.is_none());
+    assert!(state.memory.owned_regions.is_empty());
+    assert!(state.memory.missing_places.is_empty());
+    assert!(state.memory.initialized_owners.is_empty());
+    assert!(state.memory.startup_values.is_empty());
+    assert!(!state.memory.startup_invalidated);
+    assert!(state.memory.isolated_static_types.is_empty());
+    assert!(state.memory.startup_overwritten.is_empty());
+    assert!(state.memory.static_uninitialized.is_empty());
     assert!(engine.operand(caller_id, &body, &state, func).is_ok());
     engine
         .bodies
@@ -2486,8 +2599,26 @@ fn check_primitive_move_call<'tcx>(
         .bodies
         .borrow_mut()
         .insert(first_instance, std::rc::Rc::new(wrong_return));
+    let steps = engine.steps;
     assert!(engine.function_table_call(&state, call()).is_err());
-    assert_eq!(engine.steps, steps);
+    assert_eq!(engine.steps, steps + classification_work);
+    assert_eq!(
+        format!(
+            "{:?}/{:?}/{:?}/{:?}/{:?}",
+            state.locals,
+            state.missing_places,
+            state.conditions,
+            state.addresses,
+            state.memory.as_slice()
+        ),
+        before
+    );
+    assert!(engine.operand(caller_id, &body, &state, func).is_ok());
+    assert!(
+        engine
+            .operand(caller_id, &body, &state, &args[0].node)
+            .is_ok()
+    );
     engine
         .bodies
         .borrow_mut()

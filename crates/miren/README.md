@@ -2008,3 +2008,34 @@ remain unsupported. Caller source guards freeze current registries through the l
 input checks grant no raw access or complete transport/search theorem. Isolated compiler controls
 pass on host/ARM O0/O2. Full current validation passes 1,013 Rust and 91 Python tests, preserving
 all 5,232 retained queried obligations and counterexample models.
+
+
+Finite function-table entries and Repeat values may retain earlier finite selected choices. A
+separate bounded recipe conjoins every actual selection predicate; it preserves correlated indices
+and evaluates the actual MIR callable and arguments once, in order, before branch execution. Each
+feasible leaf executes its ordinary available body and preserves the returned Memory. Opaque
+incoming targets, missing bodies, adapters and unsupported ownership remain UNKNOWN.
+
+The route retains the existing integer unary and two-argument signatures, Bool, Char, f32 and f64
+validators. It independently normalizes original full compiler signatures and checks mutable
+caches. Caller, leaf and static helper bodies must authenticate against original MIR. With no
+generic Instance arguments, an independently bounded borrowed comparison may authenticate exact
+raw/current MIR without cloning or folding; any normalization difference uses the existing
+streamed service. Types, regions, scopes, auxiliary vectors and owned statement/terminator fields
+remain guarded and prepaid. Compiler inventories issue no storage or callable permission.
+
+One operation shares choice-node and static-source-edge bounds of 512, depth16, 16 leaves and 16
+held source records. Registry and Repeat bounds remain unchanged. Immutable source evidence can be
+reused within this operation only after paid current Body and full-signature cache checks. Every
+clone and actual compiler service retains its separate prepayment. The default8192 execution limit
+is unchanged; harder correlated two-call Repeat and helper-composed pair controls also use an
+explicit diagnostic 60000 budget in private tests. Diagnostic proofs do not establish default-
+budget application support.
+
+Measured four-profile default controls yield twelve PROVED unary integer roots and ten UNKNOWN
+roots. The separate 60000-step matrix yields twenty PROVED, one REFUTED and one UNKNOWN, including
+the harder correlated two-call Repeat and helper pair. The corpus records all twenty-two default
+outcomes; diagnostic results cannot promote default UNKNOWN. Complete current validation passes
+1,017 Rust and 91 Python tests, release builds, lint and repository checks. Four-profile release
+surveys measure 334 PROVED, 163 REFUTED and 116 UNKNOWN across 613 cases and 108 families. All 591
+previous outcomes and all 5,232 previous queried obligations and models remain exact.

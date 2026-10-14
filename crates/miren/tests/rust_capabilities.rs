@@ -191,7 +191,18 @@ fn actual_reference_mutation_refutes_and_fails_native() {
     let manifest = manifest();
     let directory = Directory::new();
     let mutated = directory.0.join("mutated.rs");
-    let source = std::fs::read_to_string(fixture(&manifest)).unwrap();
+    let original_fixture = fixture(&manifest);
+    let source = std::fs::read_to_string(&original_fixture).unwrap();
+    let companion = original_fixture
+        .parent()
+        .unwrap()
+        .join("nested_function_choice_cases.rs");
+    let copied_companion = directory.0.join("nested_function_choice_cases.rs");
+    std::fs::copy(&companion, &copied_companion).unwrap();
+    assert_eq!(
+        std::fs::read(companion).unwrap(),
+        std::fs::read(copied_companion).unwrap()
+    );
     let original = "*value += 1;";
     assert_eq!(source.matches(original).count(), 1);
     // Alter the shared helper body, not an assertion or analyzer expectation.

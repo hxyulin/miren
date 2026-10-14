@@ -11,7 +11,10 @@ execution at O0 and O2, positive/refuted/unknown controls, a source mutation tha
 structured UNKNOWN reporting, and passing repository checks. Completion establishes a repeatable
 baseline. It does not establish full Rust support or a completed memory-model refactor.
 
-The current manifest contains 396 cases across 97 families.
+The current manifest contains 613 cases across 108 families. Stage261 host/ARM O0/O2 surveys
+measure 334 PROVED, 163 REFUTED and 116 UNKNOWN per profile, with 497 supported outcomes.
+These counts describe the declared corpus, not a percentage of Rust parity.
+The historical Stage244 manifest contained 396 cases across 97 families.
 The completed Stage244 host/ARM O0/O2 surveys measured 187 PROVED, 119 REFUTED and 90 UNKNOWN.
 Readonly core `Option<NonZeroI8>`, `Option<NonZeroI16>` and `Option<NonZeroI32>` support signed
 payload observations, guarded getters, comparison and selected membership.
@@ -2844,3 +2847,32 @@ passes 1,013 Rust and 91 Python tests. Every survey profile retains 322 PROVED, 
 106 UNKNOWN across 591 cases and 107 families. All 5,232 queried obligations and counterexample
 models match the previous release exactly. No raw reference, full search proof or new default
 supported outcome is claimed.
+
+
+## Finite nested function choices
+
+Finite function tables and Repeat values can retain an earlier selected finite choice. A bounded
+recipe preserves every index predicate, checks complete selection-domain coverage and evaluates
+the actual callable and arguments once in MIR order. Feasible leaves execute ordinary bodies,
+contracts and effects, returning their actual Memory. Original full signatures, caller and helper
+MIR, current cache identity, initialization masks and typed primitive values remain checked.
+Opaque inputs and missing bodies remain UNKNOWN.
+
+With no generic Instance arguments, a bounded borrowed comparison can authenticate exact
+original/current MIR without cloning or normalization. Both owned-shape inventories, the current
+type/region graph and all equality fields are separately paid. Any normalization difference uses
+the existing streamed service. Operation-local immutable source reuse retains paid current guards;
+it grants no callable or storage permission by itself. Choice/source graphs retain 512-node,
+depth16, sixteen-leaf and sixteen-source-record limits; default execution remains 8192 steps.
+
+The new twenty-two-root family measures twelve PROVED and ten UNKNOWN on every default profile.
+All twelve unary integer widths are supported. Bool, Char, floating, Repeat and pair cases reach
+resource limits; the opaque case reaches its conservative semantic refusal. The separate 60000
+step matrix measures twenty PROVED, one REFUTED and one UNKNOWN, including harder two-call Repeat
+and helper-composed pairs. Diagnostic outcomes stay separate from default coverage. Genuine leaf
+mutants refute unchanged claims and fail native execution; missing dependency and eight old opaque
+cases retain UNKNOWN. Full current-checkout validation passes 1,017 Rust and 91 Python tests.
+Four-profile release surveys measure 334 PROVED, 163 REFUTED and 116 UNKNOWN across 613 cases and
+108 families. All 591 previous outcomes remain unchanged; all 5,232 previous queried obligations
+and counterexample models are exact. The twelve added default positives carry no assumptions or
+trusted calls.

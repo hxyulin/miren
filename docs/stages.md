@@ -7947,3 +7947,74 @@ across the unchanged 591 cases and 107 families. All 2,364 retained Proof compar
 5,232 retained queried obligations and counterexample models are exact, with no unresolved
 differences. No default supported outcome is added. The final four-document successor preserves
 all 1,058 code, fixture, manifest and other files from the frozen full-check candidate.
+
+
+## Stage 261: execute finite nested function choices
+
+A separate route admits finite Choice entries nested inside tables and Repeat values. It conjoins
+the actual index predicates, checks complete covered domains and evaluates the real callable and
+arguments once before branch execution. Every feasible leaf executes its ordinary actual body and
+returns normal Memory. Integer unary/pair, Bool, Char and floating validators remain required.
+Opaque inputs, missing bodies, unsupported adapters and ownership remain UNKNOWN.
+
+Original complete signatures are independently normalized under paid bounded planning. Caller,
+leaf and static helper source bodies authenticate against compiler originals. Exact no-substitution
+MIR may use a bounded borrowed comparison: raw/current owned-shape inventories and field equality
+are separately paid, while the current type/region graph is visited once. Normalization differences
+use the existing streamed service. Immutable source reuse is operation-local and checks current
+Body and any present signature cache entries before and after calls.
+
+The frozen private source records actual Parent257, without claiming a newer Root basis. Final
+strict evidence measures twenty-two roots on each of four profiles at unchanged default8192 and
+separate diagnostic60000. Default results are twelve PROVED and ten UNKNOWN; diagnostic results are
+twenty PROVED, one REFUTED and one UNKNOWN. Harder two-call Repeat and helper pairs remain in scope.
+Only the twelve actual default unary integer positives receive default supported-outcome credit.
+
+Real leaf mutations refute unchanged claims and fail native execution. Contract and missing-body
+controls, typed Bool/Char/Float faults and source/signature/registry/mask/Context mutations remain
+separate evidence. External library basename and copied analyzer mode setup failures are preserved
+with zero semantic credit. Forty-four old flat proofs, fifty-six queries and twelve models match
+exactly against the actual retained baseline. Broader Root retention is still pending.
+
+Root composes the reviewed source against Stage260 and preserves its current byte evidence. The
+corpus appends one namespaced family and twenty-two measured default cases, preserving all 591 old
+case objects and the entire old guest prefix. Namespaced function bytes match the frozen fixture
+after only its two crate attributes are removed; the corpus module forbids unsafe code. Native
+originals and real leaf mutants pass their expected outcomes on the namespaced source.
+
+Three current-checkout integration tests pass. The renewed compiler probe completes four actual
+source and primitive callbacks with full source/tool/retained guards. An initial incorrect exact
+filter matched zero tests; it is preserved with zero credit, and the corrected registered filter
+requires one actual test and all four markers. Full checks and the expanded release survey remain
+pending.
+
+The first full Root run finishes with 1,012 outer Rust passes and five failures. The expanded
+capability matrix passes. Two inherited probes still reject newly valid finite choices; two retain
+the former zero-charge expectation before flat classification; the native mutant lacks its new
+companion module in the temporary directory. These failures are preserved without full-run credit.
+
+A two-file test-only successor exercises genuine nested moved-Call results with correlated index
+predicates and actual generic Repeat preservation. It checks the exact paid classification charge
+and unchanged caller/Memory on oversized and wrong-return refusal. The native mutation copies the
+exact companion before retaining the unchanged runtime-negative and four-profile REFUTED checks.
+All five exact corrected controls pass; production, limits, fees, guest function bodies and case
+expectations remain literal. A new complete validation run is pending.
+
+
+The corrected frozen full Root run passes all ten required checks, including 1,017 outer Rust
+tests and 91 Python tests. The two nested native controls are counted separately: one genuine
+positive and one expected mutant failure. Release builds, formatting, Clippy, cargo deny, manual
+hooks and documentation checks pass. The failed first run remains preserved.
+
+The four-profile release survey measures 334 PROVED, 163 REFUTED and 116 UNKNOWN across 613 cases
+and 108 families. Twelve new default unary integer positives add supported outcomes; the ten
+remaining new cases keep their recorded UNKNOWN outcomes. All 591 previous case objects, outcomes
+and the entire old guest prefix remain unchanged.
+Sixty-four old Proof records match literally. Another 2,297 match after separately recording
+actual replay source-file fingerprints; three query-free fold records additionally retain a
+qualified deadline context. The expanded fixture and its companion source fingerprints are
+independently recomputed from actual files. All 5,232 previous queried obligations and
+counterexample models match exactly, with no unresolved differences. The eighty-eight new
+case/profile Proofs contain 172 queried obligations and no models, assumptions or trusted calls.
+The final four-document successor preserves all 1,065 code, fixture, manifest and other files
+from the frozen full-check candidate.

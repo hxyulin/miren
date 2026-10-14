@@ -4,6 +4,11 @@ use super::function_pointers::Target;
 use super::*;
 use rustc_middle::mir::visit::Visitor;
 
+#[path = "function_tables/nested.rs"]
+mod nested;
+#[path = "function_tables/source.rs"]
+mod source;
+
 const ENABLE_PRIMITIVE_FUNCTION_TABLES: bool = true;
 
 const ENABLE_FUNCTION_TABLES: bool = true;
@@ -380,6 +385,12 @@ impl<'tcx> Engine<'tcx> {
         let Value::FunctionPointer { id } = value else {
             return Err("known Repeat operand lacks its evaluated function-pointer token".into());
         };
+        if matches!(
+            self.function_pointers.borrow().get(*id),
+            Some(Target::Choice(_))
+        ) {
+            return self.admit_nested_target(*id, expected, work);
+        }
         let (instance, signature) = {
             let pointers = self.function_pointers.borrow();
             let target = pointers
@@ -803,6 +814,7 @@ impl<'tcx> Engine<'tcx> {
         if self.primitive_table_signature(signature).is_some() {
             primitive_work.charge(elements.len());
         }
+        let mut nested_work = super::aggregates::RepeatWork::new();
         for value in elements {
             let Value::FunctionPointer { id } = value else {
                 return Err("function table requires initialized known pointer elements".into());
@@ -817,7 +829,14 @@ impl<'tcx> Engine<'tcx> {
                     self.primitive_table_target_work(*instance, *signature, &mut primitive_work)?;
                 }
             }
-            self.validate_table_target(*id, signature)?;
+            if matches!(
+                self.function_pointers.borrow().get(*id),
+                Some(Target::Choice(_))
+            ) {
+                self.admit_nested_target(*id, signature, &mut nested_work)?;
+            } else {
+                self.validate_table_target(*id, signature)?;
+            }
             targets.push(*id);
         }
         let bound = symbolic::binary(
@@ -963,6 +982,17 @@ impl<'tcx> Engine<'tcx> {
                 }
                 work.operand_place(call.body, call.destination)?;
             }
+        }
+        if self.nested_table_candidate(*id)? {
+            return self
+                .prepared_nested_table_call(state, call, *id)
+                .map_err(|error| {
+                    if self.unknown_causes.borrow().contains_key(&error) {
+                        error
+                    } else {
+                        self.categorized_error(UnknownCategory::Semantics, error)
+                    }
+                });
         }
         let Some(Target::Choice(choice)) = self.function_pointers.borrow().get(*id).cloned() else {
             return Ok(None);

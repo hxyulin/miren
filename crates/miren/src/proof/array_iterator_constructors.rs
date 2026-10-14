@@ -1393,6 +1393,36 @@ std::thread_local! {
     static EVENTS: std::cell::RefCell<Vec<usize>> = const { std::cell::RefCell::new(Vec::new()) };
 }
 
+pub(in crate::proof) fn clone_value_work(
+    engine: &mut Engine<'_>,
+    value: &Value,
+    depth: usize,
+    nodes: &mut usize,
+) -> Result<usize, String> {
+    steps::value_clone_work(engine, value, depth, nodes)
+}
+pub(in crate::proof) fn clone_masks(
+    engine: &mut Engine<'_>,
+    masks: &initialized_places::MissingPlaces,
+) -> Result<initialized_places::MissingPlaces, String> {
+    clone_work::masks(engine, masks)
+}
+
+// Pure bounded field planners; these wrappers grant no iterator or source authority.
+pub(in crate::proof) fn statement_fields_work(
+    engine: &mut Engine<'_>,
+    statement: &rustc_middle::mir::Statement<'_>,
+) -> Result<usize, String> {
+    clone_work::step_statement(engine, statement)
+}
+
+pub(in crate::proof) fn terminator_fields_work(
+    engine: &mut Engine<'_>,
+    terminator: &rustc_middle::mir::Terminator<'_>,
+) -> Result<usize, String> {
+    clone_work::step_terminator(engine, terminator)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1948,3 +1978,5 @@ mod tests {
         std::fs::remove_dir_all(directory).unwrap();
     }
 }
+
+// Shared bounded clone planners; they issue no iterator or function-pointer authority.
