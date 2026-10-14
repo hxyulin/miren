@@ -3103,3 +3103,45 @@ dependency checks. All four capability profiles retain 336 PROVED, 164 REFUTED a
 All 5,420 queried obligations and 656 countermodels remain literal. Of 2,452 full baseline Proofs,
 2,450 match and two differ only in the closed query-free fold timeout context. No supported outcome
 is added by this foundation.
+
+## Paid mutable Product descriptor reuse
+
+Mutable Product helpers reuse immutable compiler-derived descriptors within an authenticated
+instruction scope. Complete current certificates, original types, live backing and owner ancestry
+still validate at each use. Reuse grants no storage or lease rights. Original/current Body identity,
+full signatures and bounded compiler names remain required; missing bodies and changed source
+associations refuse.
+
+Actual resolved calls prepare signature metadata before dispatch adapters can publish it.
+Function-pointer reification and changed Rust-call targets prepare their distinct actual signatures.
+The actual mutable SliceLen certificate pays for prospective Body-cache lookup growth before
+instantiation. Remaining comparison slots pay additional source lookup work before publication;
+ordinary signature256 and Body128 policies are unchanged. Denied work is sticky. Ordinary calls
+retain their existing route, and default limits are unchanged.
+
+Fresh composed release applications cover ten roots in sixteen target/optimization/MIR/budget
+configurations. Every default8192 configuration retains ten Resource UNKNOWNs. At diagnostic2000000,
+six prove, two refute and two remain UNKNOWN; record_retention advances from UNKNOWN to PROVED in
+all eight diagnostic configurations. Twelve existing positive results remain PROVED. All 368 prior
+ordered SMT queries remain literal, with eight additional queries. Thirty-two retained source-file
+fields and sixteen raw countermodels differ; all other retained queried-obligation fields match.
+Actual Z3 checks validate all sixteen changed countermodels against their archived queries.
+Sixteen negative substitutions are UNSAT. Countermodel equality and new native replay are not
+claimed.
+
+Focused compiler controls exercise actual owner calls, corrupted metadata, cold/warm caches and
+work denial. Separate frozen formatter callbacks pass twenty external alias/reexport path bounds,
+eight Impl checks and four oversized-alias refusals across host/ARM O0/O2. Indirect and trimmed name
+coverage remains static only. Mutable integer-niche owner integration is a separate pending stage.
+
+Full validation verifies 1,042 Rust and 91 Python tests, formatting, lint, release, dependency,
+manual-hook and documentation checks. Eight Rust tests initially failed before solver launch in two
+isolated-worktree test targets; both targets pass after supplying the pinned checkout-relative
+solver. Implementation sources did not change, and tests are counted once.
+
+Four default profiles retain 336 PROVED, 164 REFUTED and 113 UNKNOWN across 613 cases. All 5,420
+prior SMT queries and 656 countermodels remain literal. After normalizing only known checkout
+prefixes in source/replay file paths and working directories, 2,451 full Proofs match. One
+query-free host-debug fold timeout records an additional wrapping_add call frame; it remains
+resource UNKNOWN. The comparison classifies this as DIFFERENT, and its closed timeout allowance is
+unchanged.

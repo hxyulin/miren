@@ -1,6 +1,6 @@
 use super::*;
 
-const MAX_CALL_SIGNATURES: usize = 256;
+pub(super) const MAX_CALL_SIGNATURES: usize = 256;
 
 // A safe Rust body can satisfy an unsafe callable declaration. Preserve every other
 // signature component, including its bound variables, instead of rebuilding argument types.

@@ -8,7 +8,7 @@ use symbolic::MutableU16Role;
 mod signature;
 
 #[path = "mutable_product_hierarchy/work.rs"]
-mod work;
+pub(in crate::proof) mod work;
 
 pub(in crate::proof) struct Source<'tcx> {
     instance: ty::Instance<'tcx>,
@@ -53,6 +53,10 @@ pub(in crate::proof) struct Access<'tcx> {
     remaining: usize,
     descriptors: usize,
     original: Ty<'tcx>,
+    source_plan: mutable_product_descriptors::RegistryPlan,
+    source_bindings: usize,
+    instruction_source: Option<mutable_product_descriptors::Binding<'tcx>>,
+    prepared: Option<Rc<mutable_product_descriptors::Prepared<'tcx>>>,
     failed: bool,
 }
 
@@ -103,7 +107,10 @@ fn source_with_signature<'tcx>(
     instance: ty::Instance<'tcx>,
     signature: ty::PolyFnSig<'tcx>,
 ) -> Result<Source<'tcx>, String> {
-    let result = source_with_signature_inner(engine, instance, signature);
+    let result = source_with_signature_inner(engine, instance, signature).and_then(|source| {
+        engine.mutable_product_descriptor_source_replan(0, 0, 0)?;
+        Ok(source)
+    });
     if result.is_err() {
         engine.mutable_product_failed.set(true);
     }
@@ -245,7 +252,7 @@ impl<'tcx> Engine<'tcx> {
             .get(hierarchy.origin.certificate)
             .ok_or("product instruction original type certificate absent")?
             .original;
-        let descriptor = work::descriptor_work(self, original)?;
+
         let descriptors = guards
             .checked_mul(4)
             .ok_or("product descriptor allowance overflow")?;
@@ -272,13 +279,104 @@ impl<'tcx> Engine<'tcx> {
                 "mutable product source registry exceeds existing bound".into(),
             ));
         }
-        pay(self, registry + work + descriptor * descriptors + 28)?;
+        pay(self, registry + work + 28)?;
         let frame = self
             .mutable_product_sources
             .borrow()
             .iter()
             .find_map(|(frame, source)| std::ptr::eq(source.body.as_ref(), body).then_some(*frame))
             .ok_or("product instruction has no authenticated full Instance source")?;
+        // Acquisition is a separate current lookup and retained Rc operation, not future work.
+        pay(self, registry + 8)?;
+        let binding = {
+            let sources = self
+                .mutable_product_sources
+                .try_borrow()
+                .map_err(|_| "product descriptor source registry is borrowed")?;
+            let source = sources
+                .get(&frame)
+                .ok_or("product descriptor source disappeared")?;
+            mutable_product_descriptors::Binding {
+                frame,
+                instance: source.instance,
+                body: source.body.clone(),
+                signature: source.signature,
+            }
+        };
+        // Compiler metadata originates in a genuine owner input frame. A retained scalar
+        // helper instruction has its own source binding, without an invented slice parameter.
+        let acquisition = frames
+            .checked_mul(registry + 8)
+            .and_then(|lookups| lookups.checked_add(16 + 4 * frames))
+            .ok_or("product origin Binding acquisition work overflow")?;
+        pay(self, acquisition)?;
+        let mut origins = {
+            let sources = self
+                .mutable_product_sources
+                .try_borrow()
+                .map_err(|_| "product descriptor source registry is borrowed")?;
+            hierarchy
+                .owners
+                .iter()
+                .flat_map(|owner| &owner.frames)
+                .map(|frame| {
+                    let source = sources
+                        .get(frame)
+                        .ok_or("product descriptor owner source disappeared")?;
+                    Ok(mutable_product_descriptors::Binding {
+                        frame: *frame,
+                        instance: source.instance,
+                        body: source.body.clone(),
+                        signature: source.signature,
+                    })
+                })
+                .collect::<Result<Vec<_>, String>>()?
+        };
+        // After the last owner returns, the actual caller input remains an authentic issuer.
+        origins.push(mutable_product_descriptors::Binding {
+            frame: binding.frame,
+            instance: binding.instance,
+            body: binding.body.clone(),
+            signature: binding.signature,
+        });
+        let mut origin = None;
+        for candidate in origins {
+            if candidate.input_local(self, original)?.is_some() {
+                origin = Some(candidate);
+                break;
+            }
+        }
+        let origin = origin.ok_or("product descriptor has no authenticated owner input source")?;
+        let (prepared, publish) = mutable_product_descriptors::prepare(
+            self,
+            origin,
+            hierarchy.origin.certificate,
+            original,
+        )?;
+        let source_plan = mutable_product_descriptors::RegistryPlan::current(self)?;
+        pay(self, 8)?; // Exact immutable origin/current binding comparison before omission.
+        let source_bindings = if prepared.matches_binding(&binding) {
+            1
+        } else {
+            2
+        };
+        let source_work = source_plan
+            .work()?
+            .checked_mul(source_bindings)
+            .ok_or("product descriptor source allowance overflow")?;
+        let descriptor_work = prepared
+            .compare_work()
+            .checked_add(source_work)
+            .ok_or("product descriptor complete comparison allowance overflow")?;
+        pay(
+            self,
+            descriptor_work
+                .checked_mul(descriptors)
+                .ok_or("product descriptor comparison allowance overflow")?,
+        )?;
+        if publish {
+            self.mutable_product_descriptors.push(prepared.clone());
+        }
         *self.mutable_product_access.borrow_mut() = Some(Access {
             body: std::ptr::from_ref(body) as usize,
             frame,
@@ -294,8 +392,165 @@ impl<'tcx> Engine<'tcx> {
             remaining: guards,
             descriptors,
             original,
+            source_plan,
+            source_bindings,
+            instruction_source: Some(binding),
+            prepared: Some(prepared),
             failed: false,
         });
+        Ok(())
+    }
+
+    // Call adapters lazily use &self signature queries. Publish the resolved actual compiler
+    // signature before dispatch, after future active-scope lookups have been prepaid.
+    pub(in crate::proof) fn mutable_product_call_signature_prepare(
+        &mut self,
+        instance: ty::Instance<'tcx>,
+    ) -> Result<(), String> {
+        if self
+            .mutable_product_access
+            .try_borrow()
+            .map_err(|_| "product descriptor scope is borrowed during call preparation")?
+            .is_none()
+        {
+            return Ok(()); // The ordinary route retains its existing lazy cache behavior.
+        }
+        require_service(self)?;
+        let result = (|| {
+            pay(self, 4)?;
+            let count = self
+                .call_signatures
+                .try_borrow()
+                .map_err(|_| "product call signature registry is borrowed")?
+                .len();
+            pay(self, count + 8)?;
+            let present = self
+                .call_signatures
+                .try_borrow()
+                .map_err(|_| "product call signature registry is borrowed")?
+                .contains_key(&instance);
+            // Same independently normalized compiler signature policy as Product source,
+            // including rejection of a contradictory present cache entry on the warm path.
+            let actual = signature::check(self, instance)?;
+            if present || count >= super::super::call_metadata::MAX_CALL_SIGNATURES {
+                return Ok(());
+            }
+            self.mutable_product_descriptor_source_replan(0, 0, 1)?;
+            pay(self, 8)?; // Actual cache insertion follows its own payment.
+            self.call_signatures
+                .try_borrow_mut()
+                .map_err(|_| "product call signature registry is borrowed at publication")?
+                .insert(instance, actual);
+            Ok(())
+        })();
+        if result.is_err() {
+            self.mutable_product_failed.set(true);
+        }
+        result
+    }
+
+    // The actual mutable SliceLen certificate calls this before its existing Body consumer.
+    // Replenish only future source lookups; the ordinary instantiation policy stays unchanged.
+    pub(in crate::proof) fn mutable_product_length_body(
+        &mut self,
+        instance: ty::Instance<'tcx>,
+    ) -> Result<Rc<Body<'tcx>>, String> {
+        if self
+            .mutable_product_access
+            .try_borrow()
+            .map_err(|_| "product descriptor scope is borrowed during length preparation")?
+            .is_none()
+        {
+            return self.instantiated_body(instance);
+        }
+        require_service(self)?;
+        let result = (|| {
+            pay(self, 4)?;
+            let count = self
+                .bodies
+                .try_borrow()
+                .map_err(|_| "product length Body registry is borrowed")?
+                .len();
+            pay(self, count + 8)?;
+            let present = self
+                .bodies
+                .try_borrow()
+                .map_err(|_| "product length Body registry is borrowed")?
+                .contains_key(&instance);
+            if !present && count < 128 {
+                self.mutable_product_descriptor_source_replan(0, 1, 0)?;
+            }
+            // At the ordinary 128-entry clear, required current source bindings still fail.
+            self.instantiated_body(instance)
+        })();
+        if result.is_err() {
+            self.mutable_product_failed.set(true);
+        }
+        result
+    }
+
+    // Genuine Product source mutations can expand the prepaid lookup inventory. Charge only
+    // additional future work for the remaining slots before the source is published/consumed.
+    fn mutable_product_descriptor_source_replan(
+        &mut self,
+        pending_sources: usize,
+        pending_bodies: usize,
+        pending_signatures: usize,
+    ) -> Result<(), String> {
+        let scope = self
+            .mutable_product_access
+            .try_borrow()
+            .map_err(|_| "product descriptor scope is borrowed during source planning")?;
+        let Some(access) = scope.as_ref() else {
+            return Ok(());
+        };
+        if access.failed || self.mutable_product_failed.get() {
+            return Err("failed product descriptor scope cannot acquire source work".into());
+        }
+        let old = access.source_plan;
+        let slots = access.descriptors;
+        let bindings = access.source_bindings;
+        drop(scope);
+        let current = mutable_product_descriptors::RegistryPlan::current(self)?
+            .with_pending_sources(pending_sources)?
+            .with_pending_bodies(pending_bodies)?
+            .with_pending_signatures(pending_signatures)?;
+        let expanded = old.expanded(current);
+        let additional = expanded
+            .work()?
+            .checked_sub(old.work()?)
+            .and_then(|work| work.checked_mul(slots))
+            .and_then(|work| work.checked_mul(bindings))
+            .ok_or("product descriptor source replan work overflow")?;
+        if additional != 0 {
+            pay(self, additional)?;
+        }
+        self.mutable_product_access
+            .try_borrow_mut()
+            .map_err(|_| "product descriptor scope is borrowed during source publication")?
+            .as_mut()
+            .ok_or("product descriptor scope disappeared during source planning")?
+            .source_plan = expanded;
+        Ok(())
+    }
+
+    pub(in crate::proof) fn mutable_product_descriptor_source_matches(
+        &self,
+        binding: &mutable_product_descriptors::Binding<'tcx>,
+    ) -> Result<(), String> {
+        let sources = self
+            .mutable_product_sources
+            .try_borrow()
+            .map_err(|_| "product descriptor issuer registry is borrowed")?;
+        let source = sources
+            .get(&binding.frame)
+            .ok_or("product descriptor issuer source disappeared")?;
+        if source.instance != binding.instance
+            || source.signature != binding.signature
+            || !Rc::ptr_eq(&source.body, &binding.body)
+        {
+            return Err("product descriptor retained source binding differs".into());
+        }
         Ok(())
     }
 
@@ -303,10 +558,10 @@ impl<'tcx> Engine<'tcx> {
         &self,
         id: usize,
         original: Ty<'tcx>,
-    ) -> Result<(), String> {
+    ) -> Result<Option<Rc<mutable_product_descriptors::Prepared<'tcx>>>, String> {
         let mut scope = self.mutable_product_access.borrow_mut();
         let Some(access) = scope.as_mut() else {
-            return Ok(()); // The unchanged scalar/direct Product path has no new lineage scope.
+            return Ok(None); // Direct Product paths retain ordinary descriptor reconstruction.
         };
         if access.failed || self.mutable_product_failed.get() || access.descriptors == 0 {
             access.failed = true;
@@ -324,7 +579,32 @@ impl<'tcx> Engine<'tcx> {
                 "product descriptor original type changed after instruction planning".into(),
             );
         }
-        Ok(())
+        let result = (|| {
+            let current = mutable_product_descriptors::RegistryPlan::current(self)?;
+            if !access.source_plan.covers(current) {
+                return Err(self.categorized_error(
+                    UnknownCategory::ResourceLimit,
+                    "product descriptor source inventory exceeds its paid instruction plan".into(),
+                ));
+            }
+            let instruction = access
+                .instruction_source
+                .as_ref()
+                .ok_or("product descriptor scope has no current instruction source")?;
+            if access.source_bindings == 2 {
+                instruction.validate_source(self)?;
+            }
+            let prepared = access
+                .prepared
+                .as_ref()
+                .ok_or("product descriptor scope has no independently prepared metadata")?;
+            Ok(Some(prepared.clone()))
+        })();
+        if result.is_err() {
+            access.failed = true;
+            self.mutable_product_failed.set(true);
+        }
+        result
     }
 
     pub(in crate::proof) fn mutable_product_hierarchy_frame(
@@ -660,6 +940,8 @@ fn register_source<'tcx>(engine: &mut Engine<'tcx>, source: Source<'tcx>) -> Res
     {
         return Err("product hierarchy frame source registration differs".into());
     }
+    let pending = usize::from(!engine.mutable_product_sources.borrow().contains_key(&frame));
+    engine.mutable_product_descriptor_source_replan(pending, 0, 0)?;
     engine
         .mutable_product_sources
         .borrow_mut()

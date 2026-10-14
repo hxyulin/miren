@@ -8,7 +8,7 @@ use symbolic::{MutableU16Role, ScalarSliceElement};
 #[path = "mutable_product_projection.rs"]
 mod projection;
 
-fn same_product_shape(left: &CompositeShape, right: &CompositeShape) -> bool {
+pub(super) fn same_product_shape(left: &CompositeShape, right: &CompositeShape) -> bool {
     match (left, right) {
         (CompositeShape::Primitive(left), CompositeShape::Primitive(right)) => left == right,
         (CompositeShape::Tuple(left), CompositeShape::Tuple(right))
@@ -137,7 +137,13 @@ impl<'tcx> Engine<'tcx> {
             .mutable_integer_types
             .get(id)
             .ok_or("mutable product certificate was not issued")?;
-        self.mutable_product_descriptor_guard(id, certificate.original)?;
+        if let Some(prepared) = self.mutable_product_descriptor_guard(id, certificate.original)? {
+            prepared
+                .validate_source(self)
+                .and_then(|()| prepared.compare(certificate))
+                .inspect_err(|_| self.mutable_product_failed.set(true))?;
+            return Ok(certificate);
+        }
         let ElementCodec::Product(issued) = &certificate.codec else {
             return Err("mutable product needs an exact product certificate".into());
         };

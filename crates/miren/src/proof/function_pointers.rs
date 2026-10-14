@@ -44,7 +44,9 @@ impl<'tcx> Engine<'tcx> {
                 instance.def
             ));
         }
-        let signature = self.call_poly_signature(ty::Instance::new_raw(*id, args.skip_binder()))?;
+        let signature_instance = ty::Instance::new_raw(*id, args.skip_binder());
+        self.mutable_product_call_signature_prepare(signature_instance)?;
+        let signature = self.call_poly_signature(signature_instance)?;
         let expected = self
             .tcx
             .erase_and_anonymize_regions(Ty::new_fn_ptr(self.tcx, signature));

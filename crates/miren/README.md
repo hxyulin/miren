@@ -2200,3 +2200,32 @@ Product service. Tests cover all twelve integer domains, Option and both local v
 host and ARM, including correlated payload roundtrips, sibling storage and invalid-value guards.
 This foundation does not admit mutable niche owners in release analysis. Owner descriptors,
 instruction consumption, initialization transactions and live borrow checks remain required.
+
+Paid whole-product instruction scopes may reuse independently prepared immutable compiler
+metadata from an authenticated owner input frame. Each use compares every mutable certificate
+field and checks the current instruction and input source bodies, full signatures and Context.
+Storage, initialization, owner leases, epochs and ancestry remain live checks. Ordinary Product
+paths without a paid lineage instruction still reconstruct their compiler descriptor. Preparation
+and full comparisons consume the existing execution budget; no resource cap is increased.
+
+Descriptor source lookups have separate paid inventory plans. Genuine Product source acquisition
+and publication reserve additional remaining-slot work when those inventories grow; an uncovered
+mutation refuses before lookup. Identical instruction and input bindings perform one actual
+source validation. Missing dispatcher signature cache entries preserve independently authenticated
+compiler signatures; missing current bodies or source records still refuse. Impl-local product
+names plan compiler identity self types, trait paths and generic names before allocation. Unplanned
+printer kinds and oversized metadata retain explicit refusals.
+
+Product path planning also covers selectable external visible/reexport names, direct extern-crate
+aliases and diagnostic trimmed names before owned compiler display strings are constructed.
+Actual source Binding acquisition pays its own table lookups and Rc/vector retention before use;
+future descriptor comparison reserves remain separate. Oversized aliases refuse before allocation.
+
+Active Product calls prepare the actual compiler callee signature after target resolution
+before lazy dispatch adapters can publish it. Function-pointer reification and a changed Rust-call
+adapter target use the same preparation before their own signature consumers. Prospective cache
+growth and insertion
+pay separately before publication; ordinary calls retain their existing lazy cache behavior.
+The actual mutable SliceLen certificate replenishes future current-Body lookup work before a
+missing Body is instantiated. Its existing body certification and 128-entry cache policy remain
+unchanged; clearing a required source association still refuses descriptor reuse.

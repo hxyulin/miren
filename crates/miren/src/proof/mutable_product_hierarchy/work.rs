@@ -45,11 +45,66 @@ impl DescriptorPlan {
         Ok(bytes + 4)
     }
 
-    fn path(&mut self, engine: &mut Engine<'_>, mut id: DefId) -> Result<usize, String> {
+    fn path(&mut self, engine: &mut Engine<'_>, id: DefId) -> Result<usize, String> {
+        self.path_depth(engine, id, 0)
+    }
+
+    fn path_depth(
+        &mut self,
+        engine: &mut Engine<'_>,
+        id: DefId,
+        depth: usize,
+    ) -> Result<usize, String> {
+        let raw = self.raw_path_depth(engine, id, depth)?;
+        let visible = self.visible_path(engine, id, depth)?.unwrap_or(0);
+        pay(engine, 4)?;
+        let trimmed = if engine.tcx.sess.opts.unstable_opts.trim_diagnostic_paths
+            && engine.tcx.sess.opts.trimmed_def_paths
+        {
+            engine.tcx.trimmed_def_paths(()).get(&id).copied()
+        } else {
+            None
+        };
+        let trimmed = match trimmed {
+            Some(name) => self.name(engine, name.as_str().len())? + 4,
+            None => 0,
+        };
+        Ok(raw.max(visible).max(trimmed))
+    }
+
+    fn raw_path_depth(
+        &mut self,
+        engine: &mut Engine<'_>,
+        mut id: DefId,
+        depth: usize,
+    ) -> Result<usize, String> {
+        if depth >= MAX_INPUT_DEPTH {
+            return Err("product printed path exceeds existing depth budget".into());
+        }
         let mut work = 0usize;
         for _ in 0..MAX_INPUT_DEPTH {
             pay(engine, 6)?;
             let key = engine.tcx.def_key(id);
+            if key.disambiguated_data.data == rustc_hir::definitions::DefPathData::Impl {
+                // The compiler prints impl self/trait types, not just an anonymous namespace.
+                // Plan their actual identity arguments before def_path_str can allocate names.
+                pay(engine, 8)?;
+                let self_ty = engine
+                    .tcx
+                    .type_of(id)
+                    .instantiate_identity()
+                    .skip_norm_wip();
+                work += self.printed_original(engine, self_ty, depth + 1)?;
+                if matches!(engine.tcx.def_kind(id), DefKind::Impl { of_trait: true }) {
+                    let trait_ref = engine
+                        .tcx
+                        .impl_trait_ref(id)
+                        .instantiate_identity()
+                        .skip_norm_wip();
+                    work += self.path_depth(engine, trait_ref.def_id, depth + 1)?;
+                    work += self.printed_arguments(engine, &trait_ref.args[1..], depth + 1)?;
+                }
+            }
             if let Some(name) = key.disambiguated_data.data.get_opt_name() {
                 work += self.name(engine, name.as_str().len())?;
             } else if key.parent.is_some() {
@@ -74,6 +129,204 @@ impl DescriptorPlan {
             id.index = parent;
         }
         Err("product type definition path exceeds existing depth".into())
+    }
+
+    fn visible_path(
+        &mut self,
+        engine: &mut Engine<'_>,
+        mut id: DefId,
+        depth: usize,
+    ) -> Result<Option<usize>, String> {
+        use rustc_hir::definitions::DefPathData;
+        use rustc_span::def_id::ModId;
+        if depth >= MAX_INPUT_DEPTH {
+            return Err("product visible path exceeds existing nesting bound".into());
+        }
+        if id.is_local() {
+            return Ok(None);
+        }
+        let mut work = 0usize;
+        let mut visited = [None; MAX_INPUT_DEPTH];
+        for position in 0..MAX_INPUT_DEPTH {
+            pay(engine, 16)?;
+            if visited[..position].contains(&Some(id)) {
+                return Ok(None);
+            }
+            visited[position] = Some(id);
+            if id.as_crate_root().is_some() {
+                pay(engine, 8)?;
+                let external = engine.tcx.extern_crate(id.krate).copied();
+                // An indirect crate can instead be reached through a visible reexport parent.
+                if external.is_none_or(|external| external.is_direct()) {
+                    let ordinary =
+                        self.name(engine, engine.tcx.crate_name(id.krate).as_str().len())?;
+                    let explicit = if let Some(external) = external
+                        && !external.span.is_dummy()
+                        && let rustc_crate_store::ExternCrateSource::Extern(alias) = external.src
+                    {
+                        self.raw_path_depth(engine, alias, depth + 1)?
+                    } else {
+                        0
+                    };
+                    return Ok(Some(work + ordinary.max(explicit) + 4));
+                }
+            }
+            if id.is_local() {
+                return Ok(Some(work + self.raw_path_depth(engine, id, depth + 1)?));
+            }
+            let key = engine.tcx.def_key(id);
+            let parents = engine.tcx.visible_parent_map(());
+            let Some(parent) = parents.get(&id).copied() else {
+                return Ok(None);
+            };
+            let mut data = key.disambiguated_data.data;
+            if matches!(data, DefPathData::Ctor) {
+                let actual_parent = engine
+                    .tcx
+                    .opt_parent(id)
+                    .ok_or("product visible constructor parent absent")?;
+                data = engine.tcx.def_key(actual_parent).disambiguated_data.data;
+            }
+            let name = match data {
+                DefPathData::TypeNs(_) if engine.tcx.opt_parent(id) != Some(parent) => {
+                    pay(engine, 8)?;
+                    let children = engine.tcx.module_children(ModId::new_unchecked(parent));
+                    if children.len() > MAX_INPUT_VALUES {
+                        return Err(
+                            "product visible reexport catalogue exceeds existing512 bound".into(),
+                        );
+                    }
+                    pay(engine, children.len() + 4)?;
+                    let Some(name) = children
+                        .iter()
+                        .find(|child| {
+                            child.res.opt_def_id() == Some(id)
+                                && child.vis.is_public()
+                                && child.ident.name != rustc_span::kw::Underscore
+                        })
+                        .map(|child| child.ident.name)
+                    else {
+                        return Ok(None);
+                    };
+                    Some(name)
+                }
+                DefPathData::CrateRoot => Some(engine.tcx.crate_name(id.krate)),
+                _ => data.get_opt_name(),
+            };
+            if let Some(name) = name {
+                work += self.name(engine, name.as_str().len())? + 4;
+            } else if !matches!(data, DefPathData::ForeignMod | DefPathData::Ctor) {
+                let rustc_hir::definitions::DefPathDataName::Anon { namespace } = data.name()
+                else {
+                    return Err("product visible path component classification differs".into());
+                };
+                work += self.name(engine, namespace.as_str().len())? + 64;
+                if let DefPathData::AnonAssocTy(method) = data {
+                    work += self.name(engine, method.as_str().len())? + 4;
+                }
+            }
+            id = parent;
+        }
+        Err("product visible path exceeds existing16 parent bound".into())
+    }
+
+    fn printed_arguments<'tcx>(
+        &mut self,
+        engine: &mut Engine<'tcx>,
+        arguments: &[ty::GenericArg<'tcx>],
+        depth: usize,
+    ) -> Result<usize, String> {
+        if arguments.len() > MAX_INPUT_VALUES || depth >= MAX_INPUT_DEPTH {
+            return Err("product impl printed arguments exceed existing bounds".into());
+        }
+        pay(engine, 4 + arguments.len())?;
+        let mut work = 16usize;
+        for argument in arguments {
+            work += match argument.kind() {
+                ty::GenericArgKind::Type(original) => {
+                    self.printed_original(engine, original, depth + 1)?
+                }
+                ty::GenericArgKind::Lifetime(region) => self.printed_region(engine, region)?,
+                ty::GenericArgKind::Const(value) => self.printed_constant(engine, value)?,
+            } + 4;
+        }
+        Ok(work)
+    }
+
+    fn printed_region<'tcx>(
+        &mut self,
+        engine: &mut Engine<'tcx>,
+        region: ty::Region<'tcx>,
+    ) -> Result<usize, String> {
+        pay(engine, 4)?;
+        match region.kind() {
+            ty::ReEarlyParam(parameter) => {
+                Ok(8 + self.name(engine, parameter.name.as_str().len())?)
+            }
+            ty::ReStatic | ty::ReErased => Ok(16),
+            _ => Err("product impl path region printer is unsupported".into()),
+        }
+    }
+
+    fn printed_constant<'tcx>(
+        &mut self,
+        engine: &mut Engine<'tcx>,
+        value: ty::Const<'tcx>,
+    ) -> Result<usize, String> {
+        pay(engine, 6)?;
+        if let ty::ConstKind::Param(parameter) = value.kind() {
+            return Ok(8 + self.name(engine, parameter.name.as_str().len())?);
+        }
+        if value.try_to_target_usize(engine.tcx).is_some() {
+            // Existing target-usize constants have at most 39 decimal digits.
+            return Ok(64);
+        }
+        Err("product impl path constant printer is unsupported".into())
+    }
+
+    fn printed_original<'tcx>(
+        &mut self,
+        engine: &mut Engine<'tcx>,
+        original: Ty<'tcx>,
+        depth: usize,
+    ) -> Result<usize, String> {
+        if depth >= MAX_INPUT_DEPTH || self.nodes >= MAX_INPUT_VALUES {
+            return Err("product impl printed type exceeds existing expanded bounds".into());
+        }
+        pay(engine, 12)?;
+        self.nodes += 1;
+        let mut work = 64usize;
+        match original.kind() {
+            ty::Bool | ty::Char | ty::Int(_) | ty::Uint(_) | ty::Float(_) | ty::Str | ty::Never => {
+            }
+            ty::Param(parameter) => work += self.name(engine, parameter.name.as_str().len())?,
+            ty::Tuple(fields) => {
+                if fields.len() > MAX_INPUT_VALUES {
+                    return Err("product impl printed tuple exceeds existing bound".into());
+                }
+                pay(engine, fields.len())?;
+                for field in fields.iter() {
+                    work += self.printed_original(engine, field, depth + 1)?;
+                }
+            }
+            ty::Array(element, count) => {
+                work += self.printed_original(engine, *element, depth + 1)?;
+                work += self.printed_constant(engine, *count)?;
+            }
+            ty::Slice(element) | ty::RawPtr(element, _) => {
+                work += self.printed_original(engine, *element, depth + 1)?;
+            }
+            ty::Ref(region, element, _) => {
+                work += self.printed_region(engine, *region)?;
+                work += self.printed_original(engine, *element, depth + 1)?;
+            }
+            ty::Adt(definition, arguments) => {
+                work += self.path_depth(engine, definition.did(), depth + 1)?;
+                work += self.printed_arguments(engine, arguments, depth + 1)?;
+            }
+            _ => return Err("product impl self/trait type printer is unsupported".into()),
+        }
+        Ok(work)
     }
 
     fn original<'tcx>(
@@ -144,7 +397,7 @@ impl DescriptorPlan {
     }
 }
 
-pub(super) fn descriptor_work<'tcx>(
+pub(in crate::proof) fn descriptor_work<'tcx>(
     engine: &mut Engine<'tcx>,
     original: Ty<'tcx>,
 ) -> Result<usize, String> {
@@ -1007,5 +1260,132 @@ impl<'tcx> Engine<'tcx> {
             self.mutable_product_failed.set(true);
         }
         result
+    }
+}
+
+#[cfg(test)]
+pub(super) fn impl_path_controls(tcx: TyCtxt<'_>) {
+    let names = [
+        ("InherentProductWithActualCompilerQualifiedName", true),
+        ("TraitProductWithActualCompilerQualifiedName", true),
+        ("ConstProduct", true),
+        ("UnsupportedFunctionPrinterProduct", false),
+        ("OversizedPrinterProduct", false),
+    ];
+    for (name, supported) in names {
+        let id = tcx
+            .iter_local_def_id()
+            .find(|id| {
+                tcx.def_kind(*id) == DefKind::Struct
+                    && tcx.item_name(id.to_def_id()).as_str() == name
+            })
+            .unwrap();
+        let mut engine = super::super::super::nonzero_niches::test_engine(tcx);
+        engine.limits.max_steps = 2_000_000;
+        let original = tcx.type_of(id).instantiate_identity().skip_norm_wip();
+        let result = descriptor_work(&mut engine, original);
+        if supported {
+            let bound = result.unwrap();
+            // The formatter allocates only after the actual original path plan has paid.
+            pay(&mut engine, bound * 2 + 64).unwrap();
+            let actual = tcx.def_path_str(id);
+            assert!(
+                actual.len() <= bound,
+                "actual compiler name exceeds planned bytes: {name}"
+            );
+            assert!(engine.mutable_product_shape(original).unwrap().is_some());
+            eprintln!(
+                "impl product name: {name}, actual_bytes={}, bound={bound}",
+                actual.len()
+            );
+        } else {
+            assert!(
+                result.is_err(),
+                "unsupported printer must refuse before allocation: {name}"
+            );
+            eprintln!("impl product name: {name}, refused before name allocation");
+        }
+    }
+}
+
+#[cfg(test)]
+pub(super) fn external_path_controls(tcx: TyCtxt<'_>, oversized: bool) {
+    use rustc_span::def_id::{CRATE_DEF_INDEX, ModId};
+    let external = tcx
+        .crates(())
+        .iter()
+        .find(|crate_num| tcx.crate_name(**crate_num).as_str() == "d")
+        .copied()
+        .unwrap();
+    let root = DefId {
+        krate: external,
+        index: CRATE_DEF_INDEX,
+    };
+    let children = tcx.module_children(ModId::new_unchecked(root));
+    let mut count = 0;
+    let mut types = 0;
+    let mut constructors = 0;
+    for child in children {
+        if !child.vis.is_public() {
+            continue;
+        }
+        let Some(id) = child.res.opt_def_id() else {
+            continue;
+        };
+        match tcx.def_kind(id) {
+            DefKind::Struct | DefKind::Trait => types += 1,
+            DefKind::Ctor(..) => constructors += 1,
+            kind => panic!("unexpected external fixture definition {kind:?}"),
+        }
+        let mut engine = super::super::super::nonzero_niches::test_engine(tcx);
+        engine.limits.max_steps = 2_000_000;
+        let mut plan = DescriptorPlan { nodes: 0, names: 0 };
+        let result = plan.path(&mut engine, id);
+        if oversized {
+            assert!(
+                result.is_err(),
+                "actual oversized extern alias must refuse before allocation"
+            );
+            assert!(engine.bodies.borrow().is_empty());
+            assert!(engine.mutable_product_sources.borrow().is_empty());
+            assert!(engine.mutable_product_descriptors.is_empty());
+            count += 1;
+            continue;
+        }
+        let bound = result.unwrap();
+        pay(&mut engine, bound * 2 + 64).unwrap();
+        let actual = tcx.def_path_str(id);
+        assert!(actual.len() <= bound);
+        assert!(actual.contains("actual_external_alias_for_printer"));
+        assert!(actual.contains(child.ident.name.as_str()));
+        eprintln!("external compiler path: {actual}; bound={bound}");
+        count += 1;
+    }
+    assert_eq!(types, 3);
+    assert_eq!(constructors, 2);
+    assert_eq!(count, 5);
+    if oversized {
+        eprintln!("external compiler paths: actual oversized alias refused before name allocation");
+        return;
+    }
+    for name in ["ExternalSelfProduct", "ExternalTraitProduct"] {
+        let id = tcx
+            .iter_local_def_id()
+            .find(|id| {
+                tcx.def_kind(*id) == DefKind::Struct
+                    && tcx.item_name(id.to_def_id()).as_str() == name
+            })
+            .unwrap();
+        let mut engine = super::super::super::nonzero_niches::test_engine(tcx);
+        engine.limits.max_steps = 2_000_000;
+        let original = tcx.type_of(id).instantiate_identity().skip_norm_wip();
+        let bound = descriptor_work(&mut engine, original).unwrap();
+        pay(&mut engine, bound * 2 + 64).unwrap();
+        let actual = tcx.def_path_str(id);
+        assert!(actual.len() <= bound);
+        assert!(actual.contains("actual_external_alias_for_printer"));
+        assert!(actual.contains("ExternalArgumentWithVisibleAliasName"));
+        assert!(engine.mutable_product_shape(original).unwrap().is_some());
+        eprintln!("external impl product: {actual}; bound={bound}");
     }
 }

@@ -82,6 +82,7 @@ mod mutable_interval;
 #[cfg(test)]
 mod mutable_lease_probe;
 mod mutable_metadata;
+mod mutable_product_descriptors;
 mod mutable_products;
 mod mutable_reborrows;
 mod mutable_slice_ranges;
@@ -201,6 +202,7 @@ struct Engine<'tcx> {
     scalar_slice_types: Vec<Ty<'tcx>>,
     composite_slice_types: Vec<composite_slices::CompositeType<'tcx>>,
     tracked_addresses: Vec<(tracked_pointers::AddressLocation<'tcx>, Term)>,
+    mutable_product_descriptors: Vec<std::rc::Rc<mutable_product_descriptors::Prepared<'tcx>>>,
     mutable_product_failed: std::cell::Cell<bool>,
     mutable_product_access: std::cell::RefCell<Option<mutable_hierarchy::products::Access<'tcx>>>,
     mutable_product_sources:
@@ -330,6 +332,7 @@ impl<'tcx> Engine<'tcx> {
             composite_slice_types: Vec::new(),
             mutable_product_access: Default::default(),
             mutable_product_sources: Default::default(),
+            mutable_product_descriptors: Vec::new(),
             mutable_product_failed: Default::default(),
             steps: 0,
             call_chain: Vec::new(),
@@ -2095,6 +2098,8 @@ impl<'tcx> Engine<'tcx> {
                         }
                         _ => return Err("unresolved indirect call".to_owned()),
                     };
+                    self.mutable_product_call_signature_prepare(instance)?;
+                    let dispatch_instance = instance;
                     if let Some(value) = self.executable_box_format_call(
                         frame.box_invocation(),
                         &owned_body,
@@ -2628,6 +2633,9 @@ impl<'tcx> Engine<'tcx> {
                     } else {
                         instance
                     };
+                    if instance != dispatch_instance {
+                        self.mutable_product_call_signature_prepare(instance)?;
+                    }
                     if !frame.has_destruction()
                         && let Some(results) = self.shared_trait_object_call(
                             instance,

@@ -1134,7 +1134,7 @@ impl<'tcx> Engine<'tcx> {
         let ty::Slice(signature_element) = signature_slice.kind() else {
             return Err("mutable integer SliceLen element differs".into());
         };
-        let body = self.instantiated_body(instance)?;
+        let body = self.mutable_product_length_body(instance)?;
         if body.arg_count != 1
             || body.local_decls.len() != 2
             || body.basic_blocks.len() != 1

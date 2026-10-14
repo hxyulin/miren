@@ -161,6 +161,7 @@ fn actual_product_helper_source_and_failed_service_guards() {
             let used = engine.steps;
             assert!(pay(&mut engine, 0).is_err());
             assert_eq!(engine.steps, used);
+            descriptor_reuse_controls(tcx);
             actual_owner_controls(tcx);
             eligibility_controls(tcx);
             inactive_retry_controls(tcx);
@@ -196,7 +197,7 @@ fn actual_product_helper_source_and_failed_service_guards() {
 }
 
 fn actual_owner_controls(tcx: TyCtxt<'_>) {
-    for mutation in 0..16 {
+    for mutation in 0..31 {
         let mut engine = super::super::nonzero_niches::test_engine(tcx);
         engine.limits.max_steps = 2_000_000;
         let id = tcx
@@ -304,7 +305,7 @@ fn actual_owner_controls(tcx: TyCtxt<'_>) {
                 Rc::make_mut(&mut state.memory.mutable_u16)[0].data =
                     other_memory.mutable_u16[0].data.clone();
             }
-            5..=15 => {}
+            5..=30 => {}
             _ => unreachable!(),
         }
         let result = engine.mutable_product_hierarchy_call(
@@ -345,6 +346,18 @@ fn actual_owner_controls(tcx: TyCtxt<'_>) {
                         16,
                     )
                     .unwrap();
+                if mutation >= 27 {
+                    length_body_growth_controls(&mut engine, &body, memory, mutation - 27);
+                    continue;
+                }
+                if mutation >= 20 {
+                    library_signature_growth_controls(&mut engine, &body, memory, mutation - 20);
+                    continue;
+                }
+                if mutation >= 16 {
+                    descriptor_source_growth_controls(&mut engine, memory, mutation - 16);
+                    continue;
+                }
                 if mutation >= 10 {
                     active_retry_controls(&mut engine, mutation);
                     continue;
@@ -643,6 +656,10 @@ fn eligibility_controls(tcx: TyCtxt<'_>) {
     assert!(engine.mutable_product_failed.get());
     let mut engine = fresh();
     engine.mutable_product_access.borrow_mut().replace(Access {
+        source_plan: Default::default(),
+        source_bindings: 0,
+        instruction_source: None,
+        prepared: None,
         body: 1,
         frame: 1,
         occurrence: 1,
@@ -681,6 +698,10 @@ fn eligibility_singleton_controls<'tcx>(tcx: TyCtxt<'tcx>) {
     let mut engine = fresh();
     let memory = scalar(&mut engine);
     engine.mutable_product_access.borrow_mut().replace(Access {
+        source_plan: Default::default(),
+        source_bindings: 0,
+        instruction_source: None,
+        prepared: None,
         body: 1,
         frame: 1,
         occurrence: 1,
@@ -747,4 +768,736 @@ fn eligibility_singleton_controls<'tcx>(tcx: TyCtxt<'tcx>) {
     eprintln!(
         "product singleton eligibility: access/source/missing/codec/type; Scalar guard retained"
     );
+}
+
+// Compiler metadata controls use the genuine helper Instance/input Local and its actual source.
+// They exercise preparation and full mutable-certificate comparison, not owner admission.
+fn descriptor_reuse_controls(tcx: TyCtxt<'_>) {
+    use super::super::super::mutable_product_descriptors::{Binding, prepare};
+    use super::super::super::mutable_u16::ElementCodec;
+    let id = tcx
+        .hir_body_owners()
+        .find(|id| {
+            tcx.def_kind(id.to_def_id()) == DefKind::Fn
+                && tcx.item_name(id.to_def_id()).as_str() == "nested_tuple"
+        })
+        .unwrap();
+    let instance = ty::Instance::mono(tcx, id.to_def_id());
+    let setup = || {
+        let mut engine = super::super::nonzero_niches::test_engine(tcx);
+        engine.limits.max_steps = 2_000_000;
+        engine.instantiated_body(instance).unwrap();
+        let actual = source(&mut engine, instance).unwrap();
+        let body = actual.body.clone();
+        let signature = actual.signature;
+        let frame = register_source(&mut engine, actual).unwrap();
+        let ty::Ref(_, inner, _) = body.local_decls[body.args_iter().next().unwrap()].ty.kind()
+        else {
+            panic!("actual nested tuple input is not a reference")
+        };
+        let ty::Slice(original) = inner.kind() else {
+            panic!("actual nested tuple input is not a slice")
+        };
+        let original = *original;
+        let mut memory = Memory::default();
+        engine
+            .mutable_product_input(original, &mut memory, &mut Vec::new())
+            .unwrap();
+        let certificate = memory.mutable_u16[0].certificate;
+        (
+            engine,
+            Binding {
+                frame,
+                instance,
+                body,
+                signature,
+            },
+            certificate,
+            original,
+        )
+    };
+    let (mut engine, binding, certificate, original) = setup();
+    let start = engine.steps;
+    let (prepared, publish) = prepare(&mut engine, binding, certificate, original).unwrap();
+    let exact = engine.steps - start;
+    assert!(publish);
+    assert!(engine.mutable_product_descriptors.is_empty());
+    engine.mutable_product_descriptors.push(prepared.clone());
+    let signature = prepared_signature(&engine, instance);
+    let body = engine.bodies.borrow().get(&instance).unwrap().clone();
+    let frame = engine
+        .mutable_product_sources
+        .borrow()
+        .keys()
+        .next()
+        .copied()
+        .unwrap();
+    let (warm, publish) = prepare(
+        &mut engine,
+        Binding {
+            frame,
+            instance,
+            body,
+            signature,
+        },
+        certificate,
+        original,
+    )
+    .unwrap();
+    assert!(!publish);
+    assert!(Rc::ptr_eq(&prepared, &warm));
+    assert_eq!(engine.mutable_product_descriptors.len(), 1);
+    for delta in [exact - 1, exact] {
+        let (mut engine, binding, certificate, original) = setup();
+        engine.limits.max_steps = engine.steps + delta;
+        let result = prepare(&mut engine, binding, certificate, original);
+        assert_eq!(result.is_ok(), delta == exact);
+        assert_eq!(engine.mutable_product_failed.get(), delta != exact);
+        assert!(engine.mutable_product_descriptors.is_empty());
+        if result.is_err() {
+            let used = engine.steps;
+            assert!(pay(&mut engine, 0).is_err());
+            assert_eq!(engine.steps, used);
+        }
+    }
+    // The dispatcher registry is optional. Actual compiler issuance populates it; clearing
+    // it retains the independently authenticated full signature held by the source record.
+    for retained in [false, true] {
+        let (mut engine, binding, certificate, original) = setup();
+        let frame = binding.frame;
+        let body = binding.body.clone();
+        let signature = binding.signature;
+        assert_eq!(engine.call_poly_signature(instance).unwrap(), signature);
+        assert!(engine.call_signatures.borrow().contains_key(&instance));
+        if retained {
+            let (prepared, publish) = prepare(&mut engine, binding, certificate, original).unwrap();
+            assert!(publish);
+            engine.mutable_product_descriptors.push(prepared);
+        }
+        engine.call_signatures.borrow_mut().clear();
+        let (prepared, publish) = prepare(
+            &mut engine,
+            Binding {
+                frame,
+                instance,
+                body,
+                signature,
+            },
+            certificate,
+            original,
+        )
+        .unwrap();
+        assert_eq!(publish, !retained);
+        prepared.validate_source(&engine).unwrap();
+        assert!(engine.call_signatures.borrow().is_empty());
+        assert!(!engine.mutable_product_failed.get());
+    }
+    for warm in [false, true] {
+        for mutation in 0..14 {
+            let (mut engine, binding, certificate, original) = setup();
+            let frame = binding.frame;
+            let body = binding.body.clone();
+            let signature = binding.signature;
+            if warm {
+                let (prepared, publish) =
+                    prepare(&mut engine, binding, certificate, original).unwrap();
+                assert!(publish);
+                engine.mutable_product_descriptors.push(prepared);
+            }
+            let binding = Binding {
+                frame,
+                instance,
+                body: body.clone(),
+                signature,
+            };
+            let issued = &mut engine.mutable_integer_types[certificate];
+            match mutation {
+                0 => issued.original = tcx.types.bool,
+                1 => issued.bytes += 1,
+                2 => issued.alignment += 1,
+                3 => issued.codec = ElementCodec::Scalar(symbolic::ScalarSliceElement::Bool),
+                4..=8 => {
+                    let ElementCodec::Product(product) = &mut issued.codec else {
+                        unreachable!()
+                    };
+                    match mutation {
+                        4 => product.ty = tcx.types.bool,
+                        5 => product.bytes += 1,
+                        6 => product.leaves.clear(),
+                        7 => {
+                            let before = product.leaves[0];
+                            product.leaves[0] = if before == symbolic::ScalarSliceElement::Bool {
+                                symbolic::ScalarSliceElement::Char
+                            } else {
+                                symbolic::ScalarSliceElement::Bool
+                            };
+                            assert_ne!(product.leaves[0], before);
+                        }
+                        8 => {
+                            product.shape =
+                                super::super::super::composite_slices::CompositeShape::Tuple(
+                                    Vec::new(),
+                                )
+                        }
+                        _ => unreachable!(),
+                    }
+                }
+                9 => {
+                    engine
+                        .bodies
+                        .borrow_mut()
+                        .insert(instance, Rc::new((*body).clone()));
+                }
+                10 => {
+                    engine.call_signatures.borrow_mut().insert(
+                        instance,
+                        signature.map_bound(|sig| sig.set_safety(rustc_hir::Safety::Unsafe)),
+                    );
+                }
+                11 => {
+                    engine
+                        .mutable_product_sources
+                        .borrow_mut()
+                        .get_mut(&frame)
+                        .unwrap()
+                        .signature =
+                        signature.map_bound(|sig| sig.set_safety(rustc_hir::Safety::Unsafe));
+                }
+                12 => {
+                    engine.bodies.borrow_mut().remove(&instance);
+                }
+                13 => {
+                    engine.mutable_product_sources.borrow_mut().remove(&frame);
+                }
+                _ => unreachable!(),
+            }
+            assert!(
+                prepare(&mut engine, binding, certificate, original).is_err(),
+                "mutable descriptor mutation {mutation}, warm={warm}"
+            );
+            assert!(engine.mutable_product_failed.get());
+            assert_eq!(engine.mutable_product_descriptors.len(), usize::from(warm));
+        }
+    }
+    eprintln!(
+        "descriptor reuse: genuine input/cold+warm/exact fee/sticky/cache-clear/28 mutations"
+    );
+}
+
+fn prepared_signature<'tcx>(
+    engine: &Engine<'tcx>,
+    instance: ty::Instance<'tcx>,
+) -> ty::PolyFnSig<'tcx> {
+    engine
+        .mutable_product_sources
+        .borrow()
+        .values()
+        .find(|source| source.instance == instance)
+        .unwrap()
+        .signature
+}
+
+fn descriptor_source_growth_controls<'tcx>(
+    engine: &mut Engine<'tcx>,
+    memory: &Memory,
+    mode: usize,
+) {
+    let helper = engine
+        .tcx
+        .hir_body_owners()
+        .find(|id| {
+            engine.tcx.def_kind(id.to_def_id()) == DefKind::Fn
+                && engine.tcx.item_name(id.to_def_id()).as_str() == "integer_leaf"
+        })
+        .unwrap();
+    let actual = source(engine, ty::Instance::mono(engine.tcx, helper.to_def_id())).unwrap();
+    let prior = engine
+        .mutable_product_access
+        .borrow()
+        .as_ref()
+        .unwrap()
+        .source_plan
+        .work()
+        .unwrap();
+    if mode == 1 {
+        // A genuine compiler record and actual frame still cannot bypass paid publication.
+        let frame = engine
+            .activation_register_frame(&actual.body, &activation_flow::Flow::Unarmed)
+            .unwrap();
+        engine
+            .mutable_product_sources
+            .borrow_mut()
+            .insert(frame, actual);
+        let certificate = memory.mutable_u16[0].certificate;
+        assert!(engine.mutable_product_certificate(certificate).is_err());
+        assert!(engine.mutable_product_failed.get());
+    } else {
+        if mode >= 2 {
+            let frames = engine.mutable_u16_frames.borrow().len();
+            let count = engine.mutable_product_sources.borrow().len();
+            let scope = engine.mutable_product_access.borrow();
+            let access = scope.as_ref().unwrap();
+            let fee = 4 + frames + 12 + count + 8 + access.descriptors * access.source_bindings;
+            drop(scope);
+            engine.limits.max_steps = engine.steps + fee - usize::from(mode == 2);
+        }
+        let published = engine.mutable_product_sources.borrow().len();
+        let result = register_source(engine, actual);
+        if mode == 2 {
+            assert!(result.is_err());
+            assert_eq!(engine.mutable_product_sources.borrow().len(), published);
+            assert_eq!(
+                engine
+                    .mutable_product_access
+                    .borrow()
+                    .as_ref()
+                    .unwrap()
+                    .source_plan
+                    .work()
+                    .unwrap(),
+                prior
+            );
+            assert!(engine.mutable_product_failed.get());
+            let used = engine.steps;
+            assert!(pay(engine, 0).is_err());
+            assert_eq!(engine.steps, used);
+            eprintln!("descriptor source growth: denied before source publication");
+            return;
+        }
+        result.unwrap();
+        if mode == 3 {
+            assert_eq!(engine.steps, engine.limits.max_steps);
+        }
+        let next = engine
+            .mutable_product_access
+            .borrow()
+            .as_ref()
+            .unwrap()
+            .source_plan
+            .work()
+            .unwrap();
+        assert_eq!(next, prior + 1);
+        engine
+            .mutable_product_certificate(memory.mutable_u16[0].certificate)
+            .unwrap();
+        assert!(!engine.mutable_product_failed.get());
+    }
+    eprintln!("descriptor source growth: actual helper registration; mode={mode}");
+}
+
+#[test]
+fn actual_impl_product_path_plans_precede_compiler_name_allocation() {
+    struct Check(bool);
+    impl rustc_driver::Callbacks for Check {
+        fn after_analysis<'tcx>(
+            &mut self,
+            _: &rustc_interface::interface::Compiler,
+            tcx: TyCtxt<'tcx>,
+        ) -> rustc_driver::Compilation {
+            work::impl_path_controls(tcx);
+            self.0 = true;
+            rustc_driver::Compilation::Stop
+        }
+    }
+    let fixture = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/fixtures/mutable_product_impl_paths.rs");
+    for target in [None, Some("thumbv7em-none-eabihf")] {
+        for level in [0, 2] {
+            let mut check = Check(false);
+            let mut args = vec![
+                "rustc".into(),
+                fixture.display().to_string(),
+                "--crate-type=lib".into(),
+                "--edition=2024".into(),
+                "-Cpanic=abort".into(),
+                "-Zmir-opt-level=0".into(),
+                format!("-Copt-level={level}"),
+                "--sysroot".into(),
+                env!("MIREN_SYSROOT").into(),
+            ];
+            if let Some(target) = target {
+                args.extend(["--target".into(), target.into()]);
+            }
+            rustc_driver::run_compiler(&args, &mut check);
+            assert!(check.0);
+        }
+    }
+}
+
+#[test]
+fn actual_external_impl_paths_include_visible_reexports_and_explicit_aliases() {
+    struct Check {
+        complete: bool,
+        oversized: bool,
+    }
+    impl rustc_driver::Callbacks for Check {
+        fn after_analysis<'tcx>(
+            &mut self,
+            _: &rustc_interface::interface::Compiler,
+            tcx: TyCtxt<'tcx>,
+        ) -> rustc_driver::Compilation {
+            work::external_path_controls(tcx, self.oversized);
+            self.complete = true;
+            rustc_driver::Compilation::Stop
+        }
+    }
+    let fixtures = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures");
+    let output = std::env::temp_dir().join(format!(
+        "miren-product-external-name-controls-{}",
+        std::process::id(),
+    ));
+    std::fs::create_dir_all(&output).unwrap();
+    for target in [None, Some("thumbv7em-none-eabihf")] {
+        for level in [0, 2] {
+            let archive = output.join(format!("libd-{}-o{level}.rlib", target.unwrap_or("host")));
+            let compiler = std::path::Path::new(env!("MIREN_SYSROOT")).join("bin/rustc");
+            let mut dependency = std::process::Command::new(compiler);
+            dependency
+                .args([
+                    "--crate-type=rlib",
+                    "--crate-name=d",
+                    "--edition=2024",
+                    "-Cpanic=abort",
+                ])
+                .arg(format!("-Copt-level={level}"))
+                .arg(fixtures.join("mutable_product_external_names_dependency.rs"))
+                .arg("-o")
+                .arg(&archive);
+            if let Some(target) = target {
+                dependency.args(["--target", target]);
+            }
+            let compiled = dependency.output().unwrap();
+            assert!(
+                compiled.status.success(),
+                "{}",
+                String::from_utf8_lossy(&compiled.stderr)
+            );
+            let mut check = Check {
+                complete: false,
+                oversized: false,
+            };
+            let mut args = vec![
+                "rustc".into(),
+                fixtures
+                    .join("mutable_product_external_impl_names.rs")
+                    .display()
+                    .to_string(),
+                "--crate-name=e".into(),
+                "--crate-type=lib".into(),
+                "--edition=2024".into(),
+                "-Cpanic=abort".into(),
+                "-Zmir-opt-level=0".into(),
+                "-Ztrim-diagnostic-paths=no".into(),
+                format!("-Copt-level={level}"),
+                "--extern".into(),
+                format!("d={}", archive.display()),
+                "--sysroot".into(),
+                env!("MIREN_SYSROOT").into(),
+            ];
+            if let Some(target) = target {
+                args.extend(["--target".into(), target.into()]);
+            }
+            rustc_driver::run_compiler(&args, &mut check);
+            assert!(check.complete);
+            let original =
+                std::fs::read_to_string(fixtures.join("mutable_product_external_impl_names.rs"))
+                    .unwrap();
+            let oversized = output.join("oversized_external_alias.rs");
+            let name = format!("actual_external_alias_{}", "X".repeat(MAX_INPUT_VALUES));
+            std::fs::write(
+                &oversized,
+                original.replace("actual_external_alias_for_printer", &name),
+            )
+            .unwrap();
+            args[1] = oversized.display().to_string();
+            let mut check = Check {
+                complete: false,
+                oversized: true,
+            };
+            rustc_driver::run_compiler(&args, &mut check);
+            assert!(check.complete);
+        }
+    }
+    std::fs::remove_dir_all(output).unwrap();
+}
+
+fn library_signature_growth_controls<'tcx>(
+    engine: &mut Engine<'tcx>,
+    body: &Body<'tcx>,
+    memory: &Memory,
+    mode: usize,
+) {
+    let len = engine.tcx.lang_items().get(LangItem::SliceLen).unwrap();
+    // Select the real instantiated len target already called by the genuine owner helper.
+    let instance = engine
+        .call_signatures
+        .borrow()
+        .keys()
+        .find(|instance| instance.def_id() == len)
+        .copied()
+        .unwrap();
+    let original_signature = engine.call_signatures.borrow()[&instance];
+    engine.mutable_product_access_end(false);
+    engine.call_signatures.borrow_mut().remove(&instance);
+    if mode == 3 {
+        engine.call_signatures.borrow_mut().clear();
+        for id in engine.tcx.hir_body_owners() {
+            if engine.tcx.def_kind(id.to_def_id()) != DefKind::Fn
+                || engine.tcx.generics_of(id).count() != 0
+            {
+                continue;
+            }
+            let selected = ty::Instance::mono(engine.tcx, id.to_def_id());
+            let _ = engine.call_poly_signature(selected);
+            if engine.call_signatures.borrow().len()
+                == super::super::super::call_metadata::MAX_CALL_SIGNATURES
+            {
+                break;
+            }
+        }
+        assert_eq!(engine.call_signatures.borrow().len(), 256);
+        assert!(!engine.call_signatures.borrow().contains_key(&instance));
+    }
+    engine
+        .mutable_product_access_begin(body, std::ptr::from_ref(body) as usize, memory, 16)
+        .unwrap();
+    let before = engine.call_signatures.borrow().len();
+    let prior = engine
+        .mutable_product_access
+        .borrow()
+        .as_ref()
+        .unwrap()
+        .source_plan
+        .work()
+        .unwrap();
+    if mode == 3 {
+        engine
+            .mutable_product_call_signature_prepare(instance)
+            .unwrap();
+        assert_eq!(engine.call_signatures.borrow().len(), 256);
+        assert!(!engine.call_signatures.borrow().contains_key(&instance));
+        assert_eq!(
+            engine.call_poly_signature(instance).unwrap(),
+            original_signature
+        );
+        assert_eq!(engine.call_signatures.borrow().len(), 256);
+        assert!(!engine.call_signatures.borrow().contains_key(&instance));
+        engine
+            .mutable_product_certificate(memory.mutable_u16[0].certificate)
+            .unwrap();
+        assert!(!engine.mutable_product_failed.get());
+        eprintln!(
+            "actual len cache full256: no publication/downstream original sig/descriptor live"
+        );
+        return;
+    }
+    if mode == 4 {
+        // A safe held interior borrow can exercise &self descriptor lookup refusal. Rust's
+        // exclusive Engine borrow prevents constructing this conflict for the &mut precursor.
+        let held = engine.call_signatures.borrow_mut();
+        assert!(
+            engine
+                .mutable_product_certificate(memory.mutable_u16[0].certificate)
+                .is_err()
+        );
+        drop(held);
+        assert_eq!(engine.call_signatures.borrow().len(), before);
+        assert!(engine.mutable_product_failed.get());
+        eprintln!("actual len signature registry: held borrow refused by selected descriptor");
+        return;
+    }
+    if mode >= 5 {
+        let begin = engine.steps;
+        assert_eq!(
+            signature::check(engine, instance).unwrap(),
+            original_signature
+        );
+        let normalization = engine.steps - begin;
+        let scope = engine.mutable_product_access.borrow();
+        let access = scope.as_ref().unwrap();
+        let remaining_lookup = access.descriptors * access.source_bindings;
+        drop(scope);
+        let exact = before + 12 + normalization + remaining_lookup + 8;
+        engine.limits.max_steps = engine.steps + exact - usize::from(mode == 5);
+        let result = engine.mutable_product_call_signature_prepare(instance);
+        assert_eq!(result.is_ok(), mode == 6);
+        assert_eq!(
+            engine
+                .mutable_product_access
+                .borrow()
+                .as_ref()
+                .unwrap()
+                .source_plan
+                .work()
+                .unwrap(),
+            prior + 1
+        );
+        if mode == 5 {
+            assert_eq!(engine.call_signatures.borrow().len(), before);
+            assert!(!engine.call_signatures.borrow().contains_key(&instance));
+            assert!(engine.mutable_product_failed.get());
+            let used = engine.steps;
+            assert!(
+                engine
+                    .mutable_product_call_signature_prepare(instance)
+                    .is_err()
+            );
+            assert_eq!(engine.steps, used);
+        } else {
+            assert_eq!(engine.steps, engine.limits.max_steps);
+            assert_eq!(engine.call_signatures.borrow().len(), before + 1);
+            assert_eq!(
+                engine.call_signatures.borrow()[&instance],
+                original_signature
+            );
+            engine
+                .mutable_product_certificate(memory.mutable_u16[0].certificate)
+                .unwrap();
+        }
+        eprintln!("actual len insertion boundary: successful replan, exact={exact}, mode={mode}");
+        return;
+    }
+    if mode == 1 {
+        // Denial uses the unchanged real counter at the actual selected metadata boundary.
+        engine.limits.max_steps = engine.steps;
+        assert!(
+            engine
+                .mutable_product_call_signature_prepare(instance)
+                .is_err()
+        );
+        assert_eq!(engine.call_signatures.borrow().len(), before);
+        assert!(!engine.call_signatures.borrow().contains_key(&instance));
+        assert!(engine.mutable_product_failed.get());
+        let used = engine.steps;
+        assert!(
+            engine
+                .mutable_product_call_signature_prepare(instance)
+                .is_err()
+        );
+        assert_eq!(engine.steps, used);
+    } else {
+        engine
+            .mutable_product_call_signature_prepare(instance)
+            .unwrap();
+        assert_eq!(engine.call_signatures.borrow().len(), before + 1);
+        assert_eq!(
+            engine.call_signatures.borrow()[&instance],
+            original_signature
+        );
+        assert_eq!(
+            engine
+                .mutable_product_access
+                .borrow()
+                .as_ref()
+                .unwrap()
+                .source_plan
+                .work()
+                .unwrap(),
+            prior + 1
+        );
+        let used = engine.steps;
+        let count = engine.call_signatures.borrow().len();
+        engine
+            .mutable_product_call_signature_prepare(instance)
+            .unwrap();
+        assert!(engine.steps - used > count + 12);
+        assert_eq!(engine.call_signatures.borrow().len(), count);
+        engine
+            .mutable_product_certificate(memory.mutable_u16[0].certificate)
+            .unwrap();
+        assert!(!engine.mutable_product_failed.get());
+        if mode == 2 {
+            engine.call_signatures.borrow_mut().insert(
+                instance,
+                original_signature.map_bound(|sig| sig.set_safety(rustc_hir::Safety::Unsafe)),
+            );
+            assert!(
+                engine
+                    .mutable_product_call_signature_prepare(instance)
+                    .is_err()
+            );
+            assert!(engine.mutable_product_failed.get());
+        }
+    }
+    eprintln!(
+        "actual len signature growth: source plan before={prior}; signatures before={before}; mode={mode}"
+    );
+}
+
+fn length_body_growth_controls<'tcx>(
+    engine: &mut Engine<'tcx>,
+    body: &Body<'tcx>,
+    memory: &Memory,
+    mode: usize,
+) {
+    let len = engine.tcx.lang_items().get(LangItem::SliceLen).unwrap();
+    let instance = engine
+        .bodies
+        .borrow()
+        .keys()
+        .find(|instance| instance.def_id() == len)
+        .copied()
+        .unwrap();
+    engine.mutable_product_access_end(false);
+    engine.bodies.borrow_mut().remove(&instance);
+    engine
+        .mutable_product_access_begin(body, std::ptr::from_ref(body) as usize, memory, 16)
+        .unwrap();
+    let count = engine.bodies.borrow().len();
+    assert!(count < 128);
+    let (prior, exact) = {
+        let scope = engine.mutable_product_access.borrow();
+        let scope = scope.as_ref().unwrap();
+        (
+            scope.source_plan.work().unwrap(),
+            count + 12 + scope.descriptors * scope.source_bindings,
+        )
+    };
+    if mode == 1 {
+        engine.limits.max_steps = engine.steps;
+    } else if mode >= 2 {
+        engine.limits.max_steps = engine.steps + exact - usize::from(mode == 2);
+    }
+    // The observed scope fields above do not carry authority across the actual mutation.
+    let result = engine.mutable_product_length_body(instance);
+    if mode == 1 || mode == 2 {
+        assert!(result.is_err());
+        assert_eq!(engine.bodies.borrow().len(), count);
+        assert!(!engine.bodies.borrow().contains_key(&instance));
+        assert!(engine.mutable_product_failed.get());
+        let used = engine.steps;
+        assert!(engine.mutable_product_length_body(instance).is_err());
+        assert_eq!(engine.steps, used);
+    } else {
+        let actual = result.unwrap();
+        assert_eq!(actual.source.instance, instance.def);
+        assert_eq!(engine.bodies.borrow().len(), count + 1);
+        assert!(Rc::ptr_eq(&actual, &engine.bodies.borrow()[&instance]));
+        assert_eq!(
+            engine
+                .mutable_product_access
+                .borrow()
+                .as_ref()
+                .unwrap()
+                .source_plan
+                .work()
+                .unwrap(),
+            prior + 1,
+        );
+        if mode == 3 {
+            assert_eq!(engine.steps, engine.limits.max_steps);
+        }
+        engine
+            .mutable_product_certificate(memory.mutable_u16[0].certificate)
+            .unwrap();
+        if mode == 0 {
+            let used = engine.steps;
+            let warm = engine.mutable_product_length_body(instance).unwrap();
+            assert!(Rc::ptr_eq(&actual, &warm));
+            assert_eq!(engine.steps - used, count + 13);
+            assert_eq!(engine.bodies.borrow().len(), count + 1);
+        }
+        assert!(!engine.mutable_product_failed.get());
+    }
+    eprintln!("actual SliceLen Body growth: count={count}, exact={exact}, mode={mode}");
 }
