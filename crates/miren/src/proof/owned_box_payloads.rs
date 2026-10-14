@@ -15,6 +15,16 @@ pub(super) struct ZeroLayout {
     bits: u32,
 }
 
+impl<'tcx> Certificate<'tcx> {
+    pub(super) fn fieldless(tcx: TyCtxt<'tcx>, original: Ty<'tcx>) -> Result<Self, String> {
+        owned_box_effect_free_drop::certify_type(tcx, original)?;
+        Ok(Self {
+            original,
+            layout: ZeroLayout::for_type(tcx, original)?,
+        })
+    }
+}
+
 impl ZeroLayout {
     pub(super) fn for_type<'tcx>(tcx: TyCtxt<'tcx>, original: Ty<'tcx>) -> Result<Self, String> {
         let layout = tcx
@@ -427,6 +437,7 @@ mod tests {
                         payload,
                         shape: Some(shape),
                         slots: 1,
+                        executable: None,
                     };
                     assert!(engine.box_payload_value(&entry, &Value::Unit).is_err());
                     let ty::Adt(def, _) = payload.kind() else {

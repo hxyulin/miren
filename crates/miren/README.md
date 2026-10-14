@@ -2112,3 +2112,27 @@ Rust layout under current source guards. Matching size/alignment records a stati
 preparation retains the exact first missing Call as consumed incomplete metadata and still reports
 missing compiler evidence. It cannot produce a completed source or search certificate. The actual
 `memchr` result-range precondition requires both naive and aligned algorithm proofs.
+
+### Actual fieldless Box payload destruction
+
+The isolated executable Box protocol uses a one-use constructor occurrence from the actual
+initialized Move, followed by branch-local Ready, leased, consumed and retired phases. Real
+Box/T Drop glue, destructors, scalar helpers and their contracts execute with retained source,
+full-signature, typed-storage and invocation guards. A normal child return consumes T once;
+normal outer return retires the owner without restoring a payload. Panic has no normal retirement.
+The legacy effect-free certificate and its retirement path stay separate.
+
+An exact literal Arguments::from_str source schema carries opaque panic metadata with no pointer
+rights. Ordinary missing bodies, physical-address observations, summaries and unsupported callback
+models remain conservative. The default8192 and diagnostic2000000 limits stay separate; shared
+fees precede frame/branch/snapshot/incoming-graph work. Source preparation alone cannot issue an
+executable owner. Optimized inlined constructors remain unsupported without their own schema.
+
+Private four-profile evidence proves the unchanged helper destructor and refutes the real
+panicking destructor under diagnostic2000000; both remain resource UNKNOWN at default8192.
+Actual semantic mutations refute and native host controls corroborate failures. Paid hostile
+controls observe the real leased, consumed and retired boundaries and refuse invalid authority
+and replay before restored execution continues normally. Current-child-cache absence and wrong
+retained Body controls do not claim missing dependency or independent same-body clone coverage.
+The current Root composition passes focused controls and full regression validation. Fresh release
+reports retain these budget-specific outcomes. This stage adds no default supported outcome.

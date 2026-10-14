@@ -85,6 +85,41 @@ impl<'tcx> Engine<'tcx> {
         Ok(())
     }
 
+    pub(super) fn validate_incoming_frame_escape_with_box(
+        &self,
+        state: &State,
+        incoming: usize,
+        authorized: usize,
+        key: u64,
+        certificate: usize,
+    ) -> Result<(), String> {
+        for (allocation, value) in state.memory[..incoming].iter().enumerate() {
+            let Some(value) = value else { continue };
+            if allocation == authorized {
+                if !matches!(value, Value::OwnedRegion { key: actual, certificate: ty,
+                    kind: symbolic::OwnedRegionKind::Owner }
+                    if *actual == key && *ty == certificate)
+                {
+                    return Err("Box destruction authorized owner storage was replaced".into());
+                }
+                // The invocation separately authenticates the sole fieldless payload or lease.
+                // This exemption is one exact owner allocation, never an incoming-graph bypass.
+            } else {
+                self.validate_shared_trait_graph(value, state)?;
+                Self::reference_graph(
+                    value,
+                    state,
+                    Some(incoming),
+                    &mut Vec::new(),
+                    false,
+                    Some(self),
+                )?;
+                self.validate_static_initialization_graph(value, state, &mut Vec::new())?;
+            }
+        }
+        Ok(())
+    }
+
     pub(super) fn validate_typed_reference_graph(
         &self,
         value: &Value,

@@ -10,6 +10,7 @@ pub(super) struct BoxType<'tcx> {
     pub(super) payload: Ty<'tcx>,
     pub(super) shape: Option<typed_array_choices::OwnedChoiceShape>,
     pub(super) slots: usize,
+    pub(super) executable: Option<usize>,
 }
 
 impl<'tcx> Engine<'tcx> {
@@ -71,11 +72,15 @@ impl<'tcx> Engine<'tcx> {
             payload: self.tcx.types.unit,
             shape: None,
             slots: 1,
+            executable: None,
         });
         Ok(index)
     }
 
-    fn prepare_nominal_box_type(&self, payload: Ty<'tcx>) -> Result<BoxType<'tcx>, String> {
+    pub(super) fn prepare_nominal_box_type(
+        &self,
+        payload: Ty<'tcx>,
+    ) -> Result<BoxType<'tcx>, String> {
         let (shape, slots) = if payload.needs_drop(self.tcx, ty::TypingEnv::fully_monomorphized()) {
             owned_box_effect_free_drop::certify_type(self.tcx, payload)
                 .map_err(|reason| self.effect_free_drop_error(reason))?;
@@ -90,10 +95,11 @@ impl<'tcx> Engine<'tcx> {
             payload,
             shape,
             slots,
+            executable: None,
         })
     }
 
-    fn register_nominal_box(&mut self, entry: BoxType<'tcx>) -> Result<usize, String> {
+    pub(super) fn register_nominal_box(&mut self, entry: BoxType<'tcx>) -> Result<usize, String> {
         if let Some(index) = self
             .owned_box_types
             .iter()
@@ -867,6 +873,11 @@ impl<'tcx> Engine<'tcx> {
             )
         {
             let [owner] = values else { unreachable!() };
+            if self.region_box_type(owner)?.executable.is_some() {
+                // Execute the actual mem::drop body and its Drop terminator. The effect-free
+                // summary and payload-preserving retirement cannot consume an active T lease.
+                return Ok(None);
+            }
             self.validate_owned_region(owner, &state.memory)?;
             let payload = self.region_box_type(owner)?.payload;
             self.certify_owned_box_protocol(instance, payload)?;

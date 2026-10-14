@@ -316,13 +316,18 @@ fn validate_protocol<'tcx>(
     Ok(())
 }
 
+enum Destruction<'tcx> {
+    Iterator(array_iterator_constructors::drops::Invocation<'tcx>),
+    Box(owned_box_executable::Invocation<'tcx>),
+}
+
 pub(super) struct Frame<'tcx> {
     instance: ty::Instance<'tcx>,
     admission: Option<Admission<'tcx>>,
     constructor: Option<array_iterator_constructors::Invocation>,
     step: Option<array_iterator_constructors::steps::Invocation<'tcx>>,
     retained_helper: Option<mutable_reborrows::helpers::Invocation<'tcx>>,
-    destruction: Option<array_iterator_constructors::drops::Invocation<'tcx>>,
+    destruction: Option<Destruction<'tcx>>,
 }
 struct Admission<'tcx> {
     array: Ty<'tcx>,
@@ -394,14 +399,39 @@ impl<'tcx> Frame<'tcx> {
             admission: None,
             constructor: None,
             step: None,
-            destruction: Some(invocation),
+            destruction: Some(Destruction::Iterator(invocation)),
             retained_helper: None,
         }
     }
     pub(super) fn destruction_invocation(
         &self,
     ) -> Option<&array_iterator_constructors::drops::Invocation<'tcx>> {
-        self.destruction.as_ref()
+        match self.destruction.as_ref() {
+            Some(Destruction::Iterator(invocation)) => Some(invocation),
+            Some(Destruction::Box(_)) | None => None,
+        }
+    }
+    pub(super) fn has_destruction(&self) -> bool {
+        self.destruction.is_some()
+    }
+    pub(super) fn box_destruction(
+        instance: ty::Instance<'tcx>,
+        invocation: owned_box_executable::Invocation<'tcx>,
+    ) -> Self {
+        Self {
+            instance,
+            admission: None,
+            constructor: None,
+            step: None,
+            retained_helper: None,
+            destruction: Some(Destruction::Box(invocation)),
+        }
+    }
+    pub(super) fn box_invocation(&self) -> Option<&owned_box_executable::Invocation<'tcx>> {
+        match self.destruction.as_ref() {
+            Some(Destruction::Box(invocation)) => Some(invocation),
+            Some(Destruction::Iterator(_)) | None => None,
+        }
     }
     pub(super) fn step_invocation(
         &self,
@@ -419,6 +449,21 @@ impl<'tcx> Frame<'tcx> {
 }
 
 impl<'tcx> Engine<'tcx> {
+    pub(super) fn active_destruction_adopt_work(
+        &mut self,
+        frame: &Frame<'tcx>,
+        state: &State,
+    ) -> Result<(), String> {
+        match &frame.destruction {
+            Some(Destruction::Iterator(invocation)) => {
+                self.array_iterator_drop_adopt_work(Some(invocation), state)
+            }
+            Some(Destruction::Box(invocation)) => {
+                self.executable_box_adopt_work(Some(invocation), state)
+            }
+            None => Ok(()),
+        }
+    }
     pub(super) fn execute_array_drop_glue(
         &mut self,
         frame: &Frame<'tcx>,

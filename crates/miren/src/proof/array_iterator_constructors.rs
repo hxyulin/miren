@@ -2009,3 +2009,54 @@ pub(super) fn original_iterator_item_source<'tcx>(
 ) -> Result<Rc<Body<'tcx>>, String> {
     compiler_evidence::load_item(engine, instance).map(|evidence| evidence.current)
 }
+
+// The ordinary flat clone domain remains distinct from constructor component evidence.
+pub(super) fn authenticated_box_item_source<'tcx>(
+    engine: &mut Engine<'tcx>,
+    instance: ty::Instance<'tcx>,
+) -> Result<Rc<Body<'tcx>>, String> {
+    compiler_evidence::load_item(engine, instance).map(|evidence| evidence.current)
+}
+pub(super) fn authenticated_box_drop_source<'tcx>(
+    engine: &mut Engine<'tcx>,
+    instance: ty::Instance<'tcx>,
+) -> Result<Rc<Body<'tcx>>, String> {
+    compiler_evidence::load_drop(engine, instance).map(|evidence| evidence.current)
+}
+
+pub(super) fn authenticated_box_signature<'tcx>(
+    engine: &mut Engine<'tcx>,
+    instance: ty::Instance<'tcx>,
+) -> Result<ty::PolyFnSig<'tcx>, String> {
+    drops::authenticated_signature(engine, instance)
+}
+
+pub(super) fn box_value_clone_work(
+    engine: &mut Engine<'_>,
+    value: &Value,
+    nodes: &mut usize,
+) -> Result<usize, String> {
+    steps::value_clone_work(engine, value, 0, nodes)
+}
+
+pub(super) fn box_clone_masks(
+    engine: &mut Engine<'_>,
+    masks: &initialized_places::MissingPlaces,
+) -> Result<initialized_places::MissingPlaces, String> {
+    clone_work::masks(engine, masks)
+}
+
+pub(super) fn box_mask_clone_work(
+    engine: &mut Engine<'_>,
+    masks: &initialized_places::MissingPlaces,
+) -> Result<usize, String> {
+    clone_work::mask_clone_work(engine, masks)
+}
+
+#[cfg(test)]
+pub(super) fn box_receipt_current_clone_work(
+    engine: &mut Engine<'_>,
+    body: &Body<'_>,
+) -> Result<usize, String> {
+    clone_work::body(engine, body)
+}

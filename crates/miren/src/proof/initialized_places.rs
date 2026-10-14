@@ -347,6 +347,16 @@ impl<'tcx> Engine<'tcx> {
         self.bind_validated_owned_storage(original, &mut state.memory, allocation)
     }
 
+    pub(super) fn bind_box_payload_storage(
+        &self,
+        witness: &owned_box_executable::PayloadWitness<'_, 'tcx>,
+        state: &mut State,
+        allocation: usize,
+    ) -> Result<(), String> {
+        let original = witness.original(self, state, allocation)?;
+        self.bind_validated_owned_storage(original, &mut state.memory, allocation)
+    }
+
     fn bind_validated_owned_storage(
         &self,
         original: Ty<'tcx>,

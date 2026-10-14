@@ -2967,3 +2967,31 @@ Full Root validation passes 1,026 Rust and 91 Python tests. Four fresh profiles 
 obligations and 656 counterexample models remain literal. Of 2,452 full Proof comparisons, 2,450
 match literally and two independently checked query-free fold timeout contexts differ. Search
 range, load safety and membership correctness remain unfinished.
+
+
+## Executable fieldless Box payload destruction
+
+A one-use constructor occurrence retains the actual initialized Move and exact original source.
+Fieldless payloads advance through ready, leased, consumed and retired states. Actual Box/T glue,
+destructors, scalar helpers and contracts execute under full source/signature, current Context,
+owner and initialization guards. Normal child return consumes T once; normal outer return retires
+the owner. Panic does not produce normal retirement. Existing effect-free certificates remain
+separate. Literal panic Arguments metadata grants no pointer or callback rights.
+
+New shared work allowances precede frame, branch, snapshot, incoming graph and result operations.
+Current-checkout controls pass 56 exact lifecycle refusals, twelve actual phase markers, four
+completion markers and 24 payment denials across host/ARM O0/O2. Missing current-cache controls
+remain distinct from missing dependencies; wrong retained Body controls do not claim independent
+same-body clone coverage. Earlier semantic/native and single-fee mutation evidence stays separate.
+
+Fresh Root release reports contain 104 actual application Proofs. Each default8192 profile has
+five PROVED, one REFUTED and seven UNKNOWN; diagnostic2000000 has six PROVED, two REFUTED and five
+UNKNOWN. The helper destructor enters actual helper bodies and proves, while real panicking
+Drop refutes with a solver query/model. Both remain resource UNKNOWN at the default budget.
+Effectful intrinsic, nested/nonzero payload and non-Freeze domains remain conservative.
+
+Full Root validation passes 1,032 Rust and 91 Python tests. Four capability profiles retain 336
+PROVED, 164 REFUTED and 113 UNKNOWN across 613 cases. All 2,452 full baseline Proofs, 5,420 queried
+obligations and 656 counterexample models remain literal. No default capability promotion is
+claimed. The first standalone matrix driver accidentally selected a build command; its failure
+is preserved and the corrected driver selects only the eight actual analysis profiles.

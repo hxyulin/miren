@@ -10,6 +10,10 @@ pub(super) struct Path {
 }
 
 impl Path {
+    pub(super) fn len(&self) -> usize {
+        self.visits.len()
+    }
+
     pub(super) fn note(&mut self, block: BasicBlock) {
         let visits = self.visits.entry(block).or_default();
         *visits = visits.saturating_add(1);

@@ -55,9 +55,40 @@ impl<'tcx> Engine<'tcx> {
         &mut self,
         instance: ty::Instance<'tcx>,
         values: &[Value],
+        conditions: Vec<Term>,
+        memory: &Memory,
+        site: (DefId, Span),
+    ) -> Result<Vec<Term>, String> {
+        self.call_preconditions_with_box(instance, values, conditions, memory, site, None)
+    }
+
+    pub(super) fn call_box_preconditions(
+        &mut self,
+        invocation: &owned_box_executable::Invocation<'tcx>,
+        values: &[Value],
+        conditions: Vec<Term>,
+        memory: &Memory,
+        site: (DefId, Span),
+    ) -> Result<Vec<Term>, String> {
+        let instance = invocation.contract_instance();
+        self.call_preconditions_with_box(
+            instance,
+            values,
+            conditions,
+            memory,
+            site,
+            Some(invocation),
+        )
+    }
+
+    fn call_preconditions_with_box(
+        &mut self,
+        instance: ty::Instance<'tcx>,
+        values: &[Value],
         mut conditions: Vec<Term>,
         memory: &Memory,
         site: (DefId, Span),
+        box_invocation: Option<&owned_box_executable::Invocation<'tcx>>,
     ) -> Result<Vec<Term>, String> {
         let callee = instance.def_id();
         let contracts = self.configured_contracts(instance)?;
@@ -66,7 +97,18 @@ impl<'tcx> Engine<'tcx> {
             .any(|contract| matches!(contract.kind, ContractKind::Requires))
         {
             let body = self.instantiated_body(instance)?;
+            if let Some(invocation) = box_invocation {
+                invocation.check_contract_source(self, memory)?;
+                self.executable_box_snapshot_work(
+                    values,
+                    memory,
+                    owned_box_executable::work::Observation::Requires,
+                )?;
+            }
             let snapshots = self.snapshots(values, memory, &conditions)?;
+            if box_invocation.is_some() {
+                self.executable_box_configured_binding_work(&body, &snapshots)?;
+            }
             let bindings = self.configured_bindings(&body, &snapshots, instance)?;
             for contract in contracts
                 .iter()

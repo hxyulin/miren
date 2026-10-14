@@ -628,6 +628,24 @@ pub(super) fn constructor_blocks(
     reached_blocks(family, input, layout)
 }
 
+pub(super) fn executable_drop_family(definition: &str, encoded: &str) -> Option<BoxTemplateFamily> {
+    match reference_family(definition, encoded)? {
+        family @ (BoxTemplateFamily::BoxDrop
+        | BoxTemplateFamily::LayoutPrecondition
+        | BoxTemplateFamily::AlignmentPrecondition) => Some(family),
+        BoxTemplateFamily::EffectFreePayloadGlue
+        | BoxTemplateFamily::EffectFreeDestructor
+        | BoxTemplateFamily::MemDrop
+        | BoxTemplateFamily::UnitBoxDropGlue
+        | BoxTemplateFamily::UnitDropGlue
+        | BoxTemplateFamily::GlobalDeallocate
+        | BoxTemplateFamily::BoxNew
+        | BoxTemplateFamily::BoxNewUninit
+        | BoxTemplateFamily::GlobalAllocate
+        | BoxTemplateFamily::NonNullPrecondition => None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -648,3 +666,5 @@ mod tests {
         }
     }
 }
+
+// Complete core source classification, not a destructor behavior or ownership certificate.

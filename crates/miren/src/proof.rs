@@ -96,6 +96,7 @@ mod owned_box_capture;
 mod owned_box_constructor_source;
 mod owned_box_constructors;
 mod owned_box_effect_free_drop;
+mod owned_box_executable;
 mod owned_box_glue;
 mod owned_box_payloads;
 mod owned_box_references;
@@ -194,6 +195,7 @@ struct Engine<'tcx> {
     array_iterator_step_evidence: Vec<array_iterator_constructors::steps::Evidence<'tcx>>,
     box_constructor_source_evidence: Vec<array_iterator_constructors::BoxEvidence<'tcx>>,
     owned_box_types: Vec<owned_boxes::BoxType<'tcx>>,
+    executable_box_sources: Vec<std::rc::Rc<owned_box_executable::Source<'tcx>>>,
     next_owned_region: u64,
     owned_box_constructors: Vec<owned_box_constructors::Constructor<'tcx>>,
     scalar_slice_types: Vec<Ty<'tcx>>,
@@ -317,6 +319,7 @@ impl<'tcx> Engine<'tcx> {
             array_iterator_step_evidence: Vec::new(),
             box_constructor_source_evidence: Vec::new(),
             owned_box_types: Vec::new(),
+            executable_box_sources: Vec::new(),
             next_owned_region: 0,
             owned_box_constructors: Vec::new(),
             scalar_slice_types: Vec::new(),
@@ -1297,6 +1300,7 @@ impl<'tcx> Engine<'tcx> {
                 ),
             ));
         }
+        self.executable_box_stack_work(frame.box_invocation(), stack.len() + 1)?;
         let mut stack = stack.to_vec();
         stack.push(id);
         let owned_body = if matches!(flow, activation_flow::Flow::Unarmed) {
@@ -1322,6 +1326,11 @@ impl<'tcx> Engine<'tcx> {
         if arguments.len() != body.arg_count {
             return Err("call arguments do not match the MIR body".to_owned());
         }
+        self.executable_box_frame_work(
+            frame.box_invocation(),
+            body.local_decls.len(),
+            arguments.len(),
+        )?;
         self.validate_owned_call_arguments(&arguments, &memory)?;
         let initial_regions = memory.owned_regions.len();
         let owned_arguments = if initial_regions == 0 {
@@ -1352,7 +1361,12 @@ impl<'tcx> Engine<'tcx> {
             || self
                 .specification(instance)?
                 .is_some_and(|spec| !spec.arguments.is_empty());
-        let snapshots = if self.array_iterator_drop_arguments(
+        let snapshots = if self.executable_box_arguments(
+            frame.box_invocation(),
+            &owned_body,
+            &arguments,
+            &memory,
+        )? || self.array_iterator_drop_arguments(
             frame.destruction_invocation(),
             &owned_body,
             &arguments,
@@ -1381,6 +1395,8 @@ impl<'tcx> Engine<'tcx> {
             // Actual body execution retains the original arguments and validates its reads.
             // Unused detached observations need no owning materialization.
             Vec::new()
+        } else if frame.box_invocation().is_some() {
+            self.executable_box_snapshots(&arguments, &memory, &conditions)?
         } else if matches!(flow, activation_flow::Flow::Unarmed) {
             self.typed_coroutine_snapshots(&argument_types, &arguments, &memory, &conditions)?
         } else {
@@ -1389,6 +1405,9 @@ impl<'tcx> Engine<'tcx> {
             Vec::new()
         };
         let bindings = if binds_contract_names {
+            if frame.box_invocation().is_some() {
+                self.executable_box_configured_binding_work(body, &snapshots)?;
+            }
             self.configured_bindings(body, &snapshots, instance)?
         } else {
             BTreeMap::new()
@@ -1424,6 +1443,7 @@ impl<'tcx> Engine<'tcx> {
             let original = if state.memory.mutable_u16.is_empty() {
                 Vec::new()
             } else {
+                self.executable_box_argument_clone_work(frame.box_invocation(), &arguments)?;
                 arguments.clone()
             };
             for (local, argument) in body.args_iter().zip(arguments) {
@@ -1492,13 +1512,34 @@ impl<'tcx> Engine<'tcx> {
                     self.execute_array_drop_glue(&frame, &owned_body, &state, &stack)?
             {
                 for branch in branches {
-                    queue.push_back((target, branch, retry_path.clone()));
+                    queue.push_back((
+                        target,
+                        branch,
+                        self.executable_box_retry_clone(frame.box_invocation(), &retry_path)?,
+                    ));
                 }
                 continue;
             }
             for (statement_index, statement) in
                 body.basic_blocks[block].statements.iter().enumerate()
             {
+                self.executable_box_statement_gate(
+                    frame.box_invocation(),
+                    &owned_body,
+                    &state,
+                    statement,
+                )?;
+                if self.executable_box_statement(
+                    frame.box_invocation(),
+                    &owned_body,
+                    &mut state,
+                    rustc_middle::mir::Location {
+                        block,
+                        statement_index,
+                    },
+                )? {
+                    continue;
+                }
                 if self.array_iterator_drop_statement(
                     frame.destruction_invocation(),
                     &owned_body,
@@ -1561,10 +1602,17 @@ impl<'tcx> Engine<'tcx> {
             }
             let terminator = body.basic_blocks[block].terminator();
             match &terminator.kind {
-                TerminatorKind::Goto { target } => {
-                    queue.push_back((*target, state, retry_path.clone()))
-                }
+                TerminatorKind::Goto { target } => queue.push_back((
+                    *target,
+                    state,
+                    self.executable_box_retry_clone(frame.box_invocation(), &retry_path)?,
+                )),
                 TerminatorKind::SwitchInt { discr, targets } => {
+                    self.executable_box_switch_work(
+                        frame.box_invocation(),
+                        &state,
+                        targets.all_targets().len() - 1,
+                    )?;
                     let value = self.evaluate_operand(id, body, &mut state, discr)?;
                     let mut excluded = Vec::new();
                     for (number, target) in targets.iter() {
@@ -1586,11 +1634,19 @@ impl<'tcx> Engine<'tcx> {
                         state.flow.charge_branch(&state)?;
                         let mut branch = state.clone();
                         branch.conditions.push(condition.clone());
-                        queue.push_back((target, branch, retry_path.clone()));
+                        queue.push_back((
+                            target,
+                            branch,
+                            self.executable_box_retry_clone(frame.box_invocation(), &retry_path)?,
+                        ));
                         excluded.push(symbolic::not(&condition));
                     }
                     state.conditions.extend(excluded);
-                    queue.push_back((targets.otherwise(), state, retry_path.clone()));
+                    queue.push_back((
+                        targets.otherwise(),
+                        state,
+                        self.executable_box_retry_clone(frame.box_invocation(), &retry_path)?,
+                    ));
                 }
                 TerminatorKind::Assert {
                     cond,
@@ -1618,7 +1674,11 @@ impl<'tcx> Engine<'tcx> {
                         )?;
                         state.conditions.push(safe);
                     }
-                    queue.push_back((*target, state, retry_path.clone()));
+                    queue.push_back((
+                        *target,
+                        state,
+                        self.executable_box_retry_clone(frame.box_invocation(), &retry_path)?,
+                    ));
                 }
                 TerminatorKind::Return => {
                     self.check_place_initialization(
@@ -1688,7 +1748,13 @@ impl<'tcx> Engine<'tcx> {
                             &state,
                             incoming_allocations,
                         )?;
-                        let escape = if self.array_iterator_drop_escape(
+                        let escape = if self.executable_box_escape(
+                            frame.box_invocation(),
+                            &owned_body,
+                            &state,
+                            &value,
+                            incoming_allocations,
+                        )? || self.array_iterator_drop_escape(
                             frame.destruction_invocation(),
                             &owned_body,
                             &value,
@@ -1709,6 +1775,9 @@ impl<'tcx> Engine<'tcx> {
                             format!("return from {}: {error}", self.tcx.def_path_str(id))
                         })?;
                     }
+                    if frame.box_invocation().is_some() {
+                        self.executable_box_binding_clone_work(&bindings)?;
+                    }
                     let mut post_bindings = bindings.clone();
                     let uses_post_state = contracts
                         .iter()
@@ -1718,19 +1787,37 @@ impl<'tcx> Engine<'tcx> {
                             Ok::<_, String>(found | contracts::uses_post_state(predicate)?)
                         })?;
                     if uses_post_state {
+                        if frame.box_invocation().is_some() {
+                            self.executable_box_final_argument_work(body, &state)?;
+                        }
                         let final_arguments = body
                             .args_iter()
                             .map(|local| self.local(&state, local.as_usize()))
                             .collect::<Result<Vec<_>, _>>()?;
-                        let final_snapshots = self.typed_coroutine_snapshots(
-                            &argument_types,
-                            &final_arguments,
-                            &state.memory,
-                            &state.conditions,
-                        )?;
+                        let final_snapshots = if frame.box_invocation().is_some() {
+                            self.executable_box_contract_snapshots(
+                                &final_arguments,
+                                &state.memory,
+                                &state.conditions,
+                                owned_box_executable::work::Observation::FinalArguments,
+                            )?
+                        } else {
+                            self.typed_coroutine_snapshots(
+                                &argument_types,
+                                &final_arguments,
+                                &state.memory,
+                                &state.conditions,
+                            )?
+                        };
+                        if frame.box_invocation().is_some() {
+                            self.executable_box_configured_binding_work(body, &final_snapshots)?;
+                        }
                         for (name, value) in
                             self.configured_bindings(body, &final_snapshots, instance)?
                         {
+                            if frame.box_invocation().is_some() {
+                                owned_box_executable::pay(self, name.len() + 16)?;
+                            }
                             post_bindings.insert(format!("final_{name}"), value);
                         }
                     }
@@ -1738,14 +1825,26 @@ impl<'tcx> Engine<'tcx> {
                         .iter()
                         .any(|contract| matches!(contract.kind, ContractKind::Ensures))
                     {
+                        if frame.box_invocation().is_some() {
+                            owned_box_executable::pay(self, 16)?;
+                        }
                         post_bindings.insert(
                             "result".to_owned(),
-                            self.typed_coroutine_snapshots(
-                                &[body.return_ty()],
-                                std::slice::from_ref(&value),
-                                &state.memory,
-                                &state.conditions,
-                            )?
+                            if frame.box_invocation().is_some() {
+                                self.executable_box_contract_snapshots(
+                                    std::slice::from_ref(&value),
+                                    &state.memory,
+                                    &state.conditions,
+                                    owned_box_executable::work::Observation::Result,
+                                )?
+                            } else {
+                                self.typed_coroutine_snapshots(
+                                    &[body.return_ty()],
+                                    std::slice::from_ref(&value),
+                                    &state.memory,
+                                    &state.conditions,
+                                )?
+                            }
                             .remove(0),
                         );
                     }
@@ -1791,6 +1890,12 @@ impl<'tcx> Engine<'tcx> {
                     target,
                     ..
                 } => {
+                    self.executable_box_call_gate(
+                        frame.box_invocation(),
+                        &owned_body,
+                        &state,
+                        func,
+                    )?;
                     self.array_iterator_drop_call_gate(
                         frame.destruction_invocation(),
                         &owned_body,
@@ -1821,7 +1926,7 @@ impl<'tcx> Engine<'tcx> {
                     }
                     let callable_ty = func.ty(&body.local_decls, self.tcx);
                     if frame.retained_helper_invocation().is_none()
-                        && frame.destruction_invocation().is_none()
+                        && !frame.has_destruction()
                         && let Some(results) = self.function_table_call(
                             &state,
                             function_tables::TableCall {
@@ -1839,10 +1944,7 @@ impl<'tcx> Engine<'tcx> {
                         let target =
                             target.ok_or("function table call has no normal return edge")?;
                         for (consumed, result) in results {
-                            self.array_iterator_drop_adopt_work(
-                                frame.destruction_invocation(),
-                                &state,
-                            )?;
+                            self.active_destruction_adopt_work(&frame, &state)?;
                             let mut continuation = self.adopt_flow_return(
                                 &consumed,
                                 result.conditions,
@@ -1856,7 +1958,14 @@ impl<'tcx> Engine<'tcx> {
                                 destination_indices.as_ref(),
                                 result.value,
                             )?;
-                            queue.push_back((target, continuation, retry_path.clone()));
+                            queue.push_back((
+                                target,
+                                continuation,
+                                self.executable_box_retry_clone(
+                                    frame.box_invocation(),
+                                    &retry_path,
+                                )?,
+                            ));
                         }
                         continue;
                     }
@@ -1874,21 +1983,63 @@ impl<'tcx> Engine<'tcx> {
                         }
                         _ => return Err("unresolved indirect call".to_owned()),
                     };
-                    if let Some(results) = self.array_iterator_drop_call(
-                        frame.destruction_invocation(),
-                        (caller_instance, block),
+                    if let Some(value) = self.executable_box_format_call(
+                        frame.box_invocation(),
                         &owned_body,
+                        block,
+                        instance,
+                        &state,
+                    )? {
+                        self.store_call_result(
+                            body,
+                            &mut state,
+                            *destination,
+                            destination_indices.as_ref(),
+                            value,
+                        )?;
+                        let target =
+                            target.ok_or("Box literal formatting lacks normal return edge")?;
+                        queue.push_back((
+                            target,
+                            state,
+                            self.executable_box_retry_clone(frame.box_invocation(), &retry_path)?,
+                        ));
+                        continue;
+                    }
+                    if let Some(value) = self.executable_box_layout_call(
+                        frame.box_invocation(),
+                        &owned_body,
+                        block,
+                        instance,
+                        &mut state,
+                    )? {
+                        self.store_call_result(
+                            body,
+                            &mut state,
+                            *destination,
+                            destination_indices.as_ref(),
+                            value,
+                        )?;
+                        let target =
+                            target.ok_or("Box layout intrinsic lacks normal return edge")?;
+                        queue.push_back((
+                            target,
+                            state,
+                            self.executable_box_retry_clone(frame.box_invocation(), &retry_path)?,
+                        ));
+                        continue;
+                    }
+                    if let Some(results) = self.executable_box_core_call(
+                        frame.box_invocation(),
+                        &owned_body,
+                        block,
                         instance,
                         &mut state,
                         &stack,
                     )? {
-                        let target =
-                            target.ok_or("IntoIter destruction lacks normal return edge")?;
+                        let target = target.ok_or("Box core Call lacks normal return edge")?;
                         for result in results {
-                            self.array_iterator_drop_adopt_work(
-                                frame.destruction_invocation(),
-                                &state,
-                            )?;
+                            self.active_destruction_adopt_work(&frame, &state)?;
                             let mut continuation = self.adopt_flow_return(
                                 &state,
                                 result.conditions,
@@ -1902,7 +2053,50 @@ impl<'tcx> Engine<'tcx> {
                                 destination_indices.as_ref(),
                                 result.value,
                             )?;
-                            queue.push_back((target, continuation, retry_path.clone()));
+                            queue.push_back((
+                                target,
+                                continuation,
+                                self.executable_box_retry_clone(
+                                    frame.box_invocation(),
+                                    &retry_path,
+                                )?,
+                            ));
+                        }
+                        continue;
+                    }
+                    if let Some(results) = self.array_iterator_drop_call(
+                        frame.destruction_invocation(),
+                        (caller_instance, block),
+                        &owned_body,
+                        instance,
+                        &mut state,
+                        &stack,
+                    )? {
+                        let target =
+                            target.ok_or("IntoIter destruction lacks normal return edge")?;
+                        for result in results {
+                            self.active_destruction_adopt_work(&frame, &state)?;
+                            let mut continuation = self.adopt_flow_return(
+                                &state,
+                                result.conditions,
+                                result.memory,
+                                result.flow,
+                            )?;
+                            self.store_call_result(
+                                body,
+                                &mut continuation,
+                                *destination,
+                                destination_indices.as_ref(),
+                                result.value,
+                            )?;
+                            queue.push_back((
+                                target,
+                                continuation,
+                                self.executable_box_retry_clone(
+                                    frame.box_invocation(),
+                                    &retry_path,
+                                )?,
+                            ));
                         }
                         continue;
                     }
@@ -1917,7 +2111,7 @@ impl<'tcx> Engine<'tcx> {
                     }
                     let callee = instance.def_id();
                     if unarmed
-                        && frame.destruction_invocation().is_none()
+                        && !frame.has_destruction()
                         && let Some(results) = self.retained_primitive_helper_call(
                             caller_instance,
                             &owned_body,
@@ -1953,7 +2147,14 @@ impl<'tcx> Engine<'tcx> {
                                 destination_indices.as_ref(),
                                 result.value,
                             )?;
-                            queue.push_back((target, continuation, retry_path.clone()));
+                            queue.push_back((
+                                target,
+                                continuation,
+                                self.executable_box_retry_clone(
+                                    frame.box_invocation(),
+                                    &retry_path,
+                                )?,
+                            ));
                         }
                         continue;
                     }
@@ -1968,7 +2169,7 @@ impl<'tcx> Engine<'tcx> {
                         ));
                     }
                     if unarmed
-                        && frame.destruction_invocation().is_none()
+                        && !frame.has_destruction()
                         && let Some((target, continuation)) = self.mutable_retained_call(
                             &state,
                             mutable_u16_children::ChildCall {
@@ -1983,11 +2184,15 @@ impl<'tcx> Engine<'tcx> {
                             },
                         )?
                     {
-                        queue.push_back((target, continuation, retry_path.clone()));
+                        queue.push_back((
+                            target,
+                            continuation,
+                            self.executable_box_retry_clone(frame.box_invocation(), &retry_path)?,
+                        ));
                         continue;
                     }
                     if unarmed
-                        && frame.destruction_invocation().is_none()
+                        && !frame.has_destruction()
                         && let Some((target, continuation)) = self.mutable_interval_call(
                             &state,
                             mutable_u16_children::ChildCall {
@@ -2002,10 +2207,14 @@ impl<'tcx> Engine<'tcx> {
                             },
                         )?
                     {
-                        queue.push_back((target, continuation, retry_path.clone()));
+                        queue.push_back((
+                            target,
+                            continuation,
+                            self.executable_box_retry_clone(frame.box_invocation(), &retry_path)?,
+                        ));
                         continue;
                     }
-                    if frame.destruction_invocation().is_none()
+                    if !frame.has_destruction()
                         && let Some(results) = self.mutable_hierarchy_call(
                             &mut state,
                             mutable_u16_children::ChildCall {
@@ -2022,10 +2231,7 @@ impl<'tcx> Engine<'tcx> {
                     {
                         let target = target.ok_or("mutable u16 child has no normal return edge")?;
                         for result in results {
-                            self.array_iterator_drop_adopt_work(
-                                frame.destruction_invocation(),
-                                &state,
-                            )?;
+                            self.active_destruction_adopt_work(&frame, &state)?;
                             let mut continuation = self.adopt_flow_return(
                                 &state,
                                 result.conditions,
@@ -2039,11 +2245,18 @@ impl<'tcx> Engine<'tcx> {
                                 destination_indices.as_ref(),
                                 result.value,
                             )?;
-                            queue.push_back((target, continuation, retry_path.clone()));
+                            queue.push_back((
+                                target,
+                                continuation,
+                                self.executable_box_retry_clone(
+                                    frame.box_invocation(),
+                                    &retry_path,
+                                )?,
+                            ));
                         }
                         continue;
                     }
-                    if frame.destruction_invocation().is_none()
+                    if !frame.has_destruction()
                         && let Some(results) = self.mutable_u16_child_call(
                             &mut state,
                             mutable_u16_children::ChildCall {
@@ -2060,10 +2273,7 @@ impl<'tcx> Engine<'tcx> {
                     {
                         let target = target.ok_or("mutable u16 child has no normal return edge")?;
                         for result in results {
-                            self.array_iterator_drop_adopt_work(
-                                frame.destruction_invocation(),
-                                &state,
-                            )?;
+                            self.active_destruction_adopt_work(&frame, &state)?;
                             let mut continuation = self.adopt_flow_return(
                                 &state,
                                 result.conditions,
@@ -2077,11 +2287,18 @@ impl<'tcx> Engine<'tcx> {
                                 destination_indices.as_ref(),
                                 result.value,
                             )?;
-                            queue.push_back((target, continuation, retry_path.clone()));
+                            queue.push_back((
+                                target,
+                                continuation,
+                                self.executable_box_retry_clone(
+                                    frame.box_invocation(),
+                                    &retry_path,
+                                )?,
+                            ));
                         }
                         continue;
                     }
-                    if frame.destruction_invocation().is_none()
+                    if !frame.has_destruction()
                         && let Some(results) = self.array_iterator_step_call(
                             frame.step_invocation(),
                             (caller_instance, block),
@@ -2093,10 +2310,7 @@ impl<'tcx> Engine<'tcx> {
                     {
                         let target = target.ok_or("IntoIter step lacks normal return edge")?;
                         for result in results {
-                            self.array_iterator_drop_adopt_work(
-                                frame.destruction_invocation(),
-                                &state,
-                            )?;
+                            self.active_destruction_adopt_work(&frame, &state)?;
                             let mut continuation = self.adopt_flow_return(
                                 &state,
                                 result.conditions,
@@ -2110,11 +2324,18 @@ impl<'tcx> Engine<'tcx> {
                                 destination_indices.as_ref(),
                                 result.value,
                             )?;
-                            queue.push_back((target, continuation, retry_path.clone()));
+                            queue.push_back((
+                                target,
+                                continuation,
+                                self.executable_box_retry_clone(
+                                    frame.box_invocation(),
+                                    &retry_path,
+                                )?,
+                            ));
                         }
                         continue;
                     }
-                    if frame.destruction_invocation().is_none()
+                    if !frame.has_destruction()
                         && let Some(results) = self.array_iterator_constructor_call(
                             caller_instance,
                             &owned_body,
@@ -2127,10 +2348,7 @@ impl<'tcx> Engine<'tcx> {
                         let target =
                             target.ok_or("IntoIter constructor lacks normal return edge")?;
                         for result in results {
-                            self.array_iterator_drop_adopt_work(
-                                frame.destruction_invocation(),
-                                &state,
-                            )?;
+                            self.active_destruction_adopt_work(&frame, &state)?;
                             let mut continuation = self.adopt_flow_return(
                                 &state,
                                 result.conditions,
@@ -2144,7 +2362,14 @@ impl<'tcx> Engine<'tcx> {
                                 destination_indices.as_ref(),
                                 result.value,
                             )?;
-                            queue.push_back((target, continuation, retry_path.clone()));
+                            queue.push_back((
+                                target,
+                                continuation,
+                                self.executable_box_retry_clone(
+                                    frame.box_invocation(),
+                                    &retry_path,
+                                )?,
+                            ));
                         }
                         continue;
                     }
@@ -2171,6 +2396,11 @@ impl<'tcx> Engine<'tcx> {
                         args.iter()
                             .map(|arg| state.constant_receipts.operand(&arg.node))
                             .collect::<Vec<_>>()
+                    };
+                    let box_occurrence = if unarmed && !frame.has_destruction() {
+                        self.box_occurrence_before(&owned_body, block, instance, &state)?
+                    } else {
+                        None
                     };
                     let mut values = args
                         .iter()
@@ -2226,7 +2456,7 @@ impl<'tcx> Engine<'tcx> {
                     } else {
                         instance
                     };
-                    if frame.destruction_invocation().is_none()
+                    if !frame.has_destruction()
                         && let Some(results) = self.shared_trait_object_call(
                             instance,
                             &values,
@@ -2237,10 +2467,7 @@ impl<'tcx> Engine<'tcx> {
                     {
                         let target = target.ok_or("shared trait choice has no return edge")?;
                         for result in results {
-                            self.array_iterator_drop_adopt_work(
-                                frame.destruction_invocation(),
-                                &state,
-                            )?;
+                            self.active_destruction_adopt_work(&frame, &state)?;
                             let mut continuation = self.adopt_flow_return(
                                 &state,
                                 result.conditions,
@@ -2254,7 +2481,14 @@ impl<'tcx> Engine<'tcx> {
                                 destination_indices.as_ref(),
                                 result.value,
                             )?;
-                            queue.push_back((target, continuation, retry_path.clone()));
+                            queue.push_back((
+                                target,
+                                continuation,
+                                self.executable_box_retry_clone(
+                                    frame.box_invocation(),
+                                    &retry_path,
+                                )?,
+                            ));
                         }
                         continue;
                     }
@@ -2264,6 +2498,7 @@ impl<'tcx> Engine<'tcx> {
                     }
                     let callee = instance.def_id();
                     if unarmed
+                        && frame.box_invocation().is_none()
                         && let Some(mut results) = self.trusted_call(
                             instance,
                             &values,
@@ -2277,10 +2512,7 @@ impl<'tcx> Engine<'tcx> {
                         }
                         let target = target.ok_or("trusted call has no return edge")?;
                         for result in results {
-                            self.array_iterator_drop_adopt_work(
-                                frame.destruction_invocation(),
-                                &state,
-                            )?;
+                            self.active_destruction_adopt_work(&frame, &state)?;
                             let mut continuation = self.adopt_flow_return(
                                 &state,
                                 result.conditions,
@@ -2294,12 +2526,19 @@ impl<'tcx> Engine<'tcx> {
                                 destination_indices.as_ref(),
                                 result.value,
                             )?;
-                            queue.push_back((target, continuation, retry_path.clone()));
+                            queue.push_back((
+                                target,
+                                continuation,
+                                self.executable_box_retry_clone(
+                                    frame.box_invocation(),
+                                    &retry_path,
+                                )?,
+                            ));
                         }
                         continue;
                     }
                     if unarmed
-                        && frame.destruction_invocation().is_none()
+                        && !frame.has_destruction()
                         && let Some(results) = self.array_iterator_ordinary_call(
                             instance,
                             &mut values,
@@ -2311,10 +2550,7 @@ impl<'tcx> Engine<'tcx> {
                         let target =
                             target.ok_or("IntoIter ordinary helper lacks normal return edge")?;
                         for result in results {
-                            self.array_iterator_drop_adopt_work(
-                                frame.destruction_invocation(),
-                                &state,
-                            )?;
+                            self.active_destruction_adopt_work(&frame, &state)?;
                             let mut continuation = self.adopt_flow_return(
                                 &state,
                                 result.conditions,
@@ -2328,14 +2564,21 @@ impl<'tcx> Engine<'tcx> {
                                 destination_indices.as_ref(),
                                 result.value,
                             )?;
-                            queue.push_back((target, continuation, retry_path.clone()));
+                            queue.push_back((
+                                target,
+                                continuation,
+                                self.executable_box_retry_clone(
+                                    frame.box_invocation(),
+                                    &retry_path,
+                                )?,
+                            ));
                         }
                         continue;
                     }
                     let configured = self.specification(instance)?.is_some();
                     if unarmed
                         && !configured
-                        && frame.destruction_invocation().is_none()
+                        && !frame.has_destruction()
                         && let Some(results) = self.owned_iterator_call(
                             instance,
                             &values,
@@ -2346,10 +2589,7 @@ impl<'tcx> Engine<'tcx> {
                     {
                         let target = target.ok_or("owned iterator call has no return edge")?;
                         for result in results {
-                            self.array_iterator_drop_adopt_work(
-                                frame.destruction_invocation(),
-                                &state,
-                            )?;
+                            self.active_destruction_adopt_work(&frame, &state)?;
                             let mut continuation = self.adopt_flow_return(
                                 &state,
                                 result.conditions,
@@ -2363,13 +2603,20 @@ impl<'tcx> Engine<'tcx> {
                                 destination_indices.as_ref(),
                                 result.value,
                             )?;
-                            queue.push_back((target, continuation, retry_path.clone()));
+                            queue.push_back((
+                                target,
+                                continuation,
+                                self.executable_box_retry_clone(
+                                    frame.box_invocation(),
+                                    &retry_path,
+                                )?,
+                            ));
                         }
                         continue;
                     }
                     if unarmed
                         && !configured
-                        && frame.destruction_invocation().is_none()
+                        && !frame.has_destruction()
                         && let Some(results) = self.iterator_call(
                             instance,
                             &values,
@@ -2380,10 +2627,7 @@ impl<'tcx> Engine<'tcx> {
                     {
                         let target = target.ok_or("iterator call has no return edge")?;
                         for result in results {
-                            self.array_iterator_drop_adopt_work(
-                                frame.destruction_invocation(),
-                                &state,
-                            )?;
+                            self.active_destruction_adopt_work(&frame, &state)?;
                             let mut continuation = self.adopt_flow_return(
                                 &state,
                                 result.conditions,
@@ -2397,12 +2641,20 @@ impl<'tcx> Engine<'tcx> {
                                 destination_indices.as_ref(),
                                 result.value,
                             )?;
-                            queue.push_back((target, continuation, retry_path.clone()));
+                            queue.push_back((
+                                target,
+                                continuation,
+                                self.executable_box_retry_clone(
+                                    frame.box_invocation(),
+                                    &retry_path,
+                                )?,
+                            ));
                         }
                         continue;
                     }
                     if unarmed
                         && !configured
+                        && frame.box_invocation().is_none()
                         && let Some(value) = self.isolated_pointer_atomic_call(
                             instance,
                             &values,
@@ -2425,11 +2677,45 @@ impl<'tcx> Engine<'tcx> {
                         )?;
                         let target =
                             target.ok_or("isolated pointer atomic call has no return edge")?;
-                        queue.push_back((target, state, retry_path.clone()));
+                        queue.push_back((
+                            target,
+                            state,
+                            self.executable_box_retry_clone(frame.box_invocation(), &retry_path)?,
+                        ));
                         continue;
                     }
                     if unarmed
                         && !configured
+                        && frame.box_invocation().is_none()
+                        && let Some(receipt) = box_occurrence
+                    {
+                        let value = self.executable_box_constructor(
+                            receipt,
+                            &owned_body,
+                            block,
+                            instance,
+                            &values,
+                            &mut state,
+                        )?;
+                        self.store_call_result(
+                            body,
+                            &mut state,
+                            *destination,
+                            destination_indices.as_ref(),
+                            value,
+                        )?;
+                        let target =
+                            target.ok_or("executable Box constructor lacks normal return edge")?;
+                        queue.push_back((
+                            target,
+                            state,
+                            self.executable_box_retry_clone(frame.box_invocation(), &retry_path)?,
+                        ));
+                        continue;
+                    }
+                    if unarmed
+                        && !configured
+                        && frame.box_invocation().is_none()
                         && let Some(value) =
                             self.owned_box_call(&owned_body, block, instance, &values, &mut state)?
                     {
@@ -2441,10 +2727,14 @@ impl<'tcx> Engine<'tcx> {
                             value,
                         )?;
                         let target = target.ok_or("owned Box call has no normal return edge")?;
-                        queue.push_back((target, state, retry_path.clone()));
+                        queue.push_back((
+                            target,
+                            state,
+                            self.executable_box_retry_clone(frame.box_invocation(), &retry_path)?,
+                        ));
                         continue;
                     }
-                    if frame.destruction_invocation().is_none()
+                    if !frame.has_destruction()
                         && let Some(results) = self.shared_drop_receiver_call(
                             (caller_instance, &owned_body, block),
                             instance,
@@ -2455,10 +2745,7 @@ impl<'tcx> Engine<'tcx> {
                     {
                         let target = target.ok_or("shared Drop call has no normal return edge")?;
                         for result in results {
-                            self.array_iterator_drop_adopt_work(
-                                frame.destruction_invocation(),
-                                &state,
-                            )?;
+                            self.active_destruction_adopt_work(&frame, &state)?;
                             let mut continuation = self.adopt_flow_return(
                                 &state,
                                 result.conditions,
@@ -2472,22 +2759,46 @@ impl<'tcx> Engine<'tcx> {
                                 destination_indices.as_ref(),
                                 result.value,
                             )?;
-                            queue.push_back((target, continuation, retry_path.clone()));
+                            queue.push_back((
+                                target,
+                                continuation,
+                                self.executable_box_retry_clone(
+                                    frame.box_invocation(),
+                                    &retry_path,
+                                )?,
+                            ));
                         }
                         continue;
                     }
-                    let argument_types: Vec<_> = args
-                        .iter()
-                        .map(|arg| arg.node.ty(&body.local_decls, self.tcx))
-                        .collect();
-                    let modeled_values = self.typed_coroutine_snapshots(
-                        &argument_types,
-                        &values,
-                        &state.memory,
-                        &state.conditions,
-                    )?;
+                    let modeled_values = if frame.box_invocation().is_some() {
+                        if matches!(instance.def, ty::InstanceKind::Intrinsic(_)) {
+                            // The only active Box consumer here is the admitted intrinsic.
+                            // Its original full signature was checked by the earlier call gate.
+                            self.executable_box_snapshots(
+                                &values,
+                                &state.memory,
+                                &state.conditions,
+                            )?
+                        } else {
+                            // Ordinary adapters are disabled below. Actual helper execution
+                            // consumes values, not these unused detached observations.
+                            Vec::new()
+                        }
+                    } else {
+                        let argument_types: Vec<_> = args
+                            .iter()
+                            .map(|arg| arg.node.ty(&body.local_decls, self.tcx))
+                            .collect();
+                        self.typed_coroutine_snapshots(
+                            &argument_types,
+                            &values,
+                            &state.memory,
+                            &state.conditions,
+                        )?
+                    };
                     if unarmed
                         && !configured
+                        && frame.box_invocation().is_none()
                         && let Some(value) = self.interior_call(
                             instance,
                             &modeled_values,
@@ -2503,12 +2814,16 @@ impl<'tcx> Engine<'tcx> {
                             value,
                         )?;
                         let target = target.ok_or("interior call has no return edge")?;
-                        queue.push_back((target, state, retry_path.clone()));
+                        queue.push_back((
+                            target,
+                            state,
+                            self.executable_box_retry_clone(frame.box_invocation(), &retry_path)?,
+                        ));
                         continue;
                     }
                     if (unarmed || armed_metadata)
                         && !configured
-                        && frame.destruction_invocation().is_none()
+                        && !frame.has_destruction()
                         && let Some(results) = self.library_call(
                             instance,
                             &modeled_values,
@@ -2526,10 +2841,7 @@ impl<'tcx> Engine<'tcx> {
                     {
                         let target = target.ok_or("modeled call has no return edge")?;
                         for result in results {
-                            self.array_iterator_drop_adopt_work(
-                                frame.destruction_invocation(),
-                                &state,
-                            )?;
+                            self.active_destruction_adopt_work(&frame, &state)?;
                             let mut continuation = self.adopt_flow_return(
                                 &state,
                                 result.conditions,
@@ -2543,12 +2855,20 @@ impl<'tcx> Engine<'tcx> {
                                 destination_indices.as_ref(),
                                 result.value,
                             )?;
-                            queue.push_back((target, continuation, retry_path.clone()));
+                            queue.push_back((
+                                target,
+                                continuation,
+                                self.executable_box_retry_clone(
+                                    frame.box_invocation(),
+                                    &retry_path,
+                                )?,
+                            ));
                         }
                         continue;
                     }
                     if unarmed
                         && !configured
+                        && frame.box_invocation().is_none()
                         && self.finite_byte_copy_candidate(instance, &values, &state)
                     {
                         // These are the actual operands evaluated above in MIR order for this
@@ -2584,11 +2904,17 @@ impl<'tcx> Engine<'tcx> {
                             destination_indices.as_ref(),
                             value,
                         )?;
-                        queue.push_back((target, state, retry_path.clone()));
+                        queue.push_back((
+                            target,
+                            state,
+                            self.executable_box_retry_clone(frame.box_invocation(), &retry_path)?,
+                        ));
                         continue;
                     }
                     if (unarmed || armed_metadata)
                         && !configured
+                        && (frame.box_invocation().is_none()
+                            || matches!(instance.def, ty::InstanceKind::Intrinsic(_)))
                         && let Some(value) = self.builtin(
                             body,
                             instance,
@@ -2606,7 +2932,11 @@ impl<'tcx> Engine<'tcx> {
                             value,
                         )?;
                         let target = target.ok_or("modeled call has no return edge")?;
-                        queue.push_back((target, state, retry_path.clone()));
+                        queue.push_back((
+                            target,
+                            state,
+                            self.executable_box_retry_clone(frame.box_invocation(), &retry_path)?,
+                        ));
                         continue;
                     }
                     if matches!(instance.def, ty::InstanceKind::Item(_))
@@ -2631,7 +2961,16 @@ impl<'tcx> Engine<'tcx> {
                     state
                         .flow
                         .charge_call_memory(&state.conditions, &state.memory)?;
-                    let results = if let Some(parent) =
+                    let results = if let Some(parent) = frame.box_invocation() {
+                        self.executable_box_helper_execute(
+                            parent,
+                            &owned_body,
+                            instance,
+                            values,
+                            &state,
+                            (&stack, (id, terminator.source_info.span)),
+                        )?
+                    } else if let Some(parent) =
                         self.array_iterator_drop_child_frame(frame.destruction_invocation())
                     {
                         self.array_iterator_drop_helper_execute(
@@ -2654,10 +2993,7 @@ impl<'tcx> Engine<'tcx> {
                     };
                     let target = target.ok_or("local call has no return edge")?;
                     for result in results {
-                        self.array_iterator_drop_adopt_work(
-                            frame.destruction_invocation(),
-                            &state,
-                        )?;
+                        self.active_destruction_adopt_work(&frame, &state)?;
                         let mut continuation = self.adopt_flow_return(
                             &state,
                             result.conditions,
@@ -2671,16 +3007,43 @@ impl<'tcx> Engine<'tcx> {
                             destination_indices.as_ref(),
                             result.value,
                         )?;
-                        queue.push_back((target, continuation, retry_path.clone()));
+                        queue.push_back((
+                            target,
+                            continuation,
+                            self.executable_box_retry_clone(frame.box_invocation(), &retry_path)?,
+                        ));
                     }
                 }
                 TerminatorKind::Drop { place, target, .. } => {
                     let ty = place.ty(&body.local_decls, self.tcx).ty;
                     if !ty.needs_drop(self.tcx, ty::TypingEnv::fully_monomorphized()) {
-                        queue.push_back((*target, state, retry_path.clone()));
+                        queue.push_back((
+                            *target,
+                            state,
+                            self.executable_box_retry_clone(frame.box_invocation(), &retry_path)?,
+                        ));
                         continue;
                     }
                     state.flow.require_unarmed()?;
+                    if let Some(results) = self.executable_box_element_drop(
+                        frame.box_invocation(),
+                        &owned_body,
+                        &mut state,
+                        block,
+                        &stack,
+                    )? {
+                        for continuation in results {
+                            queue.push_back((
+                                *target,
+                                continuation,
+                                self.executable_box_retry_clone(
+                                    frame.box_invocation(),
+                                    &retry_path,
+                                )?,
+                            ));
+                        }
+                        continue;
+                    }
                     if let Some(results) = self.array_iterator_drop_element(
                         frame.destruction_invocation(),
                         &owned_body,
@@ -2689,7 +3052,14 @@ impl<'tcx> Engine<'tcx> {
                         &stack,
                     )? {
                         for continuation in results {
-                            queue.push_back((*target, continuation, retry_path.clone()));
+                            queue.push_back((
+                                *target,
+                                continuation,
+                                self.executable_box_retry_clone(
+                                    frame.box_invocation(),
+                                    &retry_path,
+                                )?,
+                            ));
                         }
                         continue;
                     }
@@ -2702,6 +3072,27 @@ impl<'tcx> Engine<'tcx> {
                             "IntoIter nested element Drop requires its active child lease".into(),
                         ));
                     }
+                    if !frame.has_destruction()
+                        && let Some(results) = self.executable_box_drop_place(
+                            caller_instance,
+                            &owned_body,
+                            block,
+                            &mut state,
+                            &stack,
+                        )?
+                    {
+                        for continuation in results {
+                            queue.push_back((
+                                *target,
+                                continuation,
+                                self.executable_box_retry_clone(
+                                    frame.box_invocation(),
+                                    &retry_path,
+                                )?,
+                            ));
+                        }
+                        continue;
+                    }
                     if let Some(results) = self.array_iterator_drop_place(
                         caller_instance,
                         &owned_body,
@@ -2710,7 +3101,14 @@ impl<'tcx> Engine<'tcx> {
                         &stack,
                     )? {
                         for continuation in results {
-                            queue.push_back((*target, continuation, retry_path.clone()));
+                            queue.push_back((
+                                *target,
+                                continuation,
+                                self.executable_box_retry_clone(
+                                    frame.box_invocation(),
+                                    &retry_path,
+                                )?,
+                            ));
                         }
                         continue;
                     }
@@ -2718,7 +3116,14 @@ impl<'tcx> Engine<'tcx> {
                         self.drop_fixed_subslice(instance, &owned_body, block, &state, &stack)?
                     {
                         for continuation in results {
-                            queue.push_back((*target, continuation, retry_path.clone()));
+                            queue.push_back((
+                                *target,
+                                continuation,
+                                self.executable_box_retry_clone(
+                                    frame.box_invocation(),
+                                    &retry_path,
+                                )?,
+                            ));
                         }
                         continue;
                     }
@@ -2735,7 +3140,11 @@ impl<'tcx> Engine<'tcx> {
                         } else {
                             state.missing_places.consume(local, fields)?;
                         }
-                        queue.push_back((*target, state, retry_path.clone()));
+                        queue.push_back((
+                            *target,
+                            state,
+                            self.executable_box_retry_clone(frame.box_invocation(), &retry_path)?,
+                        ));
                         continue;
                     }
                     let coroutine_argument =
@@ -2750,7 +3159,11 @@ impl<'tcx> Engine<'tcx> {
                     } else if let Ok(value) = dropped
                         && self.drop_static_place(&value, ty, &mut state)?
                     {
-                        queue.push_back((*target, state, retry_path.clone()));
+                        queue.push_back((
+                            *target,
+                            state,
+                            self.executable_box_retry_clone(frame.box_invocation(), &retry_path)?,
+                        ));
                         continue;
                     }
                     if ty.needs_drop(self.tcx, ty::TypingEnv::fully_monomorphized())
@@ -2787,10 +3200,7 @@ impl<'tcx> Engine<'tcx> {
                             (id, terminator.source_info.span),
                         )?;
                         for result in results {
-                            self.array_iterator_drop_adopt_work(
-                                frame.destruction_invocation(),
-                                &state,
-                            )?;
+                            self.active_destruction_adopt_work(&frame, &state)?;
                             let mut continuation = self.adopt_flow_return(
                                 &state,
                                 result.conditions,
@@ -2813,16 +3223,31 @@ impl<'tcx> Engine<'tcx> {
                                 }
                                 continuation.locals[place.local.as_usize()] = None;
                             }
-                            queue.push_back((*target, continuation, retry_path.clone()));
+                            queue.push_back((
+                                *target,
+                                continuation,
+                                self.executable_box_retry_clone(
+                                    frame.box_invocation(),
+                                    &retry_path,
+                                )?,
+                            ));
                         }
                         continue;
                     }
-                    queue.push_back((*target, state, retry_path.clone()));
+                    queue.push_back((
+                        *target,
+                        state,
+                        self.executable_box_retry_clone(frame.box_invocation(), &retry_path)?,
+                    ));
                 }
                 TerminatorKind::InlineAsm { .. } => {
                     state.flow.require_unarmed()?;
                     let target = self.arm_interrupt_asm(id, body, &mut state, &terminator.kind)?;
-                    queue.push_back((target, state, retry_path.clone()));
+                    queue.push_back((
+                        target,
+                        state,
+                        self.executable_box_retry_clone(frame.box_invocation(), &retry_path)?,
+                    ));
                 }
                 TerminatorKind::Unreachable => {
                     return Err("reachable MIR unreachable terminator".to_owned());

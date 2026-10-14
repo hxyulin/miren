@@ -146,7 +146,7 @@ impl<'tcx> TypeVisitor<TyCtxt<'tcx>> for Plan<'_, 'tcx> {
 pub(super) fn check<'tcx>(
     engine: &mut Engine<'tcx>,
     instance: ty::Instance<'tcx>,
-) -> Result<(), String> {
+) -> Result<ty::PolyFnSig<'tcx>, String> {
     pay(engine, 8)?;
     if !matches!(instance.def, ty::InstanceKind::Item(id)
         if matches!(engine.tcx.def_kind(id), DefKind::Fn | DefKind::AssocFn))
@@ -213,5 +213,5 @@ pub(super) fn check<'tcx>(
             "IntoIter Drop cached/original full signature differs".into(),
         ));
     }
-    Ok(())
+    Ok(expected)
 }

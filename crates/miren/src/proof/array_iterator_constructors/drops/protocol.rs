@@ -1996,5 +1996,13 @@ pub(in crate::proof::array_iterator_constructors) fn authenticate_callable<'tcx>
     engine: &mut Engine<'tcx>,
     instance: ty::Instance<'tcx>,
 ) -> Result<(), String> {
+    signature::check(engine, instance).map(|_| ())
+}
+
+pub(in crate::proof::array_iterator_constructors) fn authenticated_signature<'tcx>(
+    engine: &mut Engine<'tcx>,
+    instance: ty::Instance<'tcx>,
+) -> Result<ty::PolyFnSig<'tcx>, String> {
+    pay(engine, 1)?; // New Box immutable return service; existing callable gate fees stay intact.
     signature::check(engine, instance)
 }
