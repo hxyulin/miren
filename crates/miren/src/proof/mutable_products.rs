@@ -134,19 +134,25 @@ impl<'tcx> Engine<'tcx> {
         &self,
         id: usize,
     ) -> Result<&IntegerCertificate<'tcx>, String> {
+        if !self.niche_origins.is_empty() {
+            let paid = self.niche_certificate_work(id)?;
+            let result = (|| {
+                let certificate = self
+                    .mutable_integer_types
+                    .get(id)
+                    .ok_or("mutable product certificate was not issued")?;
+                paid.verify(self, certificate)?;
+                Ok(certificate)
+            })();
+            if result.is_err() {
+                self.niche_scope_end(true);
+            }
+            return result;
+        }
         let certificate = self
             .mutable_integer_types
             .get(id)
             .ok_or("mutable product certificate was not issued")?;
-        if let Some(origin) = self.niche_origins.get(&id) {
-            self.niche_certificate_work(id)?;
-            let result = origin.verify(self, certificate);
-            if result.is_err() {
-                self.niche_scope_end(true);
-            }
-            result?;
-            return Ok(certificate);
-        }
         if let Some(prepared) = self.mutable_product_descriptor_guard(id, certificate.original)? {
             prepared
                 .validate_source(self)
@@ -199,8 +205,10 @@ impl<'tcx> Engine<'tcx> {
         let parts = token.consume(self, memory)?;
         self.niche_root_storage_work(parts.descriptor.leaves.len())?;
         let certificate = self.mutable_integer_types.len();
+        // The existing root publication fixed fee covers this canonical Rc header retention.
+        let origin = std::rc::Rc::new(parts.origin);
         let value = self.mutable_product_input_descriptor(parts.descriptor, memory, conditions)?;
-        self.niche_origins.insert(certificate, parts.origin);
+        self.niche_origins.insert(certificate, origin);
         Ok(value)
     }
 

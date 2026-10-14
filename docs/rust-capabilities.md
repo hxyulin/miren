@@ -3191,3 +3191,28 @@ The mechanical shared-counter migration passes 1,049 Rust and 91 Python tests an
 repository gates. All default survey outcomes, 5,420 queries and 656 models remain unchanged.
 It also preserves all 192 sampled application Proof objects literally, including 168 queries
 and twelve models; charging actual niche comparisons is a separate stage.
+
+Actual niche certificate comparisons now charge their selected immutable plan and live source
+inventories immediately before verification. Linear receipts bind the canonical origin and actual
+instruction scope; the 64-use limit and storage publication guards remain. Shared step accounting
+preserves the existing domain-specific payment and overflow policies.
+
+The unchanged 24-root u8 sample at 2,000,000 steps supports nine positive roots and three deliberate
+refutations per host/ARM profile. Copying fields, whole-product assignment and replacement prove
+for all three sampled enum layouts. Default-budget results remain UNKNOWN. Helper source loading,
+outer-preservation acquisition, partial payload writes and bare enum owners remain separate gaps.
+
+
+The expanded unchanged fixture runs 288 roots across all twelve integer types and three enum
+layouts, on four profiles at two budgets (2,304 Proofs). Each diagnostic profile records
+108 PROVED, 36 REFUTED and 144 UNKNOWN; all default roots remain UNKNOWN. Independent review
+verifies 144 model-bound SAT checks and 288 contradictory-bound UNSAT controls. All prior u8
+queries remain literal per-function ordered prefixes and prior models are unchanged. Eighteen
+recorded mutation outcomes REFUTE with original assertions retained; their separately recorded
+command/binary provenance is qualified. Existing host native controls remain separate evidence;
+no native ARM execution is claimed.
+
+This stage passes 1,049 Rust and 91 Python tests, formatting, Clippy, release builds, dependency
+checks, the four-profile survey, manual hooks and documentation build. Default survey statuses,
+all 5,420 raw queries and 656 models remain unchanged. Remaining UNKNOWN cases are documented
+without being admitted through assumptions or source inventory alone.

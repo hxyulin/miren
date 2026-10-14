@@ -208,7 +208,8 @@ struct Engine<'tcx> {
     mutable_product_descriptors: Vec<std::rc::Rc<mutable_product_descriptors::Prepared<'tcx>>>,
     niche_ledger: mutable_product_niche_ledger::Registry<'tcx>,
     niche_operand: std::cell::Cell<usize>,
-    niche_origins: BTreeMap<usize, nonzero_niches::mutable_codec::input_descriptor::Origin<'tcx>>,
+    niche_origins:
+        BTreeMap<usize, std::rc::Rc<nonzero_niches::mutable_codec::input_descriptor::Origin<'tcx>>>,
     niche_root_inputs: nonzero_niches::mutable_codec::input_descriptor::RootRegistry,
     mutable_product_failed: std::cell::Cell<bool>,
     mutable_product_access: std::cell::RefCell<Option<mutable_hierarchy::products::Access<'tcx>>>,

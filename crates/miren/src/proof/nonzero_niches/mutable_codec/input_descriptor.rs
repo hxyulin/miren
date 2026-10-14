@@ -737,7 +737,9 @@ impl<'tcx> Origin<'tcx> {
         &self,
         engine: &Engine<'tcx>,
         certificate: &super::super::super::mutable_u16::IntegerCertificate<'tcx>,
+        paid: super::super::super::mutable_product_niche_ledger::PaidComparison<'tcx>,
     ) -> Result<(), String> {
+        paid.consume(engine, self)?;
         engine.niche_source_inventory_guard()?;
         let bodies = engine
             .bodies

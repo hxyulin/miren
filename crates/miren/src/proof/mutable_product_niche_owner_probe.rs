@@ -111,7 +111,7 @@ fn actual_root_niche_owner_transactions_and_refusals() {
                 .unwrap()
                 .to_def_id();
             let instance = ty::Instance::mono(tcx, id);
-            for denial in 0..28 {
+            for denial in 0..33 {
                 let mut engine = super::super::nonzero_niches::test_engine(tcx);
                 engine.limits.max_steps = 2_000_000;
                 let body = engine.instantiated_body(instance).unwrap();
@@ -198,6 +198,23 @@ fn actual_root_niche_owner_transactions_and_refusals() {
                     };
                     **discriminant = symbolic::integer(&engine.terms, 1, bits, true);
                     set_payload(&mut variants[1], &engine.terms, 7);
+                }
+                if denial >= 28 {
+                    actual_certificate_payment_controls(
+                        &mut engine,
+                        (instance, &body, store),
+                        &mut state,
+                        place,
+                        &value,
+                        denial - 28,
+                    );
+                    retained(&before, &state);
+                    drop(frame);
+                    eprintln!(
+                        "NICHE_OWNER_TRANSACTION denial={denial} target={} opt={:?}",
+                        tcx.sess.target.llvm_target, tcx.sess.opts.optimize
+                    );
+                    continue;
                 }
                 match denial {
                     0 => {}
@@ -380,15 +397,29 @@ fn actual_root_niche_owner_transactions_and_refusals() {
                         let other = ty::Instance::mono(tcx, other);
                         let body_count = engine.bodies.borrow().len();
                         let signature_count = engine.call_signatures.borrow().len();
+                        let signature = if denial % 2 == 1 {
+                            Some(
+                                mutable_hierarchy::products::niche_codec_signature(
+                                    &mut engine,
+                                    other,
+                                )
+                                .unwrap(),
+                            )
+                        } else {
+                            None
+                        };
+                        let paid = if denial >= 20 {
+                            Some(engine.niche_certificate_work(0).unwrap())
+                        } else {
+                            None
+                        };
                         if denial % 2 == 0 {
                             engine.instantiated_body(other).unwrap();
                         } else {
-                            let signature = mutable_hierarchy::products::niche_codec_signature(
-                                &mut engine,
-                                other,
-                            )
-                            .unwrap();
-                            engine.call_signatures.borrow_mut().insert(other, signature);
+                            engine
+                                .call_signatures
+                                .borrow_mut()
+                                .insert(other, signature.unwrap());
                         }
                         if denial % 2 == 0 {
                             assert_eq!(engine.bodies.borrow().len(), body_count + 1);
@@ -399,7 +430,7 @@ fn actual_root_niche_owner_transactions_and_refusals() {
                         }
                         if denial >= 20 {
                             let error = engine.niche_origins[&0]
-                                .verify(&engine, &engine.mutable_integer_types[0])
+                                .verify(&engine, &engine.mutable_integer_types[0], paid.unwrap())
                                 .unwrap_err();
                             assert!(error.contains("prepaid actual inventory"), "{error}");
                         } else {
@@ -416,11 +447,6 @@ fn actual_root_niche_owner_transactions_and_refusals() {
                             engine.call_signatures.borrow_mut().remove(&other);
                         }
                         assert!(engine.niche_certificate_work(0).is_err());
-                        assert!(
-                            engine.niche_origins[&0]
-                                .verify(&engine, &engine.mutable_integer_types[0])
-                                .is_err()
-                        );
                         retained(&before, &state);
                         drop(frame);
                         eprintln!(
@@ -488,7 +514,7 @@ fn actual_root_niche_owner_transactions_and_refusals() {
                             assert_eq!(scope.remaining, remaining);
                             assert_eq!(remaining, 63);
                             if denial >= 26 {
-                                assert_eq!(scope.denied_replan_work, Some(2 * remaining));
+                                assert_eq!(scope.denied_replan_work, Some(16));
                                 assert_eq!(engine.steps.used(), engine.limits.max_steps + 1);
                             } else {
                                 assert_eq!(scope.denied_replan_work, None);
@@ -618,4 +644,133 @@ fn actual_root_niche_owner_transactions_and_refusals() {
             assert!(check.0);
         }
     }
+}
+
+fn actual_certificate_payment_controls<'tcx>(
+    engine: &mut Engine<'tcx>,
+    instruction: (ty::Instance<'tcx>, &Body<'tcx>, &StatementKind<'tcx>),
+    state: &mut State,
+    place: Place<'tcx>,
+    value: &Value,
+    mode: usize,
+) {
+    let (instance, body, statement) = instruction;
+    // Independent numerical oracle: one real selected immutable plan, two source lookups,
+    // both bounded origin lookups, two frame checks and fixed scope/receipt header work.
+    let fee = engine.niche_origins.len() * 2
+        + 8
+        + 2 * MAX_INPUT_DEPTH
+        + 16
+        + engine.niche_origins[&0].compare_work()
+        + 2 * (engine.bodies.borrow().len() + engine.call_signatures.borrow().len());
+    let before = engine.steps.used();
+    let remaining = engine
+        .niche_ledger
+        .current
+        .borrow()
+        .as_ref()
+        .unwrap()
+        .remaining;
+    if mode == 0 {
+        engine.limits.max_steps = before + fee;
+        engine.mutable_product_certificate(0).unwrap();
+        assert_eq!(engine.steps.used(), before + fee);
+        assert_eq!(
+            engine
+                .niche_ledger
+                .current
+                .borrow()
+                .as_ref()
+                .unwrap()
+                .remaining,
+            remaining - 1
+        );
+        assert!(!engine.niche_ledger.failed.get());
+        return;
+    }
+    if mode == 1 {
+        engine.limits.max_steps = before + fee - 1;
+        let error = engine.mutable_product_certificate(0).unwrap_err();
+        assert!(
+            error.contains("niche instruction shared step limit reached"),
+            "{error}"
+        );
+        assert_eq!(
+            engine.unknown_causes.borrow().get(&error),
+            Some(&UnknownCategory::ResourceLimit)
+        );
+        assert_eq!(engine.steps.used(), before + fee);
+        assert_eq!(
+            engine
+                .niche_ledger
+                .current
+                .borrow()
+                .as_ref()
+                .unwrap()
+                .remaining,
+            remaining
+        );
+    } else if mode == 2 {
+        let error = engine.mutable_product_certificate(usize::MAX).unwrap_err();
+        assert!(error.contains("no selected compiler origin"), "{error}");
+        assert_eq!(engine.steps.used() - before, 10);
+        assert_eq!(
+            engine
+                .niche_ledger
+                .current
+                .borrow()
+                .as_ref()
+                .unwrap()
+                .remaining,
+            remaining
+        );
+    } else {
+        let paid = engine.niche_certificate_work(0).unwrap();
+        assert_eq!(engine.steps.used() - before, fee);
+        if mode == 3 {
+            engine
+                .niche_statement_scope(instance, body, state, statement)
+                .unwrap();
+            // The scope above is genuinely re-created by the real compiler instruction path.
+            let used = engine.steps.used();
+            let error = paid
+                .verify(engine, &engine.mutable_integer_types[0])
+                .unwrap_err();
+            assert!(error.contains("another actual scope"), "{error}");
+            assert_eq!(engine.steps.used(), used);
+        } else {
+            let mut foreign = super::super::nonzero_niches::test_engine(engine.tcx);
+            foreign.limits.max_steps = 2_000_000;
+            let foreign_body = foreign.instantiated_body(instance).unwrap();
+            let mut memory = Memory::default();
+            let mut conditions = Vec::new();
+            let phase = foreign.niche_root_inputs.begin(instance.def_id()).unwrap();
+            let input = input_descriptor::prepare_root(
+                &mut foreign,
+                instance.def_id(),
+                &foreign_body,
+                rustc_middle::mir::Local::from_usize(1),
+                &memory,
+            )
+            .unwrap()
+            .unwrap();
+            foreign
+                .mutable_product_niche_input(input, &mut memory, &mut conditions)
+                .unwrap();
+            phase.close();
+            let error = foreign.niche_origins[&0]
+                .verify(engine, &engine.mutable_integer_types[0], paid)
+                .unwrap_err();
+            assert!(error.contains("selected origin/Context differs"), "{error}");
+        }
+    }
+    assert!(engine.niche_ledger.failed.get());
+    let used = engine.steps.used();
+    assert!(engine.mutable_product_certificate(0).is_err());
+    assert_eq!(engine.steps.used(), used);
+    let error = engine
+        .mutable_product_store(body, state, place, value)
+        .unwrap_err();
+    assert!(error.contains("failed niche execution"), "{error}");
+    assert_eq!(engine.steps.used(), used);
 }

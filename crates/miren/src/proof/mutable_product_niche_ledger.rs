@@ -26,7 +26,108 @@ struct Leaf<'tcx> {
     site: Site<'tcx>,
     prepared: Option<Prepared<'tcx>>,
 }
+struct ScopeIdentity;
+
+// Linear proof of paid comparison work, not a storage/owner/source authority.
+pub(in crate::proof) struct PaidComparison<'tcx> {
+    id: usize,
+    origin: Rc<codec::input_descriptor::Origin<'tcx>>,
+    scope: Rc<ScopeIdentity>,
+    body: Rc<Body<'tcx>>,
+    instance: ty::Instance<'tcx>,
+    token: Term,
+}
+impl std::fmt::Debug for PaidComparison<'_> {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("PaidComparison")
+            .field("id", &self.id)
+            .finish_non_exhaustive()
+    }
+}
+impl<'tcx> PaidComparison<'tcx> {
+    pub(in crate::proof) fn verify(
+        self,
+        engine: &Engine<'tcx>,
+        certificate: &super::mutable_u16::IntegerCertificate<'tcx>,
+    ) -> Result<(), String> {
+        let origin = self.origin.clone();
+        origin.verify(engine, certificate, self)
+    }
+
+    pub(in crate::proof) fn consume(
+        self,
+        engine: &Engine<'tcx>,
+        origin: &codec::input_descriptor::Origin<'tcx>,
+    ) -> Result<(), String> {
+        let result = (|| {
+            if engine.niche_ledger.failed.get()
+                || engine.niche_origins.len() > 1
+                || !std::ptr::eq(self.origin.as_ref(), origin)
+                || engine
+                    .niche_origins
+                    .get(&self.id)
+                    .is_none_or(|current| !Rc::ptr_eq(current, &self.origin))
+                || !self.token.belongs_to(&engine.terms)
+            {
+                return Err("paid niche comparison selected origin/Context differs".into());
+            }
+            let active = engine
+                .niche_ledger
+                .current
+                .try_borrow()
+                .map_err(|_| "paid niche comparison scope borrowed")?;
+            let scope = active
+                .as_ref()
+                .ok_or("paid niche comparison scope disappeared")?;
+            if !Rc::ptr_eq(&self.scope, &scope.identity)
+                || !Rc::ptr_eq(&self.body, &scope.body)
+                || self.instance != scope.instance
+            {
+                return Err("paid niche comparison belongs to another actual scope".into());
+            }
+            let bodies = engine
+                .bodies
+                .try_borrow()
+                .map_err(|_| "niche current Body registry borrowed")?;
+            let signatures = engine
+                .call_signatures
+                .try_borrow()
+                .map_err(|_| "niche current signature registry borrowed")?;
+            if bodies.len() > scope.body_bound || signatures.len() > scope.signature_bound {
+                return Err(
+                    "niche current source catalogue exceeds prepaid actual inventory".into(),
+                );
+            }
+            if bodies
+                .get(&scope.instance)
+                .is_none_or(|body| !Rc::ptr_eq(body, &scope.body))
+                || signatures
+                    .get(&scope.instance)
+                    .is_some_and(|sig| *sig != scope.signature)
+            {
+                return Err("niche current instruction binding differs".into());
+            }
+            let frame = engine.niche_current_frame()?;
+            if scope.frame.as_ref().is_some_and(|saved| {
+                !saved.alive.get()
+                    || frame
+                        .as_ref()
+                        .is_none_or(|current| !Rc::ptr_eq(saved, current))
+            }) {
+                return Err("niche paid comparison current frame differs".into());
+            }
+            Ok(())
+        })();
+        if result.is_err() {
+            engine.niche_scope_end(true);
+        }
+        result
+    }
+}
+
 struct Scope<'tcx> {
+    identity: Rc<ScopeIdentity>,
     body: Rc<Body<'tcx>>,
     instance: ty::Instance<'tcx>,
     signature: ty::PolyFnSig<'tcx>,
@@ -46,7 +147,7 @@ struct Scope<'tcx> {
     leaves: Vec<Leaf<'tcx>>,
 }
 
-fn pay(engine: &mut Engine<'_>, count: usize) -> Result<(), String> {
+fn pay(engine: &Engine<'_>, count: usize) -> Result<(), String> {
     engine.steps.checked_add_commit(count).ok_or_else(|| {
         engine.categorized_error(
             UnknownCategory::ResourceLimit,
@@ -389,16 +490,6 @@ impl<'tcx> Engine<'tcx> {
             if self.niche_origins.len() > 1 {
                 return Err("niche origins exceed one-shot root input bound".into());
             }
-            // Planning facts are immutable and paid at authentic root construction. Price only
-            // this bounded origin catalogue lookup; current certificate comparisons stay separate.
-            pay(self, self.niche_origins.len() + 8)?;
-            let compare = self
-                .niche_origins
-                .values()
-                .try_fold(0usize, |sum, origin| {
-                    sum.checked_add(origin.compare_work())
-                        .ok_or("niche comparison work overflow")
-                })?;
             let occurrence_count = occurrences.len();
             let session = Rc::new(Session::default());
             let mut prepared = Vec::new();
@@ -460,14 +551,9 @@ impl<'tcx> Engine<'tcx> {
                 return Err("niche source inventory exceeds ordinary catalogue caps".into());
             }
             let remaining = 64usize;
-            let per_slot = compare
-                .checked_add(2 * (body_bound + signature_bound) + 2 * MAX_INPUT_DEPTH + 16)
-                .ok_or("niche source comparison reservation overflow")?;
-            let compare_work = remaining
-                .checked_mul(per_slot)
-                .and_then(|work| work.checked_add(64))
-                .ok_or("niche comparison reservation overflow")?;
-            pay(self, compare_work)?;
+            // Scope publication retains its original fixed fee; actual certificate uses pay
+            // their own full selected-origin comparison and live-source lookup work below.
+            pay(self, 64)?;
             let receipt_work = prepared
                 .len()
                 .checked_mul(24)
@@ -493,6 +579,7 @@ impl<'tcx> Engine<'tcx> {
             let cow_work = mutable_hierarchy::products::niche_backing_clone_plan(self, memory)?;
             pay(self, cow_work)?;
             let scope = Scope {
+                identity: Rc::new(ScopeIdentity),
                 body: owned,
                 instance,
                 signature,
@@ -717,6 +804,24 @@ impl<'tcx> Engine<'tcx> {
         )
     }
     fn niche_source_replan(&mut self, bodies: usize, signatures: usize) -> Result<(), String> {
+        if self.niche_ledger.failed.get() {
+            return Err("failed niche execution cannot acquire source work".into());
+        }
+        #[cfg(test)]
+        {
+            let mut active = self
+                .niche_ledger
+                .current
+                .try_borrow_mut()
+                .map_err(|_| "niche source scope borrowed during acquisition control")?;
+            if let Some(scope) = active.as_mut()
+                && scope.deny_replan
+            {
+                scope.denied_replan_work = Some(16);
+                self.limits.max_steps = self.steps.used().checked_add(15).unwrap();
+            }
+        }
+        pay(self, 16)?; // Actual bound reading/computation/publication, not future uses.
         let active = self
             .niche_ledger
             .current
@@ -730,9 +835,6 @@ impl<'tcx> Engine<'tcx> {
         }
         let old_bodies = scope.body_bound;
         let old_signatures = scope.signature_bound;
-        let remaining = scope.remaining;
-        #[cfg(test)]
-        let deny_replan = scope.deny_replan;
         drop(active);
         let current_bodies = self
             .bodies
@@ -759,24 +861,6 @@ impl<'tcx> Engine<'tcx> {
             .max(old_signatures);
         if body_bound > 128 || signature_bound > 256 {
             return Err("niche source acquisition exceeds ordinary catalogue caps".into());
-        }
-        let work = (body_bound - old_bodies)
-            .checked_add(signature_bound - old_signatures)
-            .and_then(|work| work.checked_mul(2))
-            .and_then(|work| work.checked_mul(remaining))
-            .ok_or("niche remaining source reservation overflow")?;
-        #[cfg(test)]
-        if deny_replan && work != 0 {
-            self.niche_ledger
-                .current
-                .borrow_mut()
-                .as_mut()
-                .unwrap()
-                .denied_replan_work = Some(work);
-            self.limits.max_steps = self.steps.used().checked_add(work - 1).unwrap();
-        }
-        if work != 0 {
-            pay(self, work)?;
         }
         let mut active = self
             .niche_ledger
@@ -936,17 +1020,36 @@ impl<'tcx> Engine<'tcx> {
         }
         Ok(())
     }
-    pub(super) fn niche_certificate_work(&self, id: usize) -> Result<(), String> {
+    pub(super) fn niche_certificate_work(&self, id: usize) -> Result<PaidComparison<'tcx>, String> {
         let result = self.niche_certificate_work_inner(id);
         if result.is_err() {
             self.niche_ledger.failed.set(true);
         }
         result
     }
-    fn niche_certificate_work_inner(&self, _: usize) -> Result<(), String> {
+    fn niche_certificate_work_inner(&self, id: usize) -> Result<PaidComparison<'tcx>, String> {
         if self.niche_ledger.failed.get() {
             return Err("failed niche execution cannot consume descriptor work".into());
         }
+        let origins = self.niche_origins.len();
+        // Both selected-origin lookups (planning here and actual verification) are bounded
+        // before either lookup. Invalid IDs never receive the full comparison charge.
+        pay(
+            self,
+            origins
+                .checked_mul(2)
+                .and_then(|n| n.checked_add(8))
+                .ok_or("niche selected origin header work overflow")?,
+        )?;
+        if origins > 1 {
+            return Err("niche origins exceed one-shot root input bound".into());
+        }
+        let origin = self
+            .niche_origins
+            .get(&id)
+            .ok_or("niche certificate has no selected compiler origin")?;
+        // Fixed scope/source counts, frame/Context and certificate headers are paid first.
+        pay(self, 2 * MAX_INPUT_DEPTH + 16)?;
         let mut active = self
             .niche_ledger
             .current
@@ -958,7 +1061,6 @@ impl<'tcx> Engine<'tcx> {
         if scope.remaining == 0 {
             return Err("niche descriptor comparison slots exhausted".into());
         }
-        scope.remaining -= 1;
         let bodies = self
             .bodies
             .try_borrow()
@@ -970,6 +1072,16 @@ impl<'tcx> Engine<'tcx> {
         if bodies.len() > scope.body_bound || signatures.len() > scope.signature_bound {
             return Err("niche current source catalogue exceeds prepaid actual inventory".into());
         }
+        let comparison = bodies
+            .len()
+            .checked_add(signatures.len())
+            .and_then(|n| n.checked_mul(2))
+            .and_then(|n| n.checked_add(origin.compare_work()))
+            .ok_or("niche selected comparison work overflow")?;
+        // Actual instruction and originating Body/signature lookups plus the whole selected
+        // immutable-plan comparison are covered before any of those operations execute.
+        pay(self, comparison)?;
+        scope.remaining -= 1;
         let current_frame = self.niche_current_frame()?;
         if scope.frame.as_ref().is_some_and(|frame| {
             !frame.alive.get()
@@ -977,16 +1089,17 @@ impl<'tcx> Engine<'tcx> {
                     .as_ref()
                     .is_none_or(|current| !Rc::ptr_eq(frame, current))
         }) || !scope.token.belongs_to(&self.terms)
-            || bodies
-                .get(&scope.instance)
-                .is_none_or(|body| !Rc::ptr_eq(body, &scope.body))
-            || signatures
-                .get(&scope.instance)
-                .is_some_and(|signature| *signature != scope.signature)
         {
             return Err("niche current instruction binding differs".into());
         }
-        Ok(())
+        Ok(PaidComparison {
+            id,
+            origin: origin.clone(),
+            scope: scope.identity.clone(),
+            body: scope.body.clone(),
+            instance: scope.instance,
+            token: scope.token.clone(),
+        })
     }
     pub(super) fn niche_leaf(
         &self,

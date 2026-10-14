@@ -2277,3 +2277,8 @@ Execution and retained services share one Engine step counter. Shared receivers 
 counter directly, while domain payment wrappers preserve their existing fees and failure policies.
 Function-table reservations commit only after their budget check. Protocol receipts keep their
 existing prepaid work and scope rules.
+
+Niche certificate checks charge the selected immutable compiler-origin comparison and current
+source lookups at each actual use. A linear receipt binds that paid check to the canonical origin
+and current scope identity before verification. Scopes retain the 64-use bound; source acquisition
+charges its actual bound publication work. Value construction and backing COW keep separate receipts.
