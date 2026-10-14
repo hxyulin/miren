@@ -2181,3 +2181,13 @@ errors and selected Product service failures
 remain sticky; no fee, execution cap or failed-service state is reset. The two earlier nested
 Product UNKNOWN controls now stop at the new paid Product frontier under default8192. Separate
 2000000-step diagnostic controls execute their actual helpers and prove without premises.
+
+The conditional byte range record separately authenticates the exact core `Ord::min` usize
+implementation and its genuine `integer_min::<usize>` call. Raw, normalized and current complete
+bodies, safe full signatures, original target usize layout and held registry identity are checked.
+This source-specific path preserves the ordinary source observer's ctpop-only admission. Its
+non-Clone minimum association refers to the existing unsigned-less-than/conditional integer
+intrinsic semantics and carries no output term or predicate. Initialized byte/word loads, slicing,
+alignment, reference lifetime, missing panic bodies and the algorithm range theorem remain
+unresolved; the consumer still refuses pending search certification. Additional source, clone,
+normalization, signature, layout and registry services are charged before they run.

@@ -3052,3 +3052,23 @@ Full validation passes 1,037 Rust and 91 Python tests. Each 613-case profile ret
 literal. Of 2,452 full baseline Proofs, 2,443 match; eight reflect the two new default resource
 frontiers and one differs only in a query-free fold timeout call chain. No default promotion is
 claimed. The first full run and first routing fix failures are preserved; renewed validation passes.
+
+
+## Exact target-usize minimum source association
+
+Byte range preparation authenticates the genuine core Ord implementation and its integer_min
+call against complete raw, normalized and current MIR, full signatures and 32/64-bit target layout.
+The non-Clone record retains current Body identity and both signatures; final binding checks actual
+guarded registries. Ordinary intrinsic admission is unchanged. Only cumulative work escapes to the
+still-refusing pending source.
+
+Fresh Root retained controls pass 128 raw/current semantic mutations plus signature, identity,
+registry and work refusals. Eight cold private application proofs remain missing-evidence UNKNOWN
+with two descriptive Rust-storage model strings and no queries, countermodels, assumptions or
+trusted calls. This supplies no independent arithmetic theorem, search predicate or storage rights.
+Slicing, loads, lifetime and the complete algorithm remain obligations.
+
+Full Root validation passes 1,037 Rust and 91 Python tests. Four profiles retain 336 PROVED,
+164 REFUTED and 113 UNKNOWN across 613 cases. All 5,420 queried obligations and 656 counterexample
+models remain literal; 2,450 full baseline Proofs match and two query-free fold timeout contexts
+differ. No supported outcome is added by this source-only stage.

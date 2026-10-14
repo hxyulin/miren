@@ -462,7 +462,7 @@ fn direct(place: Place<'_>, expected: usize) -> bool {
     place.local.as_usize() == expected && place.projection.is_empty()
 }
 
-fn key(work: &mut Work, id: DefId) -> Result<String, Failure> {
+pub(super) fn key(work: &mut Work, id: DefId) -> Result<String, Failure> {
     // Reuse the existing bounded key service, carrying the same cumulative work into and out of it.
     work.charge(4)?;
     let prior = work.used;
@@ -986,9 +986,10 @@ struct GuardedRangeSource<'a, 'tcx> {
 }
 
 // Both actual registries remain borrowed through every schema/constant/layout service.
-// Valid primitive/min/slicing operations are unresolved premises, not application assumptions.
+// Slicing/load/lifetime operations remain unresolved premises, not application assumptions.
 struct ConditionalRangeMetadata<'a, 'tcx> {
     records: Vec<RangeRecord<'tcx>>,
+    minimum: minimum::MinimumRecord<'tcx>,
     bodies: Ref<'a, HashMap<ty::Instance<'tcx>, Rc<Body<'tcx>>>>,
     signatures: Ref<'a, HashMap<ty::Instance<'tcx>, ty::PolyFnSig<'tcx>>>,
     work: Work,
@@ -1059,14 +1060,21 @@ fn conditional<'a, 'tcx>(
     let runtime_source = observe_inner(engine, runtime, 2, work.used)?;
     work.used = runtime_source.work.used;
     let runtime_record = record(runtime_source, &mut work)?;
+    let minimum = selected(
+        &runtime_record,
+        "DefId(core::cmp::impls::{impl#59}::min)",
+        &mut work,
+    )?;
+    let minimum = minimum::prepare(engine, minimum, &mut work)?;
     work.charge(20)?; // Actual four-element record Vec allocation and four record moves.
     let records = vec![root_record, forwarder_record, naive_record, runtime_record];
-    bind_records(engine, records, work)
+    bind_records(engine, records, minimum, work)
 }
 
 fn bind_records<'a, 'tcx>(
     engine: &'a Engine<'tcx>,
     records: Vec<RangeRecord<'tcx>>,
+    minimum: minimum::MinimumRecord<'tcx>,
     mut work: Work,
 ) -> Result<ConditionalRangeMetadata<'a, 'tcx>, Failure> {
     work.charge(4)?; // Actual consumed private prepared-record transition.
@@ -1112,9 +1120,11 @@ fn bind_records<'a, 'tcx>(
         };
         shape(&source, &mut work, &record.current, name, locals, blocks)?;
     }
-    work.charge(8)?; // Non-Clone conditional metadata publication; no external predicate exists.
+    minimum::check(engine, &minimum, &bodies, &signatures, &mut work)?;
+    work.charge(9)?; // Records plus minimum metadata, no external predicate exists.
     Ok(ConditionalRangeMetadata {
         records,
+        minimum,
         bodies,
         signatures,
         work,
@@ -1138,7 +1148,14 @@ pub(super) fn reject_pending_range<'tcx>(
             return Err("range held source guards lost prepared identity".into());
         }
     }
+    minimum::check(
+        engine,
+        &metadata.minimum,
+        &metadata.bodies,
+        &metadata.signatures,
+        &mut metadata.work,
+    )?;
     // Consume conditional metadata. PendingSources still refuses its missing edge: raw-parts,
-    // lifetime, min/slice and word-load premises remain undischarged.
+    // lifetime, slice and word-load premises remain undischarged.
     Ok(metadata.work.used)
 }

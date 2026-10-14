@@ -374,6 +374,7 @@ pub(in super::super) fn compiler_controls<'tcx>(engine: &Engine<'tcx>, root: ty:
     );
     let ConditionalRangeMetadata {
         records,
+        minimum,
         bodies,
         signatures,
         work,
@@ -390,7 +391,7 @@ pub(in super::super) fn compiler_controls<'tcx>(engine: &Engine<'tcx>, root: ty:
         .bodies
         .borrow_mut()
         .insert(search, Rc::new(current.as_ref().clone()));
-    let error = match bind_records(engine, records, paid) {
+    let error = match bind_records(engine, records, minimum, paid) {
         Ok(_) => panic!("replaced current source admitted conditional metadata"),
         Err(error) => error,
     };
@@ -403,6 +404,7 @@ pub(in super::super) fn compiler_controls<'tcx>(engine: &Engine<'tcx>, root: ty:
     let fresh = conditional(engine, search, prior).unwrap();
     let ConditionalRangeMetadata {
         records,
+        minimum,
         bodies,
         signatures,
         mut work,
@@ -418,7 +420,7 @@ pub(in super::super) fn compiler_controls<'tcx>(engine: &Engine<'tcx>, root: ty:
     drop(bodies);
     drop(signatures);
     engine.call_signatures.borrow_mut().insert(search, foreign);
-    let error = match bind_records(engine, records, work) {
+    let error = match bind_records(engine, records, minimum, work) {
         Ok(_) => panic!("foreign current full signature issued conditional metadata"),
         Err(error) => error,
     };
@@ -443,4 +445,9 @@ pub(in super::super) fn compiler_controls<'tcx>(engine: &Engine<'tcx>, root: ty:
     assert_eq!(error.category, UnknownCategory::ResourceLimit);
     assert!(conditional(engine, search, prior).is_ok());
     eprintln!("BYTE RANGE registry replacement/conflict and resource refusal; no search authority");
+    let metadata = conditional(engine, search, prior).unwrap();
+    let minimum = minimum::probe::instance(&metadata.minimum);
+    let used = metadata.work.used;
+    drop(metadata);
+    minimum::probe::compiler_controls(engine, minimum, used);
 }

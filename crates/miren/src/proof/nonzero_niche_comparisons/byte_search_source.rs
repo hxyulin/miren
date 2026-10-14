@@ -3,6 +3,8 @@ use super::*;
 
 #[path = "byte_search_source/allocation_size.rs"]
 mod allocation_size;
+#[path = "byte_search_source/minimum.rs"]
+mod minimum;
 #[path = "byte_search_source/pending.rs"]
 pub(super) mod pending;
 #[path = "byte_search_source/population.rs"]
