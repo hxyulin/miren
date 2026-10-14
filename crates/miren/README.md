@@ -2136,3 +2136,9 @@ and replay before restored execution continues normally. Current-child-cache abs
 retained Body controls do not claim missing dependency or independent same-body clone coverage.
 The current Root composition passes focused controls and full regression validation. Fresh release
 reports retain these budget-specific outcomes. This stage adds no default supported outcome.
+
+
+Executable Box source preparation categorizes an unsupported ordinary helper intrinsic as a
+semantic UNKNOWN. The effectful destructor control retains its default resource refusal; at the
+larger diagnostic budget it reaches this explicit source boundary. No intrinsic effects or missing
+body are treated as successful execution.

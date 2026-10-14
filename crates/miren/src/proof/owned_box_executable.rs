@@ -2184,7 +2184,10 @@ fn helper_graph<'tcx>(
                 } else if kind == Kind::Alignment {
                     count_intrinsic(engine, callee)?;
                 } else {
-                    return Err("executable Box helper intrinsic frontier unsupported".into());
+                    return Err(engine.categorized_error(
+                        UnknownCategory::Semantics,
+                        "executable Box helper intrinsic frontier unsupported".into(),
+                    ));
                 }
                 continue;
             }

@@ -2995,3 +2995,19 @@ PROVED, 164 REFUTED and 113 UNKNOWN across 613 cases. All 2,452 full baseline Pr
 obligations and 656 counterexample models remain literal. No default capability promotion is
 claimed. The first standalone matrix driver accidentally selected a build command; its failure
 is preserved and the corrected driver selects only the eight actual analysis profiles.
+
+
+## Explicit unsupported Box intrinsic category
+
+The executable Box source walker labels an unsupported ordinary helper intrinsic as semantic
+UNKNOWN, retaining its exact refusal reason. Source, work, owner and success behavior are unchanged.
+The effectful destructor remains resource UNKNOWN at default8192; diagnostic2000000 reaches
+`executable Box helper intrinsic frontier unsupported` with the explicit semantic category.
+Four-profile compiler controls include positive helper destruction, real panicking Drop and this
+unsupported effectful case, with no assumptions or trusted calls.
+
+Full Root validation passes 1,032 Rust and 91 Python tests. Fresh release Box reports retain all
+budget-specific statuses. The 613-case capability survey retains 336 PROVED, 164 REFUTED and 113
+UNKNOWN in every profile. All 5,420 queried obligations and 656 counterexample models remain literal;
+2,450 full baseline Proofs match and two independently checked query-free fold timeout contexts
+differ. No unsupported intrinsic is executed or converted to a successful proof.

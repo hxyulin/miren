@@ -16,7 +16,7 @@ fn actual_fieldless_box_drop_executes_under_recorded_diagnostic_budget() {
             ));
             std::fs::create_dir_all(&output_directory).unwrap();
             for diagnostic in [false, true] {
-                let entries = ["panicking", "helper_box", "implicit"];
+                let entries = ["panicking", "helper_box", "implicit", "effectful"];
                 let mut command = Command::new(env!("CARGO_BIN_EXE_miren"));
                 command.args(["--verify", "--json", "--quiet"]);
                 if diagnostic {
@@ -71,6 +71,7 @@ fn actual_fieldless_box_drop_executes_under_recorded_diagnostic_budget() {
                         ("implicit", _) | ("helper_box", true) => ProofStatus::Proved,
                         ("panicking", true) => ProofStatus::Refuted,
                         ("panicking" | "helper_box", false) => ProofStatus::Unknown,
+                        ("effectful", _) => ProofStatus::Unknown,
                         _ => panic!("unexpected root"),
                     };
                     assert_eq!(
@@ -80,13 +81,23 @@ fn actual_fieldless_box_drop_executes_under_recorded_diagnostic_budget() {
                     );
                     assert!(proof.assumptions.is_empty() && proof.trusted_calls.is_empty());
                     if expected == ProofStatus::Unknown {
+                        let category = if function.name == "effectful" && diagnostic {
+                            UnknownCategory::Semantics
+                        } else {
+                            UnknownCategory::ResourceLimit
+                        };
                         assert!(
                             proof
                                 .obligations
                                 .iter()
-                                .any(|obligation| obligation.unknown_category
-                                    == Some(UnknownCategory::ResourceLimit))
+                                .any(|obligation| obligation.unknown_category == Some(category))
                         );
+                        if function.name == "effectful" && diagnostic {
+                            assert!(proof.obligations.iter().any(|obligation| {
+                                obligation.detail
+                                    == "executable Box helper intrinsic frontier unsupported"
+                            }));
+                        }
                     }
                     println!(
                         concat!(
