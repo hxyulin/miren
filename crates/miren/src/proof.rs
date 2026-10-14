@@ -93,6 +93,7 @@ mod nonzero_options;
 mod opaque_function_inputs;
 #[cfg(test)]
 mod owned_box_capture;
+mod owned_box_constructor_source;
 mod owned_box_constructors;
 mod owned_box_effect_free_drop;
 mod owned_box_glue;
@@ -191,6 +192,7 @@ struct Engine<'tcx> {
     maybe_uninit_types: Vec<Ty<'tcx>>,
     array_iterator_types: Vec<array_iterator_constructors::PhysicalTypes<'tcx>>,
     array_iterator_step_evidence: Vec<array_iterator_constructors::steps::Evidence<'tcx>>,
+    box_constructor_source_evidence: Vec<array_iterator_constructors::BoxEvidence<'tcx>>,
     owned_box_types: Vec<owned_boxes::BoxType<'tcx>>,
     next_owned_region: u64,
     owned_box_constructors: Vec<owned_box_constructors::Constructor<'tcx>>,
@@ -313,6 +315,7 @@ impl<'tcx> Engine<'tcx> {
             maybe_uninit_types: Vec::new(),
             array_iterator_types: Vec::new(),
             array_iterator_step_evidence: Vec::new(),
+            box_constructor_source_evidence: Vec::new(),
             owned_box_types: Vec::new(),
             next_owned_region: 0,
             owned_box_constructors: Vec::new(),

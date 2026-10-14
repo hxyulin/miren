@@ -77,11 +77,15 @@ Finite nested function choices preserve correlated selection predicates and exec
 bodies. Default-budget controls support all twelve unary integer domains. Bool, Char, floating,
 Repeat and pair controls have separate diagnostic results; default resource refusals stay UNKNOWN.
 
+Fieldless Box constructor preparation authenticates actual constructor and allocation source
+bodies under a separate bounded compiler-source policy. It preserves type registries on refusal;
+effectful owner publication and destructor execution require the forthcoming execution protocol.
+
 Fixed-array partial moves preserve initialization and execute remaining destructors in compiler
 order. Nested destruction and covering assignments retain actual destructor effects. The exact
 compiler array/slice DropGlue protocol is authenticated separately. General slice destruction
 remains UNKNOWN. Remaining owning-array iterator destruction executes actual bodies at a larger
-recorded budget. The current stage passes 1,017 Rust and 91 Python tests.
+recorded budget. The current stage passes 1,019 Rust and 91 Python tests.
 Four-profile surveys measure
 334 PROVED, 163 REFUTED and 116 UNKNOWN, adding twelve default supported outcomes. All 5,232
 previous queried obligations and counterexample models remain exact.

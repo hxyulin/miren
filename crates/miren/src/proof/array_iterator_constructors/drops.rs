@@ -4,6 +4,8 @@ use super::*;
 use rustc_middle::mir::{BorrowKind, Location, RawPtrKind};
 
 mod protocol;
+pub(in crate::proof::array_iterator_constructors) use protocol::authenticate_callable;
+
 #[cfg(test)]
 pub(super) use protocol::controls as protocol_controls;
 pub(in crate::proof) use protocol::{ElementWitness, Invocation, View};

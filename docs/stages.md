@@ -8018,3 +8018,69 @@ counterexample models match exactly, with no unresolved differences. The eighty-
 case/profile Proofs contain 172 queried obligations and no models, assumptions or trusted calls.
 The final four-document successor preserves all 1,065 code, fixture, manifest and other files
 from the frozen full-check candidate.
+
+
+## Stage 262: fieldless Box constructor source foundation
+
+Root composes the reviewed V4 constructor foundation against committed Stage261. The fourteen
+source/test paths retain the finite nested-choice planners and existing byte source evidence.
+The private basis remains Parent256 plus its exact Stage257 candidate, recorded separately from
+this newer Root composition. The sole code merge conflict preserves the current planner comment
+and appends the exact incoming Box source helpers. Current README text precedes the incoming
+constructor documentation. No application function is rewritten.
+
+The new constructor source domain authenticates four exact complete original/current families.
+A bounded header/block planner and separately tagged cache retain the existing iterator refusal
+policy, including when the same Instance has broader Box evidence. All actual cloning, folding,
+comparison and canonical materialization services remain prepaid. The canonical envelope is a
+conservative materialization bound, not an instruction-count claim. Default execution limits
+remain unchanged; diagnostic preparation does not grant ownership or executable Drop rights.
+
+Nonmutating type preparation precedes original argument/payload validation and the pending
+effectful source gate. Refusal preserves the nominal registry, owner generation and Memory. The
+old effect-free Box certificate and payload retirement remain unchanged. The private earlier
+registration-before-refusal failure is preserved without completion credit; V4 corrects that
+ordering and passes twenty-four actual compiler application refusals across four profiles.
+
+Current-checkout compiler controls, full validation and retained corpus comparison are pending.
+Actual effectful payload leasing, child/helper execution and normal-return retirement remain in
+a separate isolated successor; no new supported default outcome is claimed by this foundation.
+
+
+The first frozen Root validation passes 1,017 outer Rust tests and fails two. The two nested
+native controls are counted separately. New shared cache-domain comparisons push the existing
+retained mixed helper past the default budget; the capability matrix also retains the former Box
+semantic refusal metadata. This failed run is preserved with zero complete-stage credit. Renewed
+selected reports confirm the mixed regression and actual Box frontiers on all four profiles.
+
+A V5 source successor restores the complete prior iterator Evidence and loader literally. Box
+constructor evidence has private records in a separate cache and reuses unchanged full comparison
+helpers. Old iterator loads perform no Box selector or Box-entry scan. Actual Box witness checks
+and its own lookup remain prepaid. No performed-service fee is discounted. Two independent
+512-entry metadata caches bound the aggregate at 1,024; guest, clone, depth and ordinary execution
+limits remain unchanged.
+
+Actual compiler controls retain the same-Engine Box-to-iterator flat refusal at 518 steps, equal
+to a fresh iterator Engine. The reciprocal cache stays separate. Standalone and namespaced mixed
+helpers recover PROVED on host/ARM O0/O2. Six original Box cases remain UNKNOWN: two stop at the
+explicit constructor source-work budget; four retain their original semantic refusals. Only those
+two diagnostic manifest fields change, with case outcomes and application bodies unchanged. A
+whitespace-only integration assertion wrap preserves every nonwhitespace source byte. New full
+Root validation and retained proof comparison are pending.
+
+
+The corrected frozen Root run passes all ten required checks, including 1,019 outer Rust tests
+and 91 Python tests. The two nested native controls remain separately counted: one genuine
+positive and one expected mutant failure. An earlier successor driver used the wrong inherited
+command-directory path before any checks; it is preserved with zero credit. The corrected driver
+completes formatting, Clippy, tests, release builds, cargo deny, manual/documentation hooks and
+the four-profile survey with source unchanged.
+
+Every profile retains 334 PROVED, 163 REFUTED and 116 UNKNOWN across 613 cases and 108 families.
+All 5,404 prior queried obligations and counterexample models are exact. The 2,452 old Proof
+comparisons contain 2,443 literal full matches, eight exact query-free Box source-frontier
+changes, and one separately qualified query-free fold deadline stopped in actual wrapping_add.
+For that one fold, only the additional actual call frame differs; all other fields remain literal.
+Two diagnostic case objects change; all 611 other case objects and all guest function bytes
+remain unchanged. The final four-document successor preserves all 1,069 code, fixture, manifest
+and other files from the frozen full-check candidate. No default coverage promotion is claimed.

@@ -2039,3 +2039,30 @@ outcomes; diagnostic results cannot promote default UNKNOWN. Complete current va
 1,017 Rust and 91 Python tests, release builds, lint and repository checks. Four-profile release
 surveys measure 334 PROVED, 163 REFUTED and 116 UNKNOWN across 613 cases and 108 families. All 591
 previous outcomes and all 5,232 previous queried obligations and models remain exact.
+
+A separate fieldless Box constructor source preparation certificate authenticates the complete
+selected constructor/allocation/precondition source and current bodies. Its new compiler-source
+clone domain plans bounded Body header/block components, retaining the iterator planner's original
+512-node refusal and charging all actual clone/fold/comparison work before allocations. The total
+Box plan bound derives from 128 blocks plus one header, each with at most 512 planning nodes.
+Canonical template string materialization uses a conservative prepaid envelope, so this source
+preparation can require a separately recorded diagnostic budget. Default limits remain unchanged.
+No effectful Box owner or receiver is issued: the executable payload Drop invocation and normal
+retirement are still required. Old effect-free certificates and retirement behavior remain intact.
+
+Constructor source evidence uses a dedicated Box cache. The iterator Evidence and loader remain
+literal to the prior implementation, with no Box domain-selection or Box-entry comparison work on
+that path. The Box cache has private records and an independent 512-entry metadata bound; its
+witness checks and lookup are prepaid. It cannot authorize the older flat iterator planner, even
+for an identical compiler Instance/current Body. Both caches retain original/current/Context guards.
+This source-only separation adds no ownership or executable destructor support.
+
+Nominal Box call admission prepares the original type without publishing it. The actual argument
+and payload are validated before source-only effectful-constructor preparation can refuse. Such
+refusals preserve the type registry, owner generation and guest Memory. Successful old effect-free
+admission still uses its complete constructor/Drop certificate before issuing an owner.
+
+Current constructor-source validation passes 1,019 Rust and 91 Python tests with all repository
+checks. Four-profile surveys retain 334 PROVED, 163 REFUTED and 116 UNKNOWN across 613 cases.
+All 5,404 previous queried obligations and models remain exact. Two Box diagnostic frontiers
+change to the source-work budget, with no new supported outcome or effectful owner permission.

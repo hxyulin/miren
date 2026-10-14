@@ -1991,3 +1991,10 @@ pub(in crate::proof::array_iterator_constructors) fn controls<'tcx>(
     engine.bodies.borrow_mut().insert(child_glue, child_body);
     assert!(witness.element(engine, &state, owner).is_err());
 }
+
+pub(in crate::proof::array_iterator_constructors) fn authenticate_callable<'tcx>(
+    engine: &mut Engine<'tcx>,
+    instance: ty::Instance<'tcx>,
+) -> Result<(), String> {
+    signature::check(engine, instance)
+}

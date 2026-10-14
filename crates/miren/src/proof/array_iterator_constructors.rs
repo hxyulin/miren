@@ -7,6 +7,7 @@ use std::rc::Rc;
 #[path = "array_iterator_clone_work.rs"]
 mod clone_work;
 mod compiler_evidence;
+pub(super) use compiler_evidence::BoxEvidence;
 pub(super) mod drops;
 pub(super) mod steps;
 
@@ -1980,3 +1981,31 @@ mod tests {
 }
 
 // Shared bounded clone planners; they issue no iterator or function-pointer authority.
+
+#[cfg(test)]
+mod box_source_plan_probe;
+
+// This shares immutable compiler evidence only; no iterator owner/certificate is issued.
+pub(super) fn authenticated_box_constructor_source<'tcx>(
+    engine: &mut Engine<'tcx>,
+    instance: ty::Instance<'tcx>,
+    witness: &owned_box_constructor_source::RawWitness<'tcx>,
+) -> Result<Rc<Body<'tcx>>, String> {
+    compiler_evidence::load_box_constructor(engine, instance, witness)
+        .map(|evidence| evidence.current)
+}
+
+pub(super) fn authenticated_box_callable<'tcx>(
+    engine: &mut Engine<'tcx>,
+    instance: ty::Instance<'tcx>,
+) -> Result<(), String> {
+    drops::authenticate_callable(engine, instance)
+}
+
+#[cfg(test)]
+pub(super) fn original_iterator_item_source<'tcx>(
+    engine: &mut Engine<'tcx>,
+    instance: ty::Instance<'tcx>,
+) -> Result<Rc<Body<'tcx>>, String> {
+    compiler_evidence::load_item(engine, instance).map(|evidence| evidence.current)
+}

@@ -585,6 +585,49 @@ fn certify_protocol<'tcx>(
     Ok(())
 }
 
+// Constructor-only families expose source/edge checks, never ownership or Drop behavior.
+pub(super) fn constructor_family(definition: &str, encoded: &str) -> Option<BoxTemplateFamily> {
+    match reference_family(definition, encoded)? {
+        family @ (BoxTemplateFamily::BoxNew
+        | BoxTemplateFamily::BoxNewUninit
+        | BoxTemplateFamily::GlobalAllocate
+        | BoxTemplateFamily::NonNullPrecondition) => Some(family),
+        BoxTemplateFamily::EffectFreePayloadGlue
+        | BoxTemplateFamily::EffectFreeDestructor
+        | BoxTemplateFamily::MemDrop
+        | BoxTemplateFamily::UnitBoxDropGlue
+        | BoxTemplateFamily::UnitDropGlue
+        | BoxTemplateFamily::BoxDrop
+        | BoxTemplateFamily::LayoutPrecondition
+        | BoxTemplateFamily::AlignmentPrecondition
+        | BoxTemplateFamily::GlobalDeallocate => None,
+    }
+}
+pub(super) fn constructor_blocks(
+    family: BoxTemplateFamily,
+    layout: owned_box_payloads::ZeroLayout,
+) -> Result<&'static [usize], String> {
+    let input = match family {
+        BoxTemplateFamily::BoxNew => ProtocolInput::Payload,
+        BoxTemplateFamily::BoxNewUninit | BoxTemplateFamily::GlobalAllocate => {
+            ProtocolInput::ZeroLayout
+        }
+        BoxTemplateFamily::NonNullPrecondition => ProtocolInput::NonNullAlignment,
+        BoxTemplateFamily::EffectFreePayloadGlue
+        | BoxTemplateFamily::EffectFreeDestructor
+        | BoxTemplateFamily::MemDrop
+        | BoxTemplateFamily::UnitBoxDropGlue
+        | BoxTemplateFamily::UnitDropGlue
+        | BoxTemplateFamily::BoxDrop
+        | BoxTemplateFamily::LayoutPrecondition
+        | BoxTemplateFamily::AlignmentPrecondition
+        | BoxTemplateFamily::GlobalDeallocate => {
+            return Err("Box constructor source cannot certify a destruction family".into());
+        }
+    };
+    reached_blocks(family, input, layout)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

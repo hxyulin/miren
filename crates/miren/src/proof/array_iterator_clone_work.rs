@@ -377,3 +377,100 @@ pub(super) fn mask_clone_work(
     }
     Ok(clone_work)
 }
+
+// Separate Box compiler-source domain: complete canonical constructor bodies, with inherited
+// template bounds and each owned header/block component planned under the existing 512-node bound.
+// The iterator whole-Body planner above remains unchanged.
+pub(super) fn box_constructor_body<'tcx>(
+    engine: &mut Engine<'tcx>,
+    body: &Body<'tcx>,
+    witness: &owned_box_constructor_source::RawWitness<'tcx>,
+) -> Result<usize, String> {
+    witness.check_raw(body)?;
+    let mut plan = Plan { nodes: 0, owned: 0 };
+    plan.node(engine, 20)?; // Pinned Body fields plus shallow BasicBlocks cache Arc clone.
+    if body.coroutine.is_some()
+        || body.coverage_early_info.is_some()
+        || body.coverage_mir_info.is_some()
+    {
+        return Err("IntoIter clone plan coroutine/coverage metadata is unsupported".into());
+    }
+    if !body.user_type_annotations.is_empty() {
+        return Err("IntoIter clone plan canonical user annotation table is unsupported".into());
+    }
+    plan.vector(engine, body.user_type_annotations.len())?;
+    plan.vector(engine, body.source_scopes.len())?;
+    for _ in &body.source_scopes {
+        plan.node(engine, 5)?;
+    } // All scope fields are inline handles.
+    plan.vector(engine, body.local_decls.len())?;
+    for local in &body.local_decls {
+        plan.node(engine, 5)?;
+        match &local.local_info {
+            ClearCrossCrate::Clear => {}
+            ClearCrossCrate::Set(_) => {
+                return Err(
+                    "IntoIter clone plan owned local auxiliary metadata is unsupported".into(),
+                );
+            }
+        }
+        if local.user_ty.is_some() {
+            return Err("IntoIter clone plan owned local auxiliary metadata is unsupported".into());
+        }
+    }
+    plan.vector(engine, body.var_debug_info.len())?;
+    for info in &body.var_debug_info {
+        plan.node(engine, 5)?;
+        if let Some(fragment) = &info.composite {
+            plan.node(engine, 3)?; // Fragment Box plus Ty/projection fields.
+            plan.vector(engine, fragment.projection.len())?;
+        }
+        match &info.value {
+            VarDebugInfoContents::Place(_) => {}
+            VarDebugInfoContents::Const(value) => plan.constant(engine, value)?,
+        }
+    }
+    if let Some(constants) = &body.required_consts {
+        plan.vector(engine, constants.len())?;
+        for constant in constants {
+            plan.constant(engine, constant)?;
+        }
+    }
+    if let Some(items) = &body.mentioned_items {
+        plan.vector(engine, items.len())?;
+    }
+    plan.vector(engine, body.basic_blocks.len())?;
+    let mut owned = plan.owned;
+    let mut total_nodes = plan.nodes;
+    const TOTAL_BOX_PLAN_NODES: usize = (128 + 1) * MAX_INPUT_VALUES;
+    for block in body.basic_blocks.iter() {
+        let mut component = Plan { nodes: 0, owned: 0 };
+        component.node(engine, 4)?;
+        component.debug_infos(engine, &block.after_last_stmt_debuginfos)?;
+        component.vector(engine, block.statements.len())?;
+        for statement in &block.statements {
+            component.debug_infos(engine, &statement.debuginfos)?;
+            component.statement(engine, &statement.kind)?;
+        }
+        component.terminator(engine, block.terminator())?;
+        total_nodes = total_nodes
+            .checked_add(component.nodes)
+            .ok_or("Box constructor clone planning count overflow")?;
+        if total_nodes > TOTAL_BOX_PLAN_NODES {
+            return Err(engine.categorized_error(
+                UnknownCategory::ResourceLimit,
+                "Box constructor clone plan exceeds total bounded components".into(),
+            ));
+        }
+        owned = owned
+            .checked_add(component.owned)
+            .ok_or("Box constructor owned clone work overflow")?;
+        if owned > TOTAL_BOX_PLAN_NODES * (MAX_INPUT_VALUES + 1) {
+            return Err(engine.categorized_error(
+                UnknownCategory::ResourceLimit,
+                "Box constructor clone fields exceed total component allowance".into(),
+            ));
+        }
+    }
+    Ok(owned)
+}

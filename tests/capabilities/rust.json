@@ -1961,15 +1961,15 @@
       "entry": "effect_free_zst_box_drop_survey::panicking",
       "family": "effect_free_zst_box_drop",
       "expected": "unknown",
-      "unknown_reason": "effect-free Box Drop original/current destructor identity or locals differ",
-      "unknown_category": "semantics"
+      "unknown_reason": "Box constructor source shared execution step limit reached",
+      "unknown_category": "resource_limit"
     },
     {
       "entry": "effect_free_zst_box_drop_survey::effectful",
       "family": "effect_free_zst_box_drop",
       "expected": "unknown",
-      "unknown_reason": "effect-free Box Drop original/current destructor identity or locals differ",
-      "unknown_category": "semantics"
+      "unknown_reason": "Box constructor source shared execution step limit reached",
+      "unknown_category": "resource_limit"
     },
     {
       "entry": "effect_free_zst_box_drop_survey::nested",

@@ -106,3 +106,19 @@ mod native {
         super::branches(false);
     }
 }
+
+#[repr(align(64))]
+pub struct HelperMarker;
+#[inline(never)]
+fn actual_drop_helper(value: u16) {
+    assert!(value == 17);
+}
+impl Drop for HelperMarker {
+    #[inline(never)]
+    fn drop(&mut self) {
+        actual_drop_helper(17);
+    }
+}
+pub fn helper_box() {
+    core::mem::drop(Box::new(HelperMarker));
+}

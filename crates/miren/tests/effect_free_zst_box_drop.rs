@@ -62,6 +62,22 @@ fn inspect(path: &Path, entries: &[(&str, ProofStatus, Option<&str>)]) {
                     }
                 )
             );
+            let selected = report
+                .functions
+                .iter()
+                .filter(|f| f.proof.is_some())
+                .map(|f| f.name.as_str())
+                .collect::<Vec<_>>();
+            assert_eq!(selected.len(), entries.len());
+            assert_eq!(
+                selected
+                    .into_iter()
+                    .collect::<std::collections::BTreeSet<_>>(),
+                entries
+                    .iter()
+                    .map(|(name, _, _)| *name)
+                    .collect::<std::collections::BTreeSet<_>>()
+            );
             for (name, expected, frontier) in entries {
                 let proof = report
                     .functions
@@ -97,7 +113,11 @@ fn inspect(path: &Path, entries: &[(&str, ProofStatus, Option<&str>)]) {
                             .obligations
                             .iter()
                             .any(|o| o.status == ProofStatus::Unknown
-                                && o.unknown_category == Some(UnknownCategory::Semantics)
+                                && o.unknown_category == Some(if frontier.unwrap()
+                                    == "Box constructor source shared execution step limit reached"
+                                {
+                                    UnknownCategory::ResourceLimit
+                                } else { UnknownCategory::Semantics })
                                 && o.detail.contains(frontier.unwrap())
                                 && o.query.is_none()
                                 && o.model.is_none()),
@@ -136,12 +156,12 @@ fn actual_effect_free_destructor_preserves_ownership_and_refuses_effects() {
             (
                 "panicking",
                 U,
-                Some("effect-free Box Drop original/current destructor identity or locals differ"),
+                Some("Box constructor source shared execution step limit reached"),
             ),
             (
                 "effectful",
                 U,
-                Some("effect-free Box Drop original/current destructor identity or locals differ"),
+                Some("Box constructor source shared execution step limit reached"),
             ),
             (
                 "nested",
@@ -200,12 +220,12 @@ fn actual_helper_and_destructor_mutations_preserve_caller_claims() {
             (
                 "implicit",
                 ProofStatus::Unknown,
-                Some("effect-free Box Drop original/current destructor identity or locals differ"),
+                Some("Box constructor source shared execution step limit reached"),
             ),
             (
                 "transfer",
                 ProofStatus::Unknown,
-                Some("effect-free Box Drop original/current destructor identity or locals differ"),
+                Some("Box constructor source shared execution step limit reached"),
             ),
         ],
     );

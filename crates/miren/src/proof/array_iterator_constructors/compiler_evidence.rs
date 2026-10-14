@@ -390,3 +390,16 @@ fn load_available<'tcx>(
     });
     Ok(BodyEvidence { instance, current })
 }
+
+mod box_constructor;
+pub(in crate::proof) use box_constructor::BoxEvidence;
+
+pub(super) fn load_box_constructor<'tcx>(
+    engine: &mut Engine<'tcx>,
+    instance: ty::Instance<'tcx>,
+    witness: &owned_box_constructor_source::RawWitness<'tcx>,
+) -> Result<BodyEvidence<'tcx>, String> {
+    pay(engine, 2)?; // Exported service prepays even an early witness refusal.
+    witness.check_instance(instance)?;
+    box_constructor::load(engine, instance, witness)
+}

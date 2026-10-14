@@ -75,7 +75,7 @@ impl<'tcx> Engine<'tcx> {
         Ok(index)
     }
 
-    fn register_nominal_box(&mut self, payload: Ty<'tcx>) -> Result<usize, String> {
+    fn prepare_nominal_box_type(&self, payload: Ty<'tcx>) -> Result<BoxType<'tcx>, String> {
         let (shape, slots) = if payload.needs_drop(self.tcx, ty::TypingEnv::fully_monomorphized()) {
             owned_box_effect_free_drop::certify_type(self.tcx, payload)
                 .map_err(|reason| self.effect_free_drop_error(reason))?;
@@ -85,10 +85,19 @@ impl<'tcx> Engine<'tcx> {
             (Some(shape), slots)
         };
         let original = self.original_box_type(payload)?;
+        Ok(BoxType {
+            original,
+            payload,
+            shape,
+            slots,
+        })
+    }
+
+    fn register_nominal_box(&mut self, entry: BoxType<'tcx>) -> Result<usize, String> {
         if let Some(index) = self
             .owned_box_types
             .iter()
-            .position(|entry| entry.original == original)
+            .position(|existing| existing.original == entry.original)
         {
             return Ok(index);
         }
@@ -99,12 +108,7 @@ impl<'tcx> Engine<'tcx> {
             ));
         }
         let index = self.owned_box_types.len();
-        self.owned_box_types.push(BoxType {
-            original,
-            payload,
-            shape,
-            slots,
-        });
+        self.owned_box_types.push(entry);
         Ok(index)
     }
 
@@ -759,8 +763,7 @@ impl<'tcx> Engine<'tcx> {
         if constructor == Some(instance.def_id()) {
             let payload = instance.args.type_at(0);
             if payload != self.tcx.types.unit {
-                let certificate = self.register_nominal_box(payload)?;
-                let entry = &self.owned_box_types[certificate];
+                let entry = self.prepare_nominal_box_type(payload)?;
                 let [value] = values else {
                     return Err("nominal Box constructor requires its exact single payload".into());
                 };
@@ -773,8 +776,10 @@ impl<'tcx> Engine<'tcx> {
                         "nominal Box constructor argument has a different original type".into(),
                     );
                 }
-                let prepared = self.box_payload_value(entry, value)?;
+                let prepared = self.box_payload_value(&entry, value)?;
                 let slots = entry.slots;
+                owned_box_constructor_source::pending_effectful(self, instance, payload)?;
+                let certificate = self.register_nominal_box(entry)?;
                 self.certify_owned_box_protocol(instance, payload)?;
                 let key = self.next_owned_region;
                 self.next_owned_region = key

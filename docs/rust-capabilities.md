@@ -2876,3 +2876,30 @@ Four-profile release surveys measure 334 PROVED, 163 REFUTED and 116 UNKNOWN acr
 108 families. All 591 previous outcomes remain unchanged; all 5,232 previous queried obligations
 and counterexample models are exact. The twelve added default positives carry no assumptions or
 trusted calls.
+
+
+## Fieldless Box constructor source foundation
+
+Constructor preparation checks the exact original/current Box constructor, uninitialized
+constructor, allocator and NonNull precondition bodies. A separate bounded component planner
+uses private Box cache records; it cannot authorize the older iterator source policy. Canonical
+materialization and compiler services are prepaid, with the default budget unchanged. Preparation
+records source facts only and grants no new owner, raw receiver or executable Drop permission.
+
+Box type preparation is separate from publication. Actual caller arguments and initialized
+payload checks precede effectful preparation refusals, preserving the nominal type registry,
+owner generation and Memory. Existing complete effect-free certificates retain their original
+execution and retirement behavior. Full current-checkout validation is pending; no new default
+supported outcome is claimed.
+
+The existing iterator loader and its fees remain literal. Constructor metadata has a dedicated
+512-entry cache beside the existing 512-entry iterator cache, giving a combined metadata bound
+of 1,024 records. Guest storage, clone/depth bounds and the default step limit remain unchanged.
+The panicking and effectful zero-sized Box cases stay UNKNOWN, now reporting the explicit
+constructor source-work budget. No destructor body or unsupported operation is treated as success.
+
+The corrected full validation passes 1,019 Rust and 91 Python tests, release builds, Clippy,
+cargo deny and repository hooks. All four profiles retain their 613 case outcomes and all 5,404
+queried obligations/models. Of 2,452 retained Proof comparisons, 2,443 are literal full matches;
+eight separately qualified Box source frontiers and one query-free fold deadline context account
+for the remaining records. No default supported outcome is added by constructor preparation.
