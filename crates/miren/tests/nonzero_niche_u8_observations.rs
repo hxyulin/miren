@@ -65,8 +65,11 @@ fn exact_option8_observations_comparisons_and_boundaries() {
                 .as_ref()
                 .unwrap();
             assert!(proof.obligations.iter().any(|obligation| {
-                obligation.unknown_category == Some(miren::UnknownCategory::Semantics)
-                    && obligation.detail == "byte source statement debug payload is unsupported"
+                obligation.unknown_category == Some(miren::UnknownCategory::MissingCompilerEvidence)
+                    && obligation.detail
+                        == "MIR body unavailable for core::panicking::panic_nounwind_fmt; \
+                            the prebuilt core library omitted this body; \
+                            cargo -Zbuild-std=core can retain it"
             }));
         }
     }

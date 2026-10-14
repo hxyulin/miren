@@ -72,6 +72,8 @@ encoding before carrying its work into source analysis. The relation issues no r
 search certificate. Available original caller MIR and full signatures are authenticated before
 input observations. Exact compiler-bound NonZeroU8 fields preserve initialized Some payloads.
 Full aligned search remains UNKNOWN pending source metadata, storage, precondition and loop proofs.
+Typed byte-route preparation authenticates complete forwarder/dispatcher dataflow and the real
+`size_of` wrapper. Source facts remain separate from storage rights and search correctness.
 
 Finite nested function choices preserve correlated selection predicates and execute actual leaf
 bodies. Default-budget controls support all twelve unary integer domains plus Bool and Char;
@@ -86,10 +88,10 @@ Fixed-array partial moves preserve initialization and execute remaining destruct
 order. Nested destruction and covering assignments retain actual destructor effects. The exact
 compiler array/slice DropGlue protocol is authenticated separately. General slice destruction
 remains UNKNOWN. Remaining owning-array iterator destruction executes actual bodies at a larger
-recorded budget. The current stage passes 1,019 Rust and 91 Python tests.
+recorded budget. The current stage validates 1,025 Rust and 91 Python tests.
 Four-profile surveys measure 336 PROVED, 164 REFUTED and 113 UNKNOWN, with 500 supported
-outcomes across 613 cases. Signature reuse adds three default supported outcomes. All 5,404
-previous queried obligations and counterexample models remain exact.
+outcomes across 613 cases. Typed byte-source preparation adds no default supported outcomes. All 5,420
+previous queried obligations and 656 counterexample models remain exact.
 Authenticated non-inlined array iterator constructors preserve owning payloads through actual Rust
 bodies and ordinary returns. Direct owners also pass through local helpers with unused observations.
 Element transfer executes at an explicitly larger analysis budget; default next and remaining

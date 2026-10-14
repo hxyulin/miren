@@ -262,7 +262,12 @@ fn engine_controls<'tcx>(
     let target = engine(tcx);
     let invalid = ty::Instance::new_raw(primitive.def_id(), tcx.mk_args(&[original.into()]));
     let error = target
-        .capture_niche_comparison_body(invalid, &mut GraphBudget::new(0).unwrap(), false)
+        .capture_niche_comparison_body(
+            invalid,
+            &mut GraphBudget::new(0).unwrap(),
+            false,
+            GraphGoal::Law,
+        )
         .unwrap_err();
     assert!(error.contains("argument count mismatch"));
     assert!(target.bodies.borrow().is_empty());
@@ -275,7 +280,12 @@ fn engine_controls<'tcx>(
         .borrow_mut()
         .insert(primitive, signature);
     let error = target
-        .capture_niche_comparison_body(primitive, &mut GraphBudget::new(0).unwrap(), false)
+        .capture_niche_comparison_body(
+            primitive,
+            &mut GraphBudget::new(0).unwrap(),
+            false,
+            GraphGoal::Law,
+        )
         .unwrap_err();
     assert!(error.contains("cached full signature differs"));
     assert!(target.bodies.borrow().is_empty());
@@ -296,7 +306,12 @@ fn engine_controls<'tcx>(
         .borrow_mut()
         .insert(primitive, std::rc::Rc::new(oversized));
     let error = target
-        .capture_niche_comparison_body(primitive, &mut GraphBudget::new(0).unwrap(), false)
+        .capture_niche_comparison_body(
+            primitive,
+            &mut GraphBudget::new(0).unwrap(),
+            false,
+            GraphGoal::Law,
+        )
         .unwrap_err();
     assert!(error.contains("8192") || error.contains("512 operations"));
     records.push("oversized actual cached body inventory refused before mirror clone".into());
@@ -319,7 +334,12 @@ fn engine_controls<'tcx>(
         .borrow_mut()
         .insert(primitive, std::rc::Rc::new(deep));
     let error = target
-        .capture_niche_comparison_body(primitive, &mut GraphBudget::new(0).unwrap(), false)
+        .capture_niche_comparison_body(
+            primitive,
+            &mut GraphBudget::new(0).unwrap(),
+            false,
+            GraphGoal::Law,
+        )
         .unwrap_err();
     assert!(error.contains("expansion bound"));
     records.push("depth17 cached original type refused before mirror clone".into());
@@ -334,7 +354,12 @@ fn engine_controls<'tcx>(
         .insert(primitive, std::rc::Rc::new(promoted));
     assert!(
         target
-            .capture_niche_comparison_body(primitive, &mut GraphBudget::new(0).unwrap(), false)
+            .capture_niche_comparison_body(
+                primitive,
+                &mut GraphBudget::new(0).unwrap(),
+                false,
+                GraphGoal::Law
+            )
             .unwrap_err()
             .contains("cached body metadata mismatch")
     );
@@ -350,7 +375,12 @@ fn engine_controls<'tcx>(
         .insert(primitive, std::rc::Rc::new(rekeyed));
     assert!(
         target
-            .capture_niche_comparison_body(primitive, &mut GraphBudget::new(0).unwrap(), false)
+            .capture_niche_comparison_body(
+                primitive,
+                &mut GraphBudget::new(0).unwrap(),
+                false,
+                GraphGoal::Law
+            )
             .unwrap_err()
             .contains("cached body metadata mismatch")
     );
@@ -421,7 +451,12 @@ fn engine_controls<'tcx>(
         .insert(payload_eq, std::rc::Rc::new(swapped));
     assert!(
         target
-            .capture_niche_comparison_body(payload_eq, &mut GraphBudget::new(0).unwrap(), false)
+            .capture_niche_comparison_body(
+                payload_eq,
+                &mut GraphBudget::new(0).unwrap(),
+                false,
+                GraphGoal::Law
+            )
             .unwrap_err()
             .contains("differs from actual compiler body")
     );
@@ -450,7 +485,12 @@ fn engine_controls<'tcx>(
         .insert(payload_eq, std::rc::Rc::new(cyclic));
     assert!(
         target
-            .capture_niche_comparison_body(payload_eq, &mut GraphBudget::new(0).unwrap(), false)
+            .capture_niche_comparison_body(
+                payload_eq,
+                &mut GraphBudget::new(0).unwrap(),
+                false,
+                GraphGoal::Law
+            )
             .unwrap_err()
             .contains("differs from actual compiler body")
     );
@@ -469,7 +509,7 @@ fn engine_controls<'tcx>(
     let target = engine(tcx);
     assert!(
         target
-            .capture_niche_comparison_body(genuine[9], &mut budget, false)
+            .capture_niche_comparison_body(genuine[9], &mut budget, false, GraphGoal::Law)
             .unwrap_err()
             .contains("exceed nine")
     );
@@ -539,7 +579,7 @@ fn engine_controls<'tcx>(
     let mut budget = GraphBudget::new(0).unwrap();
     assert!(
         target
-            .capture_niche_comparison_body(primitive, &mut budget, false)
+            .capture_niche_comparison_body(primitive, &mut budget, false, GraphGoal::Law)
             .unwrap_err()
             .contains("clear unrelated")
     );
@@ -550,7 +590,7 @@ fn engine_controls<'tcx>(
     target.bodies.borrow_mut().clear();
     let mut budget = GraphBudget::new(0).unwrap();
     let captured = target
-        .capture_niche_comparison_body(primitive, &mut budget, false)
+        .capture_niche_comparison_body(primitive, &mut budget, false, GraphGoal::Law)
         .unwrap();
     assert!(!target.call_signatures.borrow().contains_key(&primitive));
     budget
@@ -1979,6 +2019,7 @@ fn actual_option8_observation_and_cached_body_controls() {
                         instance,
                         &mut GraphBudget::new(0).unwrap(),
                         false,
+                        GraphGoal::Law,
                     )
                     .unwrap();
                 let mut changed = (*target.instantiated_body(instance).unwrap()).clone();
@@ -1992,7 +2033,8 @@ fn actual_option8_observation_and_cached_body_controls() {
                         .capture_niche_comparison_body(
                             instance,
                             &mut GraphBudget::new(0).unwrap(),
-                            false
+                            false,
+                            GraphGoal::Law
                         )
                         .is_err()
                 );
@@ -2033,7 +2075,12 @@ fn actual_option8_observation_and_cached_body_controls() {
                 .insert(eq, std::rc::Rc::new(changed));
             assert!(
                 target
-                    .capture_niche_comparison_body(eq, &mut GraphBudget::new(0).unwrap(), false)
+                    .capture_niche_comparison_body(
+                        eq,
+                        &mut GraphBudget::new(0).unwrap(),
+                        false,
+                        GraphGoal::Law
+                    )
                     .is_err()
             );
             eprintln!(

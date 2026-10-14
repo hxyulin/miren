@@ -2085,3 +2085,23 @@ validation passes all ten required checks, including 1,019 Rust and 91 Python te
 surveys measure 336 PROVED, 164 REFUTED and 113 UNKNOWN; all 5,404 old queried obligations and
 models remain exact. Five resource UNKNOWN controls reach one additional genuine leaf body,
 without proof credit. The direct pair retains UNKNOWN with its measured shared IntoIter limit.
+
+### Typed byte-route source preparation
+
+Readonly `Option<NonZeroU8>` membership has a separate source preparation path. It authenticates
+the complete original and current forwarder and non-inlined dispatcher, including full helper
+signatures, exact operand order, distinct Copy/Move transfers and the retained false closure branch.
+Raw helper parameters resolve through the complete concrete caller environment. Unrelated helper
+keys keep their ordinary fallback, and malformed caller argument kinds refuse without panicking.
+
+The ordinary `core::mem::size_of` wrapper is checked as real Rust source, with its exact
+`SizedTypeProperties::SIZE` associated constant. This source association does not evaluate the
+constant or prove a size-one branch. Prepared source work remains cumulative; current caller,
+initialized storage, operand and codec checks retain separate authority. Borrowed source guards
+remain held through their dependent services, and failed services cannot resume from restored data.
+
+Retained host/ARM O0/O2 source controls reject changed bodies, helper identities, signatures,
+environments and dataflow. Cold retained and ordinary-core application analyses remain UNKNOWN
+for missing panic bodies. These controls establish no raw-reference validity or complete search
+result. Reachable missing bodies remain required until an independently proved source-linked
+condition establishes that their exact incoming edges are unreachable.

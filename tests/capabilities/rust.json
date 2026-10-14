@@ -1479,8 +1479,8 @@
       "entry": "niche_membership_byte_frontier",
       "family": "readonly_nonzero_niche_membership",
       "expected": "unknown",
-      "unknown_reason": "readonly byte origin requires a live shared Rust reference",
-      "unknown_category": "unclassified"
+      "unknown_reason": "MIR body unavailable for core::panicking::panic_nounwind_fmt;",
+      "unknown_category": "missing_compiler_evidence"
     },
     {
       "entry": "issued_scalar_f64_metadata",
@@ -1568,8 +1568,8 @@
       "entry": "asserted_contains8",
       "family": "readonly_nonzero_niche",
       "expected": "unknown",
-      "unknown_reason": "byte source statement debug payload is unsupported",
-      "unknown_category": "semantics"
+      "unknown_reason": "MIR body unavailable for core::panicking::panic_nounwind_fmt;",
+      "unknown_category": "missing_compiler_evidence"
     },
     {
       "entry": "local_enum_unknown",

@@ -20,11 +20,35 @@ fn actual_retained_population_wrapper_semantics_and_conservative_search() {
     compiler_controls(ProbePhase::Population);
 }
 
+#[test]
+fn actual_retained_allocation_size_source_and_size_one_fact() {
+    compiler_controls(ProbePhase::AllocationSize);
+}
+
+#[test]
+fn actual_cold_membership_production_frontier() {
+    compiler_controls(ProbePhase::ColdPipeline);
+}
+
+#[test]
+fn actual_retained_shared_copy_route_source_controls() {
+    compiler_controls(ProbePhase::RouteCopy);
+}
+
+#[test]
+fn actual_retained_typed_byte_transport_source_and_hostile_dataflow() {
+    compiler_controls(ProbePhase::TypedRoute);
+}
+
 #[derive(Clone, Copy)]
 enum ProbePhase {
     Word,
     Runtime,
     Population,
+    AllocationSize,
+    ColdPipeline,
+    RouteCopy,
+    TypedRoute,
 }
 
 fn compiler_controls(phase: ProbePhase) {
@@ -89,6 +113,47 @@ fn compiler_controls(phase: ProbePhase) {
                 })
                 .unwrap();
             let root = ty::Instance::mono(tcx, root.to_def_id());
+            if matches!(self.phase, ProbePhase::TypedRoute) {
+                if self.retained {
+                    super::super::super::byte_transport_probe::compiler_controls(&engine, root);
+                    eprintln!("TYPED BYTE CALLBACK COMPLETE");
+                } else {
+                    eprintln!("TYPED BYTE default-core controls provide no retained source credit");
+                }
+                return rustc_driver::Compilation::Stop;
+            }
+            if matches!(self.phase, ProbePhase::RouteCopy) {
+                if self.retained {
+                    super::super::super::byte_route_probe::compiler_controls(&engine, root);
+                    eprintln!("BYTE COPY CALLBACK COMPLETE");
+                } else {
+                    eprintln!("BYTE COPY default-core controls are not retained-source evidence");
+                }
+                return rustc_driver::Compilation::Stop;
+            }
+            if matches!(self.phase, ProbePhase::ColdPipeline) {
+                // verify issues inputs/references and executes actual Rust statements itself.
+                // Its fresh Engine/cache/work is independent of the locating diagnostic Engine.
+                let proof = crate::proof::verify(
+                    tcx,
+                    root.def_id(),
+                    &miren::ContractConfig::default(),
+                    crate::proof::VerificationOptions {
+                        all_failures: false,
+                        induction: false,
+                        startup: false,
+                        isolated_startup: false,
+                        async_entry: false,
+                        limits: miren::AnalysisLimits::default(),
+                    },
+                );
+                eprintln!(
+                    "COLD PRODUCTION PROOF START\n{}\nPROOF END",
+                    serde_json::to_string_pretty(&proof).unwrap()
+                );
+                eprintln!("COLD PRODUCTION CALLBACK COMPLETE");
+                return rustc_driver::Compilation::Stop;
+            }
             let mut pending = vec![root];
             let mut seen = Vec::new();
             let mut selected = None;
@@ -126,6 +191,42 @@ fn compiler_controls(phase: ProbePhase) {
                         pending.push(next);
                     }
                 }
+            }
+            if matches!(self.phase, ProbePhase::AllocationSize) && self.retained {
+                let runtime = seen
+                    .iter()
+                    .copied()
+                    .find(|instance| {
+                        tcx.def_path_str(instance.def_id())
+                            .ends_with("::memchr_aligned::runtime")
+                    })
+                    .expect("actual retained memchr runtime missing");
+                let actual_call = |instance, name: &str| {
+                    let body = engine.instantiated_body(instance).unwrap();
+                    body.basic_blocks
+                        .iter()
+                        .find_map(|block| {
+                            let TerminatorKind::Call { func, .. } = &block.terminator().kind else {
+                                return None;
+                            };
+                            let ty::FnDef(id, args) = func.ty(&body.local_decls, tcx).kind() else {
+                                return None;
+                            };
+                            (tcx.item_name(*id).as_str() == name).then(|| {
+                                engine
+                                    .resolve_function_item(*id, args.skip_binder())
+                                    .unwrap()
+                            })
+                        })
+                        .unwrap_or_else(|| panic!("actual retained {name} call missing"))
+                };
+                let raw_parts = actual_call(runtime, "from_raw_parts");
+                let precondition = actual_call(raw_parts, "precondition_check");
+                let size = actual_call(precondition, "is_valid_allocation_size");
+                let fresh = super::super::super::super::super::nonzero_niches::test_engine(tcx);
+                allocation_size::compiler_controls(&fresh, size);
+                eprintln!("ALLOCATION SIZE CALLBACK COMPLETE");
+                return rustc_driver::Compilation::Stop;
             }
             if matches!(self.phase, ProbePhase::Runtime) && self.retained {
                 for instance in seen.iter().copied().filter(|instance| {

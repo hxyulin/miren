@@ -2923,3 +2923,26 @@ contains 5,420 queried obligations. Five resource UNKNOWN cases reach an additio
 body, with no supported-outcome credit. Exact query-free fold timeout contexts are recorded
 separately. No executed-service fee is discounted, default limit increased or guest assertion
 rewritten.
+
+
+## Typed byte-route source preparation
+
+Byte source preparation authenticates the complete original/current typed contains forwarder,
+dispatcher, operand Copy/Move distinctions and actual `size_of` wrapper. Scoped caller arguments
+preserve the complete compiler environment; source authentication does not grant raw-reference,
+storage, branch or search correctness. Existing caller-source checks, population-count argument
+modes and earlier work allowances remain intact.
+
+Two byte-frontier cases remain UNKNOWN and now report missing compiler evidence for
+`core::panicking::panic_nounwind_fmt`. Earlier source preparation encounters this missing body
+before the later storage boundary. No missing body is accepted, and no supported outcome is added.
+Four fresh host/ARM O0/O2 profiles retain 336 PROVED, 164 REFUTED and 113 UNKNOWN across 613 cases.
+All 5,420 queried obligations and 656 counterexample models remain literal. Of 2,452 full Proof
+comparisons, 2,443 match literally; eight byte-frontier diagnostic changes and one independently
+checked query-free fold timeout context account for the remaining records.
+
+Validation covers 1,025 Rust and 91 Python tests. The initial full Rust run passed 1,024 tests
+and failed one capability-matrix expectation for the changed UNKNOWN diagnostic. After updating
+only that manifest expectation, the exact matrix rerun passed; this total combines those runs.
+Formatting, Clippy, release builds, dependency policy and documentation checks pass. Source
+mutations and missing-body controls remain separate from successful execution evidence.

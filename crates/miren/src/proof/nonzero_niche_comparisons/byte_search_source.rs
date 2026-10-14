@@ -1,8 +1,13 @@
 //! Authenticated source observation only: there is no verified search constructor here.
 use super::*;
 
+#[path = "byte_search_source/allocation_size.rs"]
+mod allocation_size;
 #[path = "byte_search_source/population.rs"]
 mod population;
+#[path = "byte_search_source/preparation.rs"]
+mod preparation;
+pub(in crate::proof) use preparation::{BorrowedSources, PreparedSources, prepare};
 #[path = "byte_search_source/word.rs"]
 mod word;
 use std::cell::Ref;

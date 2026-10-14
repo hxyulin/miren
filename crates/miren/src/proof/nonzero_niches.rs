@@ -3,7 +3,7 @@ use super::*;
 use crate::symbolic::ScalarSliceElement;
 #[path = "nonzero_niche_comparisons.rs"]
 mod comparisons;
-pub(super) use comparisons::{ByteWork, CallerSource, caller_source};
+pub(super) use comparisons::{ByteWork, CallerSource, PreparedByteRoute, caller_source};
 #[cfg(test)]
 #[path = "nonzero_full_integer_probe.rs"]
 mod full_integer_probe;
@@ -2029,16 +2029,31 @@ fn check_external_copy_path<'tcx>(
 }
 
 impl<'tcx> Engine<'tcx> {
-    pub(super) fn exact_byte_membership(
+    pub(super) fn exact_prepared_byte_membership(
         &self,
+        prepared: PreparedByteRoute<'_, 'tcx>,
         relation: super::readonly_byte_origins::Relation<'_, 'tcx>,
         original: Ty<'tcx>,
         instance: ty::Instance<'tcx>,
         slice: &Value,
-        needle: &Value,
-        state: &State,
+        request: super::readonly_byte_origins::NeedleState<'_>,
     ) -> Result<Term, String> {
-        self.checked_byte_membership(relation, original, instance, slice, needle, state)
+        let needle = request.needle;
+        let state = request.state;
+        let mut relation = relation;
+        relation.check_invocation(self, original, instance, slice, needle, state)?;
+        let prior = prepared.bind_relation(&mut relation)?;
+        let mut sources = prepared.revalidate(self, instance, original, prior)?;
+        sources.check_held()?;
+        let storage = relation.borrow_storage(self, sources.used())?;
+        let used = sources.size_one_helper_fact(storage.used())?;
+        let result =
+            self.checked_prepared_byte_membership(original, instance, slice, needle, state, used);
+        // Neither the live caller/storage relation nor actual helper read guards expire while
+        // the source-linked semantic service runs. Its unfinished search certificate still refuses.
+        drop(storage);
+        drop(sources);
+        result
     }
 
     pub(super) fn exact_niche_membership(

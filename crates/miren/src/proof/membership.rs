@@ -135,10 +135,27 @@ impl<'tcx> Engine<'tcx> {
                         slice: &slice,
                         needle,
                     };
-                    let origin = readonly_byte_origins::observe(self, call, &inputs, state)?;
+                    let scope = readonly_byte_origins::RouteScope::new(
+                        self, *element, call, &inputs, state,
+                    )?;
+                    let prepared = self.prepare_niche_byte_route(scope)?;
+                    let origin = readonly_byte_origins::observe_with_work(
+                        self,
+                        call,
+                        &inputs,
+                        state,
+                        prepared.used(),
+                    )?;
                     origin.validate_current(self, call, state)?;
                     let relation = origin.relation()?;
-                    self.exact_byte_membership(relation, *element, instance, &slice, needle, state)?
+                    self.exact_prepared_byte_membership(
+                        prepared,
+                        relation,
+                        *element,
+                        instance,
+                        &slice,
+                        readonly_byte_origins::NeedleState { needle, state },
+                    )?
                 } else {
                     self.exact_niche_membership(*element, instance, &slice, needle, state)?
                 };

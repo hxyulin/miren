@@ -1,0 +1,13 @@
+args=2 spread=None
+local _0 Mut bool user=None
+local _1 Not &'{erased} [T/#0] user=None
+local _2 Not &'{erased} T/#0 user=None
+block bb0 cleanup=false
+call <T as core::slice::cmp::SliceContains>::slice_contains destination=_0/[] target=Some(bb1) u
+  | nwind=Unreachable source=Normal
+const-value ZeroSized FnDef(DefId(core::slice::cmp::SliceContains::slice_contains), Binder { val
+  | ue: [T/#0], bound_vars: [] })
+copy _2/[]
+copy _1/[]
+block bb1 cleanup=false
+return

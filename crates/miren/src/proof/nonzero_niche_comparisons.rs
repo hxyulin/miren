@@ -1,6 +1,9 @@
 //! Exact admission-local core niche comparison law and readonly membership application.
 use super::*;
 
+#[path = "nonzero_niche_comparisons/byte_route.rs"]
+mod byte_route;
+pub(in crate::proof) use byte_route::PreparedByteRoute;
 #[path = "nonzero_niche_comparisons/byte_search_source.rs"]
 mod byte_search_source;
 #[cfg(test)]
@@ -1160,6 +1163,13 @@ impl<'tcx> GraphBudget<'tcx> {
         Ok(())
     }
 
+    // Legacy exact-text source controls remain test-only after typed production replacement.
+    #[cfg(test)]
+    fn byte_route_reference_text(&mut self, upper: usize) -> Result<(), String> {
+        self.charge(1)?; // Actual additional concrete service dispatch.
+        self.text(5, upper)
+    }
+
     fn key(&mut self, id: DefId) -> Result<String, String> {
         self.text(4, 2 * 65536)?;
         let key = super::super::pure_comparison_templates::definition_key(id);
@@ -1200,6 +1210,46 @@ impl<'tcx> GraphBudget<'tcx> {
             core,
             limit: NICHE_BODY_WORK.min(NICHE_GRAPH_WORK.saturating_sub(self.work)),
             arguments,
+            work: 0,
+            depth: 0,
+            error: None,
+        };
+        let _ = arguments.visit_with(&mut visitor);
+        self.phase(GraphPhase::InventoryVisitor, visitor.work)?;
+        if let Some(error) = visitor.error {
+            return Err(error.into());
+        }
+        Ok(())
+    }
+
+    fn arguments_in_caller(
+        &mut self,
+        tcx: TyCtxt<'tcx>,
+        arguments: ty::GenericArgsRef<'tcx>,
+        caller: ty::Instance<'tcx>,
+    ) -> Result<(), String> {
+        use ty::TypeVisitable;
+        self.charge(6 + caller.args.len())?; // Actual new scoped-context setup and validation.
+        if !matches!(caller.def, ty::InstanceKind::Item(_))
+            || caller.args.len() != tcx.generics_of(caller.def_id()).count()
+        {
+            return Err(
+                "typed byte raw arguments lack the complete original caller environment".into(),
+            );
+        }
+        // The existing concrete caller argument service refuses unresolved recursive Params.
+        // Raw helper Params are still visited, now against that authenticated caller environment.
+        self.arguments(tcx, caller.args)?;
+        self.charge(arguments.len())?;
+        let core = tcx
+            .lang_items()
+            .sized_trait()
+            .ok_or("niche core unavailable")?
+            .krate;
+        let mut visitor = ExpandedTypes {
+            core,
+            limit: NICHE_BODY_WORK.min(NICHE_GRAPH_WORK.saturating_sub(self.work)),
+            arguments: caller.args,
             work: 0,
             depth: 0,
             error: None,
@@ -1286,6 +1336,17 @@ struct CapturedNicheBody<'tcx> {
     inventory: usize,
 }
 
+#[derive(Clone, Copy)]
+enum GraphGoal {
+    Law,
+    ByteRoute,
+}
+
+enum GraphOutcome<'a, 'tcx> {
+    Law(Box<CheckedNicheLaw<'a, 'tcx>>),
+    Byte(byte_route::ByteBoundary<'a, 'tcx>),
+}
+
 struct CheckedNicheLaw<'engine, 'tcx> {
     engine: &'engine Engine<'tcx>,
     original: Ty<'tcx>,
@@ -1336,6 +1397,7 @@ impl<'tcx> Engine<'tcx> {
         instance: ty::Instance<'tcx>,
         budget: &mut GraphBudget<'tcx>,
         transport: bool,
+        goal: GraphGoal,
     ) -> Result<CapturedNicheBody<'tcx>, String> {
         use super::super::pure_comparison_templates as templates;
         budget.arguments(self.tcx, instance.args)?;
@@ -1388,6 +1450,19 @@ impl<'tcx> Engine<'tcx> {
             let encoded = templates::encode_template(self.tcx, raw, core)?;
             let key = budget.key(instance.def_id())?;
             family = budget.reference(&key, &encoded)?;
+            if family.is_none() {
+                budget.charge(2)?; // Actual new failed-reference goal dispatch.
+                if matches!(goal, GraphGoal::ByteRoute) {
+                    family = byte_transport::source(
+                        self,
+                        instance,
+                        raw,
+                        byte_transport::SourcePhase::Raw,
+                        budget,
+                    )?
+                    .map(|shape| shape.family());
+                }
+            }
             if family.is_none() {
                 return Err("niche transport raw body has no complete reference".into());
             }
@@ -1508,6 +1583,9 @@ impl<'tcx> Engine<'tcx> {
             {
                 return Err("niche cached cleanup graph differs from actual compiler body".into());
             }
+            if matches!(goal, GraphGoal::ByteRoute) {
+                byte_transport::mirrored_metadata(&expected, &cached, budget)?;
+            }
             budget.encoding(expected_work)?;
             budget.encoding(body_work)?;
             if templates::encode_template(self.tcx, &expected, core)?
@@ -1538,9 +1616,43 @@ impl<'tcx> Engine<'tcx> {
         outer: ty::Instance<'tcx>,
         prior_work: usize,
     ) -> Result<CheckedNicheLaw<'engine, 'tcx>, String> {
+        match self.capture_niche_graph_with_goal(original, outer, prior_work, GraphGoal::Law)? {
+            GraphOutcome::Law(law) => Ok(*law),
+            GraphOutcome::Byte(_) => {
+                Err("ordinary niche law unexpectedly returned byte metadata".into())
+            }
+        }
+    }
+
+    pub(in crate::proof) fn prepare_niche_byte_route<'engine>(
+        &'engine self,
+        scope: super::super::readonly_byte_origins::RouteScope<'engine, 'tcx>,
+    ) -> Result<PreparedByteRoute<'engine, 'tcx>, String> {
+        let (original, outer, prior_work) = scope.request(self)?;
+        let boundary = match self.capture_niche_graph_with_goal(
+            original,
+            outer,
+            prior_work,
+            GraphGoal::ByteRoute,
+        )? {
+            GraphOutcome::Byte(boundary) => boundary,
+            GraphOutcome::Law(_) => return Err("byte route reached a non-byte law result".into()),
+        };
+        boundary.prepare(scope)
+    }
+
+    fn capture_niche_graph_with_goal<'engine>(
+        &'engine self,
+        original: Ty<'tcx>,
+        outer: ty::Instance<'tcx>,
+        prior_work: usize,
+        goal: GraphGoal,
+    ) -> Result<GraphOutcome<'engine, 'tcx>, String> {
         use super::super::pure_comparison_templates as templates;
         use super::super::pure_comparisons::CursorArithmetic;
         let mut budget = GraphBudget::new(prior_work)?;
+        // New goal/result dispatch; every old phase fee remains literal.
+        budget.charge(2)?;
         budget.phase(GraphPhase::Schema, 16)?;
         let ty::Adt(definition, _) = original.kind() else {
             return Err("niche membership original is not Option".into());
@@ -1659,7 +1771,8 @@ impl<'tcx> Engine<'tcx> {
             .try_reserve_exact(NICHE_BODIES)
             .map_err(|_| "niche body records allocation failed")?;
         for instance in laws {
-            let captured = self.capture_niche_comparison_body(instance, &mut budget, false)?;
+            let captured =
+                self.capture_niche_comparison_body(instance, &mut budget, false, goal)?;
             budget.phase(GraphPhase::SignatureValidate, captured.inventory)?;
             let body = captured.body;
             budget.record(instance)?;
@@ -1728,7 +1841,7 @@ impl<'tcx> Engine<'tcx> {
             if instance.def_id().krate != core {
                 return Err("niche membership transport has non-core selected body".into());
             }
-            let captured = self.capture_niche_comparison_body(instance, &mut budget, true)?;
+            let captured = self.capture_niche_comparison_body(instance, &mut budget, true, goal)?;
             let family = captured
                 .family
                 .ok_or("niche transport lacks captured raw family")?;
@@ -1780,9 +1893,25 @@ impl<'tcx> Engine<'tcx> {
                 return Err("niche membership outer original element mismatch".into());
             }
             if family == templates::PureTemplateFamily::ContainsBytes && schema.facts.size == 1 {
-                return byte_search_source::observe(self, instance, 0, budget.work)?
-                    .reject_unverified_search()
-                    .and_then(|()| Err("byte search semantic certificate is unavailable".into()));
+                budget.charge(2)?; // New byte-boundary goal branch, independent of old source work.
+                match goal {
+                    GraphGoal::Law => {
+                        return byte_search_source::observe(self, instance, 0, budget.work)?
+                            .reject_unverified_search()
+                            .and_then(|()| {
+                                Err("byte search semantic certificate is unavailable".into())
+                            });
+                    }
+                    GraphGoal::ByteRoute => {
+                        budget.record(instance)?;
+                        budget.charge(1)?;
+                        budget.insert_body(&mut bodies, instance, body)?;
+                        return byte_route::boundary(
+                            self, original, outer, instance, bodies, budget,
+                        )
+                        .map(GraphOutcome::Byte);
+                    }
+                }
             }
             budget.phase(GraphPhase::Edges, inventory)?;
             for block in body.basic_blocks.iter() {
@@ -1977,6 +2106,7 @@ impl<'tcx> Engine<'tcx> {
         membership_schema.membership_match_work(&membership_schema)?;
         // Move the actual admission-local meter and schema into one-shot application.
         budget.charge(44 + 1)?;
+        budget.charge(5)?; // Actual new boxed outcome allocation/move/release services.
         let result = CheckedNicheLaw {
             engine: self,
             original,
@@ -1990,7 +2120,7 @@ impl<'tcx> Engine<'tcx> {
             membership_schema,
         };
         result.validate(self)?;
-        Ok(result)
+        Ok(GraphOutcome::Law(Box::new(result)))
     }
 }
 
@@ -2105,18 +2235,17 @@ impl<'tcx> Engine<'tcx> {
         self.apply_niche_membership(&mut law, slice, needle, state)
     }
 
-    pub(super) fn checked_byte_membership(
+    pub(super) fn checked_prepared_byte_membership(
         &self,
-        relation: super::super::readonly_byte_origins::Relation<'_, 'tcx>,
         original: Ty<'tcx>,
         instance: ty::Instance<'tcx>,
         slice: &Value,
         needle: &Value,
         state: &State,
+        prior: usize,
     ) -> Result<Term, String> {
         state.flow.require_unarmed()?;
-        let prior_work = relation.into_work(self, original, instance, slice, needle, state)?;
-        let mut law = self.check_niche_comparison_law_with_work(original, instance, prior_work)?;
+        let mut law = self.check_niche_comparison_law_with_work(original, instance, prior)?;
         self.apply_niche_membership(&mut law, slice, needle, state)
     }
 
@@ -2533,3 +2662,14 @@ pub(super) fn signed_current_comparison_control<'tcx>(
     engine.bodies.borrow_mut().insert(instance, previous);
     law.validate(engine).unwrap();
 }
+
+#[cfg(test)]
+#[path = "nonzero_niche_comparisons/byte_route_probe.rs"]
+mod byte_route_probe;
+
+#[path = "nonzero_niche_comparisons/byte_transport.rs"]
+mod byte_transport;
+
+#[cfg(test)]
+#[path = "nonzero_niche_comparisons/byte_transport_probe.rs"]
+mod byte_transport_probe;

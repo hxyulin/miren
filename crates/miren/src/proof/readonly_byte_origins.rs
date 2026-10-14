@@ -53,12 +53,61 @@ impl<'a, 'tcx> CallOccurrence<'a, 'tcx> {
     }
 }
 
+pub(super) struct NeedleState<'a> {
+    pub(super) needle: &'a Value,
+    pub(super) state: &'a State,
+}
+
 pub(super) struct Inputs<'a, 'tcx> {
     pub(super) selected: ty::Instance<'tcx>,
     pub(super) slice_first: bool,
     pub(super) raw: &'a [Value],
     pub(super) slice: &'a Value,
     pub(super) needle: &'a Value,
+}
+
+// Immutable operation identity only. Preparing sources may publish caches, so this carries no
+// live source read guard and no storage permit. Original source/storage is authenticated later.
+pub(super) struct RouteScope<'a, 'tcx> {
+    engine: &'a Engine<'tcx>,
+    original: Ty<'tcx>,
+    call: &'a CallOccurrence<'a, 'tcx>,
+    inputs: &'a Inputs<'a, 'tcx>,
+    state: &'a State,
+    used: usize,
+}
+
+impl<'a, 'tcx> RouteScope<'a, 'tcx> {
+    pub(super) fn new(
+        engine: &'a Engine<'tcx>,
+        original: Ty<'tcx>,
+        call: &'a CallOccurrence<'a, 'tcx>,
+        inputs: &'a Inputs<'a, 'tcx>,
+        state: &'a State,
+    ) -> Result<Self, String> {
+        let mut work = nonzero_niches::ByteWork::new(0)
+            .map_err(|error| engine.categorized_error(error.category, error.reason))?;
+        work.charge(13)
+            .map_err(|error| engine.categorized_error(error.category, error.reason))?;
+        Ok(Self {
+            engine,
+            original,
+            call,
+            inputs,
+            state,
+            used: work.used(),
+        })
+    }
+    pub(super) fn request(
+        &self,
+        engine: &Engine<'tcx>,
+    ) -> Result<(Ty<'tcx>, ty::Instance<'tcx>, usize), String> {
+        if !std::ptr::eq(self.engine, engine) || !std::ptr::eq(self.call.evaluated, self.inputs.raw)
+        {
+            return Err("byte route request has a foreign Engine or raw operand occurrence".into());
+        }
+        Ok((self.original, self.inputs.selected, self.used))
+    }
 }
 
 // This borrow has invocation scope, not Rust raw-access authority. There is no issuance or escape
@@ -325,14 +374,25 @@ fn current_call<'a, 'tcx>(
     Ok(args)
 }
 
+#[cfg(test)]
 pub(super) fn observe<'a, 'tcx>(
     engine: &'a Engine<'tcx>,
     call: &'a CallOccurrence<'a, 'tcx>,
     inputs: &'a Inputs<'a, 'tcx>,
     state: &'a State,
 ) -> Result<Origin<'a, 'tcx>, String> {
+    observe_with_work(engine, call, inputs, state, 0)
+}
+
+pub(super) fn observe_with_work<'a, 'tcx>(
+    engine: &'a Engine<'tcx>,
+    call: &'a CallOccurrence<'a, 'tcx>,
+    inputs: &'a Inputs<'a, 'tcx>,
+    state: &'a State,
+    prior: usize,
+) -> Result<Origin<'a, 'tcx>, String> {
     state.flow.require_unarmed()?;
-    let mut source_work = nonzero_niches::ByteWork::new(0)
+    let mut source_work = nonzero_niches::ByteWork::new(prior)
         .map_err(|error| engine.categorized_error(error.category, error.reason))?;
     let caller_source =
         nonzero_niches::caller_source(engine, call.caller, call.body, &mut source_work)
@@ -639,9 +699,38 @@ impl<'a, 'tcx> Origin<'a, 'tcx> {
     }
 }
 
-impl<'tcx> Relation<'_, 'tcx> {
-    pub(super) fn into_work(
-        mut self,
+impl<'a, 'tcx> Relation<'a, 'tcx> {
+    pub(super) fn bind_route(&mut self, scope: &RouteScope<'_, 'tcx>) -> Result<usize, String> {
+        self.work.charge(12).map_err(|error| {
+            self.origin
+                .engine
+                .categorized_error(error.category, error.reason)
+        })?;
+        if !std::ptr::eq(self.origin.engine, scope.engine)
+            || self.origin.original != scope.original
+            || !std::ptr::eq(self.origin.call, scope.call)
+            || !std::ptr::eq(self.origin.inputs, scope.inputs)
+            || !std::ptr::eq(self.origin.state, scope.state)
+            || self.work.used() < scope.used
+        {
+            return Err(
+                "byte route scope has a different original caller/operand/Memory nonce".into(),
+            );
+        }
+        self.origin
+            .caller_source
+            .check(
+                scope.engine,
+                scope.call.caller,
+                scope.call.body,
+                &mut self.work,
+            )
+            .map_err(|error| scope.engine.categorized_error(error.category, error.reason))?;
+        Ok(self.work.used())
+    }
+
+    pub(super) fn check_invocation(
+        &mut self,
         engine: &Engine<'tcx>,
         original: Ty<'tcx>,
         selected: ty::Instance<'tcx>,
@@ -676,9 +765,105 @@ impl<'tcx> Relation<'_, 'tcx> {
         {
             return Err("byte relation current caller Body was replaced or unavailable".into());
         }
-        // The only output is spent work, carried into the existing source rejection service.
-        // Available source and this relation do not establish complete search semantics.
+        // Reading spent work does not consume the borrowed caller or initialized State.
         Ok(self.work.used())
+    }
+
+    #[cfg(test)]
+    pub(super) fn into_work(
+        mut self,
+        engine: &Engine<'tcx>,
+        original: Ty<'tcx>,
+        selected: ty::Instance<'tcx>,
+        slice: &Value,
+        needle: &Value,
+        state: &State,
+    ) -> Result<usize, String> {
+        self.check_invocation(engine, original, selected, slice, needle, state)
+    }
+
+    pub(super) fn borrow_storage(
+        mut self,
+        engine: &Engine<'tcx>,
+        prior: usize,
+    ) -> Result<BorrowedStorage<'a, 'tcx>, String> {
+        if !std::ptr::eq(engine, self.origin.engine) || prior < self.work.used() {
+            return Err(
+                "byte storage handoff has a different Engine or lost cumulative work".into(),
+            );
+        }
+        self.work = nonzero_niches::ByteWork::new(prior)
+            .map_err(|error| engine.categorized_error(error.category, error.reason))?;
+        self.work
+            .charge(16)
+            .map_err(|error| engine.categorized_error(error.category, error.reason))?;
+        self.origin
+            .caller_source
+            .check(
+                engine,
+                self.origin.call.caller,
+                self.origin.call.body,
+                &mut self.work,
+            )
+            .map_err(|error| engine.categorized_error(error.category, error.reason))?;
+        let raw = self.origin.inputs.raw;
+        let source = &raw[if self.origin.inputs.slice_first { 0 } else { 1 }];
+        let needle = &raw[if self.origin.inputs.slice_first { 1 } else { 0 }];
+        let (allocation, projection) = readonly_reference(source)?;
+        let (needle_allocation, needle_projection) = readonly_reference(needle)?;
+        if allocation != self.origin.slice_allocation
+            || needle_allocation != self.origin.needle_allocation
+            || !needle_projection.is_empty()
+        {
+            return Err("byte storage current shared reference identity differs".into());
+        }
+        // Origin established original safe shared types and the typed lifetime/initialization
+        // graph after cold preparation. This same immutable State is retained here: no lifetime
+        // or address is inferred from a CompositeSlice alone or an allocation number.
+        // Whole source and needle mask scans are separate actual visits; their empty field
+        // prefixes require no missing-path traversal. The original projected initialization and
+        // typed lifetime checks remain live in the immutable Origin issued after preparation.
+        self.work
+            .charge(12 + 2 * self.origin.state.memory.missing_places.entries().len())
+            .map_err(|error| engine.categorized_error(error.category, error.reason))?;
+        if projection.len() > MAX_INPUT_DEPTH {
+            return Err("byte storage original projection exceeds depth16".into());
+        }
+        storage_locations::StorageLocation::tracked(needle_allocation, false)
+            .read(&self.origin.state.memory)?;
+        let stored = storage_locations::StorageLocation::tracked(allocation, false)
+            .read(&self.origin.state.memory)?;
+        let Value::CompositeSlice { length, leaves, .. } = stored else {
+            return Err("byte storage has no retained current source column".into());
+        };
+        let [column] = leaves.as_slice() else {
+            return Err("byte storage current column inventory differs".into());
+        };
+        if usize_term(engine, length)? != self.origin.capacity || !column.belongs_to(&engine.terms)
+        {
+            return Err("byte storage current capacity or column Context differs".into());
+        }
+        // No second projection reconstruction is needed: Origin retained the exact original
+        // initialized projected view, evaluated inputs and this same immutable Memory. The
+        // preparation/revalidation services can change caches, never this borrowed storage.
+        Ok(BorrowedStorage {
+            relation: self,
+            _column: column,
+        })
+    }
+}
+
+// Original Rust safe-reference contract plus retained initialized typed storage. This is not a
+// pointer value or raw-access permit. The private allocation identity is never address arithmetic.
+pub(super) struct BorrowedStorage<'a, 'tcx> {
+    relation: Relation<'a, 'tcx>,
+    _column: &'a Term,
+}
+
+impl BorrowedStorage<'_, '_> {
+    pub(super) fn used(&self) -> usize {
+        // The exact one-column reference is held together with the immutable live State.
+        self.relation.work.used()
     }
 }
 
