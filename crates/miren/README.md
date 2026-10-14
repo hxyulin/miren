@@ -2105,3 +2105,10 @@ environments and dataflow. Cold retained and ordinary-core application analyses 
 for missing panic bodies. These controls establish no raw-reference validity or complete search
 result. Reachable missing bodies remain required until an independently proved source-linked
 condition establishes that their exact incoming edges are unreachable.
+
+
+Typed byte preparation separately evaluates the genuine compiler `SIZE` constant and original
+Rust layout under current source guards. Matching size/alignment records a static fact. Cold
+preparation retains the exact first missing Call as consumed incomplete metadata and still reports
+missing compiler evidence. It cannot produce a completed source or search certificate. The actual
+`memchr` result-range precondition requires both naive and aligned algorithm proofs.

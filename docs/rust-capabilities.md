@@ -2946,3 +2946,24 @@ and failed one capability-matrix expectation for the changed UNKNOWN diagnostic.
 only that manifest expectation, the exact matrix rerun passed; this total combines those runs.
 Formatting, Clippy, release builds, dependency policy and documentation checks pass. Source
 mutations and missing-body controls remain separate from successful execution evidence.
+
+
+## Compiler byte layout and consumed incomplete sources
+
+Typed byte preparation independently evaluates the genuine compiler SIZE constant and queries
+original type layout while holding current body/signature guards. It requires exact size1/align1;
+the private static fact supplies no raw access, branch or search authority. All new compiler
+services and metadata operations carry separate work allowances.
+
+An incomplete source collection retains the exact first unavailable current Call, full compiler
+Instances/signatures and its unfinished queue. Its only public transition consumes the record
+and refuses, including when the available closure has no missing body. It cannot issue a completed
+source or search certificate. Existing complete preparation, population modes, caller checks and
+limits remain unchanged. Four-profile hostile compiler controls check wrong types, cache conflicts,
+current source mutation, overflow and exact missing-body refusal.
+
+Full Root validation passes 1,026 Rust and 91 Python tests. Four fresh profiles retain 336 PROVED,
+164 REFUTED and 113 UNKNOWN across 613 cases; no supported outcome is added. All 5,420 queried
+obligations and 656 counterexample models remain literal. Of 2,452 full Proof comparisons, 2,450
+match literally and two independently checked query-free fold timeout contexts differ. Search
+range, load safety and membership correctness remain unfinished.

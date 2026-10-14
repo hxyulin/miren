@@ -16,6 +16,7 @@ pub(super) struct ByteBoundary<'a, 'tcx> {
     search: ty::Instance<'tcx>,
     records: Vec<RouteRecord<'tcx>>,
     mapping: Option<Box<super::byte_transport::TypedRoute<'tcx>>>,
+    layout: Option<super::byte_transport::CompilerByteLayout<'tcx>>,
     work: usize,
 }
 
@@ -35,6 +36,12 @@ pub(super) fn boundary<'a, 'tcx>(
         &bodies,
         &mut budget,
     )?;
+    let layout = mapping
+        .as_ref()
+        .map(|mapping| {
+            super::byte_transport::compiler_byte_layout(engine, mapping, original, &mut budget)
+        })
+        .transpose()?;
     budget.charge(8 + 2 * bodies.len())?;
     let body = bodies
         .iter()
@@ -117,7 +124,7 @@ pub(super) fn boundary<'a, 'tcx>(
             signature,
         });
     }
-    budget.charge(13)?; // Old12 plus the actual new optional mapping field.
+    budget.charge(16)?; // Old13 plus layout field and later prepare dispatch2.
     Ok(ByteBoundary {
         engine,
         original,
@@ -126,6 +133,7 @@ pub(super) fn boundary<'a, 'tcx>(
         search,
         records,
         mapping,
+        layout,
         work: budget.work,
     })
 }
@@ -142,6 +150,14 @@ impl<'a, 'tcx> ByteBoundary<'a, 'tcx> {
         self,
         scope: super::super::super::readonly_byte_origins::RouteScope<'a, 'tcx>,
     ) -> Result<PreparedByteRoute<'a, 'tcx>, String> {
+        if let Some(layout) = &self.layout {
+            if !layout.matches(self.original) {
+                return Err("byte route compiler layout fact has a different original type".into());
+            }
+            let pending = byte_search_source::pending(self.engine, self.search, self.work)?;
+            pending.reject()?;
+            return Err("byte route pending sources cannot issue a completed certificate".into());
+        }
         let sources = byte_search_source::prepare(self.engine, self.search, self.work)?;
         let mut work = byte_search_source::Work::new(sources.used())
             .map_err(|error| self.engine.categorized_error(error.category, error.reason))?;

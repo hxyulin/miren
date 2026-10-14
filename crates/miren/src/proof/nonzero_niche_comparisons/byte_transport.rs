@@ -783,6 +783,86 @@ impl TransportShape<'_> {
     }
 }
 
+// Static compiler fact only; this is not a pointer, storage or branch permit.
+pub(super) struct CompilerByteLayout<'tcx> {
+    original: Ty<'tcx>,
+    size: u64,
+    alignment: u64,
+}
+
+impl<'tcx> CompilerByteLayout<'tcx> {
+    pub(super) fn matches(&self, original: Ty<'tcx>) -> bool {
+        self.original == original && self.size == 1 && self.alignment == 1
+    }
+}
+
+pub(super) fn compiler_byte_layout<'tcx>(
+    engine: &Engine<'tcx>,
+    mapping: &TypedRoute<'tcx>,
+    original: Ty<'tcx>,
+    budget: &mut GraphBudget<'tcx>,
+) -> Result<CompilerByteLayout<'tcx>, String> {
+    budget.charge(16)?; // Original item/helper binding and static-fact service dispatch.
+    if mapping.dispatcher.args.len() != 1 || mapping.dispatcher.args[0].as_type() != Some(original)
+    {
+        return Err("byte layout fact has a different original caller item".into());
+    }
+    let helper = mapping
+        .helpers
+        .first()
+        .ok_or("byte layout fact lacks sizeof helper")?;
+    budget.charge(8)?; // Actual held registry reads and current constant/schema extraction.
+    let bodies = engine
+        .bodies
+        .try_borrow()
+        .map_err(|_| "byte layout Body registry is borrowed")?;
+    let signatures = engine
+        .call_signatures
+        .try_borrow()
+        .map_err(|_| "byte layout signature registry is borrowed")?;
+    budget.charge(8)?; // Exact selected key/environment and preloaded-cache validation.
+    if helper.instance.args != mapping.dispatcher.args
+        || budget.key(helper.instance.def_id())? != "DefId(core::mem::size_of)"
+        || !bodies.contains_key(&helper.instance)
+    {
+        return Err("byte layout has no exact preloaded sizeof source".into());
+    }
+    if signatures.get(&helper.instance) != Some(&helper.signature) {
+        return Err("byte layout helper current signature differs".into());
+    }
+    // Both actual guards precede helpers that use borrow(); cache publication is forbidden here.
+    size_source(engine, mapping.dispatcher, helper.instance.def_id(), budget)?;
+    let body = bodies
+        .get(&helper.instance)
+        .ok_or("byte layout helper current Body absent")?;
+    size_body(engine, helper.instance, body, original, budget)?;
+    let Rvalue::Use(Operand::Constant(constant), _) = assignment(body, 0, 0, 0)? else {
+        return Err("byte layout helper has no actual SIZE operand".into());
+    };
+    budget.phase(GraphPhase::Layout, 256)?; // Independent genuine compiler constant evaluation.
+    let evaluated = constant
+        .const_
+        .try_eval_bits(engine.tcx, ty::TypingEnv::fully_monomorphized())
+        .ok_or("byte layout original SIZE constant evaluation unavailable")?;
+    budget.phase(GraphPhase::Layout, 256)?; // Independent original Rust compiler layout query.
+    let layout = engine
+        .tcx
+        .layout_of(ty::TypingEnv::fully_monomorphized().as_query_input(original))
+        .map_err(|_| "byte layout original compiler layout unavailable")?;
+    budget.charge(8)?; // Actual comparisons and nonClone fact construction.
+    if evaluated != u128::from(layout.size.bytes())
+        || layout.size.bytes() != 1
+        || layout.align.abi.bytes() != 1
+    {
+        return Err("byte layout SIZE/original layout is not exact size1 align1".into());
+    }
+    Ok(CompilerByteLayout {
+        original,
+        size: layout.size.bytes(),
+        alignment: layout.align.abi.bytes(),
+    })
+}
+
 pub(super) struct HelperReceipt<'tcx> {
     pub(super) instance: ty::Instance<'tcx>,
     pub(super) signature: ty::PolyFnSig<'tcx>,

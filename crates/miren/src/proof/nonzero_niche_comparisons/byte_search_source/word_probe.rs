@@ -40,6 +40,11 @@ fn actual_retained_typed_byte_transport_source_and_hostile_dataflow() {
     compiler_controls(ProbePhase::TypedRoute);
 }
 
+#[test]
+fn actual_byte_compiler_layout_and_consumed_missing_source_controls() {
+    compiler_controls(ProbePhase::Preconditions);
+}
+
 #[derive(Clone, Copy)]
 enum ProbePhase {
     Word,
@@ -49,6 +54,7 @@ enum ProbePhase {
     ColdPipeline,
     RouteCopy,
     TypedRoute,
+    Preconditions,
 }
 
 fn compiler_controls(phase: ProbePhase) {
@@ -113,6 +119,19 @@ fn compiler_controls(phase: ProbePhase) {
                 })
                 .unwrap();
             let root = ty::Instance::mono(tcx, root.to_def_id());
+            if matches!(self.phase, ProbePhase::Preconditions) {
+                if self.retained {
+                    super::super::super::byte_transport_probe::compiler_precondition_controls(
+                        &engine, root,
+                    );
+                    eprintln!("BYTE PRECONDITIONS CALLBACK COMPLETE");
+                } else {
+                    eprintln!(
+                        "BYTE PRECONDITIONS default-core remains unavailable; no retained credit"
+                    );
+                }
+                return rustc_driver::Compilation::Stop;
+            }
             if matches!(self.phase, ProbePhase::TypedRoute) {
                 if self.retained {
                     super::super::super::byte_transport_probe::compiler_controls(&engine, root);

@@ -3,8 +3,11 @@ use super::*;
 
 #[path = "byte_search_source/allocation_size.rs"]
 mod allocation_size;
+#[path = "byte_search_source/pending.rs"]
+pub(super) mod pending;
 #[path = "byte_search_source/population.rs"]
 mod population;
+pub(in crate::proof) use pending::pending;
 #[path = "byte_search_source/preparation.rs"]
 mod preparation;
 pub(in crate::proof) use preparation::{BorrowedSources, PreparedSources, prepare};

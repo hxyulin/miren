@@ -568,3 +568,94 @@ pub(super) fn compiler_controls<'tcx>(engine: &Engine<'tcx>, root: ty::Instance<
         "TYPED BYTE actual full original/current dispatcher and fourteen raw/current mutations"
     );
 }
+
+pub(super) fn compiler_precondition_controls<'tcx>(
+    engine: &Engine<'tcx>,
+    root: ty::Instance<'tcx>,
+) {
+    let root_body = engine.instantiated_body(root).unwrap();
+    let outer = root_body
+        .basic_blocks
+        .iter()
+        .find_map(|block| {
+            let TerminatorKind::Call { func, .. } = &block.terminator().kind else {
+                return None;
+            };
+            let ty::FnDef(id, args) = func.ty(&root_body.local_decls, engine.tcx).kind() else {
+                return None;
+            };
+            Some(
+                engine
+                    .resolve_function_item(*id, args.skip_binder())
+                    .unwrap(),
+            )
+        })
+        .unwrap();
+    let mut budget = GraphBudget::new(0).unwrap();
+    let outer_body = engine
+        .capture_niche_comparison_body(outer, &mut budget, true, GraphGoal::ByteRoute)
+        .unwrap()
+        .body;
+    let TerminatorKind::Call { func, .. } = &outer_body.basic_blocks
+        [rustc_middle::mir::START_BLOCK]
+        .terminator()
+        .kind
+    else {
+        panic!("actual dispatcher")
+    };
+    let ty::FnDef(id, args) = func.ty(&outer_body.local_decls, engine.tcx).kind() else {
+        panic!("actual dispatcher item")
+    };
+    let dispatcher = engine
+        .resolve_function_item(*id, args.skip_binder())
+        .unwrap();
+    let dispatcher_body = engine
+        .capture_niche_comparison_body(dispatcher, &mut budget, true, GraphGoal::ByteRoute)
+        .unwrap()
+        .body;
+    let original = outer.args.type_at(0);
+    budget.charge(8).unwrap();
+    let records = [
+        (outer, outer_body.clone()),
+        (dispatcher, dispatcher_body.clone()),
+    ];
+    let mapping =
+        byte_transport::bind_current(engine, original, outer, dispatcher, &records, &mut budget)
+            .unwrap()
+            .unwrap();
+    let fact =
+        byte_transport::compiler_byte_layout(engine, &mapping, original, &mut budget).unwrap();
+    assert!(fact.matches(original));
+    assert!(!fact.matches(engine.tcx.types.bool));
+    let error = match byte_transport::compiler_byte_layout(
+        engine,
+        &mapping,
+        engine.tcx.types.bool,
+        &mut GraphBudget::new(0).unwrap(),
+    ) {
+        Ok(_) => panic!("foreign original item produced a byte layout fact"),
+        Err(error) => error,
+    };
+    assert_eq!(
+        error,
+        "byte layout fact has a different original caller item"
+    );
+    let held = engine.bodies.borrow_mut();
+    let error = match byte_transport::compiler_byte_layout(
+        engine,
+        &mapping,
+        original,
+        &mut GraphBudget::new(0).unwrap(),
+    ) {
+        Ok(_) => panic!("conflicting registry produced a layout fact"),
+        Err(error) => error,
+    };
+    assert_eq!(error, "byte layout Body registry is borrowed");
+    drop(held);
+    eprintln!("BYTE LAYOUT actual SIZE equals original size1 align1; no branch/storage rights");
+    super::byte_search_source::pending::compiler_controls(
+        engine,
+        mapping.helpers[5].instance,
+        budget.work,
+    );
+}
