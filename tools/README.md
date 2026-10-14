@@ -1,5 +1,9 @@
 # Fleet survey runner
 
+For a separate comparison with Kani, Crux-MIR and MIRAI, see the
+[verifier benchmark](verifier_comparison/README.md). Its selected host cases and DR16 wrappers are
+independent of fleet coverage counts.
+
 `fleet_survey.py` inventories every workspace library and binary target discovered beneath a fleet
 checkout, excluding the host-only `xtask`. It skips `target`, `.git`, virtual environments and
 Node dependencies. Pinned Cargo metadata supplies workspace membership and expected units;

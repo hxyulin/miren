@@ -1,0 +1,633 @@
+{
+  "schema_version": 1,
+  "measured_on": "2026-10-15",
+  "host": "aarch64-apple-darwin",
+  "miren_commit": "8472192c286078ac20057b98a674edc9f6019a10",
+  "cases_sha256": "9ce01d52af1cbf57e9a5c029756dc45e435624e67a05b13c9c7d83b6c772f171",
+  "parser_sha256": "712579d7777993448d557c4345b23cd5347a7e4dc9b9ed56eab7e791728a859f",
+  "parser_wrapper_sha256": "7e3d0776be9aade403ad7ecd01dbb5efcebada9b8feddb26f3a41c8b7aae1fd6",
+  "evidence_directory": "/tmp/miren-verifier-comparison-20261015",
+  "summary_sha256": {
+    "final-miren-kani": "2fdcae2c143bcdc8944f3a9d2339857b801b58e5b13d79e148717af67ab75e6a",
+    "final-crux": "9f80b2e3b85091ac2635b985a2a92bdf45c86a98ae995ba82e98dea304d889b7",
+    "final-mirai": "0e06c6b1f2c573e38ed9563f5e01c7b194f4eef593ca756ff669fa0dc54530a1"
+  },
+  "cases": [
+    {
+      "case": "guarded_index",
+      "expected": "safe",
+      "miren": {
+        "result": "PROVED",
+        "elapsed_seconds": 0.14373375,
+        "detail": [],
+        "stdout_sha256": "48debc1673e5c6c84febdce3960808c145b300a3cef85b3a80f98089c6ee12f1",
+        "stderr_sha256": "614540b92272cd5ddee152f1066f77ff4e550f6cf4efa76666f7214ffb734eae",
+        "binary_sha256": "cbe992d3731002e2f31fece3668061967b4306e4250f2885e9a9a5fa914dfef7"
+      },
+      "kani": {
+        "result": "PROVED",
+        "elapsed_seconds": 0.20031308400000003,
+        "detail": [],
+        "stdout_sha256": "095beeeb65f1988a28bd7e6328ab9ae6e0b7ac0db3b6aa8cf3d9f454bda5ff43",
+        "stderr_sha256": "d639ec53c3a2fb74232930e56eb7fb73193f6cf403dff2f8672c1d0209708058",
+        "binary_sha256": "d7f99c21b4964300daac2f6272f4317891719dece33c1d4857079237ac83490b"
+      },
+      "crux": {
+        "result": "PROVED",
+        "elapsed_seconds": 0.5387638750253245,
+        "detail": [],
+        "stdout_sha256": "11ba13a1e051a8d1749d7436bf17309cbf8a82889346758dffa62f90e6631de6",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "binary_sha256": "3ac125cbcf3d4dfd2cd7cad09ccdb45e166e8d218d5a4338091b2f40e8f74c2c"
+      },
+      "mirai": {
+        "result": "NO_DIAGNOSTIC",
+        "elapsed_seconds": 0.081724459,
+        "detail": [],
+        "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "binary_sha256": "d5ab4516343bf3f1897438f752e7e9abfab8dc3b463f9798c140eaaf5a2b5811"
+      }
+    },
+    {
+      "case": "unguarded_index",
+      "expected": "panic",
+      "miren": {
+        "result": "REFUTED",
+        "elapsed_seconds": 0.08826783300000002,
+        "detail": [],
+        "stdout_sha256": "986576e653b44bf5772ebc9f343cc47b94a9c04eee3734511c848cc1493bafd8",
+        "stderr_sha256": "e44bc62d307cb57f798b179fbf10ac6a16dee64aef4e3c10458fcc54a8783825",
+        "binary_sha256": "cbe992d3731002e2f31fece3668061967b4306e4250f2885e9a9a5fa914dfef7"
+      },
+      "kani": {
+        "result": "REFUTED",
+        "elapsed_seconds": 0.1860779159999999,
+        "detail": [],
+        "stdout_sha256": "fdfb2afb19e81dbf987ec3f6f8f3abfb21bf18375622976d1cd5fd84e1a143bf",
+        "stderr_sha256": "86a7ad60ee8819820111771157b4d376066388fa24ded667876cb3d45a50a6cf",
+        "binary_sha256": "d7f99c21b4964300daac2f6272f4317891719dece33c1d4857079237ac83490b"
+      },
+      "crux": {
+        "result": "REFUTED",
+        "elapsed_seconds": 0.2545045829610899,
+        "detail": [],
+        "stdout_sha256": "059663a89b4d6b269604821303d49de47d023a8fa6f7ab535989011e32f81256",
+        "stderr_sha256": "05925b99dba6019078356e9cb4e91b39e01135334ef57818473cb5b5c7cd94ad",
+        "binary_sha256": "3ac125cbcf3d4dfd2cd7cad09ccdb45e166e8d218d5a4338091b2f40e8f74c2c"
+      },
+      "mirai": {
+        "result": "DIAGNOSTIC",
+        "elapsed_seconds": 0.0873555,
+        "detail": [
+          "warning: [MIRAI] possible index out of bounds"
+        ],
+        "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_sha256": "940f68b0c7b1f78cbe122acba551b6d08d3ac4d16c4d780015c1b05e1b81e904",
+        "binary_sha256": "d5ab4516343bf3f1897438f752e7e9abfab8dc3b463f9798c140eaaf5a2b5811"
+      }
+    },
+    {
+      "case": "checked_add",
+      "expected": "safe",
+      "miren": {
+        "result": "PROVED",
+        "elapsed_seconds": 0.08556162500000003,
+        "detail": [],
+        "stdout_sha256": "19d49fa45874bb5a5c36ee70a4dea160c559b8f4e1f00c3d2ed23b8ffa630e4a",
+        "stderr_sha256": "7fd4e1b167d447e7305d2e343993fb9a048e80f99130872d11d94203971596f0",
+        "binary_sha256": "cbe992d3731002e2f31fece3668061967b4306e4250f2885e9a9a5fa914dfef7"
+      },
+      "kani": {
+        "result": "PROVED",
+        "elapsed_seconds": 0.1975115409999999,
+        "detail": [],
+        "stdout_sha256": "f8ddb299dde49fe609626b92f26baf581206236e879104a8423f7083f3d849bf",
+        "stderr_sha256": "2d2b4442a7d44bd5bf92b5ff583a013c858115df13e50a11cded6ca63e61b4b6",
+        "binary_sha256": "d7f99c21b4964300daac2f6272f4317891719dece33c1d4857079237ac83490b"
+      },
+      "crux": {
+        "result": "PROVED",
+        "elapsed_seconds": 0.4722522919764742,
+        "detail": [],
+        "stdout_sha256": "3140e402f549492cdaf2de5c580db3314b00ee9810d95d5d383f47a695463d77",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "binary_sha256": "3ac125cbcf3d4dfd2cd7cad09ccdb45e166e8d218d5a4338091b2f40e8f74c2c"
+      },
+      "mirai": {
+        "result": "NO_DIAGNOSTIC",
+        "elapsed_seconds": 0.08653495900000002,
+        "detail": [],
+        "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "binary_sha256": "d5ab4516343bf3f1897438f752e7e9abfab8dc3b463f9798c140eaaf5a2b5811"
+      }
+    },
+    {
+      "case": "overflow_add",
+      "expected": "panic",
+      "miren": {
+        "result": "REFUTED",
+        "elapsed_seconds": 0.07795470900000001,
+        "detail": [],
+        "stdout_sha256": "189a7384fb41403c6c412838a18b2804dc59b85081af6247236d8ea6c3391eb4",
+        "stderr_sha256": "e44bc62d307cb57f798b179fbf10ac6a16dee64aef4e3c10458fcc54a8783825",
+        "binary_sha256": "cbe992d3731002e2f31fece3668061967b4306e4250f2885e9a9a5fa914dfef7"
+      },
+      "kani": {
+        "result": "REFUTED",
+        "elapsed_seconds": 0.20004408399999996,
+        "detail": [],
+        "stdout_sha256": "1d61a275e7e8e209a12ed892904e830be17aea0970c61d203a39d5fb5ebecaf4",
+        "stderr_sha256": "b2e0535ab8665670abcb24253c383e9858c623a9fde91e35468b4d54c1607666",
+        "binary_sha256": "d7f99c21b4964300daac2f6272f4317891719dece33c1d4857079237ac83490b"
+      },
+      "crux": {
+        "result": "REFUTED",
+        "elapsed_seconds": 0.19351062504574656,
+        "detail": [],
+        "stdout_sha256": "922c78694e82a88b8871c0755562a0cc2b1dedee07c03698f69a3fef84cab0fe",
+        "stderr_sha256": "9ddf369adeb925fca8eeea13807ba82b1c9993a47068cb60a5d508275fa1af1b",
+        "binary_sha256": "3ac125cbcf3d4dfd2cd7cad09ccdb45e166e8d218d5a4338091b2f40e8f74c2c"
+      },
+      "mirai": {
+        "result": "DIAGNOSTIC",
+        "elapsed_seconds": 0.08957654200000004,
+        "detail": [
+          "warning: [MIRAI] possible attempt to add with overflow"
+        ],
+        "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_sha256": "fbbe06a43c523faba99de16905a921c3848ec596e1191e615a407f044f097ab3",
+        "binary_sha256": "d5ab4516343bf3f1897438f752e7e9abfab8dc3b463f9798c140eaaf5a2b5811"
+      }
+    },
+    {
+      "case": "nonzero_match",
+      "expected": "safe",
+      "miren": {
+        "result": "PROVED",
+        "elapsed_seconds": 0.08498691600000002,
+        "detail": [],
+        "stdout_sha256": "20ec4a33292564b921fc6c114560031b908a8a018747215cdd1c1d90bf841198",
+        "stderr_sha256": "7fd4e1b167d447e7305d2e343993fb9a048e80f99130872d11d94203971596f0",
+        "binary_sha256": "cbe992d3731002e2f31fece3668061967b4306e4250f2885e9a9a5fa914dfef7"
+      },
+      "kani": {
+        "result": "PROVED",
+        "elapsed_seconds": 0.20204283300000014,
+        "detail": [],
+        "stdout_sha256": "88b69d92f294502cfce503a78b15decfb5b7e010a49795bcb3c7f3830615ca14",
+        "stderr_sha256": "ce8af6a6075557ab90ffe005b92c84408ea0e63940318874464617f776549f6d",
+        "binary_sha256": "d7f99c21b4964300daac2f6272f4317891719dece33c1d4857079237ac83490b"
+      },
+      "crux": {
+        "result": "PROVED",
+        "elapsed_seconds": 0.4325126250041649,
+        "detail": [],
+        "stdout_sha256": "991c754893b3e803a562c3b739586f082ce73c7dd7ce37bbf436d1221ac867fd",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "binary_sha256": "3ac125cbcf3d4dfd2cd7cad09ccdb45e166e8d218d5a4338091b2f40e8f74c2c"
+      },
+      "mirai": {
+        "result": "DIAGNOSTIC",
+        "elapsed_seconds": 0.087892042,
+        "detail": [
+          "warning: [MIRAI] assertion failed"
+        ],
+        "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_sha256": "5368fc747312afabbffe726036ba1f0a6db18e325f01a718b6579d16d5086172",
+        "binary_sha256": "d5ab4516343bf3f1897438f752e7e9abfab8dc3b463f9798c140eaaf5a2b5811"
+      }
+    },
+    {
+      "case": "nonzero_unwrap",
+      "expected": "panic",
+      "miren": {
+        "result": "REFUTED",
+        "elapsed_seconds": 0.08042333400000001,
+        "detail": [],
+        "stdout_sha256": "10ad48c4d01f775a83980ab6b13b913a3f98d5bec0c6ffcc19354f8387f7dc72",
+        "stderr_sha256": "e44bc62d307cb57f798b179fbf10ac6a16dee64aef4e3c10458fcc54a8783825",
+        "binary_sha256": "cbe992d3731002e2f31fece3668061967b4306e4250f2885e9a9a5fa914dfef7"
+      },
+      "kani": {
+        "result": "REFUTED",
+        "elapsed_seconds": 0.18854504199999989,
+        "detail": [],
+        "stdout_sha256": "dc13c4c94131e45bd198580b4e4b892a3311dca104b605e4ace16aa432963c99",
+        "stderr_sha256": "1a6cd383c686a54811a3696feee6c911087154a2c719e2b55423f93b5d6952b7",
+        "binary_sha256": "d7f99c21b4964300daac2f6272f4317891719dece33c1d4857079237ac83490b"
+      },
+      "crux": {
+        "result": "REFUTED",
+        "elapsed_seconds": 0.20279487501829863,
+        "detail": [],
+        "stdout_sha256": "2579b2a42837c2c2dfba2d94c6e9202f3ac1cbff4736a9d38132dd1e3612f099",
+        "stderr_sha256": "54871605820df881c8ae60946de58a34fc3c6a2326edfb8f5783330c84044103",
+        "binary_sha256": "3ac125cbcf3d4dfd2cd7cad09ccdb45e166e8d218d5a4338091b2f40e8f74c2c"
+      },
+      "mirai": {
+        "result": "DIAGNOSTIC",
+        "elapsed_seconds": 0.08260699999999999,
+        "detail": [
+          "warning: [MIRAI] possible called `Option::unwrap()` on a `None` value"
+        ],
+        "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_sha256": "081a33f7133f32a784ab207dfbfddd3f4f0d55c4498e85e0b898a9b6f354fe25",
+        "binary_sha256": "d5ab4516343bf3f1897438f752e7e9abfab8dc3b463f9798c140eaaf5a2b5811"
+      }
+    },
+    {
+      "case": "mutable_preserve",
+      "expected": "safe",
+      "miren": {
+        "result": "PROVED",
+        "elapsed_seconds": 0.32028308299999997,
+        "detail": [],
+        "stdout_sha256": "6ba3069dfb86bbb87c47d62f29a57e55f0f9577f23880281fc77645aaeb85520",
+        "stderr_sha256": "51417e21f2501b491b630abd44a2a084cac6af82407ac742a6f581838b88ae1a",
+        "binary_sha256": "cbe992d3731002e2f31fece3668061967b4306e4250f2885e9a9a5fa914dfef7"
+      },
+      "kani": {
+        "result": "PROVED",
+        "elapsed_seconds": 0.2660037500000003,
+        "detail": [],
+        "stdout_sha256": "24dc4f6ab32bc4c141fdb8991f77932dbdaf20f243d1d6dc1b41d869dc0c2d6e",
+        "stderr_sha256": "e2f45a5a009488e0b8b4cd21dc84b0e71da102efd9b92445ff560cb2194a7b48",
+        "binary_sha256": "d7f99c21b4964300daac2f6272f4317891719dece33c1d4857079237ac83490b"
+      },
+      "crux": {
+        "result": "PROVED",
+        "elapsed_seconds": 0.4913709160173312,
+        "detail": [],
+        "stdout_sha256": "9451c87a16173e2d6dcd5aff3b0f0acbd66cff9f367ec32074d8c3a4e125cdf1",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "binary_sha256": "3ac125cbcf3d4dfd2cd7cad09ccdb45e166e8d218d5a4338091b2f40e8f74c2c"
+      },
+      "mirai": {
+        "result": "NO_DIAGNOSTIC",
+        "elapsed_seconds": 0.07789124999999997,
+        "detail": [],
+        "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "binary_sha256": "d5ab4516343bf3f1897438f752e7e9abfab8dc3b463f9798c140eaaf5a2b5811"
+      }
+    },
+    {
+      "case": "mutable_wrong_claim",
+      "expected": "panic",
+      "miren": {
+        "result": "UNKNOWN",
+        "elapsed_seconds": 0.08339570800000007,
+        "detail": [
+          "MIR body unavailable for core::panicking::assert_failed_inner; the prebuilt core library omitted this body; cargo -Zbuild-std=core can retain it"
+        ],
+        "stdout_sha256": "81f8196021830336393f5e11fa195aae452708804288e6ad3ba0ce935a9c7d31",
+        "stderr_sha256": "e44bc62d307cb57f798b179fbf10ac6a16dee64aef4e3c10458fcc54a8783825",
+        "binary_sha256": "cbe992d3731002e2f31fece3668061967b4306e4250f2885e9a9a5fa914dfef7"
+      },
+      "kani": {
+        "result": "REFUTED",
+        "elapsed_seconds": 0.20454616599999964,
+        "detail": [],
+        "stdout_sha256": "57c56619ec1c99f18ae5d31a702de16bd78622be3d31759b35127d5439947df2",
+        "stderr_sha256": "3aab52423a09c83c1d3a234e1198d42622a214cd9e2f051ffab0fdeaa9b9766f",
+        "binary_sha256": "d7f99c21b4964300daac2f6272f4317891719dece33c1d4857079237ac83490b"
+      },
+      "crux": {
+        "result": "REFUTED",
+        "elapsed_seconds": 0.4823232910130173,
+        "detail": [],
+        "stdout_sha256": "d6ec6de1e3f4cea01149fabb1e6ea8d1d4fabd8cf7e885ab7bab6818f55781d1",
+        "stderr_sha256": "894f079a43a14d31a1e39428fccf789a53f618ee07a05bc175130de13891cf30",
+        "binary_sha256": "3ac125cbcf3d4dfd2cd7cad09ccdb45e166e8d218d5a4338091b2f40e8f74c2c"
+      },
+      "mirai": {
+        "result": "NO_DIAGNOSTIC",
+        "elapsed_seconds": 0.08514129200000009,
+        "detail": [],
+        "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "binary_sha256": "d5ab4516343bf3f1897438f752e7e9abfab8dc3b463f9798c140eaaf5a2b5811"
+      }
+    },
+    {
+      "case": "bounded_iterator",
+      "expected": "safe",
+      "miren": {
+        "result": "PROVED",
+        "elapsed_seconds": 0.13912725000000004,
+        "detail": [],
+        "stdout_sha256": "be5ec3bdd83313c9cb3f2a688100735b22b836dbc1419a6cbd6e7bccf81a9ccd",
+        "stderr_sha256": "614540b92272cd5ddee152f1066f77ff4e550f6cf4efa76666f7214ffb734eae",
+        "binary_sha256": "cbe992d3731002e2f31fece3668061967b4306e4250f2885e9a9a5fa914dfef7"
+      },
+      "kani": {
+        "result": "PROVED",
+        "elapsed_seconds": 0.5446356670000001,
+        "detail": [],
+        "stdout_sha256": "485a81e7206f6f801245444e07f46ab162b26e0b16162708cc951d3075f35ceb",
+        "stderr_sha256": "6abbfe4776ed36496b1b861c31ec872b174e1780e21222253631c2452c0b4ac4",
+        "binary_sha256": "d7f99c21b4964300daac2f6272f4317891719dece33c1d4857079237ac83490b"
+      },
+      "crux": {
+        "result": "PROVED",
+        "elapsed_seconds": 0.26835650007706136,
+        "detail": [],
+        "stdout_sha256": "a566ce87aff107d0053cd4c59a191786282838541190486410d3bdfcf08525b5",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "binary_sha256": "3ac125cbcf3d4dfd2cd7cad09ccdb45e166e8d218d5a4338091b2f40e8f74c2c"
+      },
+      "mirai": {
+        "result": "DIAGNOSTIC",
+        "elapsed_seconds": 0.1439179169999999,
+        "detail": [
+          "warning: [MIRAI] possible attempt to add with overflow"
+        ],
+        "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_sha256": "c0b2764688fa61db31a83485b5e7b9a1debc5a4fc152313469c8c3454470b4c5",
+        "binary_sha256": "d5ab4516343bf3f1897438f752e7e9abfab8dc3b463f9798c140eaaf5a2b5811"
+      }
+    },
+    {
+      "case": "trait_dispatch",
+      "expected": "safe",
+      "miren": {
+        "result": "PROVED",
+        "elapsed_seconds": 0.0803070840000002,
+        "detail": [],
+        "stdout_sha256": "108055fd19da4f627a3043acff7636449ab553b2b75c67f91c65dff9603e0a15",
+        "stderr_sha256": "7fd4e1b167d447e7305d2e343993fb9a048e80f99130872d11d94203971596f0",
+        "binary_sha256": "cbe992d3731002e2f31fece3668061967b4306e4250f2885e9a9a5fa914dfef7"
+      },
+      "kani": {
+        "result": "PROVED",
+        "elapsed_seconds": 0.20527008400000035,
+        "detail": [],
+        "stdout_sha256": "13e6f399a336dfd2ae11578ddf245c8566b04a3c93c9750ffd14a07bc76d6aea",
+        "stderr_sha256": "b457def7832627596bf46d37bb0d59ac716bdecdc114e23bf0c3d33fb815eb45",
+        "binary_sha256": "d7f99c21b4964300daac2f6272f4317891719dece33c1d4857079237ac83490b"
+      },
+      "crux": {
+        "result": "REFUTED",
+        "elapsed_seconds": 0.44138962496072054,
+        "detail": [
+          "False alarm: exhaustive native trait test and Kani pass; symbolic branch reproduces."
+        ],
+        "stdout_sha256": "53d96314e0d61f3becaf46507deed84ef5848feb22ecc6b0fcdd9db5577f4670",
+        "stderr_sha256": "66d15c539152fec8a4297f808060d18b5cc90efd57f86b969073980e56d4b6e5",
+        "binary_sha256": "3ac125cbcf3d4dfd2cd7cad09ccdb45e166e8d218d5a4338091b2f40e8f74c2c"
+      },
+      "mirai": {
+        "result": "DIAGNOSTIC",
+        "elapsed_seconds": 0.08961854199999997,
+        "detail": [
+          "warning: [MIRAI] the called function did not resolve to an implementation with a MIR body"
+        ],
+        "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_sha256": "bb38842cb8715fbff67beabb4847ef365bc0d5aeef439871bb3b64744912ee5d",
+        "binary_sha256": "d5ab4516343bf3f1897438f752e7e9abfab8dc3b463f9798c140eaaf5a2b5811"
+      }
+    },
+    {
+      "case": "vec_roundtrip",
+      "expected": "safe",
+      "miren": {
+        "result": "UNKNOWN",
+        "elapsed_seconds": 0.04711483400000005,
+        "detail": [
+          "alloc::raw_vec::RawVecInner::<A>::try_allocate_in bb17: unsupported transmute from std::mem::Alignment to usize"
+        ],
+        "stdout_sha256": "7cf0aab3328c93f0b4e588d151feea471e3cfc95913c009c02ea025586e3f9bf",
+        "stderr_sha256": "e44bc62d307cb57f798b179fbf10ac6a16dee64aef4e3c10458fcc54a8783825",
+        "binary_sha256": "cbe992d3731002e2f31fece3668061967b4306e4250f2885e9a9a5fa914dfef7"
+      },
+      "kani": {
+        "result": "PROVED",
+        "elapsed_seconds": 1.7367528329999997,
+        "detail": [],
+        "stdout_sha256": "39e5c735804c659c8e76ea7a4fd4bce419adfcd9203ef9c4124b3aed823f56a8",
+        "stderr_sha256": "9b4f97b33adea6981c12d28b92513584f8f5da84971db91fa61a86dc52cca20e",
+        "binary_sha256": "d7f99c21b4964300daac2f6272f4317891719dece33c1d4857079237ac83490b"
+      },
+      "crux": {
+        "result": "PROVED",
+        "elapsed_seconds": 0.5653240829706192,
+        "detail": [],
+        "stdout_sha256": "edace9c4cbcddb52b5e32aca0fe4c6776c41b9ff866cddfc024c5c586083341f",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "binary_sha256": "3ac125cbcf3d4dfd2cd7cad09ccdb45e166e8d218d5a4338091b2f40e8f74c2c"
+      },
+      "mirai": {
+        "result": "DIAGNOSTIC",
+        "elapsed_seconds": 0.14326366700000004,
+        "detail": [
+          "warning: [MIRAI] assertion failed"
+        ],
+        "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_sha256": "67e6f7417729bbc6f5bc1f3db081bad00cf9b8acdbd3425e77e6d5b7ac10660f",
+        "binary_sha256": "d5ab4516343bf3f1897438f752e7e9abfab8dc3b463f9798c140eaaf5a2b5811"
+      }
+    },
+    {
+      "case": "vec_wrong_length",
+      "expected": "panic",
+      "miren": {
+        "result": "UNKNOWN",
+        "elapsed_seconds": 0.047370541999999904,
+        "detail": [
+          "alloc::raw_vec::RawVecInner::<A>::try_allocate_in bb17: unsupported transmute from std::mem::Alignment to usize"
+        ],
+        "stdout_sha256": "cf3ed344115200e6321429405a9ef30123ba9db428b3994fa348ecdc9169f048",
+        "stderr_sha256": "e44bc62d307cb57f798b179fbf10ac6a16dee64aef4e3c10458fcc54a8783825",
+        "binary_sha256": "cbe992d3731002e2f31fece3668061967b4306e4250f2885e9a9a5fa914dfef7"
+      },
+      "kani": {
+        "result": "REFUTED",
+        "elapsed_seconds": 1.147006417,
+        "detail": [],
+        "stdout_sha256": "8dc642b71f3392ece1f419e9ab7ecf83381f271d039e5ecb3c7c834764b61d71",
+        "stderr_sha256": "a9dfc0aa7d815adf71f750e7d287e8518a9e3bbe0443aa74096b1b015e880c74",
+        "binary_sha256": "d7f99c21b4964300daac2f6272f4317891719dece33c1d4857079237ac83490b"
+      },
+      "crux": {
+        "result": "REFUTED",
+        "elapsed_seconds": 0.5470001249341294,
+        "detail": [],
+        "stdout_sha256": "32bda59050af25b560f9570cbdb359e380c42ee6871da31c121f684f25a1898d",
+        "stderr_sha256": "659da715531f56e308b98e8562a7ba89418d34c8c7c7ae379805f1f5097530a4",
+        "binary_sha256": "3ac125cbcf3d4dfd2cd7cad09ccdb45e166e8d218d5a4338091b2f40e8f74c2c"
+      },
+      "mirai": {
+        "result": "DIAGNOSTIC",
+        "elapsed_seconds": 0.14018333299999997,
+        "detail": [
+          "warning: [MIRAI] assertion failed"
+        ],
+        "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_sha256": "f8c09aaf640257b7a38537671b115830876431f5e186c2117e7a153ded5abc17",
+        "binary_sha256": "d5ab4516343bf3f1897438f752e7e9abfab8dc3b463f9798c140eaaf5a2b5811"
+      }
+    },
+    {
+      "case": "async_two_polls",
+      "expected": "safe",
+      "miren": {
+        "result": "PROVED",
+        "elapsed_seconds": 0.08485170799999997,
+        "detail": [],
+        "stdout_sha256": "b332cf405c2d0da21683809fe204f1e61bf7657a0b4bb74543f71854ec99ab88",
+        "stderr_sha256": "7fd4e1b167d447e7305d2e343993fb9a048e80f99130872d11d94203971596f0",
+        "binary_sha256": "cbe992d3731002e2f31fece3668061967b4306e4250f2885e9a9a5fa914dfef7"
+      },
+      "kani": {
+        "result": "PROVED",
+        "elapsed_seconds": 0.3245688330000007,
+        "detail": [],
+        "stdout_sha256": "5859f212f8ca5c8bca510aa4d8de793f4dc12d2e2b3a5fca17e969b7a33fb170",
+        "stderr_sha256": "ee22ef0b6e524b2f8a3df94a50b74281aa288e3cbfb66a3f54b9729704ccd798",
+        "binary_sha256": "d7f99c21b4964300daac2f6272f4317891719dece33c1d4857079237ac83490b"
+      },
+      "crux": {
+        "result": "PROVED",
+        "elapsed_seconds": 0.4372182920342311,
+        "detail": [],
+        "stdout_sha256": "0dfcfddf1342a94eb98d791dafe1636ffcf48b7f6441707121cc158409012472",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "binary_sha256": "3ac125cbcf3d4dfd2cd7cad09ccdb45e166e8d218d5a4338091b2f40e8f74c2c"
+      },
+      "mirai": {
+        "result": "DIAGNOSTIC",
+        "elapsed_seconds": 0.08654824999999988,
+        "detail": [
+          "warning: [MIRAI] possible assertion failed: value < 6"
+        ],
+        "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_sha256": "eeff251e4d98eed9535fa65ec3a9d316b4a6b10f10e6d21b8c4baa47a7a4343d",
+        "binary_sha256": "d5ab4516343bf3f1897438f752e7e9abfab8dc3b463f9798c140eaaf5a2b5811"
+      }
+    },
+    {
+      "case": "async_late_panic",
+      "expected": "panic",
+      "miren": {
+        "result": "REFUTED",
+        "elapsed_seconds": 0.08793941599999999,
+        "detail": [],
+        "stdout_sha256": "f47923996682673da781af55b9cb0874c14812bb43da49d5b8ac8f55547050ec",
+        "stderr_sha256": "e44bc62d307cb57f798b179fbf10ac6a16dee64aef4e3c10458fcc54a8783825",
+        "binary_sha256": "cbe992d3731002e2f31fece3668061967b4306e4250f2885e9a9a5fa914dfef7"
+      },
+      "kani": {
+        "result": "REFUTED",
+        "elapsed_seconds": 0.26347358399999976,
+        "detail": [],
+        "stdout_sha256": "ae46d092e6bb3d2f41a4a6023c1678971c9ec9c88ac970f1e069d2102a63942f",
+        "stderr_sha256": "f474f2e6ff50ebaebf268d98c0cd688d6f5bb37355a9e11e2787398afa96f7c5",
+        "binary_sha256": "d7f99c21b4964300daac2f6272f4317891719dece33c1d4857079237ac83490b"
+      },
+      "crux": {
+        "result": "REFUTED",
+        "elapsed_seconds": 0.20774724998045713,
+        "detail": [],
+        "stdout_sha256": "23357187de6b611070d2ec4c079601d1f5792195099cf1ac37dfdd93a74b6e6d",
+        "stderr_sha256": "af2793b20bb8ea0a943ed56c49bb9fde7cb418367529b16b3eb714c8a4d91f9c",
+        "binary_sha256": "3ac125cbcf3d4dfd2cd7cad09ccdb45e166e8d218d5a4338091b2f40e8f74c2c"
+      },
+      "mirai": {
+        "result": "DIAGNOSTIC",
+        "elapsed_seconds": 0.08353595800000013,
+        "detail": [
+          "warning: [MIRAI] assertion failed: future.as_mut().poll(&mut context).is_pending()",
+          "warning: [MIRAI] possible assertion failed: value < 6"
+        ],
+        "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_sha256": "0f9c9a6d63c3e13b46872cba9876034a18e514b394848a614b74f5dc5736f759",
+        "binary_sha256": "d5ab4516343bf3f1897438f752e7e9abfab8dc3b463f9798c140eaaf5a2b5811"
+      }
+    }
+  ],
+  "tools": {
+    "miren": {
+      "version": "0.1.0",
+      "compiler": "nightly-2026-09-22",
+      "binary_source": "Stage 279 authenticated release; production engine matches 8472192"
+    },
+    "kani": {
+      "version": "0.68.0",
+      "backend": "CBMC 6.11.0 / CaDiCaL",
+      "compiler": "nightly-2026-08-21"
+    },
+    "crux": {
+      "version": "0.13.0.0.99",
+      "commit": "7f49dac06c656f7b92c8b6cc054f47c63b60abe4",
+      "artifact_id": 11885648558,
+      "mir_json_artifact_id": 11909269147,
+      "mir_json_schema": 13,
+      "compiler": "nightly-2026-03-21",
+      "solver": "Z3"
+    },
+    "mirai": {
+      "package_version": "1.1.12",
+      "cli_version": "1.1.7 (stale upstream version string)",
+      "commit": "aae0a56f91d9a0a62073bb86e7b2c9793cefc24b",
+      "compiler": "nightly-2025-01-10",
+      "features": [
+        "z3",
+        "z3-sys"
+      ],
+      "upstream_source_modified": false,
+      "lock_resolution_modified": true
+    }
+  },
+  "dr16": {
+    "miren": {
+      "receipt_sha256": "e8f0be3336f47c9ec71025733606534f58f1a99e77ca6ef808902db5b091b9cc",
+      "stdout_sha256": "2d8a2613f2539b0bc06c9bd656dd73812c9ed1a19c9bac8b1a680e67b34d8bba",
+      "stderr_sha256": "f0d678931130268c6ce009831c9c8277a9fe74913119bcf9444ee4546c444692",
+      "result": "TWO_PROVED"
+    },
+    "kani": {
+      "receipt_sha256": "be8538ba0b3837d15074867bf81073a17f1f8391cc58cd8c8c5d899f0e563d85",
+      "stdout_sha256": "1a4ab392488b86416c64fd02dd75cd57fa2803b38c24102bf391c64650b45388",
+      "stderr_sha256": "171375c1635b5d711a3459d020333172934aa976ae7e9c78b0c2ff05fe293eef",
+      "result": "TWO_PROVED"
+    },
+    "crux": {
+      "receipt_sha256": "1e2543c36af4ea89be85c81be4128006994e77ab1e2028a035eaabc411b5c2d1",
+      "stdout_sha256": "ab850dea733e87acd71d69c47aea1aefe5becdfb74651b9b09cc6804eee90e6f",
+      "stderr_sha256": "f8f3276e6524784173b74330366e6dc309fcad10e2e5555f0de63bc6e4e2ae9b",
+      "result": "TWO_PROVED"
+    },
+    "mirai": {
+      "receipt_sha256": "2652c89235b166eb9eaebc0a3e1a4b618d11ff2022f516f69650ea0e5290a3e8",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "342ba91b1c52da6f514208c10064b4dce3537ba7a04031778556a84269cc98b5",
+      "result": "DIAGNOSTIC"
+    },
+    "native": {
+      "receipt_sha256": "313deb3218c9669ae5ffb562b66a0f2bada4cfb401524119905014314ec609a7",
+      "stdout_sha256": "20f3d9bbd1d20d7bfdbe4f6a510b48866077b4bb7b4632f19119d9e072586fe1",
+      "stderr_sha256": "262e2cffba1d30fd95de5cd110ef1e61129ce404bd1e332a4c2088c9f7d5b70e",
+      "result": "NATIVE_PASS"
+    }
+  },
+  "evidence_archive": {
+    "path": "/tmp/miren-verifier-comparison-20261015/benchmark-evidence.tar.gz",
+    "sha256": "366e75db053513e4f756675c12dbccfb8a675e005911cdf266c3ff9ad19131e7",
+    "files": 255,
+    "bytes": 158666
+  },
+  "validation": {
+    "project_checks_receipt_sha256": "cb9dfb7705224741e7c28916b6d482f5b1b71d76176170c0ecbfb7251df02286",
+    "workspace_checks": [
+      "fmt",
+      "lint",
+      "tests",
+      "python",
+      "release",
+      "deny"
+    ],
+    "native_shared_controls_receipt_sha256": "1752049609042a340900cc19fe5d07cc517e22bac933f9da3b486d3a3c2e6bb9"
+  }
+}
