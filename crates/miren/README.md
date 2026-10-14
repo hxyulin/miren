@@ -2142,3 +2142,11 @@ Executable Box source preparation categorizes an unsupported ordinary helper int
 semantic UNKNOWN. The effectful destructor control retains its default resource refusal; at the
 larger diagnostic budget it reaches this explicit source boundary. No intrinsic effects or missing
 body are treated as successful execution.
+
+
+The byte range source checker binds complete naive/aligned algorithms and dispatcher forwarding
+under original/current body and full-signature guards. Original word constants are evaluated and
+compared with target usize layout. Its consumed metadata remains conditional: min and slice
+semantics, initialized loads, alignment, reference lifetime and the mathematical range theorem
+remain separate obligations. Pending source records still refuse their missing body; no search,
+branch exclusion or raw access certificate is issued.

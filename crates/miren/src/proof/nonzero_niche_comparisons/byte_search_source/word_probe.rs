@@ -45,6 +45,11 @@ fn actual_byte_compiler_layout_and_consumed_missing_source_controls() {
     compiler_controls(ProbePhase::Preconditions);
 }
 
+#[test]
+fn actual_typed_naive_aligned_range_sources_and_hostile_dataflow() {
+    compiler_controls(ProbePhase::Range);
+}
+
 #[derive(Clone, Copy)]
 enum ProbePhase {
     Word,
@@ -55,6 +60,7 @@ enum ProbePhase {
     RouteCopy,
     TypedRoute,
     Preconditions,
+    Range,
 }
 
 fn compiler_controls(phase: ProbePhase) {
@@ -119,6 +125,15 @@ fn compiler_controls(phase: ProbePhase) {
                 })
                 .unwrap();
             let root = ty::Instance::mono(tcx, root.to_def_id());
+            if matches!(self.phase, ProbePhase::Range) {
+                if self.retained {
+                    super::super::range::probe::compiler_controls(&engine, root);
+                    eprintln!("BYTE RANGE CALLBACK COMPLETE");
+                } else {
+                    eprintln!("BYTE RANGE default-core remains unavailable; no retained credit");
+                }
+                return rustc_driver::Compilation::Stop;
+            }
             if matches!(self.phase, ProbePhase::Preconditions) {
                 if self.retained {
                     super::super::super::byte_transport_probe::compiler_precondition_controls(

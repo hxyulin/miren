@@ -3011,3 +3011,18 @@ budget-specific statuses. The 613-case capability survey retains 336 PROVED, 164
 UNKNOWN in every profile. All 5,420 queried obligations and 656 counterexample models remain literal;
 2,450 full baseline Proofs match and two independently checked query-free fold timeout contexts
 differ. No unsupported intrinsic is executed or converted to a successful proof.
+
+
+## Compiler-bound byte search range sources
+
+The byte source checker authenticates the complete naive and aligned algorithms, dispatcher
+and forwarding wrapper against original and current typed MIR and full signatures. It evaluates
+original word-size constants against target usize layout. Consumed records retain conditional
+metadata; they cannot issue a search certificate or exclude a branch. Min, slicing, initialized
+loads, alignment, reference lifetime and the source-linked mathematical theorem remain obligations.
+
+Current checkout validation passes 1,033 Rust and 91 Python tests, formatting, lint, release builds
+and dependency checks. Four capability profiles retain 336 PROVED, 164 REFUTED and 113 UNKNOWN
+across 613 cases. All 5,420 queried obligations and 656 counterexample models remain literal.
+Of 2,452 full baseline Proofs, 2,450 match literally; two query-free fold timeout call chains
+differ. No supported outcome is added by this metadata stage.

@@ -7,6 +7,8 @@ mod allocation_size;
 pub(super) mod pending;
 #[path = "byte_search_source/population.rs"]
 mod population;
+#[path = "byte_search_source/range.rs"]
+mod range;
 pub(in crate::proof) use pending::pending;
 #[path = "byte_search_source/preparation.rs"]
 mod preparation;

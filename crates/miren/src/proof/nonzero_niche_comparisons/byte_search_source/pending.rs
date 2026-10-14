@@ -141,6 +141,8 @@ fn pending_inner<'a, 'tcx>(
 impl PendingSources<'_, '_> {
     pub(in crate::proof) fn reject(mut self) -> Result<(), String> {
         // Consumption is the only exposed transition. No retry or completed certificate exists.
+        self.work.used = range::reject_pending_range(self.engine, self.root, self.work.used)
+            .map_err(|error| self.engine.categorized_error(error.category, error.reason))?;
         self.work
             .charge(8 + 2 * self.selected.len() + 2 * self.remaining.len())
             .map_err(|error| self.engine.categorized_error(error.category, error.reason))?;
