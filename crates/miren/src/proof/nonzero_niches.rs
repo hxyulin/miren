@@ -16,7 +16,7 @@ use rustc_abi::{BackendRepr, FieldIdx, Primitive, Scalar, TagEncoding, Variants}
 use rustc_middle::mir::Local;
 use rustc_middle::ty::{AdtFlags, CoroutineArgsExt, TypeVisitableExt};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 struct NicheFacts {
     parent: BackendRepr,
     tag: Scalar,
@@ -98,6 +98,19 @@ struct Certificate<'tcx> {
     inner_field: String,
     outer_field: String,
     payload_field: String,
+    payload_variant: usize,
+    tags: [u128; 2],
+    bits: u32,
+    signed: bool,
+    facts: NicheFacts,
+}
+
+// Layout/type metadata without owned names. Codecs preplan every name before materialization.
+struct RawCertificate<'tcx> {
+    original: Ty<'tcx>,
+    nonzero: Ty<'tcx>,
+    primitive: Ty<'tcx>,
+    inner: Ty<'tcx>,
     payload_variant: usize,
     tags: [u128; 2],
     bits: u32,
@@ -213,7 +226,10 @@ fn layout<'tcx>(
         .map_err(|error| format!("NonZero layout unavailable: {error:?}"))
 }
 
-fn certify<'tcx>(tcx: TyCtxt<'tcx>, original: Ty<'tcx>) -> Result<Certificate<'tcx>, String> {
+fn certify_raw<'tcx>(
+    tcx: TyCtxt<'tcx>,
+    original: Ty<'tcx>,
+) -> Result<RawCertificate<'tcx>, String> {
     let ty::Adt(def, args) = original.kind() else {
         return Err("NonZero niche requires original enum".into());
     };
@@ -397,28 +413,60 @@ fn certify<'tcx>(tcx: TyCtxt<'tcx>, original: Ty<'tcx>) -> Result<Certificate<'t
     if tags != [0, 1] {
         return Err("NonZero original discriminant mapping mismatch".into());
     }
-    Ok(Certificate {
+    Ok(RawCertificate {
         original,
         nonzero: nonzero_ty,
         primitive,
         inner: inner_ty,
-        inner_name: tcx.def_path_str(inner.did()),
-        outer_name: tcx.def_path_str(nonzero.did()),
-        inner_field: inner.non_enum_variant().fields[field]
-            .name
-            .as_str()
-            .to_owned(),
-        outer_field: nonzero.non_enum_variant().fields[field]
-            .name
-            .as_str()
-            .to_owned(),
-        payload_field: payload.fields[field].name.as_str().to_owned(),
         payload_variant: payload_variant.as_usize(),
         tags,
         bits,
         signed,
         facts,
     })
+}
+
+fn materialize<'tcx>(
+    tcx: TyCtxt<'tcx>,
+    raw: RawCertificate<'tcx>,
+) -> Result<Certificate<'tcx>, String> {
+    let (ty::Adt(parent, _), ty::Adt(outer, _), ty::Adt(inner, _)) =
+        (raw.original.kind(), raw.nonzero.kind(), raw.inner.kind())
+    else {
+        return Err("NonZero certificate original identities absent".into());
+    };
+    let field = FieldIdx::from_usize(0);
+    Ok(Certificate {
+        original: raw.original,
+        nonzero: raw.nonzero,
+        primitive: raw.primitive,
+        inner: raw.inner,
+        inner_name: tcx.def_path_str(inner.did()),
+        outer_name: tcx.def_path_str(outer.did()),
+        inner_field: inner.non_enum_variant().fields[field]
+            .name
+            .as_str()
+            .to_owned(),
+        outer_field: outer.non_enum_variant().fields[field]
+            .name
+            .as_str()
+            .to_owned(),
+        payload_field: parent
+            .variant(rustc_abi::VariantIdx::from_usize(raw.payload_variant))
+            .fields[field]
+            .name
+            .as_str()
+            .to_owned(),
+        payload_variant: raw.payload_variant,
+        tags: raw.tags,
+        bits: raw.bits,
+        signed: raw.signed,
+        facts: raw.facts,
+    })
+}
+
+fn certify<'tcx>(tcx: TyCtxt<'tcx>, original: Ty<'tcx>) -> Result<Certificate<'tcx>, String> {
+    materialize(tcx, certify_raw(tcx, original)?)
 }
 
 #[cfg(test)]
@@ -2152,3 +2200,7 @@ impl Schema {
 #[cfg(test)]
 #[path = "nonzero_signed_probe.rs"]
 mod signed_probe;
+
+#[cfg(test)]
+#[path = "nonzero_niches/mutable_codec.rs"]
+pub(in crate::proof) mod mutable_codec;

@@ -92,7 +92,7 @@ Fixed-array partial moves preserve initialization and execute remaining destruct
 order. Nested destruction and covering assignments retain actual destructor effects. The exact
 compiler array/slice DropGlue protocol is authenticated separately. General slice destruction
 remains UNKNOWN. Remaining owning-array iterator destruction executes actual bodies at a larger
-recorded budget. The current stage passes 1,032 Rust and 91 Python tests.
+recorded budget. The current stage passes 1,040 Rust and 91 Python tests.
 Four-profile surveys measure 336 PROVED, 164 REFUTED and 113 UNKNOWN, with 500 supported
 outcomes across 613 cases. Typed byte-source preparation adds no default supported outcomes. All 5,420
 previous queried obligations and 656 counterexample models remain exact.

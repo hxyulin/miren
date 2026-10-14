@@ -3,8 +3,42 @@ use super::*;
 use rustc_middle::ty::{TypeSuperVisitable, TypeVisitable, TypeVisitor};
 use std::ops::ControlFlow;
 
+#[derive(Clone, Copy)]
+enum FailureDomain {
+    Product,
+    #[cfg(test)]
+    Niche,
+}
+
+fn signature_pay(
+    engine: &mut Engine<'_>,
+    count: usize,
+    domain: FailureDomain,
+) -> Result<(), String> {
+    match domain {
+        FailureDomain::Product => super::pay(engine, count),
+        #[cfg(test)]
+        FailureDomain::Niche => {
+            engine.steps = engine.steps.checked_add(count).ok_or_else(|| {
+                engine.categorized_error(
+                    UnknownCategory::ResourceLimit,
+                    "mutable product hierarchy work overflow".into(),
+                )
+            })?;
+            if engine.steps > engine.limits.max_steps {
+                return Err(engine.categorized_error(
+                    UnknownCategory::ResourceLimit,
+                    "mutable product hierarchy shared execution step limit reached".into(),
+                ));
+            }
+            Ok(())
+        }
+    }
+}
+
 struct Plan<'a, 'tcx> {
     engine: &'a mut Engine<'tcx>,
+    domain: FailureDomain,
     arguments: ty::GenericArgsRef<'tcx>,
     nodes: usize,
     depth: usize,
@@ -12,7 +46,7 @@ struct Plan<'a, 'tcx> {
 }
 impl Plan<'_, '_> {
     fn node(&mut self) -> Result<(), String> {
-        pay(self.engine, 1)?;
+        signature_pay(self.engine, 1, self.domain)?;
         self.nodes += 1;
         if self.nodes > MAX_INPUT_VALUES || self.depth >= MAX_INPUT_DEPTH {
             return Err(self.engine.categorized_error(
@@ -151,7 +185,23 @@ pub(super) fn check<'tcx>(
     engine: &mut Engine<'tcx>,
     instance: ty::Instance<'tcx>,
 ) -> Result<ty::PolyFnSig<'tcx>, String> {
-    pay(engine, 8)?;
+    check_with_domain(engine, instance, FailureDomain::Product)
+}
+
+#[cfg(test)]
+pub(super) fn check_niche<'tcx>(
+    engine: &mut Engine<'tcx>,
+    instance: ty::Instance<'tcx>,
+) -> Result<ty::PolyFnSig<'tcx>, String> {
+    check_with_domain(engine, instance, FailureDomain::Niche)
+}
+
+fn check_with_domain<'tcx>(
+    engine: &mut Engine<'tcx>,
+    instance: ty::Instance<'tcx>,
+    domain: FailureDomain,
+) -> Result<ty::PolyFnSig<'tcx>, String> {
+    signature_pay(engine, 8, domain)?;
     if !matches!(instance.def, ty::InstanceKind::Item(id)
         if matches!(engine.tcx.def_kind(id), DefKind::Fn | DefKind::AssocFn))
     {
@@ -177,12 +227,14 @@ pub(super) fn check<'tcx>(
             "mutable product hierarchy signature header exceeds existing 512-value limit".into(),
         ));
     }
-    pay(
+    signature_pay(
         engine,
         count + poly.bound_vars().len() + instance.args.len() + 4,
+        domain,
     )?;
     let mut plan = Plan {
         engine,
+        domain,
         arguments: instance.args,
         nodes: 0,
         depth: 0,
@@ -197,7 +249,7 @@ pub(super) fn check<'tcx>(
     }
     let work = plan.nodes + poly.bound_vars().len() + count + 4;
     // Disjoint prepayment for actual substitution and normalization of this bounded graph.
-    pay(plan.engine, 2 * work)?;
+    signature_pay(plan.engine, 2 * work, domain)?;
     let expected = plan
         .engine
         .tcx
@@ -210,9 +262,28 @@ pub(super) fn check<'tcx>(
         })?;
     // Interned signature comparison and bounded cache lookup are distinct. This gate publishes
     // nothing; a missing dispatcher entry will still be derived from the same compiler source.
-    let registry = plan.engine.call_signatures.borrow().len();
-    pay(plan.engine, registry + work + 4)?;
-    let prior = plan.engine.call_signatures.borrow().get(&instance).copied();
+    let registry = match domain {
+        FailureDomain::Product => plan.engine.call_signatures.borrow().len(),
+        #[cfg(test)]
+        FailureDomain::Niche => plan
+            .engine
+            .call_signatures
+            .try_borrow()
+            .map_err(|_| "niche full signature registry is mutably borrowed")?
+            .len(),
+    };
+    signature_pay(plan.engine, registry + work + 4, domain)?;
+    let prior = match domain {
+        FailureDomain::Product => plan.engine.call_signatures.borrow().get(&instance).copied(),
+        #[cfg(test)]
+        FailureDomain::Niche => plan
+            .engine
+            .call_signatures
+            .try_borrow()
+            .map_err(|_| "niche full signature registry is mutably borrowed")?
+            .get(&instance)
+            .copied(),
+    };
     if prior.is_some_and(|cached| cached != expected) {
         return Err(plan.engine.categorized_error(
             UnknownCategory::Semantics,

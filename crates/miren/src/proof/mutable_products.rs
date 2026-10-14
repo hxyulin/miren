@@ -1124,3 +1124,7 @@ mod probe;
 #[cfg(test)]
 #[path = "mutable_product_children_probe.rs"]
 mod children_probe;
+
+#[cfg(test)]
+#[path = "mutable_product_niche_source_probe.rs"]
+mod niche_source_probe;

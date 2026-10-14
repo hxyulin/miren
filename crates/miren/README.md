@@ -2191,3 +2191,12 @@ intrinsic semantics and carries no output term or predicate. Initialized byte/wo
 alignment, reference lifetime, missing panic bodies and the algorithm range theorem remain
 unresolved; the consumer still refuses pending search certification. Additional source, clone,
 normalization, signature, layout and registry services are charged before they run.
+
+Mutable integer-niche codecs have a separate compiler-tested preparation service. Private,
+consumed records bind the original enum type and layout, complete source and signature, actual
+instruction and operand retag, symbolic context and conditions. Bounded name planning precedes
+owned strings; registry conflicts and selected failures refuse without failing an unrelated
+Product service. Tests cover all twelve integer domains, Option and both local variant orders on
+host and ARM, including correlated payload roundtrips, sibling storage and invalid-value guards.
+This foundation does not admit mutable niche owners in release analysis. Owner descriptors,
+instruction consumption, initialization transactions and live borrow checks remain required.

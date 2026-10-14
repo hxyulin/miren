@@ -1564,3 +1564,11 @@ mod tests;
 #[cfg(test)]
 #[path = "mutable_product_hierarchy/work_controls.rs"]
 pub(in crate::proof) mod work_controls;
+
+#[cfg(test)]
+pub(in crate::proof) fn niche_codec_signature<'tcx>(
+    engine: &mut Engine<'tcx>,
+    instance: ty::Instance<'tcx>,
+) -> Result<ty::PolyFnSig<'tcx>, String> {
+    signature::check_niche(engine, instance)
+}

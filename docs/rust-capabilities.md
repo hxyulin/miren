@@ -3072,3 +3072,34 @@ Full Root validation passes 1,037 Rust and 91 Python tests. Four profiles retain
 164 REFUTED and 113 UNKNOWN across 613 cases. All 5,420 queried obligations and 656 counterexample
 models remain literal; 2,450 full baseline Proofs match and two query-free fold timeout contexts
 differ. No supported outcome is added by this source-only stage.
+
+
+## Consumed mutable integer-niche codec foundation
+
+Compiler-bound private codecs cover Option and both local empty/NonZero variant orders for all
+twelve integer primitives. A consumed record binds the original type and compiler layout, full
+signature, immutable current Body, actual instruction and operand retag, Context and conditions.
+Decode preserves one correlated raw column; encode proves active nonzero payload validity without
+adding assumptions. Invalid tags, fields, widths, contexts and stale recorded retags refuse.
+
+Original type/layout certification now precedes owned name materialization. Bounded raw, visible,
+external-alias and field/variant name plans precede private codec allocations. Preparation and
+consumption have separate paid work. Signature validation preserves ordinary Product behavior
+while selected codec failures remain isolated. Held mutable registry borrows refuse through
+try_borrow rather than panicking.
+
+Actual compiler source controls capture 38 original/current functions on four profiles and confirm
+their genuine WithRetag::Yes operands. The final focused codec test passes 144 domain/family rows
+with roundtrip and sibling-storage solver assertions, registry conflicts, signature resource denial,
+session and retag mutations, and two name controls per profile. These are codec controls; no literal
+solver-query archive, native execution or supported owner-level program result is claimed.
+
+Release mutable niche owners remain unsupported. Paid input descriptors, real instruction and
+terminator consumption, entry/return observations, initialization transactions and independent
+live ownership checks must be integrated before admission. The codec grants no memory rights.
+
+Full main-checkout validation passes 1,040 Rust and 91 Python tests, formatting, lint, release and
+dependency checks. All four capability profiles retain 336 PROVED, 164 REFUTED and 113 UNKNOWN.
+All 5,420 queried obligations and 656 countermodels remain literal. Of 2,452 full baseline Proofs,
+2,450 match and two differ only in the closed query-free fold timeout context. No supported outcome
+is added by this foundation.
