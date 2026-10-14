@@ -99,9 +99,9 @@ fn actual_product_helper_source_and_failed_service_guards() {
                     .call_signatures
                     .borrow_mut()
                     .insert(instance, signature);
-                let used = engine.steps;
+                let used = engine.steps.used();
                 assert!(source(&mut engine, instance).is_err());
-                assert_eq!(engine.steps, used);
+                assert_eq!(engine.steps.used(), used);
             }
             let mut engine = fresh();
             engine.limits.max_steps = 2_000_000;
@@ -117,9 +117,9 @@ fn actual_product_helper_source_and_failed_service_guards() {
                 .bodies
                 .borrow_mut()
                 .insert(instance, actual.body.clone());
-            let used = engine.steps;
+            let used = engine.steps.used();
             assert!(source(&mut engine, instance).is_err());
-            assert_eq!(engine.steps, used);
+            assert_eq!(engine.steps.used(), used);
             let mut engine = fresh();
             engine.limits.max_steps = 2_000_000;
             let mut poisoned = original_wrapping.body.as_ref().clone();
@@ -143,9 +143,9 @@ fn actual_product_helper_source_and_failed_service_guards() {
                 .bodies
                 .borrow_mut()
                 .insert(wrapping, original_wrapping.body.clone());
-            let used = engine.steps;
+            let used = engine.steps.used();
             assert!(source(&mut engine, wrapping).is_err());
-            assert_eq!(engine.steps, used);
+            assert_eq!(engine.steps.used(), used);
             let mut engine = fresh();
             engine.mutable_product_failed.set(true);
             assert!(
@@ -153,14 +153,14 @@ fn actual_product_helper_source_and_failed_service_guards() {
                     .mutable_product_vector_work(&Memory::default(), 0)
                     .is_err()
             );
-            assert_eq!(engine.steps, 0);
+            assert_eq!(engine.steps.used(), 0);
             let mut engine = fresh();
-            engine.steps = engine.limits.max_steps;
+            engine.steps.set_for_test(engine.limits.max_steps);
             assert!(pay(&mut engine, 1).is_err());
             assert!(engine.mutable_product_failed.get());
-            let used = engine.steps;
+            let used = engine.steps.used();
             assert!(pay(&mut engine, 0).is_err());
-            assert_eq!(engine.steps, used);
+            assert_eq!(engine.steps.used(), used);
             descriptor_reuse_controls(tcx);
             actual_owner_controls(tcx);
             eligibility_controls(tcx);
@@ -418,7 +418,7 @@ fn active_retry_controls(engine: &mut Engine<'_>, case: usize) {
     for block in 0..if case == 15 { MAX_INPUT_VALUES + 1 } else { 2 } {
         path.note(rustc_middle::mir::BasicBlock::from_usize(block));
     }
-    let before = engine.steps;
+    let before = engine.steps.used();
     let allowance = match case {
         10 => 0,
         11 => 3,
@@ -430,7 +430,7 @@ fn active_retry_controls(engine: &mut Engine<'_>, case: usize) {
     };
     engine.limits.max_steps = before + allowance;
     let result = engine.executable_box_retry_clone(None, &path);
-    let charged = engine.steps - before;
+    let charged = engine.steps.used() - before;
     if case == 14 {
         let mut cloned = result.unwrap();
         assert_eq!(charged, 24);
@@ -453,9 +453,9 @@ fn active_retry_controls(engine: &mut Engine<'_>, case: usize) {
         }
         assert!(engine.mutable_product_failed.get());
         engine.limits.max_steps = 2_000_000;
-        let spent = engine.steps;
+        let spent = engine.steps.used();
         assert!(engine.executable_box_retry_clone(None, &path).is_err());
-        assert_eq!(engine.steps, spent);
+        assert_eq!(engine.steps.used(), spent);
         assert!(engine.mutable_product_failed.get());
     }
     eprintln!("PRODUCT_RETRY_CONTROL case={case} allowance={allowance} charged={charged}");
@@ -467,13 +467,13 @@ fn inactive_retry_controls(tcx: TyCtxt<'_>) {
     let mut path = retry_frontiers::Path::default();
     path.note(rustc_middle::mir::BasicBlock::from_usize(0));
     let mut cloned = engine.executable_box_retry_clone(None, &path).unwrap();
-    assert_eq!(engine.steps, 0);
+    assert_eq!(engine.steps.used(), 0);
     cloned.note(rustc_middle::mir::BasicBlock::from_usize(1));
     assert_eq!(cloned.len(), 2);
     assert_eq!(path.len(), 1);
     engine.mutable_product_failed.set(true);
     assert!(engine.executable_box_retry_clone(None, &path).is_err());
-    assert_eq!(engine.steps, 0);
+    assert_eq!(engine.steps.used(), 0);
     eprintln!("PRODUCT_RETRY_CONTROL inactive/free-clone/sticky");
 }
 
@@ -543,13 +543,13 @@ fn ordinary_eligibility_exhaustion_controls(tcx: TyCtxt<'_>) {
                 body.basic_blocks[block].terminator().source_info.span,
             ),
         };
-        let before = engine.steps;
+        let before = engine.steps.used();
         engine.limits.max_steps = before;
         let error = engine
             .mutable_product_hierarchy_call(caller, &mut state, call())
             .err()
             .expect("ordinary eligibility must refuse before observing call arguments");
-        assert_eq!(engine.steps, before + 1);
+        assert_eq!(engine.steps.used(), before + 1);
         assert_eq!(error, "symbolic execution step limit reached");
         assert_eq!(
             engine.unknown_causes.borrow().get(&error),
@@ -565,7 +565,7 @@ fn ordinary_eligibility_exhaustion_controls(tcx: TyCtxt<'_>) {
                 .unwrap()
                 .is_none()
         );
-        assert_eq!(engine.steps, before + 2);
+        assert_eq!(engine.steps.used(), before + 2);
         assert!(!engine.mutable_product_failed.get());
         assert!(engine.mutable_product_access.borrow().is_none());
         assert!(engine.mutable_product_sources.borrow().is_empty());
@@ -581,22 +581,22 @@ fn eligibility_controls(tcx: TyCtxt<'_>) {
             .product_catalogue_eligible(&Memory::default())
             .unwrap()
     );
-    assert_eq!(engine.steps, 1);
+    assert_eq!(engine.steps.used(), 1);
     engine.mutable_product_failed.set(true);
     assert!(
         engine
             .product_catalogue_eligible(&Memory::default())
             .is_err()
     );
-    assert_eq!(engine.steps, 1);
+    assert_eq!(engine.steps.used(), 1);
     let mut engine = fresh();
     let mut scalar = Memory::default();
     engine
         .mutable_u16_input(tcx.types.u16, &mut scalar, &mut Vec::new())
         .unwrap();
-    let before = engine.steps;
+    let before = engine.steps.used();
     assert!(!engine.product_catalogue_eligible(&scalar).unwrap());
-    assert_eq!(engine.steps, before + 1);
+    assert_eq!(engine.steps.used(), before + 1);
     let mut product = Memory::default();
     engine
         .mutable_product_input(
@@ -718,12 +718,12 @@ fn eligibility_singleton_controls<'tcx>(tcx: TyCtxt<'tcx>) {
         original: tcx.types.u16,
         failed: false,
     });
-    let before = engine.steps;
+    let before = engine.steps.used();
     assert!(engine.product_catalogue_eligible(&memory).is_err());
-    assert_eq!(engine.steps, before + 1);
+    assert_eq!(engine.steps.used(), before + 1);
     assert!(engine.mutable_product_failed.get());
     assert!(engine.product_catalogue_eligible(&memory).is_err());
-    assert_eq!(engine.steps, before + 1);
+    assert_eq!(engine.steps.used(), before + 1);
 
     let mut engine = fresh();
     let memory = scalar(&mut engine);
@@ -737,9 +737,9 @@ fn eligibility_singleton_controls<'tcx>(tcx: TyCtxt<'tcx>) {
     engine.limits.max_steps = 2_000_000;
     let held = source(&mut engine, ty::Instance::mono(tcx, id.to_def_id())).unwrap();
     register_source(&mut engine, held).unwrap();
-    let before = engine.steps;
+    let before = engine.steps.used();
     assert!(engine.product_catalogue_eligible(&memory).is_err());
-    assert_eq!(engine.steps, before + 1);
+    assert_eq!(engine.steps.used(), before + 1);
     assert!(engine.mutable_product_failed.get());
 
     let mut engine = fresh();
@@ -760,9 +760,9 @@ fn eligibility_singleton_controls<'tcx>(tcx: TyCtxt<'tcx>) {
             engine.mutable_integer_types[certificate].codec =
                 super::super::mutable_u16::ElementCodec::Scalar(symbolic::ScalarSliceElement::Bool);
         }
-        let before = engine.steps;
+        let before = engine.steps.used();
         assert!(!engine.product_catalogue_eligible(&memory).unwrap());
-        assert_eq!(engine.steps, before + 1);
+        assert_eq!(engine.steps.used(), before + 1);
         assert!(engine.mutable_u16_backing(0, &memory).is_err());
     }
     eprintln!(
@@ -817,9 +817,9 @@ fn descriptor_reuse_controls(tcx: TyCtxt<'_>) {
         )
     };
     let (mut engine, binding, certificate, original) = setup();
-    let start = engine.steps;
+    let start = engine.steps.used();
     let (prepared, publish) = prepare(&mut engine, binding, certificate, original).unwrap();
-    let exact = engine.steps - start;
+    let exact = engine.steps.used() - start;
     assert!(publish);
     assert!(engine.mutable_product_descriptors.is_empty());
     engine.mutable_product_descriptors.push(prepared.clone());
@@ -849,15 +849,15 @@ fn descriptor_reuse_controls(tcx: TyCtxt<'_>) {
     assert_eq!(engine.mutable_product_descriptors.len(), 1);
     for delta in [exact - 1, exact] {
         let (mut engine, binding, certificate, original) = setup();
-        engine.limits.max_steps = engine.steps + delta;
+        engine.limits.max_steps = engine.steps.used() + delta;
         let result = prepare(&mut engine, binding, certificate, original);
         assert_eq!(result.is_ok(), delta == exact);
         assert_eq!(engine.mutable_product_failed.get(), delta != exact);
         assert!(engine.mutable_product_descriptors.is_empty());
         if result.is_err() {
-            let used = engine.steps;
+            let used = engine.steps.used();
             assert!(pay(&mut engine, 0).is_err());
-            assert_eq!(engine.steps, used);
+            assert_eq!(engine.steps.used(), used);
         }
     }
     // The dispatcher registry is optional. Actual compiler issuance populates it; clearing
@@ -1039,7 +1039,7 @@ fn descriptor_source_growth_controls<'tcx>(
             let access = scope.as_ref().unwrap();
             let fee = 4 + frames + 12 + count + 8 + access.descriptors * access.source_bindings;
             drop(scope);
-            engine.limits.max_steps = engine.steps + fee - usize::from(mode == 2);
+            engine.limits.max_steps = engine.steps.used() + fee - usize::from(mode == 2);
         }
         let published = engine.mutable_product_sources.borrow().len();
         let result = register_source(engine, actual);
@@ -1058,15 +1058,15 @@ fn descriptor_source_growth_controls<'tcx>(
                 prior
             );
             assert!(engine.mutable_product_failed.get());
-            let used = engine.steps;
+            let used = engine.steps.used();
             assert!(pay(engine, 0).is_err());
-            assert_eq!(engine.steps, used);
+            assert_eq!(engine.steps.used(), used);
             eprintln!("descriptor source growth: denied before source publication");
             return;
         }
         result.unwrap();
         if mode == 3 {
-            assert_eq!(engine.steps, engine.limits.max_steps);
+            assert_eq!(engine.steps.used(), engine.limits.max_steps);
         }
         let next = engine
             .mutable_product_access
@@ -1307,18 +1307,18 @@ fn library_signature_growth_controls<'tcx>(
         return;
     }
     if mode >= 5 {
-        let begin = engine.steps;
+        let begin = engine.steps.used();
         assert_eq!(
             signature::check(engine, instance).unwrap(),
             original_signature
         );
-        let normalization = engine.steps - begin;
+        let normalization = engine.steps.used() - begin;
         let scope = engine.mutable_product_access.borrow();
         let access = scope.as_ref().unwrap();
         let remaining_lookup = access.descriptors * access.source_bindings;
         drop(scope);
         let exact = before + 12 + normalization + remaining_lookup + 8;
-        engine.limits.max_steps = engine.steps + exact - usize::from(mode == 5);
+        engine.limits.max_steps = engine.steps.used() + exact - usize::from(mode == 5);
         let result = engine.mutable_product_call_signature_prepare(instance);
         assert_eq!(result.is_ok(), mode == 6);
         assert_eq!(
@@ -1336,15 +1336,15 @@ fn library_signature_growth_controls<'tcx>(
             assert_eq!(engine.call_signatures.borrow().len(), before);
             assert!(!engine.call_signatures.borrow().contains_key(&instance));
             assert!(engine.mutable_product_failed.get());
-            let used = engine.steps;
+            let used = engine.steps.used();
             assert!(
                 engine
                     .mutable_product_call_signature_prepare(instance)
                     .is_err()
             );
-            assert_eq!(engine.steps, used);
+            assert_eq!(engine.steps.used(), used);
         } else {
-            assert_eq!(engine.steps, engine.limits.max_steps);
+            assert_eq!(engine.steps.used(), engine.limits.max_steps);
             assert_eq!(engine.call_signatures.borrow().len(), before + 1);
             assert_eq!(
                 engine.call_signatures.borrow()[&instance],
@@ -1359,7 +1359,7 @@ fn library_signature_growth_controls<'tcx>(
     }
     if mode == 1 {
         // Denial uses the unchanged real counter at the actual selected metadata boundary.
-        engine.limits.max_steps = engine.steps;
+        engine.limits.max_steps = engine.steps.used();
         assert!(
             engine
                 .mutable_product_call_signature_prepare(instance)
@@ -1368,13 +1368,13 @@ fn library_signature_growth_controls<'tcx>(
         assert_eq!(engine.call_signatures.borrow().len(), before);
         assert!(!engine.call_signatures.borrow().contains_key(&instance));
         assert!(engine.mutable_product_failed.get());
-        let used = engine.steps;
+        let used = engine.steps.used();
         assert!(
             engine
                 .mutable_product_call_signature_prepare(instance)
                 .is_err()
         );
-        assert_eq!(engine.steps, used);
+        assert_eq!(engine.steps.used(), used);
     } else {
         engine
             .mutable_product_call_signature_prepare(instance)
@@ -1395,12 +1395,12 @@ fn library_signature_growth_controls<'tcx>(
                 .unwrap(),
             prior + 1
         );
-        let used = engine.steps;
+        let used = engine.steps.used();
         let count = engine.call_signatures.borrow().len();
         engine
             .mutable_product_call_signature_prepare(instance)
             .unwrap();
-        assert!(engine.steps - used > count + 12);
+        assert!(engine.steps.used() - used > count + 12);
         assert_eq!(engine.call_signatures.borrow().len(), count);
         engine
             .mutable_product_certificate(memory.mutable_u16[0].certificate)
@@ -1454,9 +1454,9 @@ fn length_body_growth_controls<'tcx>(
         )
     };
     if mode == 1 {
-        engine.limits.max_steps = engine.steps;
+        engine.limits.max_steps = engine.steps.used();
     } else if mode >= 2 {
-        engine.limits.max_steps = engine.steps + exact - usize::from(mode == 2);
+        engine.limits.max_steps = engine.steps.used() + exact - usize::from(mode == 2);
     }
     // The observed scope fields above do not carry authority across the actual mutation.
     let result = engine.mutable_product_length_body(instance);
@@ -1465,9 +1465,9 @@ fn length_body_growth_controls<'tcx>(
         assert_eq!(engine.bodies.borrow().len(), count);
         assert!(!engine.bodies.borrow().contains_key(&instance));
         assert!(engine.mutable_product_failed.get());
-        let used = engine.steps;
+        let used = engine.steps.used();
         assert!(engine.mutable_product_length_body(instance).is_err());
-        assert_eq!(engine.steps, used);
+        assert_eq!(engine.steps.used(), used);
     } else {
         let actual = result.unwrap();
         assert_eq!(actual.source.instance, instance.def);
@@ -1485,16 +1485,16 @@ fn length_body_growth_controls<'tcx>(
             prior + 1,
         );
         if mode == 3 {
-            assert_eq!(engine.steps, engine.limits.max_steps);
+            assert_eq!(engine.steps.used(), engine.limits.max_steps);
         }
         engine
             .mutable_product_certificate(memory.mutable_u16[0].certificate)
             .unwrap();
         if mode == 0 {
-            let used = engine.steps;
+            let used = engine.steps.used();
             let warm = engine.mutable_product_length_body(instance).unwrap();
             assert!(Rc::ptr_eq(&actual, &warm));
-            assert_eq!(engine.steps - used, count + 13);
+            assert_eq!(engine.steps.used() - used, count + 13);
             assert_eq!(engine.bodies.borrow().len(), count + 1);
         }
         assert!(!engine.mutable_product_failed.get());

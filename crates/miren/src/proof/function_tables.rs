@@ -1086,17 +1086,15 @@ impl<'tcx> Engine<'tcx> {
         if self.feasible(&uncovered)? {
             return Err("function table call lost its covered index domain".into());
         }
-        let next = self
-            .steps
-            .checked_add(instances.len())
-            .ok_or("function table step overflow")?;
-        if next > self.limits.max_steps {
-            return Err(self.categorized_error(
-                UnknownCategory::ResourceLimit,
-                "function table expansion exceeds execution step budget".into(),
-            ));
-        }
-        self.steps = next;
+        self.steps
+            .reserve_checked(instances.len(), self.limits.max_steps)
+            .map_err(|failure| match failure {
+                shared_steps::ReserveFailure::Overflow => "function table step overflow".into(),
+                shared_steps::ReserveFailure::Limit => self.categorized_error(
+                    UnknownCategory::ResourceLimit,
+                    "function table expansion exceeds execution step budget".into(),
+                ),
+            })?;
         let mut consumed = state.clone();
         let actual = self.evaluate_operand(call.site.0, call.body, &mut consumed, call.func)?;
         if !matches!(actual, Value::FunctionPointer { id: actual } if actual == *id) {
@@ -1202,17 +1200,15 @@ impl<'tcx> Engine<'tcx> {
         if self.feasible(&uncovered)? {
             return Err("function table call lost its covered index domain".into());
         }
-        let next = self
-            .steps
-            .checked_add(instances.len())
-            .ok_or("function table step overflow")?;
-        if next > self.limits.max_steps {
-            return Err(self.categorized_error(
-                UnknownCategory::ResourceLimit,
-                "function table expansion exceeds execution step budget".into(),
-            ));
-        }
-        self.steps = next;
+        self.steps
+            .reserve_checked(instances.len(), self.limits.max_steps)
+            .map_err(|failure| match failure {
+                shared_steps::ReserveFailure::Overflow => "function table step overflow".into(),
+                shared_steps::ReserveFailure::Limit => self.categorized_error(
+                    UnknownCategory::ResourceLimit,
+                    "function table expansion exceeds execution step budget".into(),
+                ),
+            })?;
         let mut consumed = state.clone();
         let actual = self.evaluate_operand(call.site.0, call.body, &mut consumed, call.func)?;
         if !matches!(actual, Value::FunctionPointer { id: actual } if actual == id) {
@@ -1293,17 +1289,15 @@ impl<'tcx> Engine<'tcx> {
         if self.feasible(&uncovered)? {
             return Err("two-argument table lost its covered index domain".into());
         }
-        let next = self
-            .steps
-            .checked_add(instances.len())
-            .ok_or("function table step overflow")?;
-        if next > self.limits.max_steps {
-            return Err(self.categorized_error(
-                UnknownCategory::ResourceLimit,
-                "function table expansion exceeds execution step budget".into(),
-            ));
-        }
-        self.steps = next;
+        self.steps
+            .reserve_checked(instances.len(), self.limits.max_steps)
+            .map_err(|failure| match failure {
+                shared_steps::ReserveFailure::Overflow => "function table step overflow".into(),
+                shared_steps::ReserveFailure::Limit => self.categorized_error(
+                    UnknownCategory::ResourceLimit,
+                    "function table expansion exceeds execution step budget".into(),
+                ),
+            })?;
         let mut consumed = state.clone();
         let actual = self.evaluate_operand(call.site.0, call.body, &mut consumed, call.func)?;
         if !matches!(actual, Value::FunctionPointer { id: actual } if actual == id) {

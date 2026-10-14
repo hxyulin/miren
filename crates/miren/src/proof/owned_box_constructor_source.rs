@@ -38,13 +38,13 @@ pub(super) struct Certificate<'tcx> {
     parts: Vec<Part<'tcx>>,
 }
 fn pay(engine: &mut Engine<'_>, work: usize) -> Result<(), String> {
-    let next = engine.steps.checked_add(work).ok_or_else(|| {
+    let next = engine.steps.checked_add_commit(work).ok_or_else(|| {
         engine.categorized_error(
             UnknownCategory::ResourceLimit,
             "Box constructor source work overflow".into(),
         )
     })?;
-    engine.steps = next;
+
     if next > engine.limits.max_steps {
         return Err(engine.categorized_error(
             UnknownCategory::ResourceLimit,

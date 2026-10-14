@@ -2272,3 +2272,8 @@ integer enum layouts across host/ARM O0/O2. Exact SMT models pass Z3 checks, and
 through the unchanged fixture. All default-budget sample results remain UNKNOWN. Ordinary survey
 coverage is unchanged; partial payload writes, bare enum owners and remaining resource/source
 refusals require separate support. See the capability evidence for qualifications.
+
+Execution and retained services share one Engine step counter. Shared receivers can charge this
+counter directly, while domain payment wrappers preserve their existing fees and failure policies.
+Function-table reservations commit only after their budget check. Protocol receipts keep their
+existing prepaid work and scope rules.

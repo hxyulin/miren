@@ -67,7 +67,10 @@ fn actual_box_constructor_source_planner_frontier() {
             let certificate =
                 owned_box_constructor_source::prepare(&mut constructor_engine, constructor)
                     .unwrap();
-            println!("BOX_CONSTRUCTOR_PREPARED paid={}", constructor_engine.steps);
+            println!(
+                "BOX_CONSTRUCTOR_PREPARED paid={}",
+                constructor_engine.steps.used()
+            );
             certificate.validate(&mut constructor_engine).unwrap();
             let mut pending = vec![constructor];
             let mut seen = std::collections::HashSet::new();
@@ -79,7 +82,7 @@ fn actual_box_constructor_source_planner_frontier() {
                 let result = compiler_evidence::load_item(&mut engine, instance);
                 println!(
                     "BOX_SOURCE_PLAN {instance:?} steps={} result={:?}",
-                    engine.steps,
+                    engine.steps.used(),
                     result.as_ref().map(|e| e.current.local_decls.len())
                 );
                 let body = explore.instantiated_body(instance).unwrap();

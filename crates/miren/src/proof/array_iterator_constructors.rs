@@ -88,17 +88,17 @@ struct BodyEvidence<'tcx> {
 }
 
 fn pay(engine: &mut Engine<'_>, operations: usize) -> Result<(), String> {
-    let next = match engine.steps.checked_add(operations) {
+    let next = match engine.steps.checked_add_commit(operations) {
         Some(next) => next,
         None => {
-            engine.steps = usize::MAX;
+            engine.steps.mark_max();
             return Err(engine.categorized_error(
                 UnknownCategory::ResourceLimit,
                 "IntoIter operation count overflow".into(),
             ));
         }
     };
-    engine.steps = next;
+
     if next > engine.limits.max_steps {
         return Err(engine.categorized_error(
             UnknownCategory::ResourceLimit,
@@ -1610,7 +1610,9 @@ mod tests {
         if std::env::var_os("MIREN_INTOITER_DROP_WORK_TRACE").is_some() {
             println!(
                 "Drop work target={} opt={:?} constructor_move={}",
-                tcx.sess.target.llvm_target, tcx.sess.opts.optimize, protocol_engine.steps
+                tcx.sess.target.llvm_target,
+                tcx.sess.opts.optimize,
+                protocol_engine.steps.used()
             );
             for name in ["constructor", "remaining_drop_unknown", "next_unknown"] {
                 let selected = tcx
@@ -1634,7 +1636,7 @@ mod tests {
                     "Drop work root={name} target={} opt={:?} cumulative={} normal={}",
                     tcx.sess.target.llvm_target,
                     tcx.sess.opts.optimize,
-                    profile.steps,
+                    profile.steps.used(),
                     result.is_ok()
                 );
                 assert!(result.is_ok(), "{name}: {:?}", result.err());
@@ -1846,9 +1848,9 @@ mod tests {
         // Clone payment is separate from inspection/comparison and must refuse before allocation.
         let raw = tcx.instance_mir(constructor.def);
         let mut inventory = Engine::new(tcx, &config, options());
-        let start = inventory.steps;
+        let start = inventory.steps.used();
         let owned = clone_work::body(&mut inventory, raw).unwrap();
-        let planning = inventory.steps - start;
+        let planning = inventory.steps.used() - start;
         assert!(owned > raw.local_decls.len() + raw.basic_blocks.len());
         let mut budget = options();
         budget.limits.max_steps =
@@ -2095,11 +2097,11 @@ pub(super) fn compiler_clone_inventory(
     body: &Body<'_>,
     general: bool,
 ) -> (Result<usize, String>, usize) {
-    let before = engine.steps;
+    let before = engine.steps.used();
     let result = if general {
         clone_work::compiler_source_body(engine, body)
     } else {
         clone_work::step_body(engine, body)
     };
-    (result, engine.steps - before)
+    (result, engine.steps.used() - before)
 }

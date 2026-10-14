@@ -70,7 +70,7 @@ fn actual_immutable_origin_planning_and_refusals() {
                             error.contains("niche codec shared execution step limit"),
                             "{error}"
                         );
-                        assert_eq!(engine.steps, engine.limits.max_steps + 1);
+                        assert_eq!(engine.steps.used(), engine.limits.max_steps + 1);
                         assert!(engine.niche_origins.is_empty());
                         assert!(engine.mutable_integer_types.is_empty());
                         assert!(memory.is_empty() && memory.mutable_u16.is_empty());
@@ -104,12 +104,12 @@ fn actual_immutable_origin_planning_and_refusals() {
                             assert_eq!(origin.compare_work(), 544 + 2 * name_bytes);
                             assert_eq!(origin.value_work(37).unwrap(), 1824 + 2 * name_bytes + 74);
                         }
-                        let before = engine.steps;
+                        let before = engine.steps.used();
                         for _ in 0..3 {
                             origin.compare_work();
                             origin.value_work(37).unwrap();
                         }
-                        assert_eq!(engine.steps, before);
+                        assert_eq!(engine.steps.used(), before);
                         engine
                             .niche_entry_scope(instance, &body, &memory, &conditions)
                             .unwrap();

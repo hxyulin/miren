@@ -17,13 +17,13 @@ fn signature_pay(
     match domain {
         FailureDomain::Product => super::pay(engine, count),
         FailureDomain::Niche => {
-            engine.steps = engine.steps.checked_add(count).ok_or_else(|| {
+            engine.steps.checked_add_commit(count).ok_or_else(|| {
                 engine.categorized_error(
                     UnknownCategory::ResourceLimit,
                     "mutable product hierarchy work overflow".into(),
                 )
             })?;
-            if engine.steps > engine.limits.max_steps {
+            if engine.steps.used() > engine.limits.max_steps {
                 return Err(engine.categorized_error(
                     UnknownCategory::ResourceLimit,
                     "mutable product hierarchy shared execution step limit reached".into(),

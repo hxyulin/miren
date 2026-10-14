@@ -666,13 +666,13 @@ impl<'tcx> Engine<'tcx> {
         for index in 0..count {
             let mut next = Vec::new();
             for branch in pending {
-                self.steps = self.steps.checked_add(2).ok_or_else(|| {
+                self.steps.checked_add_commit(2).ok_or_else(|| {
                     self.categorized_error(
                         UnknownCategory::ResourceLimit,
                         "array DropGlue execution step count overflow".into(),
                     )
                 })?;
-                if self.steps > self.limits.max_steps {
+                if self.steps.used() > self.limits.max_steps {
                     return Err(self.categorized_error(
                         UnknownCategory::ResourceLimit,
                         "array DropGlue shared execution step limit reached".into(),
@@ -740,13 +740,13 @@ impl<'tcx> Engine<'tcx> {
             pending = next;
         }
         for _ in &pending {
-            self.steps = self.steps.checked_add(1).ok_or_else(|| {
+            self.steps.checked_add_commit(1).ok_or_else(|| {
                 self.categorized_error(
                     UnknownCategory::ResourceLimit,
                     "array DropGlue execution step count overflow".into(),
                 )
             })?;
-            if self.steps > self.limits.max_steps {
+            if self.steps.used() > self.limits.max_steps {
                 return Err(self.categorized_error(
                     UnknownCategory::ResourceLimit,
                     "array DropGlue shared execution step limit reached".into(),

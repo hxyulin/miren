@@ -75,14 +75,14 @@ pub(in crate::proof) fn pay(engine: &mut Engine<'_>, count: usize) -> Result<(),
     if count != 0 {
         work_controls::payment(engine);
     }
-    engine.steps = engine.steps.checked_add(count).ok_or_else(|| {
+    engine.steps.checked_add_commit(count).ok_or_else(|| {
         engine.mutable_product_failed.set(true);
         engine.categorized_error(
             UnknownCategory::ResourceLimit,
             "mutable product hierarchy work overflow".into(),
         )
     })?;
-    if engine.steps > engine.limits.max_steps {
+    if engine.steps.used() > engine.limits.max_steps {
         engine.mutable_product_failed.set(true);
         return Err(engine.categorized_error(
             UnknownCategory::ResourceLimit,
@@ -1045,13 +1045,13 @@ impl<'tcx> Engine<'tcx> {
         require_service(self)?;
         // This routing node precedes Product admission. Its ordinary shared-budget failure
         // cannot fail a Product service that has not been selected or observed yet.
-        self.steps = self.steps.checked_add(1).ok_or_else(|| {
+        self.steps.checked_add_commit(1).ok_or_else(|| {
             self.categorized_error(
                 UnknownCategory::ResourceLimit,
                 "symbolic execution step limit reached".into(),
             )
         })?;
-        if self.steps > self.limits.max_steps {
+        if self.steps.used() > self.limits.max_steps {
             return Err(self.categorized_error(
                 UnknownCategory::ResourceLimit,
                 "symbolic execution step limit reached".into(),

@@ -551,7 +551,7 @@ impl<'tcx> RootInput<'tcx> {
         self.metadata.source(engine)?;
         #[cfg(test)]
         if self.deny_origin_plan {
-            engine.limits.max_steps = engine.steps.checked_add(15).unwrap();
+            engine.limits.max_steps = engine.steps.used().checked_add(15).unwrap();
         }
         let plan = origin_plan(engine, &self.metadata.expected.shape, 0, &mut 0)?;
         pay(engine, 16)?;

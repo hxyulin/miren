@@ -3217,7 +3217,7 @@ impl<'tcx> Engine<'tcx> {
             .flow
             .charge_call_memory(&state.conditions, &state.memory)?;
         #[cfg(test)]
-        let before_steps = self.steps;
+        let before_steps = self.steps.used();
         let mut results = self.call_instance_flow(
             &mut state.flow,
             instance,
@@ -3271,7 +3271,7 @@ impl<'tcx> Engine<'tcx> {
                 self.tcx.def_path_str(instance.def_id()),
                 instance.args
             );
-            assert!(self.steps > before_steps);
+            assert!(self.steps.used() > before_steps);
             assert!(!results.is_empty());
             assert!(
                 self.proof

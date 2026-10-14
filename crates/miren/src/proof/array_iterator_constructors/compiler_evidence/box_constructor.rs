@@ -69,7 +69,7 @@ pub(super) fn load<'tcx>(
         println!(
             "Step evidence {} planning steps={} owned={owned} cached={}",
             engine.tcx.item_name(instance.def_id()),
-            engine.steps,
+            engine.steps.used(),
             engine.bodies.borrow().contains_key(&instance)
         );
     }
@@ -83,7 +83,7 @@ pub(super) fn load<'tcx>(
         println!(
             "Step evidence {} current clone/fold steps={}",
             engine.tcx.item_name(instance.def_id()),
-            engine.steps
+            engine.steps.used()
         );
     }
     source_identity(&current, instance)?;
@@ -322,7 +322,7 @@ pub(super) fn load<'tcx>(
         println!(
             "Step evidence {} streamed comparisons steps={}",
             engine.tcx.item_name(instance.def_id()),
-            engine.steps
+            engine.steps.used()
         );
     }
     if engine.box_constructor_source_evidence.len() >= MAX_INPUT_VALUES {

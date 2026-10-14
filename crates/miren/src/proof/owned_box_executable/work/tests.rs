@@ -48,11 +48,11 @@ pub(super) fn near_limit(
         };
         if probe.phase == phase && kind == Some(expected) && !probe.hit {
             probe.hit = true;
-            probe.before = engine.steps;
+            probe.before = engine.steps.used();
             probe.masks = state.map_or(0, |state| state.memory.missing_places.entries().len());
             // Explicit fault injection at an actual occurrence, not a default-budget claim.
             // The next prepaid operation must refuse before its guest-visible publication.
-            engine.limits.max_steps = engine.steps;
+            engine.limits.max_steps = engine.steps.used();
         }
     });
 }
@@ -181,17 +181,17 @@ fn actual_box_frames_switches_and_incoming_graphs_refuse_before_unpaid_work() {
                     probe.publications, 0,
                     "{phase:?} crossed unpaid publication"
                 );
-                assert!(engine.steps > probe.before);
-                let spent = engine.steps;
+                assert!(engine.steps.used() > probe.before);
+                let spent = engine.steps.used();
                 assert!(pay(&mut engine, 1).is_err());
-                assert_eq!(engine.steps, spent + 1);
+                assert_eq!(engine.steps.used(), spent + 1);
                 assert!(engine.proof.assumptions.is_empty());
                 println!(
                     "BOX_WORK_DENIAL phase={phase:?} target={} opt={:?} steps={} masks={} \
                      frame_locals={}",
                     tcx.sess.target.llvm_target,
                     tcx.sess.opts.optimize,
-                    engine.steps,
+                    engine.steps.used(),
                     probe.masks,
                     probe.frame_locals
                 );

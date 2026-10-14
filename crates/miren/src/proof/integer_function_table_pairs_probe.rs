@@ -238,7 +238,7 @@ fn check_pair(tcx: TyCtxt<'_>, name: &str) {
     source_state.locals[source_index.as_usize()] = Some(index.clone());
     let before = (
         engine.function_pointers.borrow().len(),
-        engine.steps,
+        engine.steps.used(),
         engine.next_symbol.get(),
     );
     let factory = engine
@@ -263,7 +263,7 @@ fn check_pair(tcx: TyCtxt<'_>, name: &str) {
             before,
             (
                 engine.function_pointers.borrow().len(),
-                engine.steps,
+                engine.steps.used(),
                 engine.next_symbol.get()
             )
         );

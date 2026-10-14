@@ -335,7 +335,7 @@ fn actual_compiler_bound_paid_niche_codec_roundtrip_and_refusals() {
                     .unwrap_err();
                 assert!(error.contains("symbolic tag validity"));
                 assert!(session.0.get());
-                let spent = engine.steps;
+                let spent = engine.steps.used();
                 assert!(
                     prepare(
                         &mut engine,
@@ -352,7 +352,7 @@ fn actual_compiler_bound_paid_niche_codec_roundtrip_and_refusals() {
                     .is_err()
                 );
                 // Only the outside routing classifier may charge after a failed selected session.
-                assert!(engine.steps >= spent);
+                assert!(engine.steps.used() >= spent);
                 let unselected = site(&engine, instance, original, Use::Encode);
                 let noop = prepare(&mut engine, &session, tcx.types.u32, unselected, &[]).unwrap();
                 assert!(noop.is_none());

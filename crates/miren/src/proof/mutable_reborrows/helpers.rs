@@ -5,13 +5,13 @@ use rustc_middle::mir::UnwindAction;
 use std::rc::Weak;
 
 fn pay(engine: &mut Engine<'_>, count: usize) -> Result<(), String> {
-    let attempted = engine.steps.checked_add(count).ok_or_else(|| {
+    let attempted = engine.steps.checked_add_commit(count).ok_or_else(|| {
         engine.categorized_error(
             UnknownCategory::ResourceLimit,
             "retained helper work overflow".into(),
         )
     })?;
-    engine.steps = attempted;
+
     if attempted > engine.limits.max_steps {
         return Err(engine.categorized_error(
             UnknownCategory::ResourceLimit,

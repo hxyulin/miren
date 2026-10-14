@@ -165,7 +165,7 @@ pub(super) fn core_evidence_controls<'tcx>(engine: &mut Engine<'tcx>, iterator: 
     }
     println!(
         "actual remaining Drop compiler evidence only, diagnostic steps={}",
-        engine.steps
+        engine.steps.used()
     );
 }
 

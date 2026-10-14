@@ -389,7 +389,7 @@ impl<'tcx> Engine<'tcx> {
         let chain = stack.iter().copied().chain([instance.def_id()]).collect();
         let previous = std::mem::replace(&mut self.call_chain, chain);
         #[cfg(test)]
-        let (before_execution, kind) = (self.steps, invocation.kind);
+        let (before_execution, kind) = (self.steps.used(), invocation.kind);
         let result = self.execute_body_with_protocol(
             array_drop_glue::Frame::destruction(instance, invocation),
             arguments,
@@ -402,7 +402,7 @@ impl<'tcx> Engine<'tcx> {
         if std::env::var_os("MIREN_INTOITER_DROP_WORK_TRACE").is_some() {
             println!(
                 "Drop work execute={kind:?} before={before_execution} after={}",
-                self.steps
+                self.steps.used()
             );
         }
         if result.is_err() && self.failed_call_chain.is_none() {
@@ -1630,7 +1630,7 @@ pub(in crate::proof::array_iterator_constructors) fn controls<'tcx>(
         3 + "core::ops::index_range::IndexRange".len() + 1 + 6 + 1 + 2 * (3 + 5) + 5 + 3 + 2 + 12;
     for (mode, permitted) in [(0, 19), (1, 11), (2, header + field_plan + range - 1)] {
         CONSTRUCTIONS.with(|events| events.borrow_mut().clear());
-        let before = engine.steps;
+        let before = engine.steps.used();
         engine.limits.max_steps = before + permitted;
         let result = match mode {
             0 => invocation.view(engine, Role::Iterator),
@@ -1643,7 +1643,7 @@ pub(in crate::proof::array_iterator_constructors) fn controls<'tcx>(
                 .unwrap_err()
                 .contains("shared execution step limit reached")
         );
-        assert!(engine.steps > engine.limits.max_steps);
+        assert!(engine.steps.used() > engine.limits.max_steps);
         CONSTRUCTIONS.with(|events| assert!(events.borrow().is_empty()));
         engine.limits.max_steps = full_limit;
     }
@@ -1869,14 +1869,14 @@ pub(in crate::proof::array_iterator_constructors) fn controls<'tcx>(
         .expect("actual typed element DropGlue to destructor Call");
     let prior_limit = engine.limits.max_steps;
     let prior_cache = engine.call_signatures.borrow().len();
-    let before = engine.steps;
+    let before = engine.steps.used();
     engine.limits.max_steps = before + 7;
     assert!(
         signature::check(engine, actual_child)
             .unwrap_err()
             .contains("shared execution step limit reached")
     );
-    assert!(engine.steps > engine.limits.max_steps);
+    assert!(engine.steps.used() > engine.limits.max_steps);
     assert_eq!(engine.call_signatures.borrow().len(), prior_cache);
     engine.limits.max_steps = prior_limit;
     signature::check(engine, actual_child).unwrap();
@@ -1913,7 +1913,7 @@ pub(in crate::proof::array_iterator_constructors) fn controls<'tcx>(
             .call_signatures
             .borrow_mut()
             .insert(actual_child, poisoned);
-        let before = engine.steps;
+        let before = engine.steps.used();
         let mut hostile = state.clone();
         let error = engine
             .array_iterator_drop_call(
@@ -1930,7 +1930,7 @@ pub(in crate::proof::array_iterator_constructors) fn controls<'tcx>(
             error.contains("cached/original full signature differs"),
             "{error}"
         );
-        assert!(engine.steps > before);
+        assert!(engine.steps.used() > before);
         assert_eq!(engine.proof.body_entries.len(), entries);
         child.check(engine, &child_body, &state).unwrap();
         engine

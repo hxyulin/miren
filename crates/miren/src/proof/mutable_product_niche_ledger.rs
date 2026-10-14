@@ -47,13 +47,13 @@ struct Scope<'tcx> {
 }
 
 fn pay(engine: &mut Engine<'_>, count: usize) -> Result<(), String> {
-    engine.steps = engine.steps.checked_add(count).ok_or_else(|| {
+    engine.steps.checked_add_commit(count).ok_or_else(|| {
         engine.categorized_error(
             UnknownCategory::ResourceLimit,
             "niche instruction work overflow".into(),
         )
     })?;
-    if engine.steps > engine.limits.max_steps {
+    if engine.steps.used() > engine.limits.max_steps {
         return Err(engine.categorized_error(
             UnknownCategory::ResourceLimit,
             "niche instruction shared step limit reached".into(),
@@ -773,7 +773,7 @@ impl<'tcx> Engine<'tcx> {
                 .as_mut()
                 .unwrap()
                 .denied_replan_work = Some(work);
-            self.limits.max_steps = self.steps.checked_add(work - 1).unwrap();
+            self.limits.max_steps = self.steps.used().checked_add(work - 1).unwrap();
         }
         if work != 0 {
             pay(self, work)?;

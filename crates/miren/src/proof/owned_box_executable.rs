@@ -12,8 +12,8 @@ mod receipt_tests;
 pub(super) mod work;
 
 pub(super) fn pay(engine: &mut Engine<'_>, work: usize) -> Result<(), String> {
-    engine.steps = engine.steps.saturating_add(work);
-    if engine.steps > engine.limits.max_steps {
+    engine.steps.saturating_add_commit(work);
+    if engine.steps.used() > engine.limits.max_steps {
         return Err(engine.categorized_error(
             UnknownCategory::ResourceLimit,
             "executable Box shared execution step limit reached".into(),
@@ -2427,7 +2427,7 @@ mod tests {
                     let result = Source::prepare(&mut engine, constructor);
                     println!(
                         "EXECUTABLE_BOX_SOURCE name={name} work={} result={:?}",
-                        engine.steps,
+                        engine.steps.used(),
                         result.as_ref().map(|source| source.bodies.len())
                     );
                     let source =

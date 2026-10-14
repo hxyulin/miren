@@ -640,8 +640,8 @@ impl<'tcx> Engine<'tcx> {
         conditions: Vec<Term>,
         memory: Memory,
     ) -> Result<Vec<Iteration>, String> {
-        self.steps += 1;
-        if self.steps > self.limits.max_steps {
+        self.steps.legacy_increment();
+        if self.steps.used() > self.limits.max_steps {
             return Err(self.categorized_error(
                 UnknownCategory::ResourceLimit,
                 "symbolic execution step limit reached".into(),

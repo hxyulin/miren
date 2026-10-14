@@ -244,7 +244,7 @@ fn actual_root_niche_owner_transactions_and_refusals() {
                         assert!(engine.niche_certificate_work(0).is_err());
                     }
                     7 => {
-                        engine.limits.max_steps = engine.steps;
+                        engine.limits.max_steps = engine.steps.used();
                         assert!(
                             engine
                                 .niche_statement_scope(instance, &body, &state, store)
@@ -457,7 +457,7 @@ fn actual_root_niche_owner_transactions_and_refusals() {
                             (scope.body_bound, scope.signature_bound, scope.remaining)
                         };
                         if matches!(denial, 24 | 25) {
-                            engine.limits.max_steps = engine.steps;
+                            engine.limits.max_steps = engine.steps.used();
                         } else if denial >= 26 {
                             engine
                                 .niche_ledger
@@ -489,7 +489,7 @@ fn actual_root_niche_owner_transactions_and_refusals() {
                             assert_eq!(remaining, 63);
                             if denial >= 26 {
                                 assert_eq!(scope.denied_replan_work, Some(2 * remaining));
-                                assert_eq!(engine.steps, engine.limits.max_steps + 1);
+                                assert_eq!(engine.steps.used(), engine.limits.max_steps + 1);
                             } else {
                                 assert_eq!(scope.denied_replan_work, None);
                             }

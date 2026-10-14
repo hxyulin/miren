@@ -118,6 +118,7 @@ mod reference_graph;
 mod replay_inputs;
 mod retry_frontiers;
 mod scalar_slices;
+mod shared_steps;
 mod slice_equality;
 mod startup;
 mod startup_memory;
@@ -213,7 +214,7 @@ struct Engine<'tcx> {
     mutable_product_access: std::cell::RefCell<Option<mutable_hierarchy::products::Access<'tcx>>>,
     mutable_product_sources:
         std::cell::RefCell<BTreeMap<usize, mutable_hierarchy::products::Source<'tcx>>>,
-    steps: usize,
+    steps: shared_steps::SharedSteps,
     call_chain: Vec<DefId>,
     failed_call_chain: Option<Vec<DefId>>,
     trait_objects: std::cell::RefCell<Vec<trait_objects::Witness<'tcx>>>,
@@ -345,7 +346,7 @@ impl<'tcx> Engine<'tcx> {
             niche_origins: BTreeMap::new(),
             niche_root_inputs: Default::default(),
             mutable_product_failed: Default::default(),
-            steps: 0,
+            steps: shared_steps::SharedSteps::default(),
             call_chain: Vec::new(),
             failed_call_chain: None,
             trait_objects: std::cell::RefCell::new(Vec::new()),
@@ -1587,8 +1588,8 @@ impl<'tcx> Engine<'tcx> {
                 );
                 continue;
             }
-            self.steps += 1;
-            if self.steps > self.limits.max_steps {
+            self.steps.legacy_increment();
+            if self.steps.used() > self.limits.max_steps {
                 return Err(self.categorized_error(
                     UnknownCategory::ResourceLimit,
                     "symbolic execution step limit reached".into(),

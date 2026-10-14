@@ -5,8 +5,8 @@ use super::*;
 mod signature;
 
 pub(super) fn pay(engine: &mut Engine<'_>, count: usize) -> Result<(), String> {
-    engine.steps = engine.steps.saturating_add(count);
-    if engine.steps > engine.limits.max_steps {
+    engine.steps.saturating_add_commit(count);
+    if engine.steps.used() > engine.limits.max_steps {
         return Err(engine.categorized_error(
             UnknownCategory::ResourceLimit,
             "nested function choice shared step budget exhausted".into(),

@@ -3185,3 +3185,9 @@ The four-profile survey retains 336 PROVED, 164 REFUTED and 113 UNKNOWN per prof
 queries and 656 models remain literal. Four query-free niche-product refusals now report the codec
 budget frontier. One query-free host-debug fold timeout reports a different instruction/call-chain
 location; its full Proof is classified as different, without expanding timeout allowances.
+
+
+The mechanical shared-counter migration passes 1,049 Rust and 91 Python tests and all required
+repository gates. All default survey outcomes, 5,420 queries and 656 models remain unchanged.
+It also preserves all 192 sampled application Proof objects literally, including 168 queries
+and twelve models; charging actual niche comparisons is a separate stage.

@@ -311,7 +311,7 @@ fn check<'tcx>(tcx: TyCtxt<'tcx>) {
             _ => unreachable!(),
         }
         engine.function_pointers.borrow_mut()[inner] = Target::Choice(wrong);
-        engine.steps = 0;
+        engine.steps.set_for_test(0);
         assert!(prepared(&mut engine, &state, &body, caller).is_err());
         assert_eq!(engine.proof.body_entries.len(), entries);
     }
@@ -349,7 +349,7 @@ fn check<'tcx>(tcx: TyCtxt<'tcx>) {
                 .call_signatures
                 .borrow_mut()
                 .insert(instance, poisoned);
-            engine.steps = 0;
+            engine.steps.set_for_test(0);
             assert!(prepared(&mut engine, &state, &body, caller).is_err());
             assert_eq!(engine.proof.body_entries.len(), entries);
         }
@@ -380,7 +380,7 @@ fn check<'tcx>(tcx: TyCtxt<'tcx>) {
             }
             let wrong = std::rc::Rc::new(wrong);
             engine.bodies.borrow_mut().insert(instance, wrong.clone());
-            engine.steps = 0;
+            engine.steps.set_for_test(0);
             let source = if instance == caller { &wrong } else { &body };
             assert!(prepared(&mut engine, &state, source, caller).is_err());
             assert_eq!(engine.proof.body_entries.len(), entries);
@@ -400,7 +400,7 @@ fn check<'tcx>(tcx: TyCtxt<'tcx>) {
     }
     let mut deep = state.clone();
     deep.locals[inputs[0].as_usize()] = Some(Value::FunctionPointer { id: ancestor });
-    engine.steps = 0;
+    engine.steps.set_for_test(0);
     let error = prepared(&mut engine, &deep, &body, caller).err().unwrap();
     assert_eq!(
         engine.unknown_causes.borrow().get(&error),
@@ -408,7 +408,7 @@ fn check<'tcx>(tcx: TyCtxt<'tcx>) {
     );
     let old_limit = engine.limits.max_steps;
     engine.limits.max_steps = 1;
-    engine.steps = 0;
+    engine.steps.set_for_test(0);
     let error = prepared(&mut engine, &state, &body, caller).err().unwrap();
     assert_eq!(
         engine.unknown_causes.borrow().get(&error),
@@ -418,20 +418,20 @@ fn check<'tcx>(tcx: TyCtxt<'tcx>) {
     let mut foreign = state.clone();
     foreign.locals[inputs[1].as_usize()] =
         Some(symbolic::integer(&Context::default(), 129, 16, false));
-    engine.steps = 0;
+    engine.steps.set_for_test(0);
     assert!(prepared(&mut engine, &foreign, &body, caller).is_err());
     let mut foreign_condition = state.clone();
     foreign_condition
         .conditions
         .push(Context::default().boolean(true));
-    engine.steps = 0;
+    engine.steps.set_for_test(0);
     assert!(prepared(&mut engine, &foreign_condition, &body, caller).is_err());
     let mut partial = state.clone();
     partial
         .missing_places
         .consume(inputs[0].as_usize(), Vec::new())
         .unwrap();
-    engine.steps = 0;
+    engine.steps.set_for_test(0);
     assert!(prepared(&mut engine, &partial, &body, caller).is_err());
     let missing = engine
         .resolve_function_item(find("missing"), tcx.mk_args(&[]))
@@ -461,7 +461,7 @@ fn check<'tcx>(tcx: TyCtxt<'tcx>) {
         .unwrap();
     let mut missing_state = state.clone();
     missing_state.locals[inputs[0].as_usize()] = Some(Value::FunctionPointer { id: outer_missing });
-    engine.steps = 0;
+    engine.steps.set_for_test(0);
     let error = prepared(&mut engine, &missing_state, &body, caller)
         .err()
         .unwrap();
@@ -559,7 +559,7 @@ fn primitive_controls(tcx: TyCtxt<'_>) {
             ] {
                 FLOAT_TABLE_RETURN_FAULT.with(|current| current.set(fault));
                 FLOAT_TABLE_RETURN_OBSERVATIONS.with(|count| count.set(0));
-                engine.steps = 0;
+                engine.steps.set_for_test(0);
                 let result = prepared(&mut engine, &state, &body, caller);
                 FLOAT_TABLE_RETURN_FAULT.with(|current| current.set(FloatTableReturnFault::None));
                 assert!(result.is_err());
@@ -570,7 +570,7 @@ fn primitive_controls(tcx: TyCtxt<'_>) {
                 let mut wrong = state.clone();
                 wrong.locals[inputs[1].as_usize()] =
                     Some(symbolic::integer(&engine.terms, value, 32, false));
-                engine.steps = 0;
+                engine.steps.set_for_test(0);
                 assert!(prepared(&mut engine, &wrong, &body, caller).is_err());
             }
         }
@@ -648,9 +648,9 @@ fn check_signature_reuse<'tcx>(
     let mut admission = engine
         .admit_dispatch_signatures(outer, expected, RepeatWork::new())
         .unwrap();
-    engine.steps = engine.limits.max_steps;
+    engine.steps.set_for_test(engine.limits.max_steps);
     assert!(admission.graph_signature(engine, first).is_err());
-    engine.steps = 0;
+    engine.steps.set_for_test(0);
     assert!(admission.graph_signature(engine, first).is_err());
 
     let body = engine.instantiated_body(first).unwrap();
@@ -666,7 +666,7 @@ fn check_signature_reuse<'tcx>(
     // A held signature cannot authenticate a replacement Body or bypass source comparison.
     assert!(engine.admitted_source_probe(first, admission).is_err());
     engine.bodies.borrow_mut().insert(first, body);
-    engine.steps = 0;
+    engine.steps.set_for_test(0);
     eprintln!(
         "nested-signature-reuse: two-original-checks/cache/alias/Context/resource/Body guards"
     );

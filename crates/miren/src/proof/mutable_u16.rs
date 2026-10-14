@@ -1117,11 +1117,10 @@ impl<'tcx> Engine<'tcx> {
             .instantiate(self.tcx, instance.args)
             .skip_binder();
         let niche_types = self.niche_origins.len();
-        self.steps = self
-            .steps
-            .checked_add(if niche_types == 0 { 0 } else { niche_types + 4 })
+        self.steps
+            .checked_add_commit(if niche_types == 0 { 0 } else { niche_types + 4 })
             .ok_or("niche len routing overflow")?;
-        if self.steps > self.limits.max_steps {
+        if self.steps.used() > self.limits.max_steps {
             return Err(self.categorized_error(
                 UnknownCategory::ResourceLimit,
                 "niche len routing limit".into(),

@@ -122,8 +122,8 @@ impl<'tcx> Engine<'tcx> {
             };
             let mut next = Vec::new();
             for mut branch in pending {
-                self.steps += 1;
-                if self.steps > self.limits.max_steps {
+                self.steps.legacy_increment();
+                if self.steps.used() > self.limits.max_steps {
                     return Err(self.categorized_error(
                         UnknownCategory::ResourceLimit,
                         "fixed array Drop execution step limit reached".into(),

@@ -167,9 +167,9 @@ fn actual_primitive_helper_lease_preserves_owner_and_rejects_hostile_state() {
                     _ => unreachable!(),
                 };
                 engine.call_signatures.borrow_mut().insert(helper, poisoned);
-                let before = engine.steps;
+                let before = engine.steps.used();
                 assert!(checked_signature(&mut engine, helper).is_err());
-                assert!(engine.steps > before);
+                assert!(engine.steps.used() > before);
                 let mut hostile = state.clone();
                 assert!(
                     engine
@@ -526,11 +526,11 @@ fn actual_primitive_helper_lease_preserves_owner_and_rejects_hostile_state() {
                 }
                 None => lease,
             };
-            let stopped = engine.steps;
+            let stopped = engine.steps.used();
             engine.limits.max_steps = stopped;
             let body = checked.edge.callee_body.clone();
             assert!(checked.check(&mut engine, &body, &state.memory).is_err());
-            assert!(engine.steps > stopped);
+            assert!(engine.steps.used() > stopped);
             println!(
                 "Actual retained helper signature/owner/body/metadata/escape/scalar validity controls"
             );

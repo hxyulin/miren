@@ -841,7 +841,7 @@ fn check_prepared_calls<'tcx>(tcx: TyCtxt<'tcx>) {
             .len(),
         1
     );
-    engine.steps = engine.limits.max_steps - 1;
+    engine.steps.set_for_test(engine.limits.max_steps - 1);
     assert!(
         engine
             .prepared_function_table_call(&state, make_call())
@@ -2414,9 +2414,9 @@ fn check_primitive_move_call<'tcx>(
     // An original array mismatch must refuse before the Choice vector is cloned.
     wrong_signature.original = tcx.types.u32;
     engine.function_pointers.borrow_mut()[choice_id] = Target::Choice(wrong_signature);
-    let steps_before = engine.steps;
+    let steps_before = engine.steps.used();
     assert!(engine.function_table_call(&state, call()).is_err());
-    assert_eq!(engine.steps, steps_before);
+    assert_eq!(engine.steps.used(), steps_before);
     engine.function_pointers.borrow_mut()[choice_id] = saved_choice;
     if matches!(
         kind,
@@ -2549,12 +2549,12 @@ fn check_primitive_move_call<'tcx>(
         state.addresses,
         state.memory.as_slice()
     );
-    let steps = engine.steps;
+    let steps = engine.steps.used();
     let error = match engine.function_table_call(&state, call()) {
         Err(error) => error,
         Ok(_) => panic!("oversized cached callee unexpectedly admitted"),
     };
-    assert_eq!(engine.steps, steps + classification_work);
+    assert_eq!(engine.steps.used(), steps + classification_work);
     assert_eq!(
         engine.unknown_causes.borrow().get(&error),
         Some(&UnknownCategory::ResourceLimit)
@@ -2599,9 +2599,9 @@ fn check_primitive_move_call<'tcx>(
         .bodies
         .borrow_mut()
         .insert(first_instance, std::rc::Rc::new(wrong_return));
-    let steps = engine.steps;
+    let steps = engine.steps.used();
     assert!(engine.function_table_call(&state, call()).is_err());
-    assert_eq!(engine.steps, steps + classification_work);
+    assert_eq!(engine.steps.used(), steps + classification_work);
     assert_eq!(
         format!(
             "{:?}/{:?}/{:?}/{:?}/{:?}",

@@ -43,7 +43,7 @@ pub(in crate::proof) fn begin(engine: &Engine<'_>, phase: Phase, memory: &Memory
         {
             probe.hit = true;
             probe.active = true;
-            probe.before = engine.steps;
+            probe.before = engine.steps.used();
             probe.access_at_begin = engine.mutable_product_access.borrow().is_some();
         }
     });
@@ -56,7 +56,7 @@ pub(super) fn payment(engine: &mut Engine<'_>) {
         {
             probe.payments += 1;
             if probe.deny == Some(probe.payments) {
-                engine.limits.max_steps = engine.steps;
+                engine.limits.max_steps = engine.steps.used();
             }
         }
     });
@@ -182,7 +182,7 @@ fn actual_product_contract_and_return_services_refuse_before_publication() {
                         probe.publications, 0,
                         "{phase:?} crossed unpaid publication"
                     );
-                    assert!(engine.steps > probe.before);
+                    assert!(engine.steps.used() > probe.before);
                     assert!(engine.mutable_product_failed.get());
                     assert!(
                         engine
@@ -200,13 +200,13 @@ fn actual_product_contract_and_return_services_refuse_before_publication() {
                         "{phase:?} payment{deny}: {error}"
                     );
                     engine.limits.max_steps = 2_000_000;
-                    let spent = engine.steps;
+                    let spent = engine.steps.used();
                     assert!(
                         engine
                             .mutable_product_vector_work(&Memory::default(), 0)
                             .is_err()
                     );
-                    assert_eq!(engine.steps, spent);
+                    assert_eq!(engine.steps.used(), spent);
                     assert!(engine.proof.assumptions.is_empty());
                     assert!(engine.proof.trusted_calls.is_empty());
                 }

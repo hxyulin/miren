@@ -293,7 +293,7 @@ fn controls<'tcx>(tcx: TyCtxt<'tcx>) {
     let mut context = Engine::new(tcx, &config, options(30000));
     context.array_iterator_types.clear();
     assert!(context.array_iterator_return(&result.value).is_err());
-    let mut unsupported = engine.steps;
+    let mut unsupported = engine.steps.used();
     let wrong = Value::Int {
         expression: engine.terms.boolean(true),
         bits: 16,
@@ -301,12 +301,12 @@ fn controls<'tcx>(tcx: TyCtxt<'tcx>) {
     };
     let original = tcx.types.u16;
     assert!(validate_element(&mut engine, original, &wrong, &[], 0, &mut 0).is_err());
-    assert!(engine.steps > unsupported);
-    unsupported = engine.steps;
+    assert!(engine.steps.used() > unsupported);
+    unsupported = engine.steps.used();
     let foreign = symbolic::Context::default();
     let wrong = symbolic::integer(&foreign, 22, 16, false);
     assert!(validate_element(&mut engine, original, &wrong, &[], 0, &mut 0).is_err());
-    assert!(engine.steps > unsupported);
+    assert!(engine.steps.used() > unsupported);
     for (raw, valid) in [
         (0, true),
         (0xd7ff, true),

@@ -21,13 +21,13 @@ pub(super) fn load_item<'tcx>(
         ));
     }
     #[cfg(test)]
-    let before = engine.steps;
+    let before = engine.steps.used();
     let result = load_available(engine, instance);
     #[cfg(test)]
     if std::env::var_os("MIREN_INTOITER_DROP_WORK_TRACE").is_some() {
         println!(
             "Drop work source={instance:?} before={before} after={}",
-            engine.steps
+            engine.steps.used()
         );
     }
     result
@@ -46,13 +46,13 @@ pub(super) fn load_drop<'tcx>(
         return Err("IntoIter destruction evidence resolved DropGlue differs".into());
     }
     #[cfg(test)]
-    let before = engine.steps;
+    let before = engine.steps.used();
     let result = load_available(engine, instance);
     #[cfg(test)]
     if std::env::var_os("MIREN_INTOITER_DROP_WORK_TRACE").is_some() {
         println!(
             "Drop work source={instance:?} before={before} after={}",
-            engine.steps
+            engine.steps.used()
         );
     }
     result
@@ -119,7 +119,7 @@ fn load_available<'tcx>(
         println!(
             "Step evidence {} planning steps={} owned={owned} cached={}",
             engine.tcx.item_name(instance.def_id()),
-            engine.steps,
+            engine.steps.used(),
             engine.bodies.borrow().contains_key(&instance)
         );
     }
@@ -133,7 +133,7 @@ fn load_available<'tcx>(
         println!(
             "Step evidence {} current clone/fold steps={}",
             engine.tcx.item_name(instance.def_id()),
-            engine.steps
+            engine.steps.used()
         );
     }
     source_identity(&current, instance)?;
@@ -372,7 +372,7 @@ fn load_available<'tcx>(
         println!(
             "Step evidence {} streamed comparisons steps={}",
             engine.tcx.item_name(instance.def_id()),
-            engine.steps
+            engine.steps.used()
         );
     }
     if engine.array_iterator_step_evidence.len() >= MAX_INPUT_VALUES {

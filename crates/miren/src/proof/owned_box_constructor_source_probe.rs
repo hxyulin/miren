@@ -50,7 +50,7 @@ fn actual_fieldless_box_constructor_source_and_hostile_controls() {
                     "BOX_PREP name={name} target={} opt={:?} work={} parts={}",
                     tcx.sess.target.llvm_target,
                     tcx.sess.opts.optimize,
-                    engine.steps,
+                    engine.steps.used(),
                     certificate.parts.len()
                 );
                 certificate.validate(&mut engine).unwrap();
@@ -203,7 +203,7 @@ fn actual_fieldless_box_constructor_source_and_hostile_controls() {
                         assert!(state.memory.static_uninitialized.is_empty());
                         assert!(application.proof.body_entries.is_empty());
                         assert!(application.proof.assumptions.is_empty());
-                        let work_before_invalid = application.steps;
+                        let work_before_invalid = application.steps.used();
                         assert_eq!(
                             application
                                 .owned_box_call(&body, block, constructor, &[], &mut state,)
@@ -222,7 +222,7 @@ fn actual_fieldless_box_constructor_source_and_hostile_controls() {
                                 .unwrap_err(),
                             "effect-free Box Drop payload differs from its original fieldless value"
                         );
-                        assert_eq!(application.steps, work_before_invalid);
+                        assert_eq!(application.steps.used(), work_before_invalid);
                         assert_eq!(application.owned_box_types.len(), types_before);
                         assert_eq!(application.next_owned_region, generation_before);
                         assert_eq!(state.memory.as_ptr(), memory_before.as_ptr());
@@ -280,7 +280,7 @@ fn actual_fieldless_box_constructor_source_and_hostile_controls() {
                     .find(|part| part.raw.family == BoxTemplateFamily::GlobalAllocate)
                     .unwrap();
                 // The dedicated Box cache cannot authorize the older flat-plan domain.
-                let before = engine.steps;
+                let before = engine.steps.used();
                 let before_entries = engine.array_iterator_step_evidence.len();
                 let before_box_entries = engine.box_constructor_source_evidence.len();
                 assert_eq!(before_entries, 0);
@@ -296,7 +296,7 @@ fn actual_fieldless_box_constructor_source_and_hostile_controls() {
                     engine.box_constructor_source_evidence.len(),
                     before_box_entries
                 );
-                let old_work = engine.steps - before;
+                let old_work = engine.steps.used() - before;
                 let mut fresh_iterator = Engine::new(tcx, &config, options());
                 let fresh_error = array_iterator_constructors::original_iterator_item_source(
                     &mut fresh_iterator,
@@ -304,10 +304,10 @@ fn actual_fieldless_box_constructor_source_and_hostile_controls() {
                 )
                 .unwrap_err();
                 assert_eq!(fresh_error, error);
-                assert_eq!(old_work, fresh_iterator.steps);
+                assert_eq!(old_work, fresh_iterator.steps.used());
                 println!(
                     "BOX_THEN_ITERATOR_REFUSAL paid={} reason={error}",
-                    engine.steps - before
+                    engine.steps.used() - before
                 );
                 certificate.validate(&mut engine).unwrap();
                 // Conversely, a small original Iterator admission cannot skip Box admission.
@@ -339,7 +339,7 @@ fn actual_fieldless_box_constructor_source_and_hostile_controls() {
                     before_box_entries + 1
                 );
                 // Cached Box admission still authenticates full Instance and original Body.
-                let before_refusal = reciprocal.steps;
+                let before_refusal = reciprocal.steps.used();
                 assert!(
                     array_iterator_constructors::authenticated_box_constructor_source(
                         &mut reciprocal,
@@ -349,7 +349,7 @@ fn actual_fieldless_box_constructor_source_and_hostile_controls() {
                     .unwrap_err()
                     .contains("full Instance differs")
                 );
-                assert_eq!(reciprocal.steps - before_refusal, 2);
+                assert_eq!(reciprocal.steps.used() - before_refusal, 2);
                 let wrong_raw = RawWitness {
                     instance: constructor,
                     raw: global.raw.raw,
@@ -406,7 +406,7 @@ fn actual_fieldless_box_constructor_source_and_hostile_controls() {
                     .contains("shared execution step limit reached")
                 );
                 assert!(clone_exhausted.bodies.borrow().is_empty());
-                assert!(clone_exhausted.steps > clone_exhausted.limits.max_steps);
+                assert!(clone_exhausted.steps.used() > clone_exhausted.limits.max_steps);
                 let missing = tcx.lang_items().get(LangItem::PanicFmt).unwrap();
                 assert!(!tcx.is_mir_available(missing));
                 let mut unavailable = Engine::new(tcx, &config, options());
@@ -434,7 +434,7 @@ fn actual_fieldless_box_constructor_source_and_hostile_controls() {
                 assert!(exhausted.bodies.borrow().is_empty());
                 assert!(exhausted.owned_box_types.is_empty());
                 assert_eq!(exhausted.next_owned_region, 0);
-                assert!(exhausted.steps > exhausted.limits.max_steps);
+                assert!(exhausted.steps.used() > exhausted.limits.max_steps);
             }
             rustc_driver::Compilation::Stop
         }

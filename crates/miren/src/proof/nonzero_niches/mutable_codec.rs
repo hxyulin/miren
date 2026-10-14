@@ -43,13 +43,13 @@ pub(in crate::proof) struct Prepared<'tcx> {
 }
 
 fn pay(engine: &mut Engine<'_>, count: usize) -> Result<(), String> {
-    engine.steps = engine.steps.checked_add(count).ok_or_else(|| {
+    engine.steps.checked_add_commit(count).ok_or_else(|| {
         engine.categorized_error(
             UnknownCategory::ResourceLimit,
             "niche codec work overflow".into(),
         )
     })?;
-    if engine.steps > engine.limits.max_steps {
+    if engine.steps.used() > engine.limits.max_steps {
         return Err(engine.categorized_error(
             UnknownCategory::ResourceLimit,
             "niche codec shared execution step limit reached".into(),
