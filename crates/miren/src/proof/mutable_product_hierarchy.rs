@@ -461,7 +461,7 @@ impl<'tcx> Engine<'tcx> {
             .map_err(|_| "product descriptor scope is borrowed during length preparation")?
             .is_none()
         {
-            return self.instantiated_body(instance);
+            return self.niche_length_body(instance);
         }
         require_service(self)?;
         let result = (|| {
@@ -481,7 +481,7 @@ impl<'tcx> Engine<'tcx> {
                 self.mutable_product_descriptor_source_replan(0, 1, 0)?;
             }
             // At the ordinary 128-entry clear, required current source bindings still fail.
-            self.instantiated_body(instance)
+            self.niche_length_body(instance)
         })();
         if result.is_err() {
             self.mutable_product_failed.set(true);
@@ -1847,10 +1847,68 @@ mod tests;
 #[path = "mutable_product_hierarchy/work_controls.rs"]
 pub(in crate::proof) mod work_controls;
 
-#[cfg(test)]
 pub(in crate::proof) fn niche_codec_signature<'tcx>(
     engine: &mut Engine<'tcx>,
     instance: ty::Instance<'tcx>,
 ) -> Result<ty::PolyFnSig<'tcx>, String> {
     signature::check_niche(engine, instance)
+}
+
+// Independently paid clone planning for direct or hierarchical niche roots. This observes
+// current backing headers only; it grants no role, ancestry or Memory publication authority.
+pub(in crate::proof) fn niche_backing_clone_plan(
+    engine: &mut Engine<'_>,
+    memory: &Memory,
+) -> Result<usize, String> {
+    engine.niche_plan_work(8)?;
+    if memory.mutable_u16.len() > MAX_INPUT_VALUES {
+        return Err("niche backing COW inventory exceeds512".into());
+    }
+    engine.niche_plan_work(memory.mutable_u16.len() * 8 + 4)?;
+    let mut clone_work = memory.mutable_u16.len() * 32 + 16;
+    for backing in memory.mutable_u16.iter() {
+        if !matches!(&backing.length, Value::Int { .. }) || backing.interval.is_some() {
+            return Err("niche backing COW needs bounded integer header without interval".into());
+        }
+        clone_work += match &backing.data {
+            Storage::Scalar(_) => 4,
+            Storage::Product(columns) if columns.len() <= MAX_INPUT_VALUES => columns.len() * 4,
+            Storage::Product(_) => return Err("niche backing COW columns exceed512".into()),
+        };
+        clone_work += match &backing.phase {
+            super::super::mutable_u16_children::Phase::Idle => 4,
+            super::super::mutable_u16_children::Phase::Pending { .. } => 8,
+            super::super::mutable_u16_children::Phase::Active { frames }
+                if frames.len() <= MAX_INPUT_VALUES =>
+            {
+                12 + frames.len() * 4
+            }
+            super::super::mutable_u16_children::Phase::Retained { metadata, .. }
+                if metadata.len() <= MAX_INPUT_VALUES =>
+            {
+                32 + metadata.len() * 8
+            }
+            _ => return Err("niche backing COW phase inventory exceeds512".into()),
+        };
+        if let Some(hierarchy) = &backing.hierarchy {
+            if hierarchy.owners.len() > MAX_INPUT_VALUES {
+                return Err("niche backing COW hierarchy owners exceed512".into());
+            }
+            engine.niche_plan_work(hierarchy.owners.len() * 4 + 8)?;
+            let mut frames = 0usize;
+            clone_work += 32 + hierarchy.owners.len() * 24;
+            for owner in &hierarchy.owners {
+                frames = frames
+                    .checked_add(owner.frames.len())
+                    .ok_or("niche backing COW hierarchy frame overflow")?;
+                if frames > MAX_INPUT_VALUES {
+                    return Err("niche backing COW hierarchy frames exceed512".into());
+                }
+                clone_work = clone_work
+                    .checked_add(owner.frames.len() * 8)
+                    .ok_or("niche backing COW hierarchy clone overflow")?;
+            }
+        }
+    }
+    Ok(clone_work)
 }

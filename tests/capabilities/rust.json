@@ -1619,8 +1619,8 @@
       "entry": "mutable_product_survey::niche_product",
       "family": "mutable_product_slice",
       "expected": "unknown",
-      "unknown_category": "semantics",
-      "unknown_reason": "mutable product input requires exact pure tuple/array/local struct"
+      "unknown_category": "resource_limit",
+      "unknown_reason": "niche codec shared execution step limit reached"
     },
     {
       "entry": "mutable_product_survey::outer_retention",

@@ -45,6 +45,7 @@ mod call_destinations;
 mod call_metadata;
 mod characters;
 mod closure_captures;
+mod compiler_sources;
 mod composite_slices;
 mod constant_reference_receipts;
 mod constants;
@@ -83,6 +84,7 @@ mod mutable_interval;
 mod mutable_lease_probe;
 mod mutable_metadata;
 mod mutable_product_descriptors;
+mod mutable_product_niche_ledger;
 mod mutable_products;
 mod mutable_reborrows;
 mod mutable_slice_ranges;
@@ -203,6 +205,10 @@ struct Engine<'tcx> {
     composite_slice_types: Vec<composite_slices::CompositeType<'tcx>>,
     tracked_addresses: Vec<(tracked_pointers::AddressLocation<'tcx>, Term)>,
     mutable_product_descriptors: Vec<std::rc::Rc<mutable_product_descriptors::Prepared<'tcx>>>,
+    niche_ledger: mutable_product_niche_ledger::Registry<'tcx>,
+    niche_operand: std::cell::Cell<usize>,
+    niche_origins: BTreeMap<usize, nonzero_niches::mutable_codec::input_descriptor::Origin<'tcx>>,
+    niche_root_inputs: nonzero_niches::mutable_codec::input_descriptor::RootRegistry,
     mutable_product_failed: std::cell::Cell<bool>,
     mutable_product_access: std::cell::RefCell<Option<mutable_hierarchy::products::Access<'tcx>>>,
     mutable_product_sources:
@@ -239,6 +245,7 @@ struct Engine<'tcx> {
     mutable_retained: std::cell::RefCell<Vec<mutable_reborrows::Certificate<'tcx>>>,
     coroutine_places:
         std::cell::RefCell<Vec<(std::rc::Weak<Body<'tcx>>, coroutines::OriginalPlace<'tcx>)>>,
+    compiler_sources: Vec<compiler_sources::Evidence<'tcx>>,
     bodies:
         std::cell::RefCell<std::collections::HashMap<ty::Instance<'tcx>, std::rc::Rc<Body<'tcx>>>>,
     call_signatures:
@@ -333,6 +340,10 @@ impl<'tcx> Engine<'tcx> {
             mutable_product_access: Default::default(),
             mutable_product_sources: Default::default(),
             mutable_product_descriptors: Vec::new(),
+            niche_ledger: Default::default(),
+            niche_operand: std::cell::Cell::new(0),
+            niche_origins: BTreeMap::new(),
+            niche_root_inputs: Default::default(),
             mutable_product_failed: Default::default(),
             steps: 0,
             call_chain: Vec::new(),
@@ -365,6 +376,7 @@ impl<'tcx> Engine<'tcx> {
             mutable_retained: Default::default(),
             activation: Default::default(),
             coroutine_places: Default::default(),
+            compiler_sources: Vec::new(),
             bodies: std::cell::RefCell::new(std::collections::HashMap::new()),
             call_signatures: std::cell::RefCell::new(std::collections::HashMap::new()),
             proof: Proof {
@@ -405,6 +417,7 @@ impl<'tcx> Engine<'tcx> {
         let mut conditions = Vec::new();
         let mut arguments = Vec::new();
         let mut memory = Memory::default();
+        let niche_root_setup = self.niche_root_inputs.begin(id)?;
         if self.startup {
             self.proof.entry_assumptions = vec![
                 "Fresh startup: Rust statics have their declared initializer values on entry"
@@ -485,11 +498,22 @@ impl<'tcx> Engine<'tcx> {
                     let ty::Slice(original_element) = element.kind() else {
                         return Err("mutable integer root needs original slice".into());
                     };
-                    arguments.push(self.mutable_u16_input(
-                        *original_element,
-                        &mut memory,
-                        &mut conditions,
-                    )?);
+                    let niche = nonzero_niches::mutable_codec::input_descriptor::prepare_root(
+                        self, id, body, local, &memory,
+                    )?;
+                    if let Some(niche) = niche {
+                        arguments.push(self.mutable_product_niche_input(
+                            niche,
+                            &mut memory,
+                            &mut conditions,
+                        )?);
+                    } else {
+                        arguments.push(self.mutable_u16_input(
+                            *original_element,
+                            &mut memory,
+                            &mut conditions,
+                        )?);
+                    }
                     continue;
                 }
                 self.building_mutable_input = true;
@@ -568,6 +592,7 @@ impl<'tcx> Engine<'tcx> {
                 arguments.push(value);
             }
         }
+        niche_root_setup.close();
         if !async_entry {
             self.proof.replay_inputs = Some(self.replay_arguments(id, &arguments));
         }
@@ -581,6 +606,8 @@ impl<'tcx> Engine<'tcx> {
             )?;
         }
         let instance = ty::Instance::new_raw(id, ty::GenericArgs::identity_for_item(self.tcx, id));
+        let owned_entry = self.instantiated_body(instance)?;
+        self.niche_entry_scope(instance, &owned_entry, &memory, &conditions)?;
         let snapshots =
             self.mutable_product_entry_observations(instance, &arguments, &memory, &conditions)?;
         let bindings = self.configured_bindings(body, &snapshots, instance)?;
@@ -1172,6 +1199,20 @@ impl<'tcx> Engine<'tcx> {
         if let Some(body) = self.bodies.borrow().get(&instance) {
             return Ok(body.clone());
         }
+        let (body, original_places) = self.prepare_instantiated_body(instance)?;
+        self.publish_instantiated_body(instance, body, original_places)
+    }
+
+    fn prepare_instantiated_body(
+        &self,
+        instance: ty::Instance<'tcx>,
+    ) -> Result<
+        (
+            std::rc::Rc<Body<'tcx>>,
+            Vec<coroutines::OriginalPlace<'tcx>>,
+        ),
+        String,
+    > {
         if !matches!(
             instance.def,
             ty::InstanceKind::Item(_)
@@ -1202,30 +1243,49 @@ impl<'tcx> Engine<'tcx> {
         {
             return Err(self.missing_body_reason(instance.def_id()));
         }
-        let mut body = instance
+        let mut body = self.normalized_compiler_body(instance)?;
+        let original_places = self.flatten_coroutine_places(&mut body)?;
+        Ok((std::rc::Rc::new(body), original_places))
+    }
+
+    fn normalized_compiler_body(&self, instance: ty::Instance<'tcx>) -> Result<Body<'tcx>, String> {
+        instance
             .try_instantiate_mir_and_normalize_erasing_regions(
                 self.tcx,
                 ty::TypingEnv::fully_monomorphized(),
                 ty::EarlyBinder::bind(self.tcx, self.tcx.instance_mir(instance.def).clone()),
             )
-            .map_err(|error| format!("MIR substitution failed: {error:?}"))?;
-        let original_places = self.flatten_coroutine_places(&mut body)?;
-        let body = std::rc::Rc::new(body);
+            .map_err(|error| format!("MIR substitution failed: {error:?}"))
+    }
+
+    fn publish_instantiated_body(
+        &self,
+        instance: ty::Instance<'tcx>,
+        body: std::rc::Rc<Body<'tcx>>,
+        original_places: Vec<coroutines::OriginalPlace<'tcx>>,
+    ) -> Result<std::rc::Rc<Body<'tcx>>, String> {
         let owner = std::rc::Rc::downgrade(&body);
-        let mut places = self.coroutine_places.borrow_mut();
+        let mut places = self
+            .coroutine_places
+            .try_borrow_mut()
+            .map_err(|_| "compiler Body coroutine place registry borrowed")?;
         if places.len() + original_places.len() > MAX_INPUT_VALUES {
             return Err(self.categorized_error(
                 UnknownCategory::ResourceLimit,
                 "original coroutine place certificates exceed the 512-node limit".into(),
             ));
         }
+        let mut bodies = self
+            .bodies
+            .try_borrow_mut()
+            .map_err(|_| "compiler Body publication registry borrowed")?;
         places.extend(
             original_places
                 .into_iter()
                 .map(|place| (owner.clone(), place)),
         );
         drop(places);
-        let mut bodies = self.bodies.borrow_mut();
+
         if bodies.len() >= 128 {
             bodies.clear();
         }
@@ -1263,7 +1323,14 @@ impl<'tcx> Engine<'tcx> {
         self.mutable_product_stack_work(&memory, stack.len())?;
         let chain = stack.iter().copied().chain([instance.def_id()]).collect();
         let previous = std::mem::replace(&mut self.call_chain, chain);
-        let result = self.execute_body(instance, arguments, conditions, memory, stack, flow);
+        let result = (|| {
+            let niche_frame = self.niche_frame_begin(&memory)?;
+            let result = self.execute_body(instance, arguments, conditions, memory, stack, flow);
+            self.niche_scope_end(result.is_err());
+            drop(niche_frame);
+            result
+        })();
+        self.niche_scope_end(result.is_err());
         if result.is_err() && self.failed_call_chain.is_none() {
             self.failed_call_chain = Some(self.call_chain.clone());
         }
@@ -1343,6 +1410,7 @@ impl<'tcx> Engine<'tcx> {
             self.activation_prepare_body(&flow, instance)?
         };
         let body = &owned_body;
+        self.niche_entry_scope(instance, body, &memory, &conditions)?;
         if let Some(helper) = frame.retained_helper_invocation() {
             helper.check(self, &owned_body, &memory)?;
         }
@@ -1647,6 +1715,7 @@ impl<'tcx> Engine<'tcx> {
                 })?;
             }
             let terminator = body.basic_blocks[block].terminator();
+            self.niche_terminator_scope(instance, body, &state, block, false)?;
             let guards = match &terminator.kind {
                 TerminatorKind::Call { args, .. } => 16usize.saturating_add(4 * args.len()),
                 _ => 16,
@@ -2059,6 +2128,7 @@ impl<'tcx> Engine<'tcx> {
                         let target =
                             target.ok_or("function table call has no normal return edge")?;
                         for (consumed, result) in results {
+                            self.niche_resume_call(body, &state)?;
                             self.active_destruction_adopt_work(&frame, &state)?;
                             let mut continuation = self.mutable_product_adopt_return(
                                 &consumed,
@@ -2098,6 +2168,7 @@ impl<'tcx> Engine<'tcx> {
                         }
                         _ => return Err("unresolved indirect call".to_owned()),
                     };
+                    self.niche_call_signature_prepare(instance)?;
                     self.mutable_product_call_signature_prepare(instance)?;
                     let dispatch_instance = instance;
                     if let Some(value) = self.executable_box_format_call(
@@ -2156,6 +2227,7 @@ impl<'tcx> Engine<'tcx> {
                     )? {
                         let target = target.ok_or("Box core Call lacks normal return edge")?;
                         for result in results {
+                            self.niche_resume_call(body, &state)?;
                             self.active_destruction_adopt_work(&frame, &state)?;
                             let mut continuation = self.adopt_flow_return(
                                 &state,
@@ -2192,6 +2264,7 @@ impl<'tcx> Engine<'tcx> {
                         let target =
                             target.ok_or("IntoIter destruction lacks normal return edge")?;
                         for result in results {
+                            self.niche_resume_call(body, &state)?;
                             self.active_destruction_adopt_work(&frame, &state)?;
                             let mut continuation = self.mutable_product_adopt_return(
                                 &state,
@@ -2408,6 +2481,7 @@ impl<'tcx> Engine<'tcx> {
                     {
                         let target = target.ok_or("mutable u16 child has no normal return edge")?;
                         for result in results {
+                            self.niche_resume_call(body, &state)?;
                             self.active_destruction_adopt_work(&frame, &state)?;
                             let mut continuation = self.mutable_product_adopt_return(
                                 &state,
@@ -2450,6 +2524,7 @@ impl<'tcx> Engine<'tcx> {
                     {
                         let target = target.ok_or("mutable u16 child has no normal return edge")?;
                         for result in results {
+                            self.niche_resume_call(body, &state)?;
                             self.active_destruction_adopt_work(&frame, &state)?;
                             let mut continuation = self.mutable_product_adopt_return(
                                 &state,
@@ -2487,6 +2562,7 @@ impl<'tcx> Engine<'tcx> {
                     {
                         let target = target.ok_or("IntoIter step lacks normal return edge")?;
                         for result in results {
+                            self.niche_resume_call(body, &state)?;
                             self.active_destruction_adopt_work(&frame, &state)?;
                             let mut continuation = self.mutable_product_adopt_return(
                                 &state,
@@ -2525,6 +2601,7 @@ impl<'tcx> Engine<'tcx> {
                         let target =
                             target.ok_or("IntoIter constructor lacks normal return edge")?;
                         for result in results {
+                            self.niche_resume_call(body, &state)?;
                             self.active_destruction_adopt_work(&frame, &state)?;
                             let mut continuation = self.mutable_product_adopt_return(
                                 &state,
@@ -2634,6 +2711,7 @@ impl<'tcx> Engine<'tcx> {
                         instance
                     };
                     if instance != dispatch_instance {
+                        self.niche_call_signature_prepare(instance)?;
                         self.mutable_product_call_signature_prepare(instance)?;
                     }
                     if !frame.has_destruction()
@@ -2647,6 +2725,7 @@ impl<'tcx> Engine<'tcx> {
                     {
                         let target = target.ok_or("shared trait choice has no return edge")?;
                         for result in results {
+                            self.niche_resume_call(body, &state)?;
                             self.active_destruction_adopt_work(&frame, &state)?;
                             let mut continuation = self.mutable_product_adopt_return(
                                 &state,
@@ -2692,6 +2771,7 @@ impl<'tcx> Engine<'tcx> {
                         }
                         let target = target.ok_or("trusted call has no return edge")?;
                         for result in results {
+                            self.niche_resume_call(body, &state)?;
                             self.active_destruction_adopt_work(&frame, &state)?;
                             let mut continuation = self.mutable_product_adopt_return(
                                 &state,
@@ -2730,6 +2810,7 @@ impl<'tcx> Engine<'tcx> {
                         let target =
                             target.ok_or("IntoIter ordinary helper lacks normal return edge")?;
                         for result in results {
+                            self.niche_resume_call(body, &state)?;
                             self.active_destruction_adopt_work(&frame, &state)?;
                             let mut continuation = self.mutable_product_adopt_return(
                                 &state,
@@ -2769,6 +2850,7 @@ impl<'tcx> Engine<'tcx> {
                     {
                         let target = target.ok_or("owned iterator call has no return edge")?;
                         for result in results {
+                            self.niche_resume_call(body, &state)?;
                             self.active_destruction_adopt_work(&frame, &state)?;
                             let mut continuation = self.mutable_product_adopt_return(
                                 &state,
@@ -2807,6 +2889,7 @@ impl<'tcx> Engine<'tcx> {
                     {
                         let target = target.ok_or("iterator call has no return edge")?;
                         for result in results {
+                            self.niche_resume_call(body, &state)?;
                             self.active_destruction_adopt_work(&frame, &state)?;
                             let mut continuation = self.mutable_product_adopt_return(
                                 &state,
@@ -2925,6 +3008,7 @@ impl<'tcx> Engine<'tcx> {
                     {
                         let target = target.ok_or("shared Drop call has no normal return edge")?;
                         for result in results {
+                            self.niche_resume_call(body, &state)?;
                             self.active_destruction_adopt_work(&frame, &state)?;
                             let mut continuation = self.mutable_product_adopt_return(
                                 &state,
@@ -3023,6 +3107,7 @@ impl<'tcx> Engine<'tcx> {
                     {
                         let target = target.ok_or("modeled call has no return edge")?;
                         for result in results {
+                            self.niche_resume_call(body, &state)?;
                             self.active_destruction_adopt_work(&frame, &state)?;
                             let mut continuation = self.mutable_product_adopt_return(
                                 &state,
@@ -3175,6 +3260,7 @@ impl<'tcx> Engine<'tcx> {
                     };
                     let target = target.ok_or("local call has no return edge")?;
                     for result in results {
+                        self.niche_resume_call(body, &state)?;
                         self.active_destruction_adopt_work(&frame, &state)?;
                         let mut continuation = self.mutable_product_adopt_return(
                             &state,
@@ -3382,6 +3468,7 @@ impl<'tcx> Engine<'tcx> {
                             (id, terminator.source_info.span),
                         )?;
                         for result in results {
+                            self.niche_resume_call(body, &state)?;
                             self.active_destruction_adopt_work(&frame, &state)?;
                             let mut continuation = self.mutable_product_adopt_return(
                                 &state,
@@ -3497,15 +3584,19 @@ impl<'tcx> Engine<'tcx> {
             },
             _ => 8,
         };
-        self.mutable_product_access_begin(
-            body,
-            std::ptr::from_ref(statement) as usize,
-            &state.memory,
-            guards,
-        )?;
-        self.mutable_product_statement_work(body, state, statement)?;
-        let result = self.statement_with_product_access(instance, body, state, statement);
+        let result = (|| {
+            self.niche_statement_scope(instance, body, state, statement)?;
+            self.mutable_product_access_begin(
+                body,
+                std::ptr::from_ref(statement) as usize,
+                &state.memory,
+                guards,
+            )?;
+            self.mutable_product_statement_work(body, state, statement)?;
+            self.statement_with_product_access(instance, body, state, statement)
+        })();
         self.mutable_product_access_end(result.is_err());
+        self.niche_scope_end(result.is_err());
         result
     }
 
@@ -3619,9 +3710,19 @@ impl<'tcx> Engine<'tcx> {
         value: Value,
         occurrence: &StatementKind<'tcx>,
     ) -> Result<(), String> {
-        state.constant_receipts.invalidate(place);
-        if self.mutable_u16_store(body, state, place, &value)? {
-            return Ok(());
+        if self.niche_memory(&state.memory) {
+            // Selected niche storage validates every leaf and constructs every replacement
+            // before invalidating any caller observation or publishing current Memory.
+            if self.mutable_u16_store(body, state, place, &value)? {
+                state.constant_receipts.invalidate(place);
+                return Ok(());
+            }
+            state.constant_receipts.invalidate(place);
+        } else {
+            state.constant_receipts.invalidate(place);
+            if self.mutable_u16_store(body, state, place, &value)? {
+                return Ok(());
+            }
         }
         self.mutable_u16_store_role(body, state, place, &value)?;
         if self.owned_constructor_store(body, state, place, &value, occurrence)? {

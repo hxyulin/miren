@@ -3145,3 +3145,43 @@ prefixes in source/replay file paths and working directories, 2,451 full Proofs 
 query-free host-debug fold timeout records an additional wrapping_add call frame; it remains
 resource UNKNOWN. The comparison classifies this as DIFFERENT, and its closed timeout allowance is
 unchanged.
+
+
+## Mutable integer-niche owner execution foundation
+
+A separate bounded general compiler-source loader authenticates actual available MIR and full
+signatures without granting storage rights. Fresh root inputs and actual instruction receipts
+retain compiler types, Context, source bindings, live frames and transactional publication.
+Missing bodies and unsupported operations remain UNKNOWN. Coroutine-bearing locals refuse before
+source publication. Immutable origin planning facts are computed once from authenticated types;
+all current certificate comparisons still execute under paid reservations.
+
+Unchanged native fixtures cover all twelve integer types and three zero-only enum layouts.
+Actual compiler controls exercise source corruption, stale receipts, held registries, failed
+publication, genuine metadata acquisition and resource denial. The dedicated planner controls
+include fixed numeric oracles, budget refusal before publication, non-Copy refusal and an
+oversized array refusal. Paired unsupported observations are not distinct supported features.
+
+The release sample contains 24 u8 roots across host/ARM O0/O2 at 8,192 and 2,000,000 steps.
+Default runs remain UNKNOWN. At the larger recorded budget, the three deliberate wrong-sibling
+assertions REFUTE in each profile; the other 21 roots remain UNKNOWN. All twelve exact models
+satisfy their original Z3 queries, and setting index equal to length is UNSAT. Host length-three,
+index-zero counterexamples panic through the unchanged fixture at O0/O2; out-of-bounds controls
+return normally. ARM models are validated in Z3, without claiming native ARM replay.
+
+All 120 earlier queried obligations remain literal ordered prefixes of the 168 current queries.
+Later refusals include repeated instruction reservation costs, unplanned source growth during
+outer preservation, partial payload staging and bare enum owner admission. This sample does not
+change the 613-case default capability baseline or establish full Rust coverage.
+
+
+Validation passes 1,047 unique Rust tests and 91 Python tests, formatting, Clippy, release builds,
+dependency checks, manual hooks and the documentation build. The full Rust run found one stale
+UNKNOWN reason in the capability manifest; four profile runs confirmed the new resource refusal,
+and the affected target passes after correcting that record. Application assertions and expected
+statuses were unchanged. A nested native mutation panic is an expected control, not a suite failure.
+
+The four-profile survey retains 336 PROVED, 164 REFUTED and 113 UNKNOWN per profile. All 5,420 raw
+queries and 656 models remain literal. Four query-free niche-product refusals now report the codec
+budget frontier. One query-free host-debug fold timeout reports a different instruction/call-chain
+location; its full Proof is classified as different, without expanding timeout allowances.

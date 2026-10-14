@@ -1116,6 +1116,17 @@ impl<'tcx> Engine<'tcx> {
             .fn_sig(instance.def_id())
             .instantiate(self.tcx, instance.args)
             .skip_binder();
+        let niche_types = self.niche_origins.len();
+        self.steps = self
+            .steps
+            .checked_add(if niche_types == 0 { 0 } else { niche_types + 4 })
+            .ok_or("niche len routing overflow")?;
+        if self.steps > self.limits.max_steps {
+            return Err(self.categorized_error(
+                UnknownCategory::ResourceLimit,
+                "niche len routing limit".into(),
+            ));
+        }
         if signature.safety() != rustc_hir::Safety::Safe
             || signature.abi() != rustc_abi::ExternAbi::Rust
             || signature.c_variadic()
@@ -1124,7 +1135,8 @@ impl<'tcx> Engine<'tcx> {
             || !matches!(signature.inputs()[0].kind(), ty::Ref(_, inner, mutability)
                 if !mutability.is_mut() && matches!(inner.kind(), ty::Slice(element)
                     if self.mutable_integer_element(*element)
-                        || self.mutable_product_shape(*element)?.is_some()))
+                        || self.niche_origins.values().any(|origin| origin.original() == *element)
+                            || self.mutable_product_shape(*element)?.is_some()))
         {
             return Err("mutable u16 SliceLen has a different original signature".into());
         }

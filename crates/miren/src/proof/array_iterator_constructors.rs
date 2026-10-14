@@ -2060,3 +2060,46 @@ pub(super) fn box_receipt_current_clone_work(
 ) -> Result<usize, String> {
     clone_work::body(engine, body)
 }
+
+// General compiler-source traversal uses the same exhaustive owned-field inventory, a distinct
+// total-work policy and the unchanged per-vector bounds. It issues no iterator source or lease.
+pub(super) fn compiler_source_body_clone_work(
+    engine: &mut Engine<'_>,
+    body: &Body<'_>,
+) -> Result<usize, String> {
+    clone_work::compiler_source_body(engine, body)
+}
+
+pub(super) fn compiler_source_statement_work(
+    engine: &mut Engine<'_>,
+    statement: &rustc_middle::mir::Statement<'_>,
+) -> Result<usize, String> {
+    clone_work::compiler_source_statement(engine, statement)
+}
+pub(super) fn compiler_source_terminator_work(
+    engine: &mut Engine<'_>,
+    terminator: &rustc_middle::mir::Terminator<'_>,
+) -> Result<usize, String> {
+    clone_work::compiler_source_terminator(engine, terminator)
+}
+pub(super) fn compiler_source_variable_work(
+    engine: &mut Engine<'_>,
+    variable: &rustc_middle::mir::VarDebugInfo<'_>,
+) -> Result<usize, String> {
+    clone_work::compiler_source_variable(engine, variable)
+}
+
+#[cfg(test)]
+pub(super) fn compiler_clone_inventory(
+    engine: &mut Engine<'_>,
+    body: &Body<'_>,
+    general: bool,
+) -> (Result<usize, String>, usize) {
+    let before = engine.steps;
+    let result = if general {
+        clone_work::compiler_source_body(engine, body)
+    } else {
+        clone_work::step_body(engine, body)
+    };
+    (result, engine.steps - before)
+}

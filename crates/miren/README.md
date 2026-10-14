@@ -2229,3 +2229,46 @@ pay separately before publication; ordinary calls retain their existing lazy cac
 The actual mutable SliceLen certificate replenishes future current-Body lookup work before a
 missing Body is instantiated. Its existing body certification and 128-entry cache policy remain
 unchanged; clearing a required source association still refuses descriptor reuse.
+
+An isolated mutable niche owner candidate admits whole-enum leaves inside bounded pure products
+through paid compiler-bound root input and instruction receipts. It retains correlated raw integer
+storage, full original schemas and live owner guards. Actual statement operands and Call destinations
+have separate consumable receipts; fresh root issuance ends before execution. A replacement validates
+all leaves and constructs all new column terms before publishing current Memory. Partial enum payload
+writes, dynamic nested niche projections and TailCall execution remain UNKNOWN. This candidate still
+requires compiler program outcomes and transaction-denial validation; private codec controls alone
+do not establish supported mutable owner coverage.
+
+The mutable niche candidate uses a separate paid general compiler-source loader. It authenticates
+actual original/current MIR, normalization, full signatures, retags and Context before publishing
+source records. Its complete owned-field inventory shares the pinned compiler clone planner while
+retaining the iterator and finite-choice512 policies. General source totals use the shared execution
+budget with each actual vector still bounded512. These records confer no instruction or owner rights;
+unsupported operations and missing bodies remain UNKNOWN. Existing native owner assertions are
+unchanged. Compiler inventory alone does not establish supported program outcomes.
+
+Niche instruction reservations retain the 64 comparison-consumption limit and independently paid
+original schema planning. Source lookups reserve the actual Body/signature inventories after codec
+preparation; uncovered catalogue growth refuses before either current or originating source lookup.
+Value construction reserves the sealed original shape for each genuine instruction occurrence,
+including receipt lookup and staged column updates. Metadata-only scopes have no value allowance.
+These reservations retain source, live owner, initialization and transactional publication guards.
+
+Selected niche call-signature and SliceLen Body acquisition prepay additional lookup work for
+remaining comparison slots before publishing genuinely acquired compiler metadata. Preexisting
+unplanned growth still refuses, and replenishment never renews consumed comparison slots.
+Simultaneous Product and niche acquisition scopes remain unsupported pending a shared issuer.
+Ordinary routes retain their existing source cache behavior.
+
+Niche origin comparison and value-planning facts are now computed once, with bounded paid
+traversal of the independently authenticated compiler descriptor during fresh root consumption.
+Later instruction planning reads private immutable numeric facts. Every current certificate,
+layout and source comparison remains charged and executed; the 64-consumption limit is unchanged.
+
+
+The unchanged 24-root u8 application sample now reaches actual helper bodies and solver queries.
+At 2,000,000 recorded steps, deliberate wrong-sibling assertions REFUTE for Option and both local
+integer enum layouts across host/ARM O0/O2. Exact SMT models pass Z3 checks, and host inputs replay
+through the unchanged fixture. All default-budget sample results remain UNKNOWN. Ordinary survey
+coverage is unchanged; partial payload writes, bare enum owners and remaining resource/source
+refusals require separate support. See the capability evidence for qualifications.

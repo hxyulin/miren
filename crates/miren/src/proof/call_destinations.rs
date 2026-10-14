@@ -42,6 +42,7 @@ impl<'tcx> Engine<'tcx> {
         captured: Option<&CapturedCallDestination<'tcx>>,
         value: Value,
     ) -> Result<(), String> {
+        self.niche_destination_scope(body, state, place)?;
         self.validate_array_iterator_value(place.ty(&body.local_decls, self.tcx).ty, &value)?;
         state.constant_receipts.invalidate(place);
         self.activation_validate(&state.flow, &state.memory)?;

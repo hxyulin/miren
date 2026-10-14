@@ -793,6 +793,21 @@ impl<'tcx> Engine<'tcx> {
         state: &mut State,
         operand: &Operand<'tcx>,
     ) -> Result<Value, String> {
+        let previous = self
+            .niche_operand
+            .replace(std::ptr::from_ref(operand) as usize);
+        let result = self.evaluate_operand_niche_scope(id, body, state, operand);
+        self.niche_operand.set(previous);
+        result
+    }
+
+    fn evaluate_operand_niche_scope(
+        &self,
+        id: DefId,
+        body: &Body<'tcx>,
+        state: &mut State,
+        operand: &Operand<'tcx>,
+    ) -> Result<Value, String> {
         if let Operand::Move(place) = operand {
             state.constant_receipts.invalidate(*place);
         }

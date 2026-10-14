@@ -391,6 +391,11 @@ impl DescriptorPlan {
                     work += self.original(engine, original, depth + 1)?;
                 }
             }
+            ty::Adt(definition, _) if definition.is_enum() => {
+                work += nonzero_niches::mutable_codec::input_descriptor::price_leaf_schema(
+                    engine, original,
+                )?;
+            }
             _ => return Err("product descriptor plan has unsupported original type".into()),
         }
         Ok(work)

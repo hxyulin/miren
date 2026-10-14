@@ -42,6 +42,8 @@ fn site<'tcx>(
         instance,
         block,
         statement,
+        ordinal: 0,
+        terminator: false,
         kind,
     }
 }
@@ -99,6 +101,38 @@ fn actual_compiler_bound_paid_niche_codec_roundtrip_and_refusals() {
                     assert!(!engine.mutable_product_failed.get());
                     name_controls += 1;
                     continue;
+                }
+                let input_session = Rc::new(Session::default());
+                let issued = input_descriptor::prepare(
+                    &mut engine,
+                    &input_session,
+                    instance,
+                    rustc_middle::mir::Local::from_usize(1),
+                )
+                .unwrap()
+                .consume(&engine)
+                .unwrap();
+                assert_eq!(issued.descriptor().ty, *product);
+                assert_eq!(issued.descriptor().leaves.len(), 2);
+                assert_eq!(
+                    issued.alignment(),
+                    engine.static_layout(*product).unwrap().align.abi.bytes()
+                );
+                assert!(!input_session.0.get());
+                for alignment in [false, true] {
+                    let corrupt_session = Rc::new(Session::default());
+                    let mut pending = input_descriptor::prepare(
+                        &mut engine,
+                        &corrupt_session,
+                        instance,
+                        rustc_middle::mir::Local::from_usize(1),
+                    )
+                    .unwrap();
+                    pending.corrupt_for_test(alignment);
+                    let error = pending.consume(&engine).err().unwrap();
+                    assert!(error.contains("full descriptor/layout differs"));
+                    assert!(corrupt_session.0.get());
+                    assert!(!engine.mutable_product_failed.get());
                 }
                 let certificate = certify(tcx, original).unwrap();
                 let width = certificate.facts.payload_bits;
@@ -327,13 +361,10 @@ fn actual_compiler_bound_paid_niche_codec_roundtrip_and_refusals() {
                 assert!(engine.proof.assumptions.is_empty());
                 eprintln!(
                     concat!(
-                        "MUTABLE_NICHE_CODEC name={name} width={width} ",
-                        "target={} opt={:?} codec_only=true"
+                        "MUTABLE_NICHE_CODEC name={} width={} target={} ",
+                        "opt={:?} codec_only=true"
                     ),
-                    tcx.sess.target.llvm_target,
-                    tcx.sess.opts.optimize,
-                    name = name,
-                    width = width,
+                    name, width, tcx.sess.target.llvm_target, tcx.sess.opts.optimize
                 );
                 count += 1;
             }

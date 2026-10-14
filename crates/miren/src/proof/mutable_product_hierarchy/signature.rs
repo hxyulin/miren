@@ -6,7 +6,6 @@ use std::ops::ControlFlow;
 #[derive(Clone, Copy)]
 enum FailureDomain {
     Product,
-    #[cfg(test)]
     Niche,
 }
 
@@ -17,7 +16,6 @@ fn signature_pay(
 ) -> Result<(), String> {
     match domain {
         FailureDomain::Product => super::pay(engine, count),
-        #[cfg(test)]
         FailureDomain::Niche => {
             engine.steps = engine.steps.checked_add(count).ok_or_else(|| {
                 engine.categorized_error(
@@ -188,7 +186,6 @@ pub(super) fn check<'tcx>(
     check_with_domain(engine, instance, FailureDomain::Product)
 }
 
-#[cfg(test)]
 pub(super) fn check_niche<'tcx>(
     engine: &mut Engine<'tcx>,
     instance: ty::Instance<'tcx>,
@@ -264,7 +261,6 @@ fn check_with_domain<'tcx>(
     // nothing; a missing dispatcher entry will still be derived from the same compiler source.
     let registry = match domain {
         FailureDomain::Product => plan.engine.call_signatures.borrow().len(),
-        #[cfg(test)]
         FailureDomain::Niche => plan
             .engine
             .call_signatures
@@ -275,7 +271,6 @@ fn check_with_domain<'tcx>(
     signature_pay(plan.engine, registry + work + 4, domain)?;
     let prior = match domain {
         FailureDomain::Product => plan.engine.call_signatures.borrow().get(&instance).copied(),
-        #[cfg(test)]
         FailureDomain::Niche => plan
             .engine
             .call_signatures

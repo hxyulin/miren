@@ -84,7 +84,7 @@ fn inventory(
         return Err(resource(engine));
     }
     match shape {
-        CompositeShape::Primitive(_) => Ok(1),
+        CompositeShape::Primitive(_) | CompositeShape::NonZeroNiche(_) => Ok(1),
         CompositeShape::Tuple(children) | CompositeShape::Array(children) => {
             let mut count = 0usize;
             for child in children {
@@ -103,7 +103,7 @@ fn inventory(
             }
             Ok(count)
         }
-        CompositeShape::NonZeroNiche(_) | CompositeShape::Sum { .. } => {
+        CompositeShape::Sum { .. } => {
             Err("mutable product symbolic projection requires pure original storage".into())
         }
     }

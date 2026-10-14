@@ -2201,6 +2201,5 @@ impl Schema {
 #[path = "nonzero_signed_probe.rs"]
 mod signed_probe;
 
-#[cfg(test)]
 #[path = "nonzero_niches/mutable_codec.rs"]
 pub(in crate::proof) mod mutable_codec;

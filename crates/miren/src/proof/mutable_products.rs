@@ -11,6 +11,9 @@ mod projection;
 pub(super) fn same_product_shape(left: &CompositeShape, right: &CompositeShape) -> bool {
     match (left, right) {
         (CompositeShape::Primitive(left), CompositeShape::Primitive(right)) => left == right,
+        (CompositeShape::NonZeroNiche(left), CompositeShape::NonZeroNiche(right)) => {
+            left.storage_matches(right)
+        }
         (CompositeShape::Tuple(left), CompositeShape::Tuple(right))
         | (CompositeShape::Array(left), CompositeShape::Array(right)) => {
             left.len() == right.len()
@@ -50,7 +53,7 @@ pub(super) fn same_product_shape(left: &CompositeShape, right: &CompositeShape) 
 
 fn leaf_count(shape: &CompositeShape) -> Result<usize, String> {
     match shape {
-        CompositeShape::Primitive(_) => Ok(1),
+        CompositeShape::Primitive(_) | CompositeShape::NonZeroNiche(_) => Ok(1),
         CompositeShape::Tuple(fields) | CompositeShape::Array(fields) => {
             fields.iter().try_fold(0_usize, |total, field| {
                 total
@@ -65,9 +68,7 @@ fn leaf_count(shape: &CompositeShape) -> Result<usize, String> {
                     .ok_or_else(|| "mutable product leaf count overflow".into())
             })
         }
-        CompositeShape::NonZeroNiche(_) | CompositeShape::Sum { .. } => {
-            Err("mutable product sums and niches are unsupported".into())
-        }
+        CompositeShape::Sum { .. } => Err("mutable product sums and niches are unsupported".into()),
     }
 }
 
@@ -137,6 +138,15 @@ impl<'tcx> Engine<'tcx> {
             .mutable_integer_types
             .get(id)
             .ok_or("mutable product certificate was not issued")?;
+        if let Some(origin) = self.niche_origins.get(&id) {
+            self.niche_certificate_work(id)?;
+            let result = origin.verify(self, certificate);
+            if result.is_err() {
+                self.niche_scope_end(true);
+            }
+            result?;
+            return Ok(certificate);
+        }
         if let Some(prepared) = self.mutable_product_descriptor_guard(id, certificate.original)? {
             prepared
                 .validate_source(self)
@@ -177,6 +187,30 @@ impl<'tcx> Engine<'tcx> {
                 "mutable product input requires exact pure tuple/array/local struct".into(),
             )
         })?;
+        self.mutable_product_input_descriptor(descriptor, memory, conditions)
+    }
+
+    pub(super) fn mutable_product_niche_input(
+        &mut self,
+        token: nonzero_niches::mutable_codec::input_descriptor::RootInput<'tcx>,
+        memory: &mut Memory,
+        conditions: &mut Vec<Term>,
+    ) -> Result<Value, String> {
+        let parts = token.consume(self, memory)?;
+        self.niche_root_storage_work(parts.descriptor.leaves.len())?;
+        let certificate = self.mutable_integer_types.len();
+        let value = self.mutable_product_input_descriptor(parts.descriptor, memory, conditions)?;
+        self.niche_origins.insert(certificate, parts.origin);
+        Ok(value)
+    }
+
+    fn mutable_product_input_descriptor(
+        &mut self,
+        descriptor: CompositeType<'tcx>,
+        memory: &mut Memory,
+        conditions: &mut Vec<Term>,
+    ) -> Result<Value, String> {
+        let original = descriptor.ty;
         let count = descriptor.leaves.len().saturating_add(1);
         let storage = 1 + descriptor.leaves.len().max(1);
         if self.input_values.saturating_add(count) > MAX_INPUT_VALUES
@@ -878,11 +912,25 @@ impl<'tcx> Engine<'tcx> {
         let (index, shape, start) = match selected {
             projection::Projection::Direct(index, _, shape, start) => (index, shape, start),
             projection::Projection::Symbolic(mut selection) => {
+                if self.niche_origins.contains_key(&backing.certificate) {
+                    return Err("dynamic nested niche projection needs a paid transaction".into());
+                }
                 return selection.read(self, columns, &state.conditions).map(Some);
             }
         };
         let mut cursor = start;
-        let value = shape.observe(&self.terms, columns, &index.integer()?.0, &mut cursor)?;
+        let value = if self.niche_origins.contains_key(&backing.certificate) {
+            let mut read = NicheRead {
+                engine: self,
+                state,
+                place,
+                columns,
+                index: &index.integer()?.0,
+            };
+            read.observe(shape, &mut Vec::new(), &mut cursor)?
+        } else {
+            shape.observe(&self.terms, columns, &index.integer()?.0, &mut cursor)?
+        };
         if cursor != start + leaf_count(shape)? {
             return Err("mutable product read omitted typed columns".into());
         }
@@ -890,6 +938,20 @@ impl<'tcx> Engine<'tcx> {
     }
 
     pub(super) fn mutable_product_store(
+        &self,
+        body: &Body<'tcx>,
+        state: &mut State,
+        place: Place<'tcx>,
+        value: &Value,
+    ) -> Result<bool, String> {
+        let selected = self.niche_memory(&state.memory);
+        let result = self.mutable_product_store_inner(body, state, place, value);
+        if selected && result.is_err() {
+            self.niche_scope_end(true);
+        }
+        result
+    }
+    fn mutable_product_store_inner(
         &self,
         body: &Body<'tcx>,
         state: &mut State,
@@ -939,6 +1001,9 @@ impl<'tcx> Engine<'tcx> {
                 (index, original, shape, start)
             }
             projection::Projection::Symbolic(mut selection) => {
+                if self.niche_origins.contains_key(&backing.certificate) {
+                    return Err("dynamic nested niche destination needs a paid transaction".into());
+                }
                 let next = selection.store(self, columns, value, &state.conditions)?;
                 std::rc::Rc::make_mut(&mut state.memory.mutable_u16)[id].data =
                     Storage::Product(next);
@@ -946,12 +1011,35 @@ impl<'tcx> Engine<'tcx> {
             }
         };
         let mut replacements = Vec::new();
-        self.product_replacements(original, shape, value, &state.conditions, &mut replacements)?;
+        if self.niche_origins.contains_key(&backing.certificate) {
+            let read = NicheRead {
+                engine: self,
+                state,
+                place,
+                columns,
+                index: &index.integer()?.0,
+            };
+            read.replacements(original, shape, value, &mut Vec::new(), &mut replacements)?;
+        } else {
+            self.product_replacements(
+                original,
+                shape,
+                value,
+                &state.conditions,
+                &mut replacements,
+            )?;
+        }
         if replacements.len() != leaf_count(shape)? {
             return Err("mutable product store omitted typed leaves".into());
         }
+        if self.niche_origins.contains_key(&backing.certificate) {
+            self.niche_value_work(columns.len() * 32 + 64)?;
+        }
         let mut next = columns.clone();
         for (offset, replacement) in replacements.into_iter().enumerate() {
+            if self.niche_origins.contains_key(&backing.certificate) {
+                self.niche_value_work(128)?;
+            }
             next[start + offset] = self.terms.apply(
                 Op::Store,
                 &[
@@ -963,6 +1051,9 @@ impl<'tcx> Engine<'tcx> {
         }
         // No current Memory write occurs until every original type/Char/Float check and every
         // column update succeeds. Other branches, columns and outer indices retain storage.
+        if self.niche_origins.contains_key(&backing.certificate) {
+            self.niche_backing_cow(&state.memory)?;
+        }
         std::rc::Rc::make_mut(&mut state.memory.mutable_u16)[id].data = Storage::Product(next);
         Ok(true)
     }
@@ -1134,3 +1225,168 @@ mod children_probe;
 #[cfg(test)]
 #[path = "mutable_product_niche_source_probe.rs"]
 mod niche_source_probe;
+
+struct NicheRead<'a, 'tcx> {
+    engine: &'a Engine<'tcx>,
+    state: &'a State,
+    place: Place<'tcx>,
+    columns: &'a [Term],
+    index: &'a Term,
+}
+impl<'tcx> NicheRead<'_, 'tcx> {
+    fn observe(
+        &mut self,
+        shape: &CompositeShape,
+        path: &mut Vec<usize>,
+        cursor: &mut usize,
+    ) -> Result<Value, String> {
+        self.engine.niche_value_work(128 + path.len())?;
+        match shape {
+            CompositeShape::NonZeroNiche(_) => {
+                let (prepared, site) = self.engine.niche_leaf(
+                    self.state,
+                    self.place,
+                    path,
+                    nonzero_niches::mutable_codec::Use::Decode,
+                )?;
+                let column = self.columns.get(*cursor).ok_or("niche raw column absent")?;
+                let value = prepared.decode(
+                    self.engine,
+                    site,
+                    &self.state.conditions,
+                    column,
+                    self.index,
+                )?;
+                *cursor += 1;
+                Ok(value)
+            }
+            CompositeShape::Tuple(fields) | CompositeShape::Array(fields) => {
+                self.engine.niche_value_work(fields.len() * 32)?;
+                let mut values = Vec::with_capacity(fields.len());
+                for (index, shape) in fields.iter().enumerate() {
+                    path.push(index);
+                    values.push(self.observe(shape, path, cursor)?);
+                    path.pop();
+                }
+                if matches!(shape, CompositeShape::Tuple(_)) {
+                    Ok(Value::Tuple(values))
+                } else {
+                    Ok(Value::Elements(values.into()))
+                }
+            }
+            CompositeShape::Struct { name, fields } => {
+                let names = fields.iter().map(|(name, _)| name.len()).sum::<usize>();
+                self.engine
+                    .niche_value_work(name.len() + names + fields.len() * 32)?;
+                let mut values = Vec::with_capacity(fields.len());
+                for (index, (field, shape)) in fields.iter().enumerate() {
+                    path.push(index);
+                    values.push((field.clone(), self.observe(shape, path, cursor)?));
+                    path.pop();
+                }
+                Ok(Value::Adt {
+                    name: name.clone(),
+                    variant: 0,
+                    discriminant: 0,
+                    is_option: false,
+                    fields: values.into(),
+                })
+            }
+            CompositeShape::Primitive(_) => {
+                shape.observe(&self.engine.terms, self.columns, self.index, cursor)
+            }
+            CompositeShape::Sum { .. } => Err("mutable niche arbitrary sum is unsupported".into()),
+        }
+    }
+    fn replacements(
+        &self,
+        original: Ty<'tcx>,
+        shape: &CompositeShape,
+        value: &Value,
+        path: &mut Vec<usize>,
+        output: &mut Vec<Term>,
+    ) -> Result<(), String> {
+        self.engine.niche_value_work(128 + path.len())?;
+        match (original.kind(), shape, value) {
+            (_, CompositeShape::NonZeroNiche(_), _) => {
+                let (prepared, site) = self.engine.niche_leaf(
+                    self.state,
+                    self.place,
+                    path,
+                    nonzero_niches::mutable_codec::Use::Encode,
+                )?;
+                output.push(prepared.encode(self.engine, site, &self.state.conditions, value)?);
+                Ok(())
+            }
+            (ty::Tuple(types), CompositeShape::Tuple(fields), Value::Tuple(values))
+                if types.len() == fields.len() && fields.len() == values.len() =>
+            {
+                for (index, ((original, shape), value)) in
+                    types.iter().zip(fields).zip(values).enumerate()
+                {
+                    path.push(index);
+                    self.replacements(original, shape, value, path, output)?;
+                    path.pop();
+                }
+                Ok(())
+            }
+            (ty::Array(element, count), CompositeShape::Array(fields), Value::Elements(values))
+                if count.try_to_target_usize(self.engine.tcx) == Some(fields.len() as u64)
+                    && fields.len() == values.len() =>
+            {
+                for (index, (shape, value)) in fields.iter().zip(values).enumerate() {
+                    path.push(index);
+                    self.replacements(*element, shape, value, path, output)?;
+                    path.pop();
+                }
+                Ok(())
+            }
+            (
+                ty::Adt(def, args),
+                CompositeShape::Struct { name, fields },
+                Value::Adt {
+                    name: actual,
+                    variant: 0,
+                    discriminant: 0,
+                    is_option: false,
+                    fields: values,
+                },
+            ) if def.is_struct()
+                && def.did().is_local()
+                && name == actual
+                && fields.len() == values.len()
+                && fields.len() == def.non_enum_variant().fields.len() =>
+            {
+                for (index, ((field, (name, shape)), (actual, value))) in def
+                    .non_enum_variant()
+                    .fields
+                    .iter()
+                    .zip(fields)
+                    .zip(values)
+                    .enumerate()
+                {
+                    if field.name.as_str() != name || actual != name {
+                        return Err("niche replacement original field differs".into());
+                    }
+                    path.push(index);
+                    self.replacements(
+                        field.ty(self.engine.tcx, args).skip_norm_wip(),
+                        shape,
+                        value,
+                        path,
+                        output,
+                    )?;
+                    path.pop();
+                }
+                Ok(())
+            }
+            _ => self.engine.product_replacements(
+                original,
+                shape,
+                value,
+                &self.state.conditions,
+                output,
+            ),
+        }
+    }
+}

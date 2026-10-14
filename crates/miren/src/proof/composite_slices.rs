@@ -75,6 +75,30 @@ fn ordinary_external_struct_policy(
     core_crate.is_some_and(|core| defining_crate != core && ordinary_struct_flags(flags))
 }
 
+#[derive(Clone, Copy)]
+enum ShapePolicy {
+    Products,
+    ReadonlySums,
+    CertifiedNiches,
+}
+
+impl ShapePolicy {
+    fn niches(self) -> bool {
+        match self {
+            Self::Products => false,
+            Self::ReadonlySums => true,
+            Self::CertifiedNiches => true,
+        }
+    }
+    fn sums(self) -> bool {
+        match self {
+            Self::Products => false,
+            Self::ReadonlySums => true,
+            Self::CertifiedNiches => false,
+        }
+    }
+}
+
 impl<'tcx> Engine<'tcx> {
     pub(super) fn plain_composite_struct(&self, def: ty::AdtDef<'tcx>) -> bool {
         if !def.is_struct() {
@@ -115,11 +139,33 @@ impl<'tcx> Engine<'tcx> {
         ty: Ty<'tcx>,
         allow_sums: bool,
     ) -> Result<Option<CompositeType<'tcx>>, String> {
+        self.composite_shape_policy(
+            ty,
+            if allow_sums {
+                ShapePolicy::ReadonlySums
+            } else {
+                ShapePolicy::Products
+            },
+        )
+    }
+
+    pub(in crate::proof) fn composite_shape_with_niches(
+        &self,
+        original: Ty<'tcx>,
+    ) -> Result<Option<CompositeType<'tcx>>, String> {
+        self.composite_shape_policy(original, ShapePolicy::CertifiedNiches)
+    }
+
+    fn composite_shape_policy(
+        &self,
+        ty: Ty<'tcx>,
+        policy: ShapePolicy,
+    ) -> Result<Option<CompositeType<'tcx>>, String> {
         if !matches!(ty.kind(), ty::Tuple(_) | ty::Array(..) | ty::Adt(..)) {
             return Ok(None);
         }
         let mut nodes = 0;
-        let Some(shape) = self.composite_shape_depth(ty, 0, &mut nodes, allow_sums, false)? else {
+        let Some(shape) = self.composite_shape_depth(ty, 0, &mut nodes, policy, false)? else {
             return Ok(None);
         };
         let bytes = self.static_layout(ty)?.size.bytes();
@@ -141,7 +187,7 @@ impl<'tcx> Engine<'tcx> {
         ty: Ty<'tcx>,
         depth: usize,
         nodes: &mut usize,
-        allow_sums: bool,
+        policy: ShapePolicy,
         enum_payload: bool,
     ) -> Result<Option<CompositeShape>, String> {
         if depth >= MAX_SHAPE_DEPTH || *nodes >= MAX_SHAPE_NODES {
@@ -171,13 +217,8 @@ impl<'tcx> Engine<'tcx> {
             ty::Tuple(fields) => {
                 let mut shapes = Vec::new();
                 for field in fields.iter() {
-                    let Some(shape) = self.composite_shape_depth(
-                        field,
-                        depth + 1,
-                        nodes,
-                        allow_sums,
-                        enum_payload,
-                    )?
+                    let Some(shape) =
+                        self.composite_shape_depth(field, depth + 1, nodes, policy, enum_payload)?
                     else {
                         return Ok(None);
                     };
@@ -197,13 +238,8 @@ impl<'tcx> Engine<'tcx> {
                 }
                 // Certify the original element even for N=0, then charge every actual
                 // occurrence independently. A zero array's type probe is conservative.
-                let Some(first) = self.composite_shape_depth(
-                    *element,
-                    depth + 1,
-                    nodes,
-                    allow_sums,
-                    enum_payload,
-                )?
+                let Some(first) =
+                    self.composite_shape_depth(*element, depth + 1, nodes, policy, enum_payload)?
                 else {
                     return Ok(None);
                 };
@@ -215,7 +251,7 @@ impl<'tcx> Engine<'tcx> {
                             *element,
                             depth + 1,
                             nodes,
-                            allow_sums,
+                            policy,
                             enum_payload,
                         )?
                         else {
@@ -226,18 +262,22 @@ impl<'tcx> Engine<'tcx> {
                 }
                 Ok(Some(CompositeShape::Array(shapes)))
             }
-            ty::Adt(def, args) if allow_sums && def.is_enum() => {
+            ty::Adt(def, args) if policy.niches() && def.is_enum() => {
                 if let Some(schema) = self.nonzero_niche_shape(ty, depth, nodes)? {
                     return Ok(Some(CompositeShape::NonZeroNiche(Box::new(schema))));
                 }
-                self.readonly_sum_shape(ty, *def, args, depth, nodes)
+                if policy.sums() {
+                    self.readonly_sum_shape(ty, *def, args, depth, nodes)
+                } else {
+                    Ok(None)
+                }
             }
             ty::Adt(def, _)
                 if self.plain_composite_struct(*def)
                     && (!enum_payload
                         || local_sum_payload_struct_policy(def.did().is_local(), def.flags())) =>
             {
-                self.composite_struct_shape(ty, layout, depth, nodes, allow_sums, enum_payload)
+                self.composite_struct_shape(ty, layout, depth, nodes, policy, enum_payload)
             }
             _ => Ok(None),
         }
@@ -249,7 +289,7 @@ impl<'tcx> Engine<'tcx> {
         layout: rustc_middle::ty::layout::TyAndLayout<'tcx>,
         depth: usize,
         nodes: &mut usize,
-        allow_sums: bool,
+        policy: ShapePolicy,
         enum_payload: bool,
     ) -> Result<Option<CompositeShape>, String> {
         let ty::Adt(def, args) = original.kind() else {
@@ -270,7 +310,7 @@ impl<'tcx> Engine<'tcx> {
             // turn opaque wrappers into ordinary primitive fields, even beneath N=0.
             let field_ty = field.ty(self.tcx, args).skip_norm_wip();
             let Some(shape) =
-                self.composite_shape_depth(field_ty, depth + 1, nodes, allow_sums, enum_payload)?
+                self.composite_shape_depth(field_ty, depth + 1, nodes, policy, enum_payload)?
             else {
                 return Ok(None);
             };
@@ -397,8 +437,13 @@ impl<'tcx> Engine<'tcx> {
             let mut physical = Vec::new();
             for (index, field) in variant.fields.iter().enumerate() {
                 let field_ty = field.ty(self.tcx, args).skip_norm_wip();
-                let Some(shape) =
-                    self.composite_shape_depth(field_ty, depth + 1, nodes, true, true)?
+                let Some(shape) = self.composite_shape_depth(
+                    field_ty,
+                    depth + 1,
+                    nodes,
+                    ShapePolicy::ReadonlySums,
+                    true,
+                )?
                 else {
                     return Ok(None);
                 };
@@ -527,8 +572,13 @@ impl<'tcx> Engine<'tcx> {
                 if original_field != self.tcx.types.bool {
                     return Ok(None);
                 }
-                let Some(shape) =
-                    self.composite_shape_depth(original_field, depth + 1, nodes, true, true)?
+                let Some(shape) = self.composite_shape_depth(
+                    original_field,
+                    depth + 1,
+                    nodes,
+                    ShapePolicy::ReadonlySums,
+                    true,
+                )?
                 else {
                     return Ok(None);
                 };
@@ -639,8 +689,13 @@ impl<'tcx> Engine<'tcx> {
                 if original_field != self.tcx.types.char {
                     return Ok(None);
                 }
-                let Some(shape) =
-                    self.composite_shape_depth(original_field, depth + 1, nodes, true, true)?
+                let Some(shape) = self.composite_shape_depth(
+                    original_field,
+                    depth + 1,
+                    nodes,
+                    ShapePolicy::ReadonlySums,
+                    true,
+                )?
                 else {
                     return Ok(None);
                 };

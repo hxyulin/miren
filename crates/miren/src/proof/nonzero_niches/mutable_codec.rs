@@ -1,11 +1,14 @@
 //! Paid, consumed whole-enum leaf codecs. These records grant no owner or Memory permission.
 use super::*;
-use rustc_middle::mir::{BasicBlock, Operand, Rvalue, StatementKind};
+use rustc_middle::mir::{BasicBlock, Operand, Rvalue, StatementKind, TerminatorKind};
 use std::cell::Cell;
 use std::rc::Rc;
 
 #[path = "mutable_codec/names.rs"]
 mod names;
+
+#[path = "mutable_codec/input_descriptor.rs"]
+pub(in crate::proof) mod input_descriptor;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(in crate::proof) enum Use {
@@ -20,6 +23,7 @@ pub(in crate::proof) struct Session(Cell<bool>);
 // Non-Clone: the precharged operation and source association are consumed together.
 pub(in crate::proof) struct Prepared<'tcx> {
     original: Ty<'tcx>,
+    traversal: Option<(Ty<'tcx>, Vec<usize>)>,
     consume_names: names::Names<'tcx>,
     schema: Schema,
     instance: ty::Instance<'tcx>,
@@ -27,6 +31,8 @@ pub(in crate::proof) struct Prepared<'tcx> {
     body: Rc<Body<'tcx>>,
     block: BasicBlock,
     statement: usize,
+    ordinal: usize,
+    terminator: bool,
     occurrence: usize,
     retag: Option<rustc_middle::mir::WithRetag>,
     kind: Use,
@@ -184,10 +190,12 @@ fn selected<'tcx>(engine: &mut Engine<'tcx>, original: Ty<'tcx>) -> Result<bool,
 
 #[derive(Clone, Copy)]
 pub(in crate::proof) struct Site<'tcx> {
-    instance: ty::Instance<'tcx>,
-    block: BasicBlock,
-    statement: usize,
-    kind: Use,
+    pub(in crate::proof) instance: ty::Instance<'tcx>,
+    pub(in crate::proof) block: BasicBlock,
+    pub(in crate::proof) statement: usize,
+    pub(in crate::proof) ordinal: usize,
+    pub(in crate::proof) terminator: bool,
+    pub(in crate::proof) kind: Use,
 }
 
 pub(in crate::proof) fn prepare<'tcx>(
@@ -197,6 +205,136 @@ pub(in crate::proof) fn prepare<'tcx>(
     site: Site<'tcx>,
     conditions: &[Term],
 ) -> Result<Option<Prepared<'tcx>>, String> {
+    prepare_inner(engine, session, original, site, conditions, None)
+}
+
+pub(in crate::proof) fn prepare_traversal<'tcx>(
+    engine: &mut Engine<'tcx>,
+    session: &Rc<Session>,
+    original: Ty<'tcx>,
+    site: Site<'tcx>,
+    conditions: &[Term],
+    traversal: (Ty<'tcx>, &[usize]),
+) -> Result<Option<Prepared<'tcx>>, String> {
+    let (root, path) = traversal;
+    if path.len() > 16 {
+        return Err("niche traversal path exceeds16".into());
+    }
+    pay(engine, path.len() * 32 + 16)?;
+    prepare_inner(
+        engine,
+        session,
+        original,
+        site,
+        conditions,
+        Some((root, path.to_vec())),
+    )
+}
+
+fn instruction<'tcx>(
+    body: &Body<'tcx>,
+    site: Site<'tcx>,
+) -> Result<
+    (
+        usize,
+        rustc_middle::mir::Place<'tcx>,
+        Option<rustc_middle::mir::WithRetag>,
+    ),
+    String,
+> {
+    let data = body
+        .basic_blocks
+        .get(site.block)
+        .ok_or("niche actual block absent")?;
+    if site.terminator {
+        let actual = &data.terminator().kind;
+        let (operand, destination) = match actual {
+            TerminatorKind::Call {
+                args, destination, ..
+            } => (
+                args.get(site.ordinal).map(|arg| &arg.node),
+                Some(*destination),
+            ),
+            TerminatorKind::TailCall { args, .. } => {
+                (args.get(site.ordinal).map(|arg| &arg.node), None)
+            }
+            _ => return Err("niche terminator is not an actual Call/TailCall".into()),
+        };
+        let place = match site.kind {
+            Use::Encode => destination.ok_or("tail call has no destination")?,
+            Use::Decode => match operand {
+                Some(Operand::Copy(place) | Operand::Move(place)) => *place,
+                _ => return Err("niche call operand is not an actual Place".into()),
+            },
+        };
+        return Ok((std::ptr::from_ref(actual) as usize, place, None));
+    }
+    let actual = &data
+        .statements
+        .get(site.statement)
+        .ok_or("niche actual statement absent")?
+        .kind;
+    let StatementKind::Assign(assignment) = actual else {
+        return Err("niche instruction needs actual Assign".into());
+    };
+    let retag = match assignment.1 {
+        Rvalue::Use(_, retag) => Some(retag),
+        _ => None,
+    };
+    let operand = match &assignment.1 {
+        Rvalue::Use(operand, _) if site.ordinal == 0 => Some(operand),
+        Rvalue::Aggregate(_, operands) => operands.get(FieldIdx::from_usize(site.ordinal)),
+        _ => None,
+    };
+    let place = match site.kind {
+        Use::Encode => assignment.0,
+        Use::Decode => match operand {
+            Some(Operand::Copy(place) | Operand::Move(place)) => *place,
+            _ => return Err("niche source is not an actual operand Place".into()),
+        },
+    };
+    Ok((std::ptr::from_ref(actual) as usize, place, retag))
+}
+
+fn traversed<'tcx>(
+    engine: &Engine<'tcx>,
+    mut original: Ty<'tcx>,
+    path: &[usize],
+) -> Result<Ty<'tcx>, String> {
+    for index in path {
+        original = match original.kind() {
+            ty::Tuple(fields) => fields
+                .get(*index)
+                .copied()
+                .ok_or("niche tuple traversal field absent")?,
+            ty::Array(element, count)
+                if count
+                    .try_to_target_usize(engine.tcx)
+                    .is_some_and(|count| (*index as u64) < count) =>
+            {
+                *element
+            }
+            ty::Adt(def, args) if def.is_struct() && def.did().is_local() => def
+                .non_enum_variant()
+                .fields
+                .get(FieldIdx::from_usize(*index))
+                .ok_or("niche struct traversal field absent")?
+                .ty(engine.tcx, args)
+                .skip_norm_wip(),
+            _ => return Err("niche traversal is not an original product field".into()),
+        };
+    }
+    Ok(original)
+}
+
+fn prepare_inner<'tcx>(
+    engine: &mut Engine<'tcx>,
+    session: &Rc<Session>,
+    original: Ty<'tcx>,
+    site: Site<'tcx>,
+    conditions: &[Term],
+    traversal: Option<(Ty<'tcx>, Vec<usize>)>,
+) -> Result<Option<Prepared<'tcx>>, String> {
     if !selected(engine, original)? {
         return Ok(None);
     }
@@ -204,6 +342,8 @@ pub(in crate::proof) fn prepare<'tcx>(
         instance,
         block,
         statement,
+        ordinal,
+        terminator,
         kind,
     } = site;
     let result = (|| {
@@ -247,45 +387,49 @@ pub(in crate::proof) fn prepare<'tcx>(
         }
         let signature =
             super::super::mutable_hierarchy::products::niche_codec_signature(engine, instance)?;
-        let signatures = engine.call_signatures.borrow().len();
-        if signatures > 512 {
-            return Err("niche codec signature registry exceeds512".into());
+        let signatures = engine
+            .call_signatures
+            .try_borrow()
+            .map_err(|_| "niche codec signature registry borrowed")?
+            .len();
+        if signatures > 256 {
+            return Err("niche codec signature registry exceeds ordinary256 cap".into());
         }
         pay(engine, signatures + 16)?;
-        engine
+        let mut catalogue = engine
             .call_signatures
-            .borrow_mut()
-            .insert(instance, signature);
+            .try_borrow_mut()
+            .map_err(|_| "niche codec signature registry borrowed")?;
+        if catalogue
+            .get(&instance)
+            .is_some_and(|current| *current != signature)
+        {
+            return Err("niche codec cached full signature differs".into());
+        }
+        if signatures < 256 {
+            catalogue.insert(instance, signature);
+        }
+        drop(catalogue);
+        // The linear codec consumes a distinct paid current Source lookup pair.
+        pay(engine, 128 + 256 + 32)?;
 
-        let body = match super::super::function_tables::source::borrowed(engine, instance)? {
-            Some(body) => body,
-            None => super::super::array_iterator_constructors::steps::authenticated_helper_body(
-                engine, instance,
-            )?,
-        };
+        let body = super::super::compiler_sources::authenticated_item(engine, instance)?;
         pay(engine, 16)?;
-        let actual = body
-            .basic_blocks
-            .get(block)
-            .and_then(|block| block.statements.get(statement))
-            .ok_or("niche codec original instruction occurrence absent")?;
-        let StatementKind::Assign(assignment) = &actual.kind else {
-            return Err("niche codec needs actual whole-enum Assign".into());
-        };
-        let place = match kind {
-            Use::Encode => assignment.0,
-            Use::Decode => match &assignment.1 {
-                // Exact certified niche values contain integer payloads and no references.
-                // Retag Yes is authentic operand metadata, with no reference permission to issue.
-                Rvalue::Use(Operand::Copy(place) | Operand::Move(place), _) => *place,
-                _ => return Err("niche decode needs actual original whole-enum operand".into()),
-            },
-        };
+        let (occurrence, place, retag) = instruction(&body, site)?;
         if place.projection.len() > 16 {
             return Err("niche codec original projection exceeds16".into());
         }
         pay(engine, place.projection.len() + 12)?;
-        if place.ty(&body.local_decls, engine.tcx).ty != original
+        let projected = place.ty(&body.local_decls, engine.tcx).ty;
+        let associated = if let Some((root, path)) = &traversal {
+            if projected != *root {
+                return Err("niche traversal root differs from actual Place".into());
+            }
+            traversed(engine, *root, path)?
+        } else {
+            projected
+        };
+        if associated != original
             || place
                 .projection
                 .iter()
@@ -297,14 +441,10 @@ pub(in crate::proof) fn prepare<'tcx>(
         // owned condition vectors, two guarded feasibility queries and term/Value construction.
         // This is paid before any consumed operation; the codec still proves validity itself.
         pay(engine, 256 + 8 * 129 + 4 * conditions.len() + 96)?;
-        let occurrence = std::ptr::from_ref(&actual.kind) as usize;
-        let retag = match assignment.1 {
-            Rvalue::Use(_, retag) => Some(retag),
-            _ => None,
-        };
         let token = engine.terms.boolean(true);
         Ok(Some(Prepared {
             original,
+            traversal,
             consume_names,
             schema,
             instance,
@@ -312,6 +452,8 @@ pub(in crate::proof) fn prepare<'tcx>(
             body,
             block,
             statement,
+            ordinal,
+            terminator,
             occurrence,
             retag,
             kind,
@@ -341,6 +483,8 @@ impl<'tcx> Prepared<'tcx> {
             || site.instance != self.instance
             || site.block != self.block
             || site.statement != self.statement
+            || site.ordinal != self.ordinal
+            || site.terminator != self.terminator
             || conditions != self.conditions
             || !self.token.belongs_to(&engine.terms)
             || !self.token.belongs_to(&self.context)
@@ -355,33 +499,26 @@ impl<'tcx> Prepared<'tcx> {
             .call_signatures
             .try_borrow()
             .map_err(|_| "niche codec full signature registry is mutably borrowed")?;
+        if bodies.len() > 128 || signatures.len() > 256 {
+            return Err("niche codec consumed Source exceeds prepaid ordinary catalogues".into());
+        }
         if bodies
             .get(&self.instance)
             .is_none_or(|body| !Rc::ptr_eq(body, &self.body))
             || signatures
                 .get(&self.instance)
-                .is_none_or(|signature| *signature != self.signature)
+                .is_some_and(|signature| *signature != self.signature)
         {
             return Err("niche codec current Body/full signature association differs".into());
         }
-        let actual = self
-            .body
-            .basic_blocks
-            .get(self.block)
-            .and_then(|block| block.statements.get(self.statement))
-            .ok_or("niche codec current occurrence absent")?;
-        if std::ptr::from_ref(&actual.kind) as usize != self.occurrence {
-            return Err("niche codec current occurrence differs".into());
+        let (occurrence, _, retag) = instruction(&self.body, site)?;
+        if occurrence != self.occurrence || retag != self.retag {
+            return Err("niche codec current occurrence/authentic retag differs".into());
         }
-        let StatementKind::Assign(assignment) = &actual.kind else {
-            return Err("niche codec current Assign absent".into());
-        };
-        let retag = match assignment.1 {
-            Rvalue::Use(_, retag) => Some(retag),
-            _ => None,
-        };
-        if retag != self.retag {
-            return Err("niche codec authentic operand retag differs".into());
+        if let Some((root, path)) = &self.traversal
+            && traversed(engine, *root, path)? != self.original
+        {
+            return Err("niche current traversal association differs".into());
         }
         let raw = certify_raw(engine.tcx, self.original)?;
         self.consume_names.check(&raw)?;
@@ -430,7 +567,7 @@ impl<'tcx> Prepared<'tcx> {
 }
 
 impl Schema {
-    fn storage_matches(&self, expected: &Self) -> bool {
+    pub(in crate::proof) fn storage_matches(&self, expected: &Self) -> bool {
         facts_match(&self.facts)
             && facts_match(&expected.facts)
             && self.name == expected.name

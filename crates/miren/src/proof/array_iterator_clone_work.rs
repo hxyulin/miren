@@ -3,7 +3,13 @@
 use super::*;
 use rustc_middle::mir::{AssertKind, ClearCrossCrate, ConstOperand, Terminator};
 
+#[derive(Clone, Copy)]
+enum Domain {
+    Iterator,
+    CompilerSource,
+}
 struct Plan {
+    domain: Domain,
     nodes: usize,
     owned: usize,
 }
@@ -12,7 +18,7 @@ impl Plan {
     fn node(&mut self, engine: &mut Engine<'_>, clone_fields: usize) -> Result<(), String> {
         pay(engine, 1)?; // This distinct borrowed planning visit occurs even if allocation refuses.
         self.nodes = self.nodes.saturating_add(1);
-        if self.nodes > MAX_INPUT_VALUES {
+        if matches!(self.domain, Domain::Iterator) && self.nodes > MAX_INPUT_VALUES {
             return Err(engine.categorized_error(
                 UnknownCategory::ResourceLimit,
                 "IntoIter clone plan exceeds the existing 512-node limit".into(),
@@ -209,7 +215,11 @@ pub(super) fn step_statement(
     engine: &mut Engine<'_>,
     statement: &rustc_middle::mir::Statement<'_>,
 ) -> Result<usize, String> {
-    let mut plan = Plan { nodes: 0, owned: 0 };
+    let mut plan = Plan {
+        domain: Domain::Iterator,
+        nodes: 0,
+        owned: 0,
+    };
     plan.statement(engine, &statement.kind)?;
     plan.debug_infos(engine, &statement.debuginfos)?;
     Ok(plan.owned)
@@ -218,7 +228,11 @@ pub(super) fn step_terminator(
     engine: &mut Engine<'_>,
     terminator: &Terminator<'_>,
 ) -> Result<usize, String> {
-    let mut plan = Plan { nodes: 0, owned: 0 };
+    let mut plan = Plan {
+        domain: Domain::Iterator,
+        nodes: 0,
+        owned: 0,
+    };
     plan.terminator(engine, terminator)?;
     Ok(plan.owned)
 }
@@ -226,7 +240,11 @@ pub(super) fn step_variable(
     engine: &mut Engine<'_>,
     info: &rustc_middle::mir::VarDebugInfo<'_>,
 ) -> Result<usize, String> {
-    let mut plan = Plan { nodes: 0, owned: 0 };
+    let mut plan = Plan {
+        domain: Domain::Iterator,
+        nodes: 0,
+        owned: 0,
+    };
     plan.node(engine, 5)?;
     if let Some(fragment) = &info.composite {
         plan.node(engine, 3)?;
@@ -237,11 +255,63 @@ pub(super) fn step_variable(
     }
     Ok(plan.owned)
 }
+pub(super) fn compiler_source_body(
+    engine: &mut Engine<'_>,
+    body: &Body<'_>,
+) -> Result<usize, String> {
+    body_inner(engine, body, true, false, Domain::CompilerSource)
+}
+
+pub(super) fn compiler_source_statement(
+    engine: &mut Engine<'_>,
+    statement: &rustc_middle::mir::Statement<'_>,
+) -> Result<usize, String> {
+    let mut plan = Plan {
+        domain: Domain::CompilerSource,
+        nodes: 0,
+        owned: 0,
+    };
+    plan.statement(engine, &statement.kind)?;
+    plan.debug_infos(engine, &statement.debuginfos)?;
+    Ok(plan.owned)
+}
+pub(super) fn compiler_source_terminator(
+    engine: &mut Engine<'_>,
+    terminator: &Terminator<'_>,
+) -> Result<usize, String> {
+    let mut plan = Plan {
+        domain: Domain::CompilerSource,
+        nodes: 0,
+        owned: 0,
+    };
+    plan.terminator(engine, terminator)?;
+    Ok(plan.owned)
+}
+pub(super) fn compiler_source_variable(
+    engine: &mut Engine<'_>,
+    info: &rustc_middle::mir::VarDebugInfo<'_>,
+) -> Result<usize, String> {
+    let mut plan = Plan {
+        domain: Domain::CompilerSource,
+        nodes: 0,
+        owned: 0,
+    };
+    plan.node(engine, 5)?;
+    if let Some(fragment) = &info.composite {
+        plan.node(engine, 3)?;
+        plan.vector(engine, fragment.projection.len())?;
+    }
+    if let VarDebugInfoContents::Const(value) = &info.value {
+        plan.constant(engine, value)?;
+    }
+    Ok(plan.owned)
+}
+
 pub(super) fn body(engine: &mut Engine<'_>, body: &Body<'_>) -> Result<usize, String> {
-    body_inner(engine, body, false, false)
+    body_inner(engine, body, false, false, Domain::Iterator)
 }
 pub(super) fn step_body(engine: &mut Engine<'_>, body: &Body<'_>) -> Result<usize, String> {
-    body_inner(engine, body, true, false)
+    body_inner(engine, body, true, false, Domain::Iterator)
 }
 pub(super) fn drop_body(engine: &mut Engine<'_>, body: &Body<'_>) -> Result<usize, String> {
     if !matches!(
@@ -250,15 +320,20 @@ pub(super) fn drop_body(engine: &mut Engine<'_>, body: &Body<'_>) -> Result<usiz
     ) {
         return Err("IntoIter destruction clone plan requires actual typed DropGlue".into());
     }
-    body_inner(engine, body, true, true)
+    body_inner(engine, body, true, true, Domain::Iterator)
 }
 fn body_inner(
     engine: &mut Engine<'_>,
     body: &Body<'_>,
     step_debug: bool,
     boring_locals: bool,
+    domain: Domain,
 ) -> Result<usize, String> {
-    let mut plan = Plan { nodes: 0, owned: 0 };
+    let mut plan = Plan {
+        domain,
+        nodes: 0,
+        owned: 0,
+    };
     plan.node(engine, 20)?; // Pinned Body fields plus shallow BasicBlocks cache Arc clone.
     if body.coroutine.is_some()
         || body.coverage_early_info.is_some()
@@ -387,7 +462,11 @@ pub(super) fn box_constructor_body<'tcx>(
     witness: &owned_box_constructor_source::RawWitness<'tcx>,
 ) -> Result<usize, String> {
     witness.check_raw(body)?;
-    let mut plan = Plan { nodes: 0, owned: 0 };
+    let mut plan = Plan {
+        domain: Domain::Iterator,
+        nodes: 0,
+        owned: 0,
+    };
     plan.node(engine, 20)?; // Pinned Body fields plus shallow BasicBlocks cache Arc clone.
     if body.coroutine.is_some()
         || body.coverage_early_info.is_some()
@@ -444,7 +523,11 @@ pub(super) fn box_constructor_body<'tcx>(
     let mut total_nodes = plan.nodes;
     const TOTAL_BOX_PLAN_NODES: usize = (128 + 1) * MAX_INPUT_VALUES;
     for block in body.basic_blocks.iter() {
-        let mut component = Plan { nodes: 0, owned: 0 };
+        let mut component = Plan {
+            domain: Domain::Iterator,
+            nodes: 0,
+            owned: 0,
+        };
         component.node(engine, 4)?;
         component.debug_infos(engine, &block.after_last_stmt_debuginfos)?;
         component.vector(engine, block.statements.len())?;
